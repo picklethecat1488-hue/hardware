@@ -8712,7 +8712,7 @@
       "logs": "",
       "attachments": [
         {
-          "id": "att-3",
+          "id": "att-1",
           "filename": "carrier_board_bom_rev3.csv",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv",
@@ -8721,7 +8721,7 @@
           "created_at": ""
         },
         {
-          "id": "att-4",
+          "id": "att-2",
           "filename": "digikey_order_2026-10-14.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx",
@@ -8730,7 +8730,7 @@
           "created_at": ""
         },
         {
-          "id": "att-5",
+          "id": "att-3",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
@@ -8739,7 +8739,7 @@
           "created_at": ""
         },
         {
-          "id": "att-6",
+          "id": "att-4",
           "filename": "carrier_board_bom_rev2.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
@@ -8748,7 +8748,7 @@
           "created_at": ""
         },
         {
-          "id": "att-7",
+          "id": "att-5",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
@@ -8757,7 +8757,7 @@
           "created_at": ""
         },
         {
-          "id": "att-8",
+          "id": "att-6",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
@@ -8766,7 +8766,7 @@
           "created_at": ""
         },
         {
-          "id": "att-5",
+          "id": "att-7",
           "filename": "carrier_board_bom_rev2.csv",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv",
@@ -8775,7 +8775,7 @@
           "created_at": ""
         },
         {
-          "id": "att-6",
+          "id": "att-8",
           "filename": "carrier_board_bom_rev3.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
@@ -9290,7 +9290,7 @@
       "logs": "",
       "attachments": [
         {
-          "id": "att-2",
+          "id": "att-1",
           "filename": "screenshot_paste_1793890911006_wvg54.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png",
@@ -9299,7 +9299,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-2",
           "filename": "screenshot_paste_1793890876309_0c9ae.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png",
@@ -9333,28 +9333,28 @@
       "logs": "",
       "attachments": [
         {
-          "id": "fad49de4",
+          "id": "att-1",
           "filename": "screenshot_paste_1793891379527_mc2d2.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891379527_mc2d2.png",
-          "size_bytes": 393686,
+          "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793891379527_mc2d2.png",
-          "created_at": "2026-11-05 15:09:42 UTC"
+          "created_at": ""
         },
         {
-          "id": "701fde3e",
+          "id": "att-2",
           "filename": "screenshot_paste_1793891547400_gyg0h.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891547400_gyg0h.png",
-          "size_bytes": 297442,
+          "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793891547400_gyg0h.png",
-          "created_at": "2026-11-05 15:12:27 UTC"
+          "created_at": ""
         }
       ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-05 15:06:09 UTC",
-      "updated_at": "2026-11-05 15:12:38 UTC",
+      "updated_at": "",
       "resolved_at": "2026-11-05 17:14:12 UTC",
       "resolution_notes": "Add triangular motor strut grooves to drive hub bottom and refactor drive hub body to a 3-lobed convex hull with >=1.5mm wall thickness around all magnets, grooves, and shaft hole.",
       "rejection_notes": "",
@@ -9362,5 +9362,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 17:15:09 UTC"
+  "updated_at": "2026-11-05 17:15:13 UTC"
 }
