@@ -9331,11 +9331,21 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "fad49de4",
+          "filename": "screenshot_paste_1793891379527_mc2d2.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891379527_mc2d2.png",
+          "size_bytes": 393686,
+          "description": "Pasted screenshot screenshot_paste_1793891379527_mc2d2.png",
+          "created_at": "2026-11-05 15:09:42 UTC"
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-05 15:06:09 UTC",
-      "updated_at": "2026-11-05 15:09:42 UTC",
+      "updated_at": "2026-11-05 15:09:53 UTC",
       "resolved_at": null,
       "resolution_notes": "",
       "rejection_notes": null,
@@ -9343,5 +9353,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 15:09:42 UTC"
+  "updated_at": "2026-11-05 15:09:53 UTC"
 }
