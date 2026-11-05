@@ -14,6 +14,7 @@ import re
 
 
 def test_hardware_diff_component_green_highlight_css() -> None:
+    """Verify green highlights for line additions in diff_component.html.j2 template."""
     templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
     diff_comp_path = templates_dir / "diff_component.html.j2"
     assert diff_comp_path.exists(), f"Missing template: {diff_comp_path}"
@@ -37,9 +38,7 @@ def test_hardware_diff_component_green_highlight_css() -> None:
     ), "SBS .row-replace td.new-code must use green background rgba(34, 197, 94, 0.22)"
 
     # 3. SBS row-add should also be supported
-    assert ".diff-sbs-row.row-add" in content, (
-        "SBS view must support .diff-sbs-row.row-add selector"
-    )
+    assert ".diff-sbs-row.row-add" in content, "SBS view must support .diff-sbs-row.row-add selector"
 
     # 4. Unified diff rows for additions must match .row-add, .add, .insert, .row-insert
     # and apply green background rgba(34, 197, 94, 0.22)

@@ -642,6 +642,9 @@ class MarkdownBugExporter:
                     and not md_bug.resolution_notes.strip()
                 ):
                     pass
+                elif existing.status == BugStatus.CLOSED and md_bug.status == BugStatus.RESOLVED:
+                    # Bug was already accepted/closed in database; protect from stale markdown without acceptance
+                    pass
                 elif md_bug.status != existing.status:
                     existing.status = md_bug.status
                     if md_bug.status in (BugStatus.RESOLVED, BugStatus.CLOSED):
@@ -1204,6 +1207,9 @@ class MarkdownBugExporter:
                     and not (md_bug.rejection_notes and md_bug.rejection_notes.strip())
                     and not md_bug.resolution_notes.strip()
                 ):
+                    pass
+                elif existing_by_uuid.status == BugStatus.CLOSED and md_bug.status == BugStatus.RESOLVED:
+                    # Bug was already accepted/closed in database; do not regress to RESOLVED from stale markdown
                     pass
                 else:
                     database.add_or_update(md_bug)

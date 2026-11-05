@@ -514,3 +514,212 @@ def test_cli_functional_review_subcommands(
     dashboard_main(["--db-file", str(db_file), "list-bugs", "--open"])
     captured = capsys.readouterr()
     assert "BUG-CLI-001" not in captured.out
+
+
+def test_migrate_resolved_bugs_cli(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+    """Verify migrate-resolved-bugs CLI handles dry-run, timestamp filtering, exclude, and --all."""
+    db_file = tmp_path / "test_bugs.sqlite"
+    store = SQLiteBugStore(db_path=db_file)
+
+    b_old = BugReportModel(
+        id="BUG-LEGACY-001",
+        title="Legacy resolved bug",
+        status=BugStatus.RESOLVED,
+        severity=BugSeverity.MEDIUM,
+        category=BugCategory.PCB,
+        created_at="2026-09-01 10:00:00 UTC",
+        resolved_at="2026-09-01 12:00:00 UTC",
+        accepted_at=None,
+    )
+    b_recent = BugReportModel(
+        id="BUG-RECENT-002",
+        title="Recently resolved bug awaiting review",
+        status=BugStatus.RESOLVED,
+        severity=BugSeverity.HIGH,
+        category=BugCategory.CAD,
+        created_at="2026-11-05 14:15:00 UTC",
+        resolved_at="2026-11-05 14:20:00 UTC",
+        accepted_at=None,
+    )
+    b_open = BugReportModel(
+        id="BUG-OPEN-003",
+        title="Open defect",
+        status=BugStatus.OPEN,
+        severity=BugSeverity.LOW,
+        category=BugCategory.UI,
+    )
+
+    store.save_bug(b_old)
+    store.save_bug(b_recent)
+    store.save_bug(b_open)
+
+    # 1. Dry run
+    capsys.readouterr()
+    dashboard_main(["--db-file", str(db_file), "migrate-resolved-bugs", "--dry-run"])
+    captured = capsys.readouterr()
+    assert "[DRY-RUN]" in captured.out
+    assert "BUG-LEGACY-001" in captured.out
+    assert "BUG-RECENT-002" not in captured.out
+
+    # Status must not change after dry-run
+    assert store.get_bug("BUG-LEGACY-001").status == BugStatus.RESOLVED
+
+    # 2. Exclude flag
+    capsys.readouterr()
+    dashboard_main(
+        [
+            "--db-file",
+            str(db_file),
+            "migrate-resolved-bugs",
+            "--all",
+            "--exclude",
+            "BUG-RECENT-002",
+            "--dry-run",
+        ]
+    )
+    captured = capsys.readouterr()
+    assert "BUG-LEGACY-001" in captured.out
+    assert "BUG-RECENT-002" not in captured.out
+
+    # 3. Default migration (migrates bugs resolved <= 2026-11-05 14:00:00 UTC)
+    dashboard_main(["--db-file", str(db_file), "migrate-resolved-bugs"])
+    updated_old = store.get_bug("BUG-LEGACY-001")
+    updated_recent = store.get_bug("BUG-RECENT-002")
+    updated_open = store.get_bug("BUG-OPEN-003")
+
+    assert updated_old.status == BugStatus.CLOSED
+    assert updated_old.accepted_at == "2026-09-01 12:00:00 UTC"
+    assert updated_recent.status == BugStatus.RESOLVED
+    assert updated_recent.accepted_at is None
+    assert updated_open.status == BugStatus.OPEN
+
+    # 4. Migrate remaining with --all
+    dashboard_main(["--db-file", str(db_file), "migrate-resolved-bugs", "--all"])
+    updated_recent_all = store.get_bug("BUG-RECENT-002")
+    assert updated_recent_all.status == BugStatus.CLOSED
+    assert updated_recent_all.accepted_at is not None
+
+
+def test_sqlite_store_auto_migration_and_markdown_protection(tmp_path: Path) -> None:
+    """Verify SQLiteBugStore schema migration of legacy resolved bugs and markdown merge protection."""
+    db_file = tmp_path / "legacy_test.sqlite"
+
+    # Seed legacy bugs directly into SQLite without metadata flag
+    conn = sqlite3.connect(str(db_file))
+    conn.execute(
+        """
+        CREATE TABLE bugs (
+            id TEXT PRIMARY KEY, uuid TEXT, title TEXT NOT NULL, status TEXT NOT NULL,
+            severity TEXT NOT NULL, category TEXT NOT NULL, component TEXT DEFAULT '',
+            description TEXT DEFAULT '', reproduction_steps TEXT DEFAULT '[]',
+            expected_behavior TEXT DEFAULT '', actual_behavior TEXT DEFAULT '',
+            logs TEXT DEFAULT '', commit_ids TEXT DEFAULT '[]', review_tasks TEXT DEFAULT '[]',
+            created_at TEXT DEFAULT '', updated_at TEXT DEFAULT '', resolved_at TEXT,
+            resolution_notes TEXT DEFAULT '', rejection_notes TEXT DEFAULT '',
+            accepted_at TEXT, rejected_at TEXT
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE metadata (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO bugs (id, uuid, title, status, severity, category, resolved_at)
+        VALUES ('BUG-SEED-001', 'u-seed-1', 'Legacy seed bug', 'RESOLVED', 'MEDIUM', 'PCB', '2026-09-10 12:00:00 UTC')
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    # Initializing SQLiteBugStore runs _ensure_schema and auto-migrates
+    store = SQLiteBugStore(db_path=db_file)
+    bug = store.get_bug("BUG-SEED-001")
+    assert bug is not None
+    assert bug.status == BugStatus.CLOSED
+    assert bug.accepted_at == "2026-09-10 12:00:00 UTC"
+
+    # Verify metadata flag is recorded
+    with store._get_connection() as c:
+        row = c.execute("SELECT value FROM metadata WHERE key = 'legacy_resolved_migrated'").fetchone()
+        assert row is not None and row["value"] == "1"
+
+    # Test Markdown merge protection: stale markdown with RESOLVED must not regress CLOSED bug
+    exporter = MarkdownBugExporter(repo_root=tmp_path)
+    base_db = BugDatabaseModel(bugs=[bug])
+    stale_md_db = BugDatabaseModel(
+        bugs=[
+            BugReportModel(
+                id="BUG-SEED-001",
+                uuid="u-seed-1",
+                title="Legacy seed bug",
+                status=BugStatus.RESOLVED,
+                severity=BugSeverity.MEDIUM,
+                category=BugCategory.PCB,
+                resolved_at="2026-09-10 12:00:00 UTC",
+                accepted_at=None,
+            )
+        ]
+    )
+    merged = exporter.merge_databases(base_db, stale_md_db)
+    merged_bug = merged.get_bug("BUG-SEED-001")
+    assert merged_bug.status == BugStatus.CLOSED
+    assert merged_bug.accepted_at == "2026-09-10 12:00:00 UTC"
+
+
+def test_api_migrate_legacy_bugs(tmp_path: Path) -> None:
+    """Verify REST API endpoint POST /api/bugs/migrate_legacy."""
+    db_file = tmp_path / "api_test.sqlite"
+    server = BugReportServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=tmp_path,
+        sqlite_file=db_file,
+        bind_and_activate=True,
+    )
+
+    t = threading.Thread(target=server.serve_forever, daemon=True)
+    t.start()
+
+    try:
+        url = server.get_url()
+
+        # Add a legacy resolved bug directly to server database
+        server.database.bugs.append(
+            BugReportModel(
+                id="BUG-API-001",
+                title="API legacy bug",
+                status=BugStatus.RESOLVED,
+                severity=BugSeverity.LOW,
+                category=BugCategory.PCB,
+                resolved_at="2026-09-15 10:00:00 UTC",
+                accepted_at=None,
+            )
+        )
+        server.sqlite_store.save_database(server.database)
+
+        # POST /api/bugs/migrate_legacy
+        req = urllib.request.Request(
+            f"{url}/api/bugs/migrate_legacy",
+            data=json.dumps({"all": True}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "ok"
+            assert data["count"] >= 1
+            assert "BUG-API-001" in data["migrated_ids"]
+
+        migrated_bug = server.database.get_bug("BUG-API-001")
+        assert migrated_bug.status == BugStatus.CLOSED
+        assert migrated_bug.accepted_at == "2026-09-15 10:00:00 UTC"
+    finally:
+        server.server_close()
+        server.shutdown()
+        t.join(timeout=2.0)
