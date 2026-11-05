@@ -2,11 +2,12 @@
 
 - **UUID**: `33d8ef9c-5293-412b-9943-faa2d45e1b22`
 - **ID**: `BUG-HUMIC-CENTIPEDE-711`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `INFRASTRUCTURE`
 - **Created**: `2026-10-11 03:51:01 UTC`
 - **Resolved**: `2026-10-11 04:02:33 UTC`
+- **Accepted**: `2026-10-11 04:02:33 UTC`
 
 #### Description
 

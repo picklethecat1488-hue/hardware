@@ -2,12 +2,13 @@
 
 - **UUID**: `bc1f616f-c211-4848-ad74-0eb516692200`
 - **ID**: `BUG-CAMOUFLAGED-MIDGE-831`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `PCB`
 - **Component**: `cat_fountain`
 - **Created**: `2026-10-15 21:21:16 UTC`
 - **Resolved**: `2026-10-15 21:29:02 UTC`
+- **Accepted**: `2026-10-15 21:29:02 UTC`
 
 #### Description
 

@@ -2,11 +2,12 @@
 
 - **UUID**: `b7264527-1380-4b21-b750-016729009ae9`
 - **ID**: `BUG-TRANSLUCENT-TERMITE-733`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `GENERAL`
 - **Created**: `2026-10-18 23:43:41 UTC`
 - **Resolved**: `2026-10-19 01:01:01 UTC`
+- **Accepted**: `2026-10-19 01:01:01 UTC`
 
 #### Description
 

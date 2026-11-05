@@ -2,12 +2,13 @@
 
 - **UUID**: `3e17a613-50d8-4c90-9e62-24e63b8f13fe`
 - **ID**: `BUG-TRANSLUCENT-TAPEWORM-953`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-10-15 00:32:11 UTC`
 - **Resolved**: `2026-10-15 00:32:17 UTC`
+- **Accepted**: `2026-10-15 00:32:17 UTC`
 
 #### Description
 

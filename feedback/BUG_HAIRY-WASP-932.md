@@ -2,12 +2,13 @@
 
 - **UUID**: `146f6268-0981-4761-ad81-d040b71ecedb`
 - **ID**: `BUG-HAIRY-WASP-932`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `PCB`
 - **Component**: `cat_fountain`
 - **Created**: `2026-10-15 21:12:56 UTC`
 - **Resolved**: `2026-10-15 21:22:37 UTC`
+- **Accepted**: `2026-10-15 21:22:37 UTC`
 
 #### Description
 

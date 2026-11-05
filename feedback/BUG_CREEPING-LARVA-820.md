@@ -2,11 +2,12 @@
 
 - **UUID**: `c9679ffa-7211-4f3f-bea5-a57be3bc91a4`
 - **ID**: `WORM-CREEPING-LARVA-820`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `GENERAL`
 - **Created**: `2026-10-23 00:51:04 UTC`
 - **Resolved**: `2026-10-23 01:03:28 UTC`
+- **Accepted**: `2026-10-23 01:03:28 UTC`
 
 #### Description
 

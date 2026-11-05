@@ -2,12 +2,13 @@
 
 - **UUID**: `098d867c-1283-4051-83af-26809d6149bc`
 - **ID**: `BUG-SWARMING-CICADA-917`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-10-23 23:07:38 UTC`
 - **Resolved**: `2026-10-23 23:42:55 UTC`
+- **Accepted**: `2026-10-23 23:42:55 UTC`
 
 #### Description
 

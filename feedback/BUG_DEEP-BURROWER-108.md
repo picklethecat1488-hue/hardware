@@ -2,12 +2,13 @@
 
 - **UUID**: `4067b6ef-8bec-42fe-9c9c-680966c0b020`
 - **ID**: `BUG-DEEP-BURROWER-108`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `cat_fountain`
 - **Created**: `2026-10-10 23:07:44 UTC`
 - **Resolved**: `2026-10-11 00:07:45 UTC`
+- **Accepted**: `2026-10-11 00:07:45 UTC`
 
 #### Description
 

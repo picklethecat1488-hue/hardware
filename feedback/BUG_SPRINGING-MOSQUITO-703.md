@@ -2,12 +2,13 @@
 
 - **UUID**: `c78f3b26-9aa7-4944-bc63-66740f0ef2db`
 - **ID**: `BUG-SPRINGING-MOSQUITO-703`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-10-23 23:00:18 UTC`
 - **Resolved**: `2026-10-23 23:55:57 UTC`
+- **Accepted**: `2026-10-23 23:55:57 UTC`
 
 #### Description
 

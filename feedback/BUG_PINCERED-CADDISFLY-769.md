@@ -2,12 +2,13 @@
 
 - **UUID**: `39e27e43-1d69-4cde-9de4-819864d10df9`
 - **ID**: `BUG-PINCERED-CADDISFLY-769`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-10-23 23:10:52 UTC`
 - **Resolved**: `2026-10-23 23:48:48 UTC`
+- **Accepted**: `2026-10-23 23:48:48 UTC`
 
 #### Description
 

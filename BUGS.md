@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-05 14:27:05 UTC` |
+| **Report Date** | `2026-11-05 14:38:45 UTC` |
 | **Total Issues** | `309` |
 | **Open Issues** | `2` |
 | **Resolved / Closed** | `307 (99%)` |
@@ -32,325 +32,326 @@
 
 ## Issue Checklist
 
-- [x] **`[MEDIUM]`** [#BUG-010](#bug-010): bug reporter should use the quake UI color scheme (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-011](#bug-011): Rename "Export BUGS.md" to "Save and Exit" `[bug_reporter]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-012](#bug-012): Add ability to paste screenshotsand documents into attachments and references section `[bug_reporter]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-013](#bug-013): J_USB missing pads, has overlapping drill holes (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-014](#bug-014): Add bug filtering `[bug_report]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-015](#bug-015): Multiple components failed to route correctly (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-016](#bug-016): locate silkscreens for MH3 and MH4 to bottom of drill holes (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-017](#bug-017): T junction for SDA has rounded edge (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-018](#bug-018): View.py still fails (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-019](#bug-019): Move flex tail connector to board edge `[J_FLEX]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-020](#bug-020): Electrodes are missing on the flex tail, capacitive channels are incorrectly routed capacitive buttons `[flex_tail]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-021](#bug-021): The flex tail shape should be a manifold hull `[flex_tail]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-022](#bug-022): Power supply and distribution page has multiple issues `[schematic]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-024](#bug-024): Implement DRC for schematics `[drc]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-025](#bug-025): Sheet3 has multiple overlapping components `[schematic]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-026](#bug-026): Go to first change in file automatically `[bug_report]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-027](#bug-027): carrier board and flex tail have no tracks or vais (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-028](#bug-028): test_board_diagram flex tail should be oriented at connector edge (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-029](#bug-029): VBUS and GND pins on J_USB are not connected (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-030](#bug-030): antennae on sheet 2 decoupling caps (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-031](#bug-031): multiple caps on sheet 5 are open on one side and overlap with other symbology (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-032](#bug-032): move U1 to the right of U4 under SPK1 (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-033](#bug-033): pull up resistors overlap with U4 (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-034](#bug-034): flex tail PCB outline is incorrect (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-035](#bug-035): Q1 load switch truth table has overlap with decoupling capactitors (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-036](#bug-036): Overlapping placement in sheet 5 (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-037](#bug-037): Overlapping oplacement in sheet 7 (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-038](#bug-038): Flex tail not routed (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-039](#bug-039): carrier board still shows multiple routing failures (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-040](#bug-040): TP_GND is not connected to ground (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-041](#bug-041): Canonicalize component names on carrier board and flex tail (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-042](#bug-042): Test board wiring diagram looks like spaghetti (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-043](#bug-043): auto router is bridging pads to traces (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-044](#bug-044): auto router is placing vias in mid air on flex tail (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-045](#bug-045): every carrier PCB silkscreen is missing (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-046](#bug-046): U1 has missing balls on left, 2 vias in middle where balls should be (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-047](#bug-047): Parse kicad DRC reports (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-048](#bug-048): Create BuildTraces, BuildVias CMs (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-049](#bug-049): Use BuildSilkScreen CM for carrier PCB (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-050](#bug-050): Remove carrier_pcb from the provider manifest (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-051](#bug-051): Add SWD header to test board (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-052](#bug-052): Add peripheral headers to test board (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-053](#bug-053): Add RGB status LED to test board (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-054](#bug-054): Add charger and fuel gauge to test board (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-055](#bug-055): Add GPIO header to the test board (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-056](#bug-056): Add embedded NAND storage (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-057](#bug-057): Add USB-UART IC (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-058](#bug-058): Source new microcontroller (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-059](#bug-059): Begin downselection process (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-060](#bug-060): Support Deep Power Down (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-061](#bug-061): Verify required power on sequencing steps (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-062](#bug-062): Connect FlexSPI to embedded flash in Dual Channel mode (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-063](#bug-063): Connect /CHG to MCU (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-064](#bug-064): Round edges of bottom of enclosure (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-065](#bug-065): Add connector cutouts to bottom enclosure (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-066](#bug-066): Component silkscreens missing from the PCB (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-067](#bug-067): Apply component downselection results  to PCB (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-068](#bug-068): Component fell off schematic page 5 (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-069](#bug-069): Change bug_report and code_review backing store to sqlite (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-070](#bug-070): Add battery connector to carrier board (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-071](#bug-071): I2c pull ups on sheet 7 dangling off page (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-073](#bug-073): Add GPIO cutout to enclosure (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-074](#bug-074): Add peripheral cutouts to enclosure bottom (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-075](#bug-075): Add SWD cutout to enclosure (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-076](#bug-076): Enclosure lid should snap fit (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-077](#bug-077): Add ventillation holes to enclosure bottom (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-080](#bug-080): Add LED cutout to test board enclosure `[test_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-079](#bug-079): Move BUGS.md to repo root (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-081](#bug-081): This build.py command should have failed (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-082](#bug-082): Route test board (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-083](#bug-083): I2C pullup resistors overlap (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-084](#bug-084): Update board files schematics `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-085](#bug-085): Change mounting holes on enclosure bottom to mounting posts (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-086](#bug-086): Capacitive sensing and control section is incorrect (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-087](#bug-087): Add power test points (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-088](#bug-088): Schematic bugs review (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-089](#bug-089): Organize schematic pages by subsystem (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-090](#bug-090): Test board Enclosure feedback (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-091](#bug-091): The diff view has scroll bars on every line `[code_review]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-092](#bug-092): Add logo to carrier board top (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-093](#bug-093): Update docs with architecture changes (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-094](#bug-094): Remove manual net priorities from PCB router (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-095](#bug-095): Make JAX router backend the default (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-096](#bug-096): Load switch should control audio and peripheral domains (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-097](#bug-097): Log routing violations to a file (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-098](#bug-098): Sheer 3 - C9, C10 overlap (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-099](#bug-099): Sheet 4- FLEXSPI wires should route around U8 (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-100](#bug-100): Sheet 6-SCL and SDA lines overlap (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-101](#bug-101): Sheet 7-U2 and J2- cap touch net routing is messy (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-102](#bug-102): Sheet 9- PCIE lanes are not cleanly routed (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-103](#bug-103): Sheet 10- Serial Bus Expansion Headers needs to be broken into 2 pages (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-104](#bug-104): Sheet11- GPIOs should route without off-sheet connectors (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-105](#bug-105): U4-Add AUDIO_EN GPIO connection to U1 (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-106](#bug-106): J6-J9: Remove VLOAD_SW connector (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-107](#bug-107): Simulate flying probes test: carrier board `[carrier_board]` (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-108](#bug-108): Simulate flying probes test: flex tail (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-109](#bug-109): Resolve pytest warnings (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-110](#bug-110): Expansion header connectors should be JST-style (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-111](#bug-111): White square above J2 `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-112](#bug-112): Update test board docs with recommended battery model `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-113](#bug-113): Carrier board serial expansion cutouts overlap `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-114](#bug-114): Bug report tool does not pickup changes to BUGS.md `[bug_report]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-115](#bug-115): Move U10, U10 decoupling caps to new sheet page (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-116](#bug-116): SWD should not route thru U9 (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-117](#bug-117): Remove SWO and NRST (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-118](#bug-118): GND has routing conflict with LED_R on U6 sheet (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-119](#bug-119): Cap signals has multiple overlaps (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-120](#bug-120): Move C8 to power regulation and distribution section. (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-121](#bug-121): Move MIPI CLK pins on J2 (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-122](#bug-122): J6, J7, J8 should be JST-PH-6P connectors (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-123](#bug-123): Sheet 12- GPIO wires overlap (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-124](#bug-124): Couldn't run carrier board flying probe test (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-125](#bug-125): Add top and bottom textures to PCB objects (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-126](#bug-126): Components designators are overlapping pads and holes (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-127](#bug-127): Some components have duplicate designators (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-128](#bug-128): Newly created folders do not show up in the Changed Files section `[code_review]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-129](#bug-129): Support reboot into ISP mode from the FTDI `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-130](#bug-130): J8 has wire overlaps (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-131](#bug-131): Resolve all schematic wire overlaps (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-132](#bug-132): Create expansion carrier mount `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-133](#bug-133): Flex tail schematic looks wrong `[flex_tail]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-134](#bug-134): Carrier board PCB components don't match schematic `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-135](#bug-135): Flying probe simulate still fails `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-136](#bug-136): The horizontal scrollbar is really long for some reason. `[code_review]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-137](#bug-137): Support binary files diff UI `[code_review]` (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-138](#bug-138): Refactor schematic_diagram.py (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-139](#bug-139): Add battery cover `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-140](#bug-140): Extend enclosure bottom under flex tail `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-141](#bug-141): It does not look like the flex tail will fit in the connector. `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-142](#bug-142): No cutout for PCIE connector `[enclosure_bottom]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-143](#bug-143): Peripheral cutouts should all be the same size `[enclosure_bottom]` (`RESOLVED`)
-- [x] **`[CRITICAL]`** [#BUG-144](#bug-144): Cutout region for J1 is missing from the design `[enclosure_bottom]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-145](#bug-145): Simplify battery holder shape, retain cover over the battery cover hole `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-146](#bug-146): Remove MIPI camera routing `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-147](#bug-147): Change flex ribbon design `[carrier_board]` (`RESOLVED`)
-- [x] **`[CRITICAL]`** [#BUG-148](#bug-148): Flex ribbon support does not connect with main enclosure button `[enclosure_bottom]` (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-149](#bug-149): Mutual intersection test `[enclosure_bottom, enclosure_top]` (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-150](#bug-150): Component cutouts missing labels `[enclosure_bottom]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-151](#bug-151): Git_utils.py shows as binary `[bug_report]` (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-152](#bug-152): Textured PC still ain't visible (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-153](#bug-153): Bad formatting in flying probes report (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-154](#bug-154): Rename test_board project to carrier_board `[test_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-155](#bug-155): "SLIDER" text slightly overlaps "S3" `[flex_tail]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-156](#bug-156): J1 is missing thru holes `[carrier_board]` (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-157](#bug-157): Action button isn't routed! `[flex_tail]` (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-158](#bug-158): Flex tail layout needs revision `[flex_tail]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-159](#bug-159): SWD and USB connector text is reversed (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-160](#bug-160): Connector text on right side of enclosure bottom will form a hollow shell `[enclosure_bottom, enclosure_top]` (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-161](#bug-161): Create feedback/ directory for agentic review feedback `[code_review, bug_report]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-162](#bug-162): The flying probes test for flex tail is showing the carrier board PCB `[flex_tail]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-163](#bug-163): The flying probes test for carrier board is making contact with solder mask regions `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-164](#bug-164): Carrier board has multiple component designators `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-165](#bug-165): The carrier board flying probe test- text appears mirrored (`RESOLVED`)
-- [x] **`[CRITICAL]`** [#BUG-001](#bug-001): Flex tail PCB visualization fails due to on-the-fly router invocation in view.py `[flex_tail]` (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-002](#bug-002): J_USB connector plug mouth faces board interior instead of board edge `[J_USB]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-003](#bug-003): Test point and discrete component silkscreen text collisions `[silkscreen]` (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-004](#bug-004): C1 decoupling capacitor dangling without plane connections `[C1]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-005](#bug-005): Piezo speaker SPK1 silkscreen border rectangular instead of round `[SPK1]` (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-006](#bug-006): Collinear trace segment simplification failure in A* router due to d2[0] Y-axis typo `[PCBAutoRouter]` (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-007](#bug-007): A* router net ordering deadlock walling in local MCU control pins `[test_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-008](#bug-008): Carrier PCB rectangular sharp corners around mounting holes `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-009](#bug-009): Split-view CSS text overflow clipping code review diff listings `[code_review]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-072](#bug-072): Flex tail cutout doesn't align with flex tail (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-078](#bug-078): Code review highlight markers elide diff colors `[code_review]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-166](#bug-166): Remove the baseline BUGS.md and CR.md from the repo `[bug_report, code_review]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-167](#bug-167): Flying probes test- text is mirrored horizontally (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-168](#bug-168): Motor base is not secured in place `[cat_fountain]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-169](#bug-169): Store bug attachments in Git LFS `[bug_report]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-170](#bug-170): Bug loses resolution state when I click Save in bug report tool (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-171](#bug-171): Diff Viewer (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-172](#bug-172): Allow text panels to be extended vertically `[bug_report, code_review]` (`RESOLVED`)
-- [x] **`[CRITICAL]`** [#BUG-173](#bug-173): Multiple Netlist disconnects in schematic (`RESOLVED`)
-- [x] **`[CRITICAL]`** [#BUG-174](#bug-174): Missing GND connections in Serial Expansion connectors (`RESOLVED`)
-- [x] **`[CRITICAL]`** [#BUG-175](#bug-175): code_review.py is broken (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-176](#bug-176): JST connector footprints overlap with each other `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-177](#bug-177): Enclosure bottom CAD feedback `[enclosure_bottom, enclosure_top]` (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-178](#bug-178): Remove standalone bug_report and code_review tools `[diff_view]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-179](#bug-179): Right side ports overlap mounting holes `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-180](#bug-180): Resolve or suppress DRC violations `[carrier_board, flex_tail]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-181](#bug-181): Tracebacks in bug report tool (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-182](#bug-182): Create merge PR-75d5f929a2950f5d71d2875b10799be50b4c25a5 into v6 `[cat_fountain]` (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-183](#bug-183): Carrier board design hardening `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-184](#bug-184): Pull power and GND off-sheet symbols to the sheet edge `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-185](#bug-185): Add commit/ammend UI to dashboard/diff_view `[diff_view, dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-186](#bug-186): Support git LFS tracking in dashboard `[diff_view, dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-187](#bug-187): Allow file and commit panes to be collapsed in VS UI `[diff_view, dashboard]` (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-188](#bug-188): Dashboard/diff view - loading screen `[dash_board, diff_view]` (`RESOLVED`)
-- [x] **`[CRITICAL]`** [#BUG-189](#bug-189): GPIO pin labels overlap, rendering error `[enclosure_top]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-190](#bug-190): Clicking on the PR tag in the VCS dashboard doesn't take me to the PR in github `[dashboard]` (`RESOLVED`)
-- [x] **`[CRITICAL]`** [#BUG-191](#bug-191): Clicking "Code Review" with multiple commits selected took me to a blank bug report page `[dashboard]` (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-192](#bug-192): Add Pull Request highlight to commit element `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-193](#bug-193): Add "Create PR", "Unlink PR" button to VCS dashboard `[dashboard]` (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-194](#bug-194): Separate group for LFS tracked files `[dashboard]` (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-195](#bug-195): Add diff pair testing in flying probes test `[flying_probe]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-196](#bug-196): Allow vertical panels to be resized `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-197](#bug-197): Improve branch formatting `[dashboard]` (`RESOLVED`)
-- [x] **`[CRITICAL]`** [#BUG-198](#bug-198): Traceback in dashboard `[dashboard]` (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-199](#bug-199): Add CR icon in the commit panel `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-200](#bug-200): Multiple scrollbars in the VCS diff view `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-201](#bug-201): Multiple Diff Viewers tabs visible after a while (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-202](#bug-202): Vertical scroll bar not visible in Smartlog View `[dashboard]` (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-203](#bug-203): Support multiple commit selection `[dashboard]` (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-204](#bug-204): pytestt should contain only critical testing (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-205](#bug-205): Clicking "Code Review" opens wrong commit (`RESOLVED`)
-- [x] **`[CRITICAL]`** [#BUG-206](#bug-206): Off sheet schematic feedback (`RESOLVED`)
-- [x] **`[CRITICAL]`** [#BUG-207](#bug-207): Please add sheet 17 components to the carrier board `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-208](#bug-208): Battery cover will elide text on enclosure top `[enclosure_top]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-209](#bug-209): Schematic and PCB silkscreening unreadable despite DRC checks passing `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-210](#bug-210): Capacitors and resistors missing values `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-211](#bug-211): Update Code Review UI `[code_review]` (`RESOLVED`)
-- [x] **`[CRITICAL]`** [#BUG-212](#bug-212): Clicking on any PR past PR535 in the dashboard results in a 404 error `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-213](#bug-213): Update sync behavior and add rebase button to dashboard `[dashboard]` (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-214](#bug-214): Remove PCIe end connector, add support for BTLE `[carrier_board, enclosure_bottom]` (`RESOLVED`)
-- [x] **`[CRITICAL]`** [#BUG-215](#bug-215): Corrupted UI in dashboard VCS window `[dashboard]` (`RESOLVED`)
-- [x] **`[CRITICAL]`** [#BUG-216](#bug-216): Bugs reopened after clicking "Save and Exit" in dashboard (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-217](#bug-217): Add horizontal and vertical resizes to bug report page `[dashboard]` (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-218](#bug-218): Error creating PR `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-219](#bug-219): Move RESET out of "OVERRIDES" group `[carrier_board]` (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-220](#bug-220): Unexpected isolation results in flying probes test `[flex_tail]` (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-221](#bug-221): Branches missing from branch viewer `[dashboard]` (`RESOLVED`)
-- [x] **`[CRITICAL]`** [#BUG-222](#bug-222): I still see the M.2 connector on the PCB after rebuilding `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-223](#bug-223): Can't comment on commit `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-224](#bug-224): We should add horizontal resizers to the split commit views in the main VCS UI and code review UI `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-225](#bug-225): We should add horizontal resizers to the split commit views in the main VCS UI and code review UI (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-226](#bug-226): Still see stale commits in my commit list (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-227](#bug-227): Globally disable text wrap on toolbar buttons `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-228](#bug-228): Create PR-default behavior `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-229](#bug-229): Create PR didn't submit PRs to GitHub (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-230](#bug-230): Execution Logs and Tracebacks not preserved (`RESOLVED`)
-- [x] **`[CRITICAL]`** [#BUG-231](#bug-231): Our BLE module requires firmware to work `[carrier_board]` (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-232](#bug-232): Add copy/Open in VS code buttons `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-233](#bug-233): Scrollbars appear invisible int he UI theme `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-234](#bug-234): Confusing error message submitting stack PR `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-235](#bug-235): Add web icon for dashboard `[dashboard]` (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-236](#bug-236): Saving extra CR feedback didn't update the CR count `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-237](#bug-237): Vertical gripper in side-by-side view didn't update the split pane diff position (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-238](#bug-238): "CR_working.md" in feedback directory `[dashboard]` (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-239](#bug-239): Per-User behavior for feedback/ items `[dashboard]` (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-240](#bug-240): Argument subcommands are erroneously declared as flags `[dashboard]` (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-241](#bug-241): Trim GEMINI.md (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-242](#bug-242): Reformat Code Review main toolbar `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-243](#bug-243): Add power hardening to carrier board `[carrier_board]` (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-244](#bug-244): Dashboard CLI should have a commit subcommand `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-245](#bug-245): Word wrap needed in diff views `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-246](#bug-246): We should sync the working tree and commit panes automatically `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-247](#bug-247): We should just have one 'Sync' button. `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-248](#bug-248): Add sort and filter menus to Bug Report field `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-249](#bug-249): NINA-VLOAD_SW pin not in the documentation `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-250](#bug-250): NINA-Utilize Native nRF52840 NFC on the NINA-B312 `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-251](#bug-251): NINA-Remove J15 from BOM, mark board connector as no connect `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-252](#bug-252): Corrupted text or sth in diff view `[dashboard]` (`RESOLVED`)
-- [x] **`[CRITICAL]`** [#BUG-253](#bug-253): Traceback in dashboard `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-254](#bug-254): enclosure_lid.stl-review failure (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-255](#bug-255): sheet 8- R1 and R2 are bridged with an off sheet 3V3 connector `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-256](#bug-256): primary signal nets on flex tail schematic are wrong `[flex_tail]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-257](#bug-257): Add copy icon next to commit hashes, branch names and bug ID's `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-258](#bug-258): CR feedback- keeps showing up as modified, only timestamp is updated `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-259](#bug-259): Carrier board schematic feedback-floating pins, component spacing, off sheet connectors `[carrier_board]` (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-260](#bug-260): Schematic Index-sheet names fall of edge of page `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-261](#bug-261): Downselection report-feedback (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-262](#bug-262): Supplier PCB guidelines (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-263](#bug-263): CI failures- (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-264](#bug-264): Tracebacks after cleaning build directory `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-265](#bug-265): Simplify build logging `[build]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-266](#bug-266): Remove component designators for LEDs and jumpers `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-267](#bug-267): C18 and C19-too close to U11 `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-268](#bug-268): I seem to have to rebuilt the carrier_board project to view PCB changes `[carrier_board]` (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-269](#bug-269): encode LFS attachments in a way that multiple bugs can have an attachment with the same name `[dashboard]` (`RESOLVED`)
-- [x] **`[CRITICAL]`** [#BUG-270](#bug-270): Traceback in dashboard `[carrier_board]` (`RESOLVED`)
-- [x] **`[CRITICAL]`** [#BUG-271](#bug-271): W908185AS2CN65-Supplier feedback (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-272](#bug-272): W908185ASE67-Supplier feedback `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-273](#bug-273): Hit the traceback again :-( `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-274](#bug-274): Make code review, bug report views modal windows `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-275](#bug-275): W908185ASE69-Supplier feedback `[flex_tail]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-276](#bug-276): PCBWay.com -- Questions with BOM file of Order #T-E70W908185A `[flex_tail]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-277](#bug-277): PCBWay.com -- Questions with BOM file of Order #T-E68W908185A `[carrier_board, flex_tail]` (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-278](#bug-278): Working tree actions doesn't show up unless I click an older commit `[dashboard]` (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-279](#bug-279): Populate component list `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-280](#bug-280): Remediations for stuck CI tasks `[CI]` (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-281](#bug-281): Port dashboard to Eel `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-282](#bug-282): Replace integer ID’s with Docker-pattern ID's (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-LUBRICATED-BRISTLE-678](#bug-lubricated-bristle-678): Pytest taking too long `[Purest]` (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-TRANSLUCENT-LARVA-792](#bug-translucent-larva-792): Motor clip interferes with the 1102 motor base `[cat_fountain]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-DEEP-BURROWER-108](#bug-deep-burrower-108): Wiring diagram- pin discrepancy on TMC 6300 `[cat_fountain]` (`RESOLVED`)
-- [x] **`[CRITICAL]`** [#BUG-FOSSORIAL-BRISTLE-291](#bug-fossorial-bristle-291): RP2040 pinout-uynreadible mess `[cat_fountain]` (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-PROBOSCID-NIGHTCRAWLER-523](#bug-proboscid-nightcrawler-523): Some overlaps still visible on the wiring diagram `[cat_fountain]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-SUBTERRANEAN-VINEGARWORM-291](#bug-subterranean-vinegarworm-291): There is some issue with pasting screenshots into bug reports `[Dashboard]` (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-HUMIC-CENTIPEDE-711](#bug-humic-centipede-711): Clean up repo (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-BRISTLY-SETAE-415](#bug-bristly-setae-415): Copy/paste does not work `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-SEGMENTED-PALOLO-739](#bug-segmented-palolo-739): Questions with BOM file of Order #T-E68W908185A (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-GLOWING-OLIGOCHAETE-544](#bug-glowing-oligochaete-544): PCBWay.com -- Questions with BOM file of Order #T-E68W908185A `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-WRITHING-VERMIS-367](#bug-writhing-vermis-367): Update coverlay color to Black `[flex_tail]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-FERTILE-SANDWORM-588](#bug-fertile-sandworm-588): PCBWay.com -- Questions with BOM file of Order #T-E68W908185A `[carrier_board]` (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-TRANSLUCENT-TAPEWORM-953](#bug-translucent-tapeworm-953): Dashboard stuck at 20% on launch `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-LOAMY-BRISTLE-455](#bug-loamy-bristle-455): Elide physical address and personal email in privacy sanitizer `[sanitizer]` (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-VERMIFORM-CRAWLER-442](#bug-vermiform-crawler-442): Update issue ID generator with bug and insect themed nouns and adjectives `[id_generator]` (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-HAIRY-WASP-932](#bug-hairy-wasp-932): Update TMC6300 wiring to 6-PWM GPIO control and decouple SEN pin (WORM-GLIDING-BRISTLE-252) `[cat_fountain]` (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-CAMOUFLAGED-MIDGE-831](#bug-camouflaged-midge-831): I don’t have a cyan wire color `[cat_fountain]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-FAST-KATYDID-792](#bug-fast-katydid-792): Create supplier required assembly documents- `[carrier_board]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-FLYING-GRASSHOPPER-413](#bug-flying-grasshopper-413): CI is failing (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-TRANSLUCENT-TERMITE-733](#bug-translucent-termite-733): Fold directories under src/ into the repo root (`RESOLVED`)
-- [x] **`[HIGH]`** [#WORM-CREEPING-LARVA-820](#worm-creeping-larva-820): Regression tests are not useful (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-VIBRANT-WOODBORER-940](#bug-vibrant-woodborer-940): Create motor hub assembly `[cat_fountain]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-010](#bug-010): bug reporter should use the quake UI color scheme (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-011](#bug-011): Rename "Export BUGS.md" to "Save and Exit" `[bug_reporter]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-012](#bug-012): Add ability to paste screenshotsand documents into attachments and references section `[bug_reporter]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-013](#bug-013): J_USB missing pads, has overlapping drill holes (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-014](#bug-014): Add bug filtering `[bug_report]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-015](#bug-015): Multiple components failed to route correctly (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-016](#bug-016): locate silkscreens for MH3 and MH4 to bottom of drill holes (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-017](#bug-017): T junction for SDA has rounded edge (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-018](#bug-018): View.py still fails (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-019](#bug-019): Move flex tail connector to board edge `[J_FLEX]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-020](#bug-020): Electrodes are missing on the flex tail, capacitive channels are incorrectly routed capacitive buttons `[flex_tail]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-021](#bug-021): The flex tail shape should be a manifold hull `[flex_tail]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-022](#bug-022): Power supply and distribution page has multiple issues `[schematic]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-024](#bug-024): Implement DRC for schematics `[drc]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-025](#bug-025): Sheet3 has multiple overlapping components `[schematic]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-026](#bug-026): Go to first change in file automatically `[bug_report]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-027](#bug-027): carrier board and flex tail have no tracks or vais (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-028](#bug-028): test_board_diagram flex tail should be oriented at connector edge (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-029](#bug-029): VBUS and GND pins on J_USB are not connected (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-030](#bug-030): antennae on sheet 2 decoupling caps (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-031](#bug-031): multiple caps on sheet 5 are open on one side and overlap with other symbology (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-032](#bug-032): move U1 to the right of U4 under SPK1 (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-033](#bug-033): pull up resistors overlap with U4 (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-034](#bug-034): flex tail PCB outline is incorrect (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-035](#bug-035): Q1 load switch truth table has overlap with decoupling capactitors (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-036](#bug-036): Overlapping placement in sheet 5 (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-037](#bug-037): Overlapping oplacement in sheet 7 (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-038](#bug-038): Flex tail not routed (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-039](#bug-039): carrier board still shows multiple routing failures (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-040](#bug-040): TP_GND is not connected to ground (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-041](#bug-041): Canonicalize component names on carrier board and flex tail (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-042](#bug-042): Test board wiring diagram looks like spaghetti (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-043](#bug-043): auto router is bridging pads to traces (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-044](#bug-044): auto router is placing vias in mid air on flex tail (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-045](#bug-045): every carrier PCB silkscreen is missing (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-046](#bug-046): U1 has missing balls on left, 2 vias in middle where balls should be (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-047](#bug-047): Parse kicad DRC reports (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-048](#bug-048): Create BuildTraces, BuildVias CMs (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-049](#bug-049): Use BuildSilkScreen CM for carrier PCB (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-050](#bug-050): Remove carrier_pcb from the provider manifest (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-051](#bug-051): Add SWD header to test board (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-052](#bug-052): Add peripheral headers to test board (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-053](#bug-053): Add RGB status LED to test board (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-054](#bug-054): Add charger and fuel gauge to test board (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-055](#bug-055): Add GPIO header to the test board (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-056](#bug-056): Add embedded NAND storage (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-057](#bug-057): Add USB-UART IC (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-058](#bug-058): Source new microcontroller (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-059](#bug-059): Begin downselection process (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-060](#bug-060): Support Deep Power Down (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-061](#bug-061): Verify required power on sequencing steps (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-062](#bug-062): Connect FlexSPI to embedded flash in Dual Channel mode (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-063](#bug-063): Connect /CHG to MCU (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-064](#bug-064): Round edges of bottom of enclosure (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-065](#bug-065): Add connector cutouts to bottom enclosure (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-066](#bug-066): Component silkscreens missing from the PCB (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-067](#bug-067): Apply component downselection results  to PCB (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-068](#bug-068): Component fell off schematic page 5 (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-069](#bug-069): Change bug_report and code_review backing store to sqlite (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-070](#bug-070): Add battery connector to carrier board (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-071](#bug-071): I2c pull ups on sheet 7 dangling off page (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-073](#bug-073): Add GPIO cutout to enclosure (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-074](#bug-074): Add peripheral cutouts to enclosure bottom (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-075](#bug-075): Add SWD cutout to enclosure (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-076](#bug-076): Enclosure lid should snap fit (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-077](#bug-077): Add ventillation holes to enclosure bottom (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-080](#bug-080): Add LED cutout to test board enclosure `[test_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-079](#bug-079): Move BUGS.md to repo root (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-081](#bug-081): This build.py command should have failed (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-082](#bug-082): Route test board (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-083](#bug-083): I2C pullup resistors overlap (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-084](#bug-084): Update board files schematics `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-085](#bug-085): Change mounting holes on enclosure bottom to mounting posts (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-086](#bug-086): Capacitive sensing and control section is incorrect (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-087](#bug-087): Add power test points (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-088](#bug-088): Schematic bugs review (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-089](#bug-089): Organize schematic pages by subsystem (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-090](#bug-090): Test board Enclosure feedback (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-091](#bug-091): The diff view has scroll bars on every line `[code_review]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-092](#bug-092): Add logo to carrier board top (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-093](#bug-093): Update docs with architecture changes (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-094](#bug-094): Remove manual net priorities from PCB router (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-095](#bug-095): Make JAX router backend the default (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-096](#bug-096): Load switch should control audio and peripheral domains (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-097](#bug-097): Log routing violations to a file (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-098](#bug-098): Sheer 3 - C9, C10 overlap (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-099](#bug-099): Sheet 4- FLEXSPI wires should route around U8 (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-100](#bug-100): Sheet 6-SCL and SDA lines overlap (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-101](#bug-101): Sheet 7-U2 and J2- cap touch net routing is messy (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-102](#bug-102): Sheet 9- PCIE lanes are not cleanly routed (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-103](#bug-103): Sheet 10- Serial Bus Expansion Headers needs to be broken into 2 pages (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-104](#bug-104): Sheet11- GPIOs should route without off-sheet connectors (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-105](#bug-105): U4-Add AUDIO_EN GPIO connection to U1 (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-106](#bug-106): J6-J9: Remove VLOAD_SW connector (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-107](#bug-107): Simulate flying probes test: carrier board `[carrier_board]` (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-108](#bug-108): Simulate flying probes test: flex tail (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-109](#bug-109): Resolve pytest warnings (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-110](#bug-110): Expansion header connectors should be JST-style (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-111](#bug-111): White square above J2 `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-112](#bug-112): Update test board docs with recommended battery model `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-113](#bug-113): Carrier board serial expansion cutouts overlap `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-114](#bug-114): Bug report tool does not pickup changes to BUGS.md `[bug_report]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-115](#bug-115): Move U10, U10 decoupling caps to new sheet page (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-116](#bug-116): SWD should not route thru U9 (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-117](#bug-117): Remove SWO and NRST (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-118](#bug-118): GND has routing conflict with LED_R on U6 sheet (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-119](#bug-119): Cap signals has multiple overlaps (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-120](#bug-120): Move C8 to power regulation and distribution section. (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-121](#bug-121): Move MIPI CLK pins on J2 (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-122](#bug-122): J6, J7, J8 should be JST-PH-6P connectors (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-123](#bug-123): Sheet 12- GPIO wires overlap (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-124](#bug-124): Couldn't run carrier board flying probe test (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-125](#bug-125): Add top and bottom textures to PCB objects (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-126](#bug-126): Components designators are overlapping pads and holes (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-127](#bug-127): Some components have duplicate designators (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-128](#bug-128): Newly created folders do not show up in the Changed Files section `[code_review]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-129](#bug-129): Support reboot into ISP mode from the FTDI `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-130](#bug-130): J8 has wire overlaps (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-131](#bug-131): Resolve all schematic wire overlaps (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-132](#bug-132): Create expansion carrier mount `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-133](#bug-133): Flex tail schematic looks wrong `[flex_tail]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-134](#bug-134): Carrier board PCB components don't match schematic `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-135](#bug-135): Flying probe simulate still fails `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-136](#bug-136): The horizontal scrollbar is really long for some reason. `[code_review]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-137](#bug-137): Support binary files diff UI `[code_review]` (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-138](#bug-138): Refactor schematic_diagram.py (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-139](#bug-139): Add battery cover `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-140](#bug-140): Extend enclosure bottom under flex tail `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-141](#bug-141): It does not look like the flex tail will fit in the connector. `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-142](#bug-142): No cutout for PCIE connector `[enclosure_bottom]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-143](#bug-143): Peripheral cutouts should all be the same size `[enclosure_bottom]` (`CLOSED`)
+- [x] **`[CRITICAL]`** [#BUG-144](#bug-144): Cutout region for J1 is missing from the design `[enclosure_bottom]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-145](#bug-145): Simplify battery holder shape, retain cover over the battery cover hole `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-146](#bug-146): Remove MIPI camera routing `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-147](#bug-147): Change flex ribbon design `[carrier_board]` (`CLOSED`)
+- [x] **`[CRITICAL]`** [#BUG-148](#bug-148): Flex ribbon support does not connect with main enclosure button `[enclosure_bottom]` (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-149](#bug-149): Mutual intersection test `[enclosure_bottom, enclosure_top]` (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-150](#bug-150): Component cutouts missing labels `[enclosure_bottom]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-151](#bug-151): Git_utils.py shows as binary `[bug_report]` (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-152](#bug-152): Textured PC still ain't visible (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-153](#bug-153): Bad formatting in flying probes report (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-154](#bug-154): Rename test_board project to carrier_board `[test_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-155](#bug-155): "SLIDER" text slightly overlaps "S3" `[flex_tail]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-156](#bug-156): J1 is missing thru holes `[carrier_board]` (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-157](#bug-157): Action button isn't routed! `[flex_tail]` (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-158](#bug-158): Flex tail layout needs revision `[flex_tail]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-159](#bug-159): SWD and USB connector text is reversed (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-160](#bug-160): Connector text on right side of enclosure bottom will form a hollow shell `[enclosure_bottom, enclosure_top]` (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-161](#bug-161): Create feedback/ directory for agentic review feedback `[code_review, bug_report]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-162](#bug-162): The flying probes test for flex tail is showing the carrier board PCB `[flex_tail]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-163](#bug-163): The flying probes test for carrier board is making contact with solder mask regions `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-164](#bug-164): Carrier board has multiple component designators `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-165](#bug-165): The carrier board flying probe test- text appears mirrored (`CLOSED`)
+- [x] **`[CRITICAL]`** [#BUG-001](#bug-001): Flex tail PCB visualization fails due to on-the-fly router invocation in view.py `[flex_tail]` (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-002](#bug-002): J_USB connector plug mouth faces board interior instead of board edge `[J_USB]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-003](#bug-003): Test point and discrete component silkscreen text collisions `[silkscreen]` (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-004](#bug-004): C1 decoupling capacitor dangling without plane connections `[C1]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-005](#bug-005): Piezo speaker SPK1 silkscreen border rectangular instead of round `[SPK1]` (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-006](#bug-006): Collinear trace segment simplification failure in A* router due to d2[0] Y-axis typo `[PCBAutoRouter]` (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-007](#bug-007): A* router net ordering deadlock walling in local MCU control pins `[test_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-008](#bug-008): Carrier PCB rectangular sharp corners around mounting holes `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-009](#bug-009): Split-view CSS text overflow clipping code review diff listings `[code_review]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-072](#bug-072): Flex tail cutout doesn't align with flex tail (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-078](#bug-078): Code review highlight markers elide diff colors `[code_review]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-166](#bug-166): Remove the baseline BUGS.md and CR.md from the repo `[bug_report, code_review]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-167](#bug-167): Flying probes test- text is mirrored horizontally (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-168](#bug-168): Motor base is not secured in place `[cat_fountain]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-169](#bug-169): Store bug attachments in Git LFS `[bug_report]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-170](#bug-170): Bug loses resolution state when I click Save in bug report tool (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-171](#bug-171): Diff Viewer (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-172](#bug-172): Allow text panels to be extended vertically `[bug_report, code_review]` (`CLOSED`)
+- [x] **`[CRITICAL]`** [#BUG-173](#bug-173): Multiple Netlist disconnects in schematic (`CLOSED`)
+- [x] **`[CRITICAL]`** [#BUG-174](#bug-174): Missing GND connections in Serial Expansion connectors (`CLOSED`)
+- [x] **`[CRITICAL]`** [#BUG-175](#bug-175): code_review.py is broken (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-176](#bug-176): JST connector footprints overlap with each other `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-177](#bug-177): Enclosure bottom CAD feedback `[enclosure_bottom, enclosure_top]` (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-178](#bug-178): Remove standalone bug_report and code_review tools `[diff_view]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-179](#bug-179): Right side ports overlap mounting holes `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-180](#bug-180): Resolve or suppress DRC violations `[carrier_board, flex_tail]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-181](#bug-181): Tracebacks in bug report tool (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-182](#bug-182): Create merge PR-75d5f929a2950f5d71d2875b10799be50b4c25a5 into v6 `[cat_fountain]` (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-183](#bug-183): Carrier board design hardening `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-184](#bug-184): Pull power and GND off-sheet symbols to the sheet edge `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-185](#bug-185): Add commit/ammend UI to dashboard/diff_view `[diff_view, dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-186](#bug-186): Support git LFS tracking in dashboard `[diff_view, dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-187](#bug-187): Allow file and commit panes to be collapsed in VS UI `[diff_view, dashboard]` (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-188](#bug-188): Dashboard/diff view - loading screen `[dash_board, diff_view]` (`CLOSED`)
+- [x] **`[CRITICAL]`** [#BUG-189](#bug-189): GPIO pin labels overlap, rendering error `[enclosure_top]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-190](#bug-190): Clicking on the PR tag in the VCS dashboard doesn't take me to the PR in github `[dashboard]` (`CLOSED`)
+- [x] **`[CRITICAL]`** [#BUG-191](#bug-191): Clicking "Code Review" with multiple commits selected took me to a blank bug report page `[dashboard]` (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-192](#bug-192): Add Pull Request highlight to commit element `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-193](#bug-193): Add "Create PR", "Unlink PR" button to VCS dashboard `[dashboard]` (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-194](#bug-194): Separate group for LFS tracked files `[dashboard]` (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-195](#bug-195): Add diff pair testing in flying probes test `[flying_probe]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-196](#bug-196): Allow vertical panels to be resized `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-197](#bug-197): Improve branch formatting `[dashboard]` (`CLOSED`)
+- [x] **`[CRITICAL]`** [#BUG-198](#bug-198): Traceback in dashboard `[dashboard]` (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-199](#bug-199): Add CR icon in the commit panel `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-200](#bug-200): Multiple scrollbars in the VCS diff view `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-201](#bug-201): Multiple Diff Viewers tabs visible after a while (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-202](#bug-202): Vertical scroll bar not visible in Smartlog View `[dashboard]` (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-203](#bug-203): Support multiple commit selection `[dashboard]` (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-204](#bug-204): pytestt should contain only critical testing (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-205](#bug-205): Clicking "Code Review" opens wrong commit (`CLOSED`)
+- [x] **`[CRITICAL]`** [#BUG-206](#bug-206): Off sheet schematic feedback (`CLOSED`)
+- [x] **`[CRITICAL]`** [#BUG-207](#bug-207): Please add sheet 17 components to the carrier board `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-208](#bug-208): Battery cover will elide text on enclosure top `[enclosure_top]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-209](#bug-209): Schematic and PCB silkscreening unreadable despite DRC checks passing `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-210](#bug-210): Capacitors and resistors missing values `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-211](#bug-211): Update Code Review UI `[code_review]` (`CLOSED`)
+- [x] **`[CRITICAL]`** [#BUG-212](#bug-212): Clicking on any PR past PR535 in the dashboard results in a 404 error `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-213](#bug-213): Update sync behavior and add rebase button to dashboard `[dashboard]` (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-214](#bug-214): Remove PCIe end connector, add support for BTLE `[carrier_board, enclosure_bottom]` (`CLOSED`)
+- [x] **`[CRITICAL]`** [#BUG-215](#bug-215): Corrupted UI in dashboard VCS window `[dashboard]` (`CLOSED`)
+- [x] **`[CRITICAL]`** [#BUG-216](#bug-216): Bugs reopened after clicking "Save and Exit" in dashboard (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-217](#bug-217): Add horizontal and vertical resizes to bug report page `[dashboard]` (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-218](#bug-218): Error creating PR `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-219](#bug-219): Move RESET out of "OVERRIDES" group `[carrier_board]` (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-220](#bug-220): Unexpected isolation results in flying probes test `[flex_tail]` (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-221](#bug-221): Branches missing from branch viewer `[dashboard]` (`CLOSED`)
+- [x] **`[CRITICAL]`** [#BUG-222](#bug-222): I still see the M.2 connector on the PCB after rebuilding `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-223](#bug-223): Can't comment on commit `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-224](#bug-224): We should add horizontal resizers to the split commit views in the main VCS UI and code review UI `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-225](#bug-225): We should add horizontal resizers to the split commit views in the main VCS UI and code review UI (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-226](#bug-226): Still see stale commits in my commit list (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-227](#bug-227): Globally disable text wrap on toolbar buttons `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-228](#bug-228): Create PR-default behavior `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-229](#bug-229): Create PR didn't submit PRs to GitHub (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-230](#bug-230): Execution Logs and Tracebacks not preserved (`CLOSED`)
+- [x] **`[CRITICAL]`** [#BUG-231](#bug-231): Our BLE module requires firmware to work `[carrier_board]` (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-232](#bug-232): Add copy/Open in VS code buttons `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-233](#bug-233): Scrollbars appear invisible int he UI theme `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-234](#bug-234): Confusing error message submitting stack PR `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-235](#bug-235): Add web icon for dashboard `[dashboard]` (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-236](#bug-236): Saving extra CR feedback didn't update the CR count `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-237](#bug-237): Vertical gripper in side-by-side view didn't update the split pane diff position (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-238](#bug-238): "CR_working.md" in feedback directory `[dashboard]` (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-239](#bug-239): Per-User behavior for feedback/ items `[dashboard]` (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-240](#bug-240): Argument subcommands are erroneously declared as flags `[dashboard]` (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-241](#bug-241): Trim GEMINI.md (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-242](#bug-242): Reformat Code Review main toolbar `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-243](#bug-243): Add power hardening to carrier board `[carrier_board]` (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-244](#bug-244): Dashboard CLI should have a commit subcommand `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-245](#bug-245): Word wrap needed in diff views `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-246](#bug-246): We should sync the working tree and commit panes automatically `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-247](#bug-247): We should just have one 'Sync' button. `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-248](#bug-248): Add sort and filter menus to Bug Report field `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-249](#bug-249): NINA-VLOAD_SW pin not in the documentation `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-250](#bug-250): NINA-Utilize Native nRF52840 NFC on the NINA-B312 `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-251](#bug-251): NINA-Remove J15 from BOM, mark board connector as no connect `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-252](#bug-252): Corrupted text or sth in diff view `[dashboard]` (`CLOSED`)
+- [x] **`[CRITICAL]`** [#BUG-253](#bug-253): Traceback in dashboard `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-254](#bug-254): enclosure_lid.stl-review failure (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-255](#bug-255): sheet 8- R1 and R2 are bridged with an off sheet 3V3 connector `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-256](#bug-256): primary signal nets on flex tail schematic are wrong `[flex_tail]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-257](#bug-257): Add copy icon next to commit hashes, branch names and bug ID's `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-258](#bug-258): CR feedback- keeps showing up as modified, only timestamp is updated `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-259](#bug-259): Carrier board schematic feedback-floating pins, component spacing, off sheet connectors `[carrier_board]` (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-260](#bug-260): Schematic Index-sheet names fall of edge of page `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-261](#bug-261): Downselection report-feedback (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-262](#bug-262): Supplier PCB guidelines (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-263](#bug-263): CI failures- (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-264](#bug-264): Tracebacks after cleaning build directory `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-265](#bug-265): Simplify build logging `[build]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-266](#bug-266): Remove component designators for LEDs and jumpers `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-267](#bug-267): C18 and C19-too close to U11 `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-268](#bug-268): I seem to have to rebuilt the carrier_board project to view PCB changes `[carrier_board]` (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-269](#bug-269): encode LFS attachments in a way that multiple bugs can have an attachment with the same name `[dashboard]` (`CLOSED`)
+- [x] **`[CRITICAL]`** [#BUG-270](#bug-270): Traceback in dashboard `[carrier_board]` (`CLOSED`)
+- [x] **`[CRITICAL]`** [#BUG-271](#bug-271): W908185AS2CN65-Supplier feedback (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-272](#bug-272): W908185ASE67-Supplier feedback `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-273](#bug-273): Hit the traceback again :-( `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-274](#bug-274): Make code review, bug report views modal windows `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-275](#bug-275): W908185ASE69-Supplier feedback `[flex_tail]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-276](#bug-276): PCBWay.com -- Questions with BOM file of Order #T-E70W908185A `[flex_tail]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-277](#bug-277): PCBWay.com -- Questions with BOM file of Order #T-E68W908185A `[carrier_board, flex_tail]` (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-278](#bug-278): Working tree actions doesn't show up unless I click an older commit `[dashboard]` (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-279](#bug-279): Populate component list `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-280](#bug-280): Remediations for stuck CI tasks `[CI]` (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-281](#bug-281): Port dashboard to Eel `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-282](#bug-282): Replace integer ID’s with Docker-pattern ID's (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-LUBRICATED-BRISTLE-678](#bug-lubricated-bristle-678): Pytest taking too long `[Purest]` (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-TRANSLUCENT-LARVA-792](#bug-translucent-larva-792): Motor clip interferes with the 1102 motor base `[cat_fountain]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-DEEP-BURROWER-108](#bug-deep-burrower-108): Wiring diagram- pin discrepancy on TMC 6300 `[cat_fountain]` (`CLOSED`)
+- [x] **`[CRITICAL]`** [#BUG-FOSSORIAL-BRISTLE-291](#bug-fossorial-bristle-291): RP2040 pinout-uynreadible mess `[cat_fountain]` (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-PROBOSCID-NIGHTCRAWLER-523](#bug-proboscid-nightcrawler-523): Some overlaps still visible on the wiring diagram `[cat_fountain]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-SUBTERRANEAN-VINEGARWORM-291](#bug-subterranean-vinegarworm-291): There is some issue with pasting screenshots into bug reports `[Dashboard]` (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-HUMIC-CENTIPEDE-711](#bug-humic-centipede-711): Clean up repo (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-BRISTLY-SETAE-415](#bug-bristly-setae-415): Copy/paste does not work `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-SEGMENTED-PALOLO-739](#bug-segmented-palolo-739): Questions with BOM file of Order #T-E68W908185A (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-GLOWING-OLIGOCHAETE-544](#bug-glowing-oligochaete-544): PCBWay.com -- Questions with BOM file of Order #T-E68W908185A `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-WRITHING-VERMIS-367](#bug-writhing-vermis-367): Update coverlay color to Black `[flex_tail]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-FERTILE-SANDWORM-588](#bug-fertile-sandworm-588): PCBWay.com -- Questions with BOM file of Order #T-E68W908185A `[carrier_board]` (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-TRANSLUCENT-TAPEWORM-953](#bug-translucent-tapeworm-953): Dashboard stuck at 20% on launch `[dashboard]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-LOAMY-BRISTLE-455](#bug-loamy-bristle-455): Elide physical address and personal email in privacy sanitizer `[sanitizer]` (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-VERMIFORM-CRAWLER-442](#bug-vermiform-crawler-442): Update issue ID generator with bug and insect themed nouns and adjectives `[id_generator]` (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-HAIRY-WASP-932](#bug-hairy-wasp-932): Update TMC6300 wiring to 6-PWM GPIO control and decouple SEN pin (WORM-GLIDING-BRISTLE-252) `[cat_fountain]` (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-CAMOUFLAGED-MIDGE-831](#bug-camouflaged-midge-831): I don’t have a cyan wire color `[cat_fountain]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-FAST-KATYDID-792](#bug-fast-katydid-792): Create supplier required assembly documents- `[carrier_board]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-FLYING-GRASSHOPPER-413](#bug-flying-grasshopper-413): CI is failing (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-TRANSLUCENT-TERMITE-733](#bug-translucent-termite-733): Fold directories under src/ into the repo root (`CLOSED`)
+- [x] **`[HIGH]`** [#WORM-CREEPING-LARVA-820](#worm-creeping-larva-820): Regression tests are not useful (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-VIBRANT-WOODBORER-940](#bug-vibrant-woodborer-940): Create motor hub assembly `[cat_fountain]` (`CLOSED`)
 - [ ] **`[MEDIUM]`** [#BUG-BARBED-MIDGE-630](#bug-barbed-midge-630): There are 3 outer borders in my dashboard window? `[dashboard]` (`OPEN`)
-- [x] **`[MEDIUM]`** [#BUG-SPRINGING-MOSQUITO-703](#bug-springing-mosquito-703): Extend inner wall to surface of ToF sensor PCB `[cat_fountain]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-SPRINGING-MOSQUITO-703](#bug-springing-mosquito-703): Extend inner wall to surface of ToF sensor PCB `[cat_fountain]` (`CLOSED`)
 - [ ] **`[MEDIUM]`** [#BUG-FEATHERED-CENTIPEDE-381](#bug-feathered-centipede-381): It takes 3-4s to save bugs now `[dashboard]` (`OPEN`)
-- [x] **`[HIGH]`** [#BUG-POLLEN-BACKSWIMMER-846](#bug-pollen-backswimmer-846): TMC6300-clip on mounts are too big `[cat_fountain]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-SWARMING-CICADA-917](#bug-swarming-cicada-917): Replace motor room mount halls with clip mounts `[cat_fountain]` (`RESOLVED`)
-- [x] **`[LOW]`** [#BUG-PINCERED-CADDISFLY-769](#bug-pincered-caddisfly-769): Add clip on mount for SWD header `[cat_fountain]` (`RESOLVED`)
+- [x] **`[HIGH]`** [#BUG-POLLEN-BACKSWIMMER-846](#bug-pollen-backswimmer-846): TMC6300-clip on mounts are too big `[cat_fountain]` (`CLOSED`)
+- [x] **`[MEDIUM]`** [#BUG-SWARMING-CICADA-917](#bug-swarming-cicada-917): Replace motor room mount halls with clip mounts `[cat_fountain]` (`CLOSED`)
+- [x] **`[LOW]`** [#BUG-PINCERED-CADDISFLY-769](#bug-pincered-caddisfly-769): Add clip on mount for SWD header `[cat_fountain]` (`CLOSED`)
 
 ## Detailed Issue Log
 
 ### <a id="bug-010"></a> 🟢 `[BUG-010]` bug reporter should use the quake UI color scheme
 
 - **UUID**: `31ecc369-401a-45bf-8b01-6d66cd348448`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Created**: `2026-09-20 01:09:59 UTC`
+- **Accepted**: `2026-09-20 01:09:59 UTC`
 
 #### Description
 
@@ -365,11 +366,12 @@ Restyled bug_report.html.j2 with complete Quake I / GLQuake console retro HUD en
 ### <a id="bug-011"></a> 🟢 `[BUG-011]` Rename "Export BUGS.md" to "Save and Exit"
 
 - **UUID**: `583170c4-e050-4436-b622-abf5ea87decb`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `bug_reporter`
 - **Created**: `2026-09-20 01:10:35 UTC`
+- **Accepted**: `2026-09-20 01:10:35 UTC`
 
 #### Resolution Notes
 
@@ -380,11 +382,12 @@ Renamed topbar button to 'Save and Exit' with gold Quake button styling. Connect
 ### <a id="bug-012"></a> 🟢 `[BUG-012]` Add ability to paste screenshotsand documents into attachments and references section
 
 - **UUID**: `6992e723-b480-4bf7-a8b3-fe7d850e8549`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `bug_reporter`
 - **Created**: `2026-09-20 01:11:51 UTC`
+- **Accepted**: `2026-09-20 01:11:51 UTC`
 
 #### Resolution Notes
 
@@ -395,10 +398,11 @@ Added comprehensive clipboard paste handling for screenshots, PDFs, logs, code, 
 ### <a id="bug-013"></a> 🟢 `[BUG-013]` J_USB missing pads, has overlapping drill holes
 
 - **UUID**: `847950e2-c14d-4aee-bd34-4b0443d2c8f6`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 01:21:09 UTC`
+- **Accepted**: `2026-09-20 01:21:09 UTC`
 
 #### Description
 
@@ -419,11 +423,12 @@ Redesigned USB-C-16P footprint with surface-mount pads for signal/power lines, e
 ### <a id="bug-014"></a> 🟢 `[BUG-014]` Add bug filtering
 
 - **UUID**: `fd9be713-b79e-47cd-80be-bcbbdf9b7c5f`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `bug_report`
 - **Created**: `2026-09-20 01:23:18 UTC`
+- **Accepted**: `2026-09-20 01:23:18 UTC`
 
 #### Description
 
@@ -438,11 +443,12 @@ Added bug status filtering (OPEN, ALL, RESOLVED) in web dashboard with OPEN acti
 ### <a id="bug-015"></a> 🟢 `[BUG-015]` Multiple components failed to route correctly
 
 - **UUID**: `ef043847-c315-4d01-9bdd-8e062f215b2a`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 01:23:52 UTC`
 - **Resolved**: `2026-09-20 02:40:00 UTC`
+- **Accepted**: `2026-09-20 02:40:00 UTC`
 
 #### Description
 
@@ -475,11 +481,12 @@ Completed auto-routing for carrier board with 0 DRC violations. Added copper reg
 ### <a id="bug-016"></a> 🟢 `[BUG-016]` locate silkscreens for MH3 and MH4 to bottom of drill holes
 
 - **UUID**: `46511413-5f95-4c90-bfe7-3837c654873d`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 01:25:11 UTC`
 - **Resolved**: `2026-09-20 01:36:16 UTC`
+- **Accepted**: `2026-09-20 01:36:16 UTC`
 
 #### Attachments & References
 
@@ -496,11 +503,12 @@ Updated kicad_pcb.j2 to position reference silkscreen text at +drill_mm (bottom)
 ### <a id="bug-017"></a> 🟢 `[BUG-017]` T junction for SDA has rounded edge
 
 - **UUID**: `7fdc77bb-b099-4d96-804c-9b0c0746f9d7`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 01:28:48 UTC`
 - **Resolved**: `2026-09-20 02:40:00 UTC`
+- **Accepted**: `2026-09-20 02:40:00 UTC`
 
 #### Description
 
@@ -521,10 +529,11 @@ Implemented straighten_junction_traces in router.py to detect multi-connection t
 ### <a id="bug-018"></a> 🟢 `[BUG-018]` View.py still fails
 
 - **UUID**: `6ddf4f85-466f-4d9e-a4b2-3b05c5cb8cc0`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 01:37:51 UTC`
+- **Accepted**: `2026-09-20 01:37:51 UTC`
 
 #### Description
 
@@ -565,12 +574,13 @@ Ensured set_port defaults to integer 3939 instead of None, filtered ocp_vscode c
 ### <a id="bug-019"></a> 🟢 `[BUG-019]` Move flex tail connector to board edge
 
 - **UUID**: `ead7a741-7ecd-49b4-9eae-0023c8c02d8f`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `J_FLEX`
 - **Created**: `2026-09-20 01:39:07 UTC`
 - **Resolved**: `2026-09-20 02:40:00 UTC`
+- **Accepted**: `2026-09-20 02:40:00 UTC`
 
 #### Description
 
@@ -592,12 +602,13 @@ Repositioned J_FLEX to the carrier board edge at [0.0, -22.75, 0.0] and moved re
 ### <a id="bug-020"></a> 🟢 `[BUG-020]` Electrodes are missing on the flex tail, capacitive channels are incorrectly routed capacitive buttons
 
 - **UUID**: `15ab3701-870e-4451-b587-132ffd2e59fc`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `flex_tail`
 - **Created**: `2026-09-20 01:44:52 UTC`
 - **Resolved**: `2026-09-20 02:40:00 UTC`
+- **Accepted**: `2026-09-20 02:40:00 UTC`
 
 #### Description
 
@@ -627,12 +638,13 @@ Rewrote capacitive hatched ground offset math in local coordinate system, ensuri
 ### <a id="bug-021"></a> 🟢 `[BUG-021]` The flex tail shape should be a manifold hull
 
 - **UUID**: `77aace5d-688f-489b-b910-ac09b4764c75`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `flex_tail`
 - **Created**: `2026-09-20 01:50:22 UTC`
 - **Resolved**: `2026-09-20 02:40:00 UTC`
+- **Accepted**: `2026-09-20 02:40:00 UTC`
 
 #### Description
 
@@ -647,12 +659,13 @@ Updated build_flex_tail CAD shape generation in test_board provider.py using Bui
 ### <a id="bug-022"></a> 🟢 `[BUG-022]` Power supply and distribution page has multiple issues
 
 - **UUID**: `783993d9-7d21-48ff-9113-1e53494d34eb`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `schematic`
 - **Created**: `2026-09-20 01:53:06 UTC`
 - **Resolved**: `2026-09-20 02:40:00 UTC`
+- **Accepted**: `2026-09-20 02:40:00 UTC`
 
 #### Description
 
@@ -681,12 +694,13 @@ Broke schematic into 7 dedicated functional pages (USB-C Interface, 3.3V LDO Reg
 ### <a id="bug-024"></a> 🟢 `[BUG-024]` Implement DRC for schematics
 
 - **UUID**: `16588ff0-3d03-4fe1-85e7-f589c3e3af9c`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `drc`
 - **Created**: `2026-09-20 02:01:08 UTC`
 - **Resolved**: `2026-09-20 02:40:00 UTC`
+- **Accepted**: `2026-09-20 02:40:00 UTC`
 
 #### Description
 
@@ -701,12 +715,13 @@ Implemented check_schematic() in PCBDesignRulesChecker and hooked into check_all
 ### <a id="bug-025"></a> 🟢 `[BUG-025]` Sheet3 has multiple overlapping components
 
 - **UUID**: `45208e97-9046-4e20-8208-c945f2231314`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `schematic`
 - **Created**: `2026-09-20 02:02:06 UTC`
 - **Resolved**: `2026-09-20 02:40:00 UTC`
+- **Accepted**: `2026-09-20 02:40:00 UTC`
 
 #### Attachments & References
 
@@ -723,12 +738,13 @@ Resolved Sheet 3 overlap by isolating Power Distribution (Q1, J1) and decoupling
 ### <a id="bug-026"></a> 🟢 `[BUG-026]` Go to first change in file automatically
 
 - **UUID**: `2a53836d-74df-44cd-9413-4bca0ec3d3ff`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `bug_report`
 - **Created**: `2026-09-20 02:03:38 UTC`
 - **Resolved**: `2026-09-20 16:30:00 UTC`
+- **Accepted**: `2026-09-20 16:30:00 UTC`
 
 #### Description
 
@@ -752,11 +768,12 @@ Enhanced goto() in code_review.html.j2 to locate and highlight the first modifie
 ### <a id="bug-027"></a> 🟢 `[BUG-027]` carrier board and flex tail have no tracks or vais
 
 - **UUID**: `c3cbdd31-ad20-453f-8d5b-acd5f1963b31`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 16:04:39 UTC`
 - **Resolved**: `2026-09-20 16:30:00 UTC`
+- **Accepted**: `2026-09-20 16:30:00 UTC`
 
 #### Description
 
@@ -789,11 +806,12 @@ Loaded pre-routed traces and vias from routing.yaml and routing_flex.yaml in vie
 ### <a id="bug-028"></a> 🟢 `[BUG-028]` test_board_diagram flex tail should be oriented at connector edge
 
 - **UUID**: `d194dab4-a248-4020-abc6-621e5806fe7b`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 16:07:41 UTC`
 - **Resolved**: `2026-09-20 16:30:00 UTC`
+- **Accepted**: `2026-09-20 16:30:00 UTC`
 
 #### Description
 
@@ -814,11 +832,12 @@ Dynamically translated flex tail in TestBoardProvider.view_product() to mount di
 ### <a id="bug-029"></a> 🟢 `[BUG-029]` VBUS and GND pins on J_USB are not connected
 
 - **UUID**: `a1085d25-9517-4cea-bed0-22d68e5e428c`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 16:09:29 UTC`
 - **Resolved**: `2026-09-20 16:30:00 UTC`
+- **Accepted**: `2026-09-20 16:30:00 UTC`
 
 #### Description
 
@@ -844,11 +863,12 @@ Added VBUS2 and GND2 pins to J_USB in wiring.yaml and tied them to their respect
 ### <a id="bug-030"></a> 🟢 `[BUG-030]` antennae on sheet 2 decoupling caps
 
 - **UUID**: `93cda001-6100-45b7-a811-b3cde5956c49`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 16:11:09 UTC`
 - **Resolved**: `2026-09-20 16:30:00 UTC`
+- **Accepted**: `2026-09-20 16:30:00 UTC`
 
 #### Description
 
@@ -869,11 +889,12 @@ Repositioned decoupling capacitor bank toward page center on Sheet 2 and elimina
 ### <a id="bug-031"></a> 🟢 `[BUG-031]` multiple caps on sheet 5 are open on one side and overlap with other symbology
 
 - **UUID**: `1138a6e2-f403-4916-99cc-c0efdaf980d9`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 16:13:36 UTC`
 - **Resolved**: `2026-09-20 16:30:00 UTC`
+- **Accepted**: `2026-09-20 16:30:00 UTC`
 
 #### Description
 
@@ -895,11 +916,12 @@ Closed open capacitor lead gaps on Sheet 5 (C_RST, C_OSC1, C_OSC2) connecting le
 ### <a id="bug-032"></a> 🟢 `[BUG-032]` move U1 to the right of U4 under SPK1
 
 - **UUID**: `c91fb9ed-15c3-4990-8824-0216e89f53b0`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 16:15:22 UTC`
 - **Resolved**: `2026-09-20 16:30:00 UTC`
+- **Accepted**: `2026-09-20 16:30:00 UTC`
 
 #### Description
 
@@ -920,11 +942,12 @@ Configured Sheet 6 Audio Subsystem with cols_per_row: 2 and grid_positions: U4 a
 ### <a id="bug-033"></a> 🟢 `[BUG-033]` pull up resistors overlap with U4
 
 - **UUID**: `0bc69eea-f4d7-40a6-bf9d-0558a713c14a`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 16:16:33 UTC`
 - **Resolved**: `2026-09-20 16:30:00 UTC`
+- **Accepted**: `2026-09-20 16:30:00 UTC`
 
 #### Description
 
@@ -952,11 +975,12 @@ Sorted filtered_pins by sheet_def.pin_breakouts index in _build_sheet_plans() to
 ### <a id="bug-034"></a> 🟢 `[BUG-034]` flex tail PCB outline is incorrect
 
 - **UUID**: `947cf1d2-994b-49f7-b903-fd33a54c946a`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 16:19:59 UTC`
 - **Resolved**: `2026-09-20 16:30:00 UTC`
+- **Accepted**: `2026-09-20 16:30:00 UTC`
 
 #### Description
 
@@ -980,10 +1004,11 @@ Attached outline_polygon from CAD shape to PCBBoard in TestBoardProvider.flex_ta
 ### <a id="bug-035"></a> 🟢 `[BUG-035]` Q1 load switch truth table has overlap with decoupling capactitors
 
 - **UUID**: `5ecb87f0-0f7b-48c9-93f6-684788243a13`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 16:20:46 UTC`
+- **Accepted**: `2026-09-20 16:20:46 UTC`
 
 #### Description
 
@@ -1004,10 +1029,11 @@ Separated decoupling capacitor bank to base_x=35.0 on the left and Q1 truth tabl
 ### <a id="bug-036"></a> 🟢 `[BUG-036]` Overlapping placement in sheet 5
 
 - **UUID**: `bd5cc1ac-a39f-4f4f-9224-7ca585b8c51c`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 21:03:41 UTC`
+- **Accepted**: `2026-09-20 21:03:41 UTC`
 
 #### Description
 
@@ -1030,10 +1056,11 @@ Offset capacitor RefDes and value text clear of plate width (text_x_off=4.8), in
 ### <a id="bug-037"></a> 🟢 `[BUG-037]` Overlapping oplacement in sheet 7
 
 - **UUID**: `11851671-3b3d-4fcd-8c9a-174f40d6e403`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 21:07:01 UTC`
+- **Accepted**: `2026-09-20 21:07:01 UTC`
 
 #### Description
 
@@ -1056,10 +1083,11 @@ Increased I2C pullup card height and moved title to top with >7mm clearance abov
 ### <a id="bug-038"></a> 🟢 `[BUG-038]` Flex tail not routed
 
 - **UUID**: `431b886a-2d7f-4cf7-94ca-c03979ce3029`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 21:09:18 UTC`
+- **Accepted**: `2026-09-20 21:09:18 UTC`
 
 #### Description
 
@@ -1090,10 +1118,11 @@ Removed flex trace export suppression in exporter.py, routing all flex tail trac
 ### <a id="bug-039"></a> 🟢 `[BUG-039]` carrier board still shows multiple routing failures
 
 - **UUID**: `42b78f3b-3a30-40cf-a161-b1c34d1e128d`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 21:16:53 UTC`
+- **Accepted**: `2026-09-20 21:16:53 UTC`
 
 #### Description
 
@@ -1117,10 +1146,11 @@ Root caused and fixed inner copper plane refilling (In1.Cu GND, In3.Cu 3V3), inv
 ### <a id="bug-040"></a> 🟢 `[BUG-040]` TP_GND is not connected to ground
 
 - **UUID**: `051ecdad-7d4e-4abb-afdc-d9e170b3b93e`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 21:21:39 UTC`
+- **Accepted**: `2026-09-20 21:21:39 UTC`
 
 #### Description
 
@@ -1141,10 +1171,11 @@ Updated PCBAutoRouter to include plane net test points in smd_endpoints, added F
 ### <a id="bug-041"></a> 🟢 `[BUG-041]` Canonicalize component names on carrier board and flex tail
 
 - **UUID**: `e501b694-250a-49a4-9e82-52fe75cd2958`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 21:22:50 UTC`
+- **Accepted**: `2026-09-20 21:22:50 UTC`
 
 #### Description
 
@@ -1168,11 +1199,12 @@ Canonicalized component reference designators to standard single-letter prefixes
 ### <a id="bug-042"></a> 🟢 `[BUG-042]` Test board wiring diagram looks like spaghetti
 
 - **UUID**: `ef266a4f-9624-4284-a389-8be2dc5e5eab`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 21:24:58 UTC`
 - **Resolved**: `2026-09-21 05:13:27 UTC`
+- **Accepted**: `2026-09-21 05:13:27 UTC`
 
 #### Description
 
@@ -1190,11 +1222,12 @@ Added Room.diagram_options to respect top-down colored 2D wiring views in build.
 ### <a id="bug-043"></a> 🟢 `[BUG-043]` auto router is bridging pads to traces
 
 - **UUID**: `106dedfb-8e08-4161-b163-b104fbab4596`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 21:27:13 UTC`
 - **Resolved**: `2026-09-21 02:09:49 UTC`
+- **Accepted**: `2026-09-21 02:09:49 UTC`
 
 #### Description
 
@@ -1220,11 +1253,12 @@ Added pad-to-trace clearance padding in PCBAutoRouter obstacle grid and implemen
 ### <a id="bug-044"></a> 🟢 `[BUG-044]` auto router is placing vias in mid air on flex tail
 
 - **UUID**: `bfa909fc-57a3-42e6-8741-b75d81be2c68`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 23:29:47 UTC`
 - **Resolved**: `2026-09-21 02:09:56 UTC`
+- **Accepted**: `2026-09-21 02:09:56 UTC`
 
 #### Description
 
@@ -1245,11 +1279,12 @@ Implemented check_via_connectivity in drc.py validating that every via resides w
 ### <a id="bug-045"></a> 🟢 `[BUG-045]` every carrier PCB silkscreen is missing
 
 - **UUID**: `9e96cab1-648c-4537-808d-6d7fd3b7db5e`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 23:35:07 UTC`
 - **Resolved**: `2026-09-21 02:10:00 UTC`
+- **Accepted**: `2026-09-21 02:10:00 UTC`
 
 #### Resolution Notes
 
@@ -1260,11 +1295,12 @@ Implemented BuildSilkscreen CM in provider.py and silkscreen() method on TestBoa
 ### <a id="bug-046"></a> 🟢 `[BUG-046]` U1 has missing balls on left, 2 vias in middle where balls should be
 
 - **UUID**: `67ed4854-d82f-449d-8dca-4ae3b9213fee`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 23:36:53 UTC`
 - **Resolved**: `2026-09-21 02:10:06 UTC`
+- **Accepted**: `2026-09-21 02:10:06 UTC`
 
 #### Description
 
@@ -1285,11 +1321,12 @@ Aligned U1 BGA-196 footprint to canonical 14x14 0.8mm pitch grid in ic.yaml, and
 ### <a id="bug-047"></a> 🟢 `[BUG-047]` Parse kicad DRC reports
 
 - **UUID**: `0018c583-7135-4611-af1e-817c11ce48ba`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 23:37:51 UTC`
 - **Resolved**: `2026-09-21 02:10:10 UTC`
+- **Accepted**: `2026-09-21 02:10:10 UTC`
 
 #### Description
 
@@ -1312,11 +1349,12 @@ Implemented parse_drc_report in KiCadCLI, integrated headless KiCad DRC generati
 ### <a id="bug-048"></a> 🟢 `[BUG-048]` Create BuildTraces, BuildVias CMs
 
 - **UUID**: `fa11ebc8-8432-4bf4-8dcf-d8ee240f41b4`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-20 23:45:22 UTC`
 - **Resolved**: `2026-09-21 02:10:15 UTC`
+- **Accepted**: `2026-09-21 02:10:15 UTC`
 
 #### Description
 
@@ -1335,11 +1373,12 @@ Created BuildTraces and BuildVias context managers in provider/pcb/routing.py an
 ### <a id="bug-049"></a> 🟢 `[BUG-049]` Use BuildSilkScreen CM for carrier PCB
 
 - **UUID**: `77e7e739-6f4b-4cde-89da-eb500700147d`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 00:59:39 UTC`
 - **Resolved**: `2026-09-21 02:10:20 UTC`
+- **Accepted**: `2026-09-21 02:10:20 UTC`
 
 #### Description
 
@@ -1360,11 +1399,12 @@ Refactored carrier_board to use with BuildSilkscreen() as silk: silk.add(self.si
 ### <a id="bug-050"></a> 🟢 `[BUG-050]` Remove carrier_pcb from the provider manifest
 
 - **UUID**: `f5c0e4cd-26cb-4e0d-90a3-60f05afd7b5e`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 01:02:07 UTC`
 - **Resolved**: `2026-09-21 02:10:25 UTC`
+- **Accepted**: `2026-09-21 02:10:25 UTC`
 
 #### Description
 
@@ -1385,11 +1425,12 @@ Removed obsolete carrier_pcb target from src/projects/test_board/manifest.yaml.
 ### <a id="bug-051"></a> 🟢 `[BUG-051]` Add SWD header to test board
 
 - **UUID**: `c03e10eb-3ee6-433a-9eb2-0d8ece106f92`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 01:05:11 UTC`
 - **Resolved**: `2026-09-21 02:41:22 UTC`
+- **Accepted**: `2026-09-21 02:41:22 UTC`
 
 #### Description
 
@@ -1404,11 +1445,12 @@ Added standard 10-pin ARM Cortex SWD micro-header footprint (pin_header_2x5_1.27
 ### <a id="bug-052"></a> 🟢 `[BUG-052]` Add peripheral headers to test board
 
 - **UUID**: `4cfaf4e0-a9aa-4309-be1f-5f7627179b0b`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 01:07:13 UTC`
 - **Resolved**: `2026-09-21 02:41:26 UTC`
+- **Accepted**: `2026-09-21 02:41:26 UTC`
 
 #### Description
 
@@ -1425,11 +1467,12 @@ Added evaluation peripheral headers for dual I2C (J6, J7, SM04B-SRSS-TB), dual I
 ### <a id="bug-053"></a> 🟢 `[BUG-053]` Add RGB status LED to test board
 
 - **UUID**: `8545ccf7-0359-4710-b123-a70a32ba0c6e`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 01:08:03 UTC`
 - **Resolved**: `2026-09-21 02:41:30 UTC`
+- **Accepted**: `2026-09-21 02:41:30 UTC`
 
 #### Description
 
@@ -1444,11 +1487,12 @@ Selected dedicated I2C constant-current RGB LED driver (U6, TI LP5009, TSSOP-16)
 ### <a id="bug-054"></a> 🟢 `[BUG-054]` Add charger and fuel gauge to test board
 
 - **UUID**: `5f477a1a-eb39-43f4-811b-1a3cb3554517`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 01:09:13 UTC`
 - **Resolved**: `2026-09-21 02:41:34 UTC`
+- **Accepted**: `2026-09-21 02:41:34 UTC`
 
 #### Description
 
@@ -1463,11 +1507,12 @@ Selected TI BQ24074 1.5A dynamic power-path Li-Ion charger (U3, VQFN-16) to repl
 ### <a id="bug-055"></a> 🟢 `[BUG-055]` Add GPIO header to the test board
 
 - **UUID**: `d532e4b8-796b-4ee5-91c8-63513bf170aa`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 01:10:07 UTC`
 - **Resolved**: `2026-09-21 02:41:37 UTC`
+- **Accepted**: `2026-09-21 02:41:37 UTC`
 
 #### Description
 
@@ -1482,11 +1527,12 @@ Added 10-pin general-purpose breakout header (J14, pin_header_1x10, Samtec TSW-1
 ### <a id="bug-056"></a> 🟢 `[BUG-056]` Add embedded NAND storage
 
 - **UUID**: `9b1d5b90-fc7e-4ec6-b432-f7003a2dbb7c`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 01:11:26 UTC`
 - **Resolved**: `2026-09-21 02:41:40 UTC`
+- **Accepted**: `2026-09-21 02:41:40 UTC`
 
 #### Description
 
@@ -1501,11 +1547,12 @@ Selected Winbond W25N01GV 1Gb Serial SLC NAND flash (U8, WSON-8, 104MHz Quad SPI
 ### <a id="bug-057"></a> 🟢 `[BUG-057]` Add USB-UART IC
 
 - **UUID**: `cc26623a-ad39-4a35-95d6-5797ab59e9c3`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 01:13:29 UTC`
 - **Resolved**: `2026-09-21 02:41:44 UTC`
+- **Accepted**: `2026-09-21 02:41:44 UTC`
 
 #### Description
 
@@ -1520,11 +1567,12 @@ Selected FTDI FT232RNQ high-speed USB-UART bridge (U9, QFN-32) connected to exte
 ### <a id="bug-058"></a> 🟢 `[BUG-058]` Source new microcontroller
 
 - **UUID**: `2f7c5612-c77f-499f-8c9c-5dbfac310a29`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 01:14:34 UTC`
 - **Resolved**: `2026-09-21 02:41:46 UTC`
+- **Accepted**: `2026-09-21 02:41:46 UTC`
 
 #### Description
 
@@ -1545,11 +1593,12 @@ Conducted architecture downselection trade study across NXP MCX N947, ST STM32U5
 ### <a id="bug-059"></a> 🟢 `[BUG-059]` Begin downselection process
 
 - **UUID**: `8ec03035-6248-4b36-8242-92488529ae3b`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 01:19:02 UTC`
 - **Resolved**: `2026-09-21 02:21:29 UTC`
+- **Accepted**: `2026-09-21 02:21:29 UTC`
 
 #### Description
 
@@ -1564,11 +1613,12 @@ Created comprehensive Downselection & Architecture Report (docs/downselection_re
 ### <a id="bug-060"></a> 🟢 `[BUG-060]` Support Deep Power Down
 
 - **UUID**: `83c4fb9a-1eb5-4bde-9427-fde6037c9327`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 01:21:20 UTC`
 - **Resolved**: `2026-09-21 03:15:51 UTC`
+- **Accepted**: `2026-09-21 03:15:51 UTC`
 
 #### Description
 
@@ -1583,11 +1633,12 @@ Wired independent hardware wakeup triggers into MCX N947 always-on power domain:
 ### <a id="bug-061"></a> 🟢 `[BUG-061]` Verify required power on sequencing steps
 
 - **UUID**: `d8866091-6a3f-4c3a-8454-4c5e48caabaf`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 02:58:44 UTC`
 - **Resolved**: `2026-09-21 03:15:51 UTC`
+- **Accepted**: `2026-09-21 03:15:51 UTC`
 
 #### Description
 
@@ -1611,11 +1662,12 @@ Verified all 5 required power-on sequencing steps and documented in Downselectio
 ### <a id="bug-062"></a> 🟢 `[BUG-062]` Connect FlexSPI to embedded flash in Dual Channel mode
 
 - **UUID**: `3c744d4a-4406-4bd5-82f3-e35302a95d26`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 03:01:44 UTC`
 - **Resolved**: `2026-09-21 04:38:38 UTC`
+- **Accepted**: `2026-09-21 04:38:38 UTC`
 
 #### Description
 
@@ -1638,11 +1690,12 @@ Implemented Dual-Channel FlexSPI architecture connecting Winbond W25N01GV 1Gb se
 ### <a id="bug-063"></a> 🟢 `[BUG-063]` Connect /CHG to MCU
 
 - **UUID**: `8a865764-b65a-4dfe-9017-0b4ba7dc71fb`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 03:06:00 UTC`
 - **Resolved**: `2026-09-21 04:38:42 UTC`
+- **Accepted**: `2026-09-21 04:38:42 UTC`
 
 #### Description
 
@@ -1663,11 +1716,12 @@ Connected TI BQ24074 charging status output (/CHG, pin 11) via net CHG_STAT with
 ### <a id="bug-064"></a> 🟢 `[BUG-064]` Round edges of bottom of enclosure
 
 - **UUID**: `dc6afb9a-35fe-498a-9690-a50237ae478c`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Created**: `2026-09-21 03:16:13 UTC`
 - **Resolved**: `2026-09-21 05:13:31 UTC`
+- **Accepted**: `2026-09-21 05:13:31 UTC`
 
 #### Description
 
@@ -1682,11 +1736,12 @@ Applied outer corner fillets (r=8mm) and inner fillets (r=6mm) to enclosure bott
 ### <a id="bug-065"></a> 🟢 `[BUG-065]` Add connector cutouts to bottom enclosure
 
 - **UUID**: `648caaa1-539a-4576-918c-e17ddf5f78e1`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Created**: `2026-09-21 04:41:42 UTC`
 - **Resolved**: `2026-09-21 05:13:34 UTC`
+- **Accepted**: `2026-09-21 05:13:34 UTC`
 
 #### Description
 
@@ -1701,11 +1756,12 @@ Added connector cutouts for USB-C (12x6.5mm), flex tail slot (26x3mm), and M.2 c
 ### <a id="bug-066"></a> 🟢 `[BUG-066]` Component silkscreens missing from the PCB
 
 - **UUID**: `19cb20ea-93e8-4b2c-94a8-c0cddebeaa36`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 04:42:50 UTC`
 - **Resolved**: `2026-09-21 05:13:40 UTC`
+- **Accepted**: `2026-09-21 05:13:40 UTC`
 
 #### Description
 
@@ -1720,11 +1776,12 @@ Added all component reference designators (U1-U4, J1-J3, Q1, SPK1, Y1, R1-R6, C1
 ### <a id="bug-067"></a> 🟢 `[BUG-067]` Apply component downselection results  to PCB
 
 - **UUID**: `fcbbd37c-e6e1-40c1-8d20-ff7f19faf4ca`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 04:43:55 UTC`
 - **Resolved**: `2026-09-22 15:05:08 UTC`
+- **Accepted**: `2026-09-22 15:05:08 UTC`
 
 #### Description
 
@@ -1755,11 +1812,12 @@ Applied NXP MCXN947VDF in VFBGA-184 (184 pins, 0.50mm pitch) to test_board wirin
 ### <a id="bug-068"></a> 🟢 `[BUG-068]` Component fell off schematic page 5
 
 - **UUID**: `f1f55c2c-dc46-4df5-8a0e-b7e8e7d8946d`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 04:47:04 UTC`
 - **Resolved**: `2026-09-21 05:13:57 UTC`
+- **Accepted**: `2026-09-21 05:13:57 UTC`
 
 #### Description
 
@@ -1782,11 +1840,12 @@ Reoriented Sheet 5 oscillator pins to face Y1 and added SCHEMATIC_PAGE_BOUNDARY_
 ### <a id="bug-069"></a> 🟢 `[BUG-069]` Change bug_report and code_review backing store to sqlite
 
 - **UUID**: `056b1fec-578d-430c-b32c-8e188cd9eca2`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Created**: `2026-09-21 04:48:26 UTC`
 - **Resolved**: `2026-09-21 05:14:04 UTC`
+- **Accepted**: `2026-09-21 05:14:04 UTC`
 
 #### Description
 
@@ -1801,11 +1860,12 @@ Implemented SQLiteBugStore backed by build/bugs.sqlite providing atomic ACID per
 ### <a id="bug-070"></a> 🟢 `[BUG-070]` Add battery connector to carrier board
 
 - **UUID**: `6164d2aa-1e90-46b3-be31-56e461366164`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 04:49:03 UTC`
 - **Resolved**: `2026-09-22 05:25:55 UTC`
+- **Accepted**: `2026-09-22 05:25:55 UTC`
 
 #### Description
 
@@ -1822,11 +1882,12 @@ Verified JST-PH battery connector J13 and C13 decoupling capacitor placement, VB
 ### <a id="bug-071"></a> 🟢 `[BUG-071]` I2c pull ups on sheet 7 dangling off page
 
 - **UUID**: `46160a75-4a0b-483a-ac83-cae3ae10b3b3`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 04:50:11 UTC`
 - **Resolved**: `2026-09-21 05:14:16 UTC`
+- **Accepted**: `2026-09-21 05:14:16 UTC`
 
 #### Description
 
@@ -1847,11 +1908,12 @@ Reoriented Sheet 7 I2C pins, clamped passive placement within page boundaries, a
 ### <a id="bug-073"></a> 🟢 `[BUG-073]` Add GPIO cutout to enclosure
 
 - **UUID**: `290f00ab-1e47-4fde-bd2b-206dbc69e1f1`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Created**: `2026-09-21 15:36:11 UTC`
 - **Resolved**: `2026-09-21 16:17:54 UTC`
+- **Accepted**: `2026-09-21 16:17:54 UTC`
 
 #### Description
 
@@ -1866,11 +1928,12 @@ Added GPIO cutout to enclosure lid aligned with J14 and engraved GPIO pinout key
 ### <a id="bug-074"></a> 🟢 `[BUG-074]` Add peripheral cutouts to enclosure bottom
 
 - **UUID**: `46374750-19f9-4f7b-9da0-656b765c734f`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Created**: `2026-09-21 15:37:11 UTC`
 - **Resolved**: `2026-09-21 16:19:32 UTC`
+- **Accepted**: `2026-09-21 16:19:32 UTC`
 
 #### Description
 
@@ -1885,11 +1948,12 @@ Added peripheral cutouts for J6 (I2C), J7 (I3C0), J8 (I3C1), J9 (SPI), and J10 (
 ### <a id="bug-075"></a> 🟢 `[BUG-075]` Add SWD cutout to enclosure
 
 - **UUID**: `4459e1cc-bf43-4fa1-8f5c-cc5ec242d0e6`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Created**: `2026-09-21 15:38:17 UTC`
 - **Resolved**: `2026-09-21 16:21:05 UTC`
+- **Accepted**: `2026-09-21 16:21:05 UTC`
 
 #### Description
 
@@ -1904,11 +1968,12 @@ Added SWD connector cutout through the left exterior wall of enclosure bottom al
 ### <a id="bug-076"></a> 🟢 `[BUG-076]` Enclosure lid should snap fit
 
 - **UUID**: `c9caaa42-32e2-4d19-80eb-704db97154f4`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Created**: `2026-09-21 15:39:09 UTC`
 - **Resolved**: `2026-09-21 16:23:05 UTC`
+- **Accepted**: `2026-09-21 16:23:05 UTC`
 
 #### Description
 
@@ -1927,11 +1992,12 @@ Replaced useless screw holes on enclosure lid with snap fit cantilever ridges on
 ### <a id="bug-077"></a> 🟢 `[BUG-077]` Add ventillation holes to enclosure bottom
 
 - **UUID**: `287ce0c0-517d-4435-bed8-60ee8acf836c`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Created**: `2026-09-21 16:02:28 UTC`
 - **Resolved**: `2026-09-21 16:24:14 UTC`
+- **Accepted**: `2026-09-21 16:24:14 UTC`
 
 #### Description
 
@@ -1946,12 +2012,13 @@ Added ventilation slots through left exterior wall of enclosure bottom strategic
 ### <a id="bug-080"></a> 🟢 `[BUG-080]` Add LED cutout to test board enclosure
 
 - **UUID**: `ede3fd6e-7bbc-4764-8145-a4624b604c3e`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `test_board`
 - **Created**: `2026-09-21 17:00:00 UTC`
 - **Resolved**: `2026-09-21 17:58:00 UTC`
+- **Accepted**: `2026-09-21 17:58:00 UTC`
 
 #### Description
 
@@ -1971,11 +2038,12 @@ Added 5.0mm LED cutout to enclosure lid at D1, created translucent push-fit led_
 ### <a id="bug-079"></a> 🟢 `[BUG-079]` Move BUGS.md to repo root
 
 - **UUID**: `e9ecf898-0dd2-4b0c-8a91-c4ee2132c777`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Created**: `2026-09-21 18:07:16 UTC`
 - **Resolved**: `2026-09-21 18:15:28 UTC`
+- **Accepted**: `2026-09-21 18:15:28 UTC`
 
 #### Description
 
@@ -1990,11 +2058,12 @@ Moved BUGS.md export destination to repository root (BUGS.md) for persistent com
 ### <a id="bug-081"></a> 🟢 `[BUG-081]` This build.py command should have failed
 
 - **UUID**: `9857a36d-52ea-4e8c-bb10-13211cded1c1`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Created**: `2026-09-21 18:21:02 UTC`
 - **Resolved**: `2026-09-21 18:43:17 UTC`
+- **Accepted**: `2026-09-21 18:43:17 UTC`
 
 #### Description
 
@@ -2018,11 +2087,12 @@ Resolved target resolution in Builder.generate_pcbs using TargetParser.resolve s
 ### <a id="bug-082"></a> 🟢 `[BUG-082]` Route test board
 
 - **UUID**: `1a434ffc-4003-43ee-9f14-eab696413438`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 18:23:13 UTC`
 - **Resolved**: `2026-09-24 20:37:46 UTC`
+- **Accepted**: `2026-09-24 20:37:46 UTC`
 
 #### Description
 
@@ -2048,11 +2118,12 @@ Carrier board auto-routed with zero drc.py and zero KiCad DRC violations.
 ### <a id="bug-083"></a> 🟢 `[BUG-083]` I2C pullup resistors overlap
 
 - **UUID**: `65df51ef-6b32-4bcd-a8c3-5d486ce4c0bb`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 18:25:23 UTC`
 - **Resolved**: `2026-09-21 19:06:32 UTC`
+- **Accepted**: `2026-09-21 19:06:32 UTC`
 
 #### Description
 
@@ -2073,12 +2144,13 @@ Fixed Sheet 7 I2C pullup resistor overlap by setting col_gap 50.0, spacing chann
 ### <a id="bug-084"></a> 🟢 `[BUG-084]` Update board files schematics
 
 - **UUID**: `0da1a2dc-0f8c-4b34-9a71-57fae729a708`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-21 18:26:11 UTC`
 - **Resolved**: `2026-09-23 03:42:54 UTC`
+- **Accepted**: `2026-09-23 03:42:54 UTC`
 
 #### Description
 
@@ -2110,11 +2182,12 @@ Verified and updated carrier board files, silkscreen, and schematics to Revision
 ### <a id="bug-085"></a> 🟢 `[BUG-085]` Change mounting holes on enclosure bottom to mounting posts
 
 - **UUID**: `936491ad-efab-460b-b39f-833d1d6c629d`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Created**: `2026-09-21 18:53:03 UTC`
 - **Resolved**: `2026-09-22 01:30:56 UTC`
+- **Accepted**: `2026-09-22 01:30:56 UTC`
 
 #### Description
 
@@ -2129,11 +2202,12 @@ Replaced standoff screw mounting pilot holes with clip-on mounting posts featuri
 ### <a id="bug-086"></a> 🟢 `[BUG-086]` Capacitive sensing and control section is incorrect
 
 - **UUID**: `431547ae-b8ad-4f7c-a481-73b2b58b3428`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 19:12:34 UTC`
 - **Resolved**: `2026-09-22 05:21:44 UTC`
+- **Accepted**: `2026-09-22 05:21:44 UTC`
 
 #### Description
 
@@ -2155,11 +2229,12 @@ Downselected U2 to Azoteq IQS7222A001QNR in QFN-20 with dual internal LDO decoup
 ### <a id="bug-087"></a> 🟢 `[BUG-087]` Add power test points
 
 - **UUID**: `85c32628-6439-495a-b4c6-40c3bbcb0254`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-22 02:54:00 UTC`
 - **Resolved**: `2026-09-22 07:35:55 UTC`
+- **Accepted**: `2026-09-22 07:35:55 UTC`
 
 #### Description
 
@@ -2174,11 +2249,12 @@ Added power test points TP_VBAT at (-18.0, -26.0), TP_VBUS at (-14.0, -26.0), an
 ### <a id="bug-088"></a> 🟢 `[BUG-088]` Schematic bugs review
 
 - **UUID**: `be95461b-fd1b-4369-be49-995cb7356e69`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-22 02:59:42 UTC`
 - **Resolved**: `2026-09-22 08:42:28 UTC`
+- **Accepted**: `2026-09-22 08:42:28 UTC`
 
 #### Description
 
@@ -2207,11 +2283,12 @@ Clamped symbol heights in SchematicDiagram to avoid page bottom overflow (cy >= 
 ### <a id="bug-089"></a> 🟢 `[BUG-089]` Organize schematic pages by subsystem
 
 - **UUID**: `436f41bf-29b0-46dd-9a40-12ee59275372`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-22 03:04:02 UTC`
 - **Resolved**: `2026-09-22 14:58:53 UTC`
+- **Accepted**: `2026-09-22 14:58:53 UTC`
 
 #### Description
 
@@ -2226,11 +2303,12 @@ Reorganized carrier board schematic pages into 11 functional subsystem sheets co
 ### <a id="bug-090"></a> 🟢 `[BUG-090]` Test board Enclosure feedback
 
 - **UUID**: `8c4c6527-9a0a-4bb6-9c13-533fe827b095`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Created**: `2026-09-22 03:06:00 UTC`
 - **Resolved**: `2026-09-22 15:09:49 UTC`
+- **Accepted**: `2026-09-22 15:09:49 UTC`
 
 #### Description
 
@@ -2253,12 +2331,13 @@ Spaced SWD cutout (swd_y = -15.0mm, swd_w = 8.0mm) from USB-C cutout with >= 5.0
 ### <a id="bug-091"></a> 🟢 `[BUG-091]` The diff view has scroll bars on every line
 
 - **UUID**: `f5335916-4d1e-4454-9243-36e31beb3f47`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `code_review`
 - **Created**: `2026-09-23 03:07:50 UTC`
 - **Resolved**: `2026-09-23 03:35:25 UTC`
+- **Accepted**: `2026-09-23 03:35:25 UTC`
 
 #### Description
 
@@ -2279,11 +2358,12 @@ Removed per-line max-width: 0 and overflow-x: auto styling from table cells and 
 ### <a id="bug-092"></a> 🟢 `[BUG-092]` Add logo to carrier board top
 
 - **UUID**: `36b4d8c6-8ccb-4728-b096-db51999c1bc7`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-23 03:11:12 UTC`
 - **Resolved**: `2026-09-24 04:44:21 UTC`
+- **Accepted**: `2026-09-24 04:44:21 UTC`
 
 #### Description
 
@@ -2303,11 +2383,12 @@ Replaced text-based silkscreen markings with a totally unique vector image emble
 ### <a id="bug-093"></a> 🟢 `[BUG-093]` Update docs with architecture changes
 
 - **UUID**: `bd9bccab-f6fe-4eb6-a75d-f74708c22b85`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `GENERAL`
 - **Created**: `2026-09-23 03:12:05 UTC`
 - **Resolved**: `2026-09-23 03:39:28 UTC`
+- **Accepted**: `2026-09-23 03:39:28 UTC`
 
 #### Description
 
@@ -2322,11 +2403,12 @@ Updated src/projects/test_board.md with revised architecture: snap-in mounting p
 ### <a id="bug-094"></a> 🟢 `[BUG-094]` Remove manual net priorities from PCB router
 
 - **UUID**: `802f1b89-ee10-48a5-a984-10dc318edd99`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-23 03:29:42 UTC`
 - **Resolved**: `2026-09-23 03:48:26 UTC`
+- **Accepted**: `2026-09-23 03:48:26 UTC`
 
 #### Description
 
@@ -2368,11 +2450,12 @@ Replaced manual net name matching in PCBAutoRouter with dynamic geometric priori
 ### <a id="bug-095"></a> 🟢 `[BUG-095]` Make JAX router backend the default
 
 - **UUID**: `0e77b57d-9b5b-4863-adf6-5598d7774bb7`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 02:44:12 UTC`
 - **Resolved**: `2026-09-24 03:09:37 UTC`
+- **Accepted**: `2026-09-24 03:09:37 UTC`
 
 #### Description
 
@@ -2387,11 +2470,12 @@ Made JaxPCBRouter the default backend, removed deprecated AStarPCBRouter, and ad
 ### <a id="bug-096"></a> 🟢 `[BUG-096]` Load switch should control audio and peripheral domains
 
 - **UUID**: `ffe2d0e2-5e40-4f77-b9b1-6c53450a57a7`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 02:45:52 UTC`
 - **Resolved**: `2026-09-24 03:12:01 UTC`
+- **Accepted**: `2026-09-24 03:12:01 UTC`
 
 #### Description
 
@@ -2406,11 +2490,12 @@ Wired audio amplifier U4, C8, and peripheral headers J6-J9 to switched domain VL
 ### <a id="bug-097"></a> 🟢 `[BUG-097]` Log routing violations to a file
 
 - **UUID**: `bd66ac71-0bc6-4bc0-87ab-5b01d37e905e`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 02:47:31 UTC`
 - **Resolved**: `2026-09-24 03:13:49 UTC`
+- **Accepted**: `2026-09-24 03:13:49 UTC`
 
 #### Description
 
@@ -2434,11 +2519,12 @@ Redirected PCB DRC routing violations to board/<provider>/<subassembly>_drc_viol
 ### <a id="bug-098"></a> 🟢 `[BUG-098]` Sheer 3 - C9, C10 overlap
 
 - **UUID**: `98685440-f419-4451-8ea6-093f69e83cfd`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 20:52:26 UTC`
 - **Resolved**: `2026-09-25 03:08:55 UTC`
+- **Accepted**: `2026-09-25 03:08:55 UTC`
 
 #### Description
 
@@ -2459,11 +2545,12 @@ Increased horizontal separation between crystal load capacitors C9 and C10 to 18
 ### <a id="bug-099"></a> 🟢 `[BUG-099]` Sheet 4- FLEXSPI wires should route around U8
 
 - **UUID**: `03d38cfc-601b-4516-98da-72c902bb1547`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 20:53:44 UTC`
 - **Resolved**: `2026-09-25 03:08:57 UTC`
+- **Accepted**: `2026-09-25 03:08:57 UTC`
 
 #### Description
 
@@ -2484,11 +2571,12 @@ Added concentric detour routing under U8 for Sheet 4 FLEXSPI signals to eliminat
 ### <a id="bug-100"></a> 🟢 `[BUG-100]` Sheet 6-SCL and SDA lines overlap
 
 - **UUID**: `157cac13-2237-412a-b50b-182196eeb89c`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 20:55:50 UTC`
 - **Resolved**: `2026-09-25 03:08:59 UTC`
+- **Accepted**: `2026-09-25 03:08:59 UTC`
 
 #### Description
 
@@ -2509,11 +2597,12 @@ Staggered Sheet 6 SCL and SDA doglegs to eliminate collinear segment overlaps.
 ### <a id="bug-101"></a> 🟢 `[BUG-101]` Sheet 7-U2 and J2- cap touch net routing is messy
 
 - **UUID**: `a60970aa-b66e-4a1d-9a46-2c38468d9ae9`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 20:57:12 UTC`
 - **Resolved**: `2026-09-25 03:09:00 UTC`
+- **Accepted**: `2026-09-25 03:09:00 UTC`
 
 #### Description
 
@@ -2528,11 +2617,12 @@ Cleaned up Sheet 7 capacitive touch routing on U2 and J2 with direct orthogonal 
 ### <a id="bug-102"></a> 🟢 `[BUG-102]` Sheet 9- PCIE lanes are not cleanly routed
 
 - **UUID**: `01da2c17-f5fa-4053-bb5d-7ac30907cdf5`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 21:01:11 UTC`
 - **Resolved**: `2026-09-25 03:09:02 UTC`
+- **Accepted**: `2026-09-25 03:09:02 UTC`
 
 #### Description
 
@@ -2553,11 +2643,12 @@ Routed Sheet 9 PCIE differential pairs straight across and detoured MIPI signals
 ### <a id="bug-103"></a> 🟢 `[BUG-103]` Sheet 10- Serial Bus Expansion Headers needs to be broken into 2 pages
 
 - **UUID**: `bbdab2dd-e9ed-454f-8155-e9c64cc67fbc`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 21:04:04 UTC`
 - **Resolved**: `2026-09-25 03:09:04 UTC`
+- **Accepted**: `2026-09-25 03:09:04 UTC`
 
 #### Description
 
@@ -2578,11 +2669,12 @@ Split dense Serial Bus Expansion Headers into Sheet 10 (I2C & I3C) and Sheet 11 
 ### <a id="bug-104"></a> 🟢 `[BUG-104]` Sheet11- GPIOs should route without off-sheet connectors
 
 - **UUID**: `8df883c5-54f4-4855-ac46-fb51af07aa33`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 21:06:52 UTC`
 - **Resolved**: `2026-09-25 03:09:07 UTC`
+- **Accepted**: `2026-09-25 03:09:07 UTC`
 
 #### Description
 
@@ -2603,11 +2695,12 @@ Routed Sheet 12 GPIO signals directly on-sheet without off-sheet connectors usin
 ### <a id="bug-105"></a> 🟢 `[BUG-105]` U4-Add AUDIO_EN GPIO connection to U1
 
 - **UUID**: `53b3ecc8-b0d9-40e3-a1b1-3036debc1621`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 21:10:15 UTC`
 - **Resolved**: `2026-09-25 03:09:08 UTC`
+- **Accepted**: `2026-09-25 03:09:08 UTC`
 
 #### Description
 
@@ -2622,11 +2715,12 @@ Routed dedicated AUDIO_EN GPIO from U1.L4 to U4.SD_MODE, decoupling audio shutdo
 ### <a id="bug-106"></a> 🟢 `[BUG-106]` J6-J9: Remove VLOAD_SW connector
 
 - **UUID**: `044d2cb2-3ea1-4094-ac59-09e760c39a34`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 21:11:33 UTC`
 - **Resolved**: `2026-09-25 03:09:10 UTC`
+- **Accepted**: `2026-09-25 03:09:10 UTC`
 
 #### Description
 
@@ -2641,12 +2735,13 @@ Replaced VLOAD_SW on J6-J9 with dedicated interrupt lines (EXP_INT_*); powered e
 ### <a id="bug-107"></a> 🟢 `[BUG-107]` Simulate flying probes test: carrier board
 
 - **UUID**: `ea397244-f29c-4dcf-a6f9-e64e0bdc3a82`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `SIMULATION`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-25 00:29:09 UTC`
 - **Resolved**: `2026-09-25 15:18:11 UTC`
+- **Accepted**: `2026-09-25 15:18:11 UTC`
 
 #### Description
 
@@ -2665,11 +2760,12 @@ Simulated flying probes test for carrier_board with obstacle clearance, electric
 ### <a id="bug-108"></a> 🟢 `[BUG-108]` Simulate flying probes test: flex tail
 
 - **UUID**: `37083992-c774-4d36-b4ec-216d78e8654b`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `SIMULATION`
 - **Created**: `2026-09-25 00:34:01 UTC`
 - **Resolved**: `2026-09-25 15:18:13 UTC`
+- **Accepted**: `2026-09-25 15:18:13 UTC`
 
 #### Description
 
@@ -2688,11 +2784,12 @@ Simulated flying probes test for flex_tail with obstacle clearance, electrical n
 ### <a id="bug-109"></a> 🟢 `[BUG-109]` Resolve pytest warnings
 
 - **UUID**: `72fe6f52-34ed-4099-afcd-4a8993ed8115`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `GENERAL`
 - **Created**: `2026-09-25 01:05:13 UTC`
 - **Resolved**: `2026-09-25 15:18:15 UTC`
+- **Accepted**: `2026-09-25 15:18:15 UTC`
 
 #### Description
 
@@ -2717,11 +2814,12 @@ Registered geometry mark in pyproject.toml and added warning filters for pyparsi
 ### <a id="bug-110"></a> 🟢 `[BUG-110]` Expansion header connectors should be JST-style
 
 - **UUID**: `7c1cd172-aaae-43cd-93f9-1dbe7d3710b9`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-25 01:10:03 UTC`
 - **Resolved**: `2026-09-25 15:18:17 UTC`
+- **Accepted**: `2026-09-25 15:18:17 UTC`
 
 #### Description
 
@@ -2736,12 +2834,13 @@ Updated expansion headers J9 and J10 to JST-PH-6P connectors with 2.0mm pitch in
 ### <a id="bug-111"></a> 🟢 `[BUG-111]` White square above J2
 
 - **UUID**: `d76b88da-f482-4019-9e64-b3da9517b83c`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-25 01:14:00 UTC`
 - **Resolved**: `2026-09-25 15:18:18 UTC`
+- **Accepted**: `2026-09-25 15:18:18 UTC`
 
 #### Description
 
@@ -2762,12 +2861,13 @@ Exported unfilled silkscreen rectangles as 4 explicit gr_line strokes to avoid K
 ### <a id="bug-112"></a> 🟢 `[BUG-112]` Update test board docs with recommended battery model
 
 - **UUID**: `32112b3a-96b0-417a-a341-b8f9ad7afaeb`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `GENERAL`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-25 01:15:38 UTC`
 - **Resolved**: `2026-09-25 15:18:20 UTC`
+- **Accepted**: `2026-09-25 15:18:20 UTC`
 
 #### Description
 
@@ -2782,12 +2882,13 @@ Updated test board docs with recommended PKCELL LP352438 350mAh LiPo battery mod
 ### <a id="bug-113"></a> 🟢 `[BUG-113]` Carrier board serial expansion cutouts overlap
 
 - **UUID**: `d1c06aea-2d5f-46ba-aca9-1bf40dd7be73`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-25 01:17:38 UTC`
 - **Resolved**: `2026-09-25 15:18:22 UTC`
+- **Accepted**: `2026-09-25 15:18:22 UTC`
 
 #### Description
 
@@ -2808,12 +2909,13 @@ Parameterized enclosure peripheral cutouts in measurements.yaml, adjusted J10 of
 ### <a id="bug-114"></a> 🟢 `[BUG-114]` Bug report tool does not pickup changes to BUGS.md
 
 - **UUID**: `e698a313-57ee-46a5-a468-71d9afc509f0`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `bug_report`
 - **Created**: `2026-09-25 02:21:09 UTC`
 - **Resolved**: `2026-09-25 15:18:24 UTC`
+- **Accepted**: `2026-09-25 15:18:24 UTC`
 
 #### Description
 
@@ -2828,11 +2930,12 @@ Implemented markdown parser, database merger, R+M+W sync, and file watcher on BU
 ### <a id="bug-115"></a> 🟢 `[BUG-115]` Move U10, U10 decoupling caps to new sheet page
 
 - **UUID**: `2c4ca06b-c2d1-4b23-9843-cca9fccba0eb`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-25 17:50:20 UTC`
 - **Resolved**: `2026-09-25 21:44:04 UTC`
+- **Accepted**: `2026-09-25 21:44:04 UTC`
 
 #### Description
 
@@ -2853,11 +2956,12 @@ Moved U10 to dedicated Peripheral Power sheet; renamed SENSOR_EN/3V3 to PERIPH_E
 ### <a id="bug-116"></a> 🟢 `[BUG-116]` SWD should not route thru U9
 
 - **UUID**: `cc57e1a5-411a-4c8c-b64c-7a3bcb05bd84`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-25 17:52:29 UTC`
 - **Resolved**: `2026-09-25 21:44:07 UTC`
+- **Accepted**: `2026-09-25 21:44:07 UTC`
 
 #### Description
 
@@ -2878,11 +2982,12 @@ Enhanced detour routing over U9 and placed power net symbols vertically above U9
 ### <a id="bug-117"></a> 🟢 `[BUG-117]` Remove SWO and NRST
 
 - **UUID**: `ffe00fd4-ff0f-483a-9ed3-7ff2f7272c07`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-25 17:55:30 UTC`
 - **Resolved**: `2026-09-25 21:44:09 UTC`
+- **Accepted**: `2026-09-25 21:44:09 UTC`
 
 #### Description
 
@@ -2903,11 +3008,12 @@ Pruned SWD_SWO net and pruned NRST routing from U9:23 and J5:10.
 ### <a id="bug-118"></a> 🟢 `[BUG-118]` GND has routing conflict with LED_R on U6 sheet
 
 - **UUID**: `4114073d-a2f9-451f-8154-2de82f2fb895`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-25 17:57:20 UTC`
 - **Resolved**: `2026-09-25 21:44:11 UTC`
+- **Accepted**: `2026-09-25 21:44:11 UTC`
 
 #### Description
 
@@ -2928,11 +3034,12 @@ Configured U6 pin sides with outputs 6-8 on right and GND on left, eliminating r
 ### <a id="bug-119"></a> 🟢 `[BUG-119]` Cap signals has multiple overlaps
 
 - **UUID**: `6b50deb1-f7f3-4679-9137-6bfe50ac3bd0`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-25 17:58:48 UTC`
 - **Resolved**: `2026-09-25 21:44:14 UTC`
+- **Accepted**: `2026-09-25 21:44:14 UTC`
 
 #### Description
 
@@ -2953,11 +3060,12 @@ Aligned J2 pin breakout order with U2 on Capacitive Sensing sheet.
 ### <a id="bug-120"></a> 🟢 `[BUG-120]` Move C8 to power regulation and distribution section.
 
 - **UUID**: `70b16445-9759-4eaa-acf8-ac2dfa74edec`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-25 18:01:12 UTC`
 - **Resolved**: `2026-09-25 21:44:16 UTC`
+- **Accepted**: `2026-09-25 21:44:16 UTC`
 
 #### Description
 
@@ -2978,11 +3086,12 @@ Moved C8 from Audio Subsystem to 3.3V Power Regulation sheet in pcb.yaml.
 ### <a id="bug-121"></a> 🟢 `[BUG-121]` Move MIPI CLK pins on J2
 
 - **UUID**: `f34546c5-a0f3-49c1-8e6a-0bf03d03a1fd`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-25 19:35:13 UTC`
 - **Resolved**: `2026-09-25 21:44:19 UTC`
+- **Accepted**: `2026-09-25 21:44:19 UTC`
 
 #### Description
 
@@ -3003,11 +3112,12 @@ Moved MIPI CLK differential pins to right side of J2.
 ### <a id="bug-122"></a> 🟢 `[BUG-122]` J6, J7, J8 should be JST-PH-6P connectors
 
 - **UUID**: `0fd439c8-ca48-45ad-a849-a3374ae10aa2`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-25 19:37:35 UTC`
 - **Resolved**: `2026-09-25 21:44:21 UTC`
+- **Accepted**: `2026-09-25 21:44:21 UTC`
 
 #### Description
 
@@ -3028,11 +3138,12 @@ Configured JST-PH-6P connector style on J6-J8 and created 5 dedicated expansion 
 ### <a id="bug-123"></a> 🟢 `[BUG-123]` Sheet 12- GPIO wires overlap
 
 - **UUID**: `50dd752e-3551-4998-8f56-a6384763bb80`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-25 19:39:13 UTC`
 - **Resolved**: `2026-09-25 21:44:23 UTC`
+- **Accepted**: `2026-09-25 21:44:23 UTC`
 
 #### Description
 
@@ -3053,11 +3164,12 @@ Configured GPIO pin sides on Sheet 16 and routed upper pins over U1 into header 
 ### <a id="bug-124"></a> 🟢 `[BUG-124]` Couldn't run carrier board flying probe test
 
 - **UUID**: `8456345b-08cb-4720-b3e7-64cdb9acb597`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `SIMULATION`
 - **Created**: `2026-09-25 19:50:48 UTC`
 - **Resolved**: `2026-09-25 21:44:26 UTC`
+- **Accepted**: `2026-09-25 21:44:26 UTC`
 
 #### Description
 
@@ -3123,11 +3235,12 @@ Added obj export to carrier_board and flex_tail in manifest.yaml for flying prob
 ### <a id="bug-125"></a> 🟢 `[BUG-125]` Add top and bottom textures to PCB objects
 
 - **UUID**: `5adac2e7-d42c-4603-b180-a6600bcfa0ae`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `SIMULATION`
 - **Created**: `2026-09-25 19:51:08 UTC`
 - **Resolved**: `2026-09-25 21:44:28 UTC`
+- **Accepted**: `2026-09-25 21:44:28 UTC`
 
 #### Description
 
@@ -3149,11 +3262,12 @@ Added top and bottom PCB textures to test_board/textures/ and bound them in PyBu
 ### <a id="bug-126"></a> 🟢 `[BUG-126]` Components designators are overlapping pads and holes
 
 - **UUID**: `9e5aaa33-55fd-4b1f-9367-8e81f5adf738`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `PCB`
 - **Created**: `2026-09-25 19:56:17 UTC`
 - **Resolved**: `2026-09-25 21:44:30 UTC`
+- **Accepted**: `2026-09-25 21:44:30 UTC`
 
 #### Description
 
@@ -3174,11 +3288,12 @@ Updated DRC engine to rotate footprint pins via _get_pin_absolute_pos and invert
 ### <a id="bug-127"></a> 🟢 `[BUG-127]` Some components have duplicate designators
 
 - **UUID**: `ae41c63f-1106-4490-909c-2c6f829fa809`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `PCB`
 - **Created**: `2026-09-25 19:59:39 UTC`
 - **Resolved**: `2026-09-25 21:44:32 UTC`
+- **Accepted**: `2026-09-25 21:44:32 UTC`
 
 #### Description
 
@@ -3199,12 +3314,13 @@ Deduplicated silkscreen text export in exporter.py when matching component footp
 ### <a id="bug-128"></a> 🟢 `[BUG-128]` Newly created folders do not show up in the Changed Files section
 
 - **UUID**: `e329980d-f484-4b7f-a251-b98c771d21a7`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `code_review`
 - **Created**: `2026-09-25 21:42:13 UTC`
 - **Resolved**: `2026-09-26 03:22:55 UTC`
+- **Accepted**: `2026-09-26 03:22:55 UTC`
 
 #### Description
 
@@ -3225,12 +3341,13 @@ Added --untracked-files=all flag to git status command in git_utils.py so all un
 ### <a id="bug-129"></a> 🟢 `[BUG-129]` Support reboot into ISP mode from the FTDI
 
 - **UUID**: `1a603d41-43b1-4546-8e56-387756da0a60`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-25 22:15:53 UTC`
 - **Resolved**: `2026-09-26 03:22:59 UTC`
+- **Accepted**: `2026-09-26 03:22:59 UTC`
 
 #### Description
 
@@ -3251,11 +3368,12 @@ Connected FTDI CBUS0 (U9 pin 23) to MCU NRST net in wiring.yaml and added schema
 ### <a id="bug-130"></a> 🟢 `[BUG-130]` J8 has wire overlaps
 
 - **UUID**: `207f17ab-d232-48cd-99b9-06c407e0dd82`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-25 22:25:07 UTC`
 - **Resolved**: `2026-09-25 22:39:57 UTC`
+- **Accepted**: `2026-09-25 22:39:57 UTC`
 
 #### Description
 
@@ -3276,11 +3394,12 @@ Aligned U1 pin breakout sequence on the J8 secondary I3C expansion interface she
 ### <a id="bug-131"></a> 🟢 `[BUG-131]` Resolve all schematic wire overlaps
 
 - **UUID**: `e9a83b12-4f83-4ab8-b6ab-4829f8fe65aa`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-25 22:29:58 UTC`
 - **Resolved**: `2026-09-26 03:23:03 UTC`
+- **Accepted**: `2026-09-26 03:23:03 UTC`
 
 #### Description
 
@@ -3295,12 +3414,13 @@ Added SCHEMATIC_WIRE_COLLINEAR_OVERLAP check to schematic DRC engine and updated
 ### <a id="bug-132"></a> 🟢 `[BUG-132]` Create expansion carrier mount
 
 - **UUID**: `6521f036-9069-4967-91b6-150257ba6a4b`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-25 22:32:22 UTC`
 - **Resolved**: `2026-09-26 03:23:07 UTC`
+- **Accepted**: `2026-09-26 03:23:07 UTC`
 
 #### Description
 
@@ -3321,12 +3441,13 @@ Added expansion carrier mounting collar with snap-fit retention ridge to enclosu
 ### <a id="bug-133"></a> 🟢 `[BUG-133]` Flex tail schematic looks wrong
 
 - **UUID**: `4bc75ec4-eae1-46d4-a7e4-43b6b1544322`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `GENERAL`
 - **Component**: `flex_tail`
 - **Created**: `2026-09-25 22:34:28 UTC`
 - **Resolved**: `2026-09-26 03:23:11 UTC`
+- **Accepted**: `2026-09-26 03:23:11 UTC`
 
 #### Description
 
@@ -3347,12 +3468,13 @@ Filtered wiring to only include footprints associated with the flex tail subasse
 ### <a id="bug-134"></a> 🟢 `[BUG-134]` Carrier board PCB components don't match schematic
 
 - **UUID**: `7075c63f-1ced-4e3e-888b-44d9f4d32519`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-25 22:37:58 UTC`
 - **Resolved**: `2026-09-26 03:23:14 UTC`
+- **Accepted**: `2026-09-26 03:23:14 UTC`
 
 #### Description
 
@@ -3387,12 +3509,13 @@ Updated J6, J7, J8 to JST-PH-6P connectors in wiring.yaml and routed zero-collis
 ### <a id="bug-135"></a> 🟢 `[BUG-135]` Flying probe simulate still fails
 
 - **UUID**: `aa6ea723-3e6a-4504-9e90-60e451e25ee5`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `SIMULATION`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-25 22:48:37 UTC`
 - **Resolved**: `2026-09-26 03:23:18 UTC`
+- **Accepted**: `2026-09-26 03:23:18 UTC`
 
 #### Description
 
@@ -3463,12 +3586,13 @@ Updated flying probe simulator to use rr.Scalars for multi-channel logging, made
 ### <a id="bug-136"></a> 🟢 `[BUG-136]` The horizontal scrollbar is really long for some reason.
 
 - **UUID**: `cea9cc73-77ff-4638-8a8c-89c01eae42f9`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `code_review`
 - **Created**: `2026-09-26 01:49:51 UTC`
 - **Resolved**: `2026-09-26 13:08:19 UTC`
+- **Accepted**: `2026-09-26 13:08:19 UTC`
 
 #### Description
 
@@ -3489,12 +3613,13 @@ Enforced MAX_DIFF_LINE_LENGTH = 1000 truncation in git_utils.py and CSS/JS trunc
 ### <a id="bug-137"></a> 🟢 `[BUG-137]` Support binary files diff UI
 
 - **UUID**: `f75d9806-9b0f-4559-a057-94aca5ba2757`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `UI`
 - **Component**: `code_review`
 - **Created**: `2026-09-26 01:50:59 UTC`
 - **Resolved**: `2026-09-26 13:08:29 UTC`
+- **Accepted**: `2026-09-26 13:08:29 UTC`
 
 #### Description
 
@@ -3509,11 +3634,12 @@ Added binary diff handling with get_file_bytes in git_utils.py, raw file downloa
 ### <a id="bug-138"></a> 🟢 `[BUG-138]` Refactor schematic_diagram.py
 
 - **UUID**: `60ad728b-6fa4-4d8f-9afe-af4190a254fe`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `PCB`
 - **Created**: `2026-09-26 01:53:33 UTC`
 - **Resolved**: `2026-09-26 13:08:33 UTC`
+- **Accepted**: `2026-09-26 13:08:33 UTC`
 
 #### Description
 
@@ -3528,12 +3654,13 @@ Decomposed monolithic schematic_diagram.py into modular subcomponents under prov
 ### <a id="bug-139"></a> 🟢 `[BUG-139]` Add battery cover
 
 - **UUID**: `e09b9a37-62c0-4c10-8f50-54b626533f52`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-26 02:40:24 UTC`
 - **Resolved**: `2026-09-26 13:08:36 UTC`
+- **Accepted**: `2026-09-26 13:08:36 UTC`
 
 #### Description
 
@@ -3548,12 +3675,13 @@ Added battery_cover CAD part with snap-fit lip tabs, parameterized dimensions in
 ### <a id="bug-140"></a> 🟢 `[BUG-140]` Extend enclosure bottom under flex tail
 
 - **UUID**: `649ab951-5a0b-4bf9-a9df-cbe28d4767f6`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-26 02:42:26 UTC`
 - **Resolved**: `2026-09-26 13:08:40 UTC`
+- **Accepted**: `2026-09-26 13:08:40 UTC`
 
 #### Description
 
@@ -3568,12 +3696,13 @@ Extended enclosure_bottom under flex tail with supporting plane parameterized vi
 ### <a id="bug-141"></a> 🟢 `[BUG-141]` It does not look like the flex tail will fit in the connector.
 
 - **UUID**: `2b3fb3ba-711f-4a9f-a13b-a183754bb9d8`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-26 02:49:53 UTC`
 - **Resolved**: `2026-09-26 13:08:43 UTC`
+- **Accepted**: `2026-09-26 13:08:43 UTC`
 
 #### Description
 
@@ -3594,12 +3723,13 @@ Updated J2 connector obstacle dimensions to [25.0, 5.0, 2.0] in pcb.yaml to perf
 ### <a id="bug-142"></a> 🟢 `[BUG-142]` No cutout for PCIE connector
 
 - **UUID**: `81bc78c1-5b74-4e6a-991e-7ce7a3f52fc4`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `enclosure_bottom`
 - **Created**: `2026-09-26 02:52:07 UTC`
 - **Resolved**: `2026-09-26 13:08:47 UTC`
+- **Accepted**: `2026-09-26 13:08:47 UTC`
 
 #### Description
 
@@ -3625,12 +3755,13 @@ Added floor pass-through cutout for M.2 PCIE connector J1 in enclosure_bottom fl
 ### <a id="bug-143"></a> 🟢 `[BUG-143]` Peripheral cutouts should all be the same size
 
 - **UUID**: `ff03f0ac-6a4b-4cee-b1d5-3bb7abc33296`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `enclosure_bottom`
 - **Created**: `2026-09-26 02:57:12 UTC`
 - **Resolved**: `2026-09-26 13:08:50 UTC`
+- **Accepted**: `2026-09-26 13:08:50 UTC`
 
 #### Description
 
@@ -3651,12 +3782,13 @@ Equalized peripheral connector cutouts in enclosure_bottom right wall to uniform
 ### <a id="bug-144"></a> 🟢 `[BUG-144]` Cutout region for J1 is missing from the design
 
 - **UUID**: `6d3810f9-d8d0-4276-9cb7-b36d7eb8f76c`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `CRITICAL`
 - **Category**: `CAD`
 - **Component**: `enclosure_bottom`
 - **Created**: `2026-09-26 17:37:29 UTC`
 - **Resolved**: `2026-09-26 20:21:10 UTC`
+- **Accepted**: `2026-09-26 20:21:10 UTC`
 
 #### Description
 
@@ -3678,12 +3810,13 @@ Aligned rear wall cutout for J1 using Plane.XZ.offset(length / 2.0) at (0, -leng
 ### <a id="bug-145"></a> 🟢 `[BUG-145]` Simplify battery holder shape, retain cover over the battery cover hole
 
 - **UUID**: `459dfc85-0d7b-4a95-824d-e8618d9eb68a`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-26 17:37:44 UTC`
 - **Resolved**: `2026-09-27 02:14:09 UTC`
+- **Accepted**: `2026-09-27 02:14:09 UTC`
 
 #### Description
 
@@ -3711,12 +3844,13 @@ Simplified battery holder shape to a single unified rounded rectangle enclosing 
 ### <a id="bug-146"></a> 🟢 `[BUG-146]` Remove MIPI camera routing
 
 - **UUID**: `adf78511-5271-4a80-89d9-285605d0395e`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-26 17:54:58 UTC`
 - **Resolved**: `2026-09-26 20:21:14 UTC`
+- **Accepted**: `2026-09-26 20:21:14 UTC`
 
 #### Description
 
@@ -3731,12 +3865,13 @@ Removed MIPI camera differential pairs and nets from wiring.yaml, pcb.yaml, rout
 ### <a id="bug-147"></a> 🟢 `[BUG-147]` Change flex ribbon design
 
 - **UUID**: `d73bb111-6b8d-4bf6-9d7c-056b4792def3`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-26 17:57:02 UTC`
 - **Resolved**: `2026-09-26 20:21:16 UTC`
+- **Accepted**: `2026-09-26 20:21:16 UTC`
 
 #### Description
 
@@ -3757,12 +3892,13 @@ Updated flex ribbon design with 5-button slider (S1-S5), ACTION button, PROX sen
 ### <a id="bug-148"></a> 🟢 `[BUG-148]` Flex ribbon support does not connect with main enclosure button
 
 - **UUID**: `23ed853c-3f85-4ea2-9988-cba564f18bbb`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `CRITICAL`
 - **Category**: `CAD`
 - **Component**: `enclosure_bottom`
 - **Created**: `2026-09-26 18:01:36 UTC`
 - **Resolved**: `2026-09-26 20:21:18 UTC`
+- **Accepted**: `2026-09-26 20:21:18 UTC`
 
 #### Description
 
@@ -3783,12 +3919,13 @@ Adjusted shelf_y_start to (length / 2.0) - wall, unifying flex ribbon shelf with
 ### <a id="bug-149"></a> 🟢 `[BUG-149]` Mutual intersection test
 
 - **UUID**: `3f660006-747e-4e91-b825-79f1e0fd0c85`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `CAD`
 - **Component**: `enclosure_bottom, enclosure_top`
 - **Created**: `2026-09-26 18:03:50 UTC`
 - **Resolved**: `2026-09-26 20:21:20 UTC`
+- **Accepted**: `2026-09-26 20:21:20 UTC`
 
 #### Description
 
@@ -3803,12 +3940,13 @@ Added test_regression_bug_149_mutual_intersection_test decorated with @pytest.ma
 ### <a id="bug-150"></a> 🟢 `[BUG-150]` Component cutouts missing labels
 
 - **UUID**: `0d880283-cc36-4070-81ca-a6b054472e23`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `CAD`
 - **Component**: `enclosure_bottom`
 - **Created**: `2026-09-26 18:05:45 UTC`
 - **Resolved**: `2026-09-26 20:21:22 UTC`
+- **Accepted**: `2026-09-26 20:21:22 UTC`
 
 #### Description
 
@@ -3823,12 +3961,13 @@ Added embossed/engraved labels for USB-C, SWD, M.2 PCIE, FLEX TAIL, and BATTERY 
 ### <a id="bug-151"></a> 🟢 `[BUG-151]` Git_utils.py shows as binary
 
 - **UUID**: `755beed1-75d9-4a93-944b-a691d573a733`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `bug_report`
 - **Created**: `2026-09-26 18:09:09 UTC`
 - **Resolved**: `2026-09-26 20:21:24 UTC`
+- **Accepted**: `2026-09-26 20:21:24 UTC`
 
 #### Description
 
@@ -3855,11 +3994,12 @@ Updated git_utils.py to detect git binary diff lines and prevent git_utils.py fr
 ### <a id="bug-152"></a> 🟢 `[BUG-152]` Textured PC still ain't visible
 
 - **UUID**: `3fbbcb6c-f129-4dfe-9b58-9e668dac8bfd`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `SIMULATION`
 - **Created**: `2026-09-26 18:15:08 UTC`
 - **Resolved**: `2026-09-27 05:23:35 UTC`
+- **Accepted**: `2026-09-27 05:23:35 UTC`
 
 #### Description
 
@@ -3907,11 +4047,12 @@ Tessellated CAD planar faces directly to align textured PCB mesh with exact boar
 ### <a id="bug-153"></a> 🟢 `[BUG-153]` Bad formatting in flying probes report
 
 - **UUID**: `8b345648-d76e-44be-bb8a-d3e8341060df`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `SIMULATION`
 - **Created**: `2026-09-26 18:15:57 UTC`
 - **Resolved**: `2026-09-26 20:21:28 UTC`
+- **Accepted**: `2026-09-26 20:21:28 UTC`
 
 #### Description
 
@@ -3935,12 +4076,13 @@ Cleaned up flying_probe_report.md.j2 replacing corrupted LaTeX escapes with stan
 ### <a id="bug-154"></a> 🟢 `[BUG-154]` Rename test_board project to carrier_board
 
 - **UUID**: `cc684ed8-c948-4b70-bf22-866c1c2ac01d`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `GENERAL`
 - **Component**: `test_board`
 - **Created**: `2026-09-26 21:04:32 UTC`
 - **Resolved**: `2026-09-27 02:14:13 UTC`
+- **Accepted**: `2026-09-27 02:14:13 UTC`
 
 #### Description
 
@@ -3955,12 +4097,13 @@ Renamed test_board package to carrier_board across source files, configs, docume
 ### <a id="bug-155"></a> 🟢 `[BUG-155]` "SLIDER" text slightly overlaps "S3"
 
 - **UUID**: `b78c2995-5058-42f8-abe6-8ca6e26530e2`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `flex_tail`
 - **Created**: `2026-09-26 21:18:49 UTC`
 - **Resolved**: `2026-09-27 02:14:15 UTC`
+- **Accepted**: `2026-09-27 02:14:15 UTC`
 
 #### Description
 
@@ -3981,12 +4124,13 @@ Repositioned SLIDER silkscreen text to (0.0, 11.5) to maintain full clearance (>
 ### <a id="bug-156"></a> 🟢 `[BUG-156]` J1 is missing thru holes
 
 - **UUID**: `a1eeae60-f911-437a-97f6-fcd5d05749b7`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-27 01:33:20 UTC`
 - **Resolved**: `2026-09-27 02:14:17 UTC`
+- **Accepted**: `2026-09-27 02:14:17 UTC`
 
 #### Description
 
@@ -4007,12 +4151,13 @@ Added NC1, NC2, and NC3 thru-hole pins to M.2-KEY-M footprint in ic.yaml, ensuri
 ### <a id="bug-157"></a> 🟢 `[BUG-157]` Action button isn't routed!
 
 - **UUID**: `a0238df9-30db-494c-a167-c3c0b9cd1a0e`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `PCB`
 - **Component**: `flex_tail`
 - **Created**: `2026-09-27 01:36:34 UTC`
 - **Resolved**: `2026-09-27 02:14:19 UTC`
+- **Accepted**: `2026-09-27 02:14:19 UTC`
 
 #### Description
 
@@ -4056,12 +4201,13 @@ Updated ACTION_BUTTON configuration to interdigital shape with CAP_TX2 and CAP_R
 ### <a id="bug-158"></a> 🟢 `[BUG-158]` Flex tail layout needs revision
 
 - **UUID**: `07241891-984f-4ca3-a61e-5cb773dc2285`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `PCB`
 - **Component**: `flex_tail`
 - **Created**: `2026-09-27 01:42:13 UTC`
 - **Resolved**: `2026-09-27 05:23:37 UTC`
+- **Accepted**: `2026-09-27 05:23:37 UTC`
 
 #### Description
 
@@ -4108,11 +4254,12 @@ Revised flex tail layout to perimeter proximity sensor loop enclosing touch sens
 ### <a id="bug-159"></a> 🟢 `[BUG-159]` SWD and USB connector text is reversed
 
 - **UUID**: `2f77eddd-8e58-407f-b682-a8f7bfafa0e8`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-27 01:56:46 UTC`
 - **Resolved**: `2026-09-27 02:14:24 UTC`
+- **Accepted**: `2026-09-27 02:14:24 UTC`
 
 #### Description
 
@@ -4133,12 +4280,13 @@ Reoriented left wall engraving sketch plane to an exterior-facing plane with nor
 ### <a id="bug-160"></a> 🟢 `[BUG-160]` Connector text on right side of enclosure bottom will form a hollow shell
 
 - **UUID**: `477ffd84-d87e-4efd-8b42-1476f5a9bdd7`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `enclosure_bottom, enclosure_top`
 - **Created**: `2026-09-27 02:10:06 UTC`
 - **Resolved**: `2026-09-27 02:14:26 UTC`
+- **Accepted**: `2026-09-27 02:14:26 UTC`
 
 #### Description
 
@@ -4153,12 +4301,13 @@ Removed peripheral connector labels under mounting collar in enclosure_bottom to
 ### <a id="bug-161"></a> 🟢 `[BUG-161]` Create feedback/ directory for agentic review feedback
 
 - **UUID**: `1999b0d2-069a-4ed4-b23a-42eb41d4138a`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `code_review, bug_report`
 - **Created**: `2026-09-27 03:34:56 UTC`
 - **Resolved**: `2026-09-27 06:03:59 UTC`
+- **Accepted**: `2026-09-27 06:03:59 UTC`
 
 #### Description
 
@@ -4182,12 +4331,13 @@ Created feedback/ directory for agentic review feedback and bug reports. Added U
 ### <a id="bug-162"></a> 🟢 `[BUG-162]` The flying probes test for flex tail is showing the carrier board PCB
 
 - **UUID**: `62456de5-7ab0-4fc4-ab89-916d1887aa12`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `SIMULATION`
 - **Component**: `flex_tail`
 - **Created**: `2026-09-27 03:45:04 UTC`
 - **Resolved**: `2026-09-27 05:23:39 UTC`
+- **Accepted**: `2026-09-27 05:23:39 UTC`
 
 #### Description
 
@@ -4212,12 +4362,13 @@ Cleared prior simulation world entities on target initialization and isolated fl
 ### <a id="bug-163"></a> 🟢 `[BUG-163]` The flying probes test for carrier board is making contact with solder mask regions
 
 - **UUID**: `dd1c4a8a-90fb-43f7-9b45-32fe4fb3a8b7`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `SIMULATION`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-27 03:49:36 UTC`
 - **Resolved**: `2026-09-27 05:23:42 UTC`
+- **Accepted**: `2026-09-27 05:23:42 UTC`
 
 #### Description
 
@@ -4241,12 +4392,13 @@ Corrected probe target coordinates in pcb_test_steps.yaml to land on bare copper
 ### <a id="bug-164"></a> 🟢 `[BUG-164]` Carrier board has multiple component designators
 
 - **UUID**: `6e3d1d0b-68a2-4481-bc21-f1c024f2fb58`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `SIMULATION`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-27 03:55:36 UTC`
 - **Resolved**: `2026-09-27 05:23:44 UTC`
+- **Accepted**: `2026-09-27 05:23:44 UTC`
 
 #### Description
 
@@ -4271,11 +4423,12 @@ Hidden duplicate footprint reference designators in kicad_pcb.j2 template and pr
 ### <a id="bug-165"></a> 🟢 `[BUG-165]` The carrier board flying probe test- text appears mirrored
 
 - **UUID**: `e90ecd5c-c65a-42bb-b548-fcd979dd49e0`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-27 16:25:46 UTC`
 - **Resolved**: `2026-09-27 21:15:34 UTC`
+- **Accepted**: `2026-09-27 21:15:34 UTC`
 
 #### Description
 
@@ -4294,12 +4447,13 @@ Corrected CAD-to-KiCad silkscreen parity transformation in PCBExporter and kicad
 ### <a id="bug-001"></a> 🟢 `[BUG-001]` Flex tail PCB visualization fails due to on-the-fly router invocation in view.py
 
 - **UUID**: `407a0a2e-e8e4-43d5-be26-cafb7ecf3f84`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `CRITICAL`
 - **Category**: `PCB`
 - **Component**: `flex_tail`
 - **Created**: `2026-09-27 16:27:07 UTC`
 - **Resolved**: `2026-09-19 23:30:00 UTC`
+- **Accepted**: `2026-09-19 23:30:00 UTC`
 
 #### Description
 
@@ -4337,12 +4491,13 @@ Removed on-the-fly auto_router.route_all_nets() from PCBExporter. Pre-computed f
 ### <a id="bug-002"></a> 🟢 `[BUG-002]` J_USB connector plug mouth faces board interior instead of board edge
 
 - **UUID**: `b8066cdb-9279-49bb-9d22-2f94a84b2bcf`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `PCB`
 - **Component**: `J_USB`
 - **Created**: `2026-09-27 16:27:07 UTC`
 - **Resolved**: `2026-09-19 23:35:00 UTC`
+- **Accepted**: `2026-09-19 23:35:00 UTC`
 
 #### Description
 
@@ -4373,12 +4528,13 @@ Rotated J_USB to 270 degrees in wiring.yaml and positioned at [-26.0, 0.0, 0.8].
 ### <a id="bug-003"></a> 🟢 `[BUG-003]` Test point and discrete component silkscreen text collisions
 
 - **UUID**: `30099a0a-a1af-4bcf-9957-0db5ac1aaff0`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `silkscreen`
 - **Created**: `2026-09-27 16:27:07 UTC`
 - **Resolved**: `2026-09-19 23:40:00 UTC`
+- **Accepted**: `2026-09-19 23:40:00 UTC`
 
 #### Description
 
@@ -4410,12 +4566,13 @@ Rotated test point labels 90 degrees with dedicated clearance boxes. Added place
 ### <a id="bug-004"></a> 🟢 `[BUG-004]` C1 decoupling capacitor dangling without plane connections
 
 - **UUID**: `d83412c3-bf8c-4e3c-8ede-e7be441932f1`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `PCB`
 - **Component**: `C1`
 - **Created**: `2026-09-27 16:27:07 UTC`
 - **Resolved**: `2026-09-19 23:42:00 UTC`
+- **Accepted**: `2026-09-19 23:42:00 UTC`
 
 #### Description
 
@@ -4446,12 +4603,13 @@ Relocated C1 to [20.0, -15.0, 0.8] opposite U2 on F.Cu. Automated plane net stit
 ### <a id="bug-005"></a> 🟢 `[BUG-005]` Piezo speaker SPK1 silkscreen border rectangular instead of round
 
 - **UUID**: `ae249edb-c6c4-4676-96a0-b1a84df525da`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `SPK1`
 - **Created**: `2026-09-27 16:27:07 UTC`
 - **Resolved**: `2026-09-19 23:45:00 UTC`
+- **Accepted**: `2026-09-19 23:45:00 UTC`
 
 #### Description
 
@@ -4482,12 +4640,13 @@ Added piezo_speaker_12mm circular footprint to thru_hole.yaml, added (fp_circle 
 ### <a id="bug-006"></a> 🟢 `[BUG-006]` Collinear trace segment simplification failure in A* router due to d2[0] Y-axis typo
 
 - **UUID**: `df61fe60-d619-41a7-908a-19f014a61d81`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `PCB`
 - **Component**: `PCBAutoRouter`
 - **Created**: `2026-09-27 16:27:07 UTC`
 - **Resolved**: `2026-09-19 23:48:00 UTC`
+- **Accepted**: `2026-09-19 23:48:00 UTC`
 
 #### Description
 
@@ -4512,12 +4671,13 @@ Fixed dot product calculation in router.py line 109: dot = d1[0] * d2[0] + d1[1]
 ### <a id="bug-007"></a> 🟢 `[BUG-007]` A* router net ordering deadlock walling in local MCU control pins
 
 - **UUID**: `1cb7bb7e-68f5-429b-bc9e-0a0c08e07f38`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `PCB`
 - **Component**: `test_board`
 - **Created**: `2026-09-27 16:27:07 UTC`
 - **Resolved**: `2026-09-19 23:52:00 UTC`
+- **Accepted**: `2026-09-19 23:52:00 UTC`
 
 #### Description
 
@@ -4543,12 +4703,13 @@ Placed MCU escape nets (OSC_IN, OSC_OUT, NRST, BOOT0) in netlist sequence immedi
 ### <a id="bug-008"></a> 🟢 `[BUG-008]` Carrier PCB rectangular sharp corners around mounting holes
 
 - **UUID**: `165852ff-562c-420d-8f2e-1c397b06fe3e`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-27 16:27:07 UTC`
 - **Resolved**: `2026-09-19 23:55:00 UTC`
+- **Accepted**: `2026-09-19 23:55:00 UTC`
 
 #### Description
 
@@ -4572,12 +4733,13 @@ Set corner_radius: 6.0 in measurements.yaml. Updated kicad_pcb.j2 and exporter.p
 ### <a id="bug-009"></a> 🟢 `[BUG-009]` Split-view CSS text overflow clipping code review diff listings
 
 - **UUID**: `cd9e15bb-3e98-4f6f-b2e9-0a582221de33`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `UI`
 - **Component**: `code_review`
 - **Created**: `2026-09-27 16:27:07 UTC`
 - **Resolved**: `2026-09-19 23:58:00 UTC`
+- **Accepted**: `2026-09-19 23:58:00 UTC`
 
 #### Description
 
@@ -4609,11 +4771,12 @@ Added max-width: 0; overflow-x: auto; to .sbs-row td in code_review.html.j2.
 ### <a id="bug-072"></a> 🟢 `[BUG-072]` Flex tail cutout doesn't align with flex tail
 
 - **UUID**: `07443235-6cf9-41bb-96bd-39fb0023c98b`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Created**: `2026-09-27 16:27:07 UTC`
 - **Resolved**: `2026-09-21 16:15:14 UTC`
+- **Accepted**: `2026-09-21 16:15:14 UTC`
 
 #### Description
 
@@ -4643,12 +4806,13 @@ Extended enclosure bottom flex tail slot downward to z_carrier - 1.0, ensuring 0
 ### <a id="bug-078"></a> 🟢 `[BUG-078]` Code review highlight markers elide diff colors
 
 - **UUID**: `2b03ebd6-e8d4-483a-9d30-2f5030cd1bd0`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `code_review`
 - **Created**: `2026-09-27 16:27:07 UTC`
 - **Resolved**: `2026-09-21 18:14:36 UTC`
+- **Accepted**: `2026-09-21 18:14:36 UTC`
 
 #### Description
 
@@ -4663,12 +4827,13 @@ Moved code review selection highlight markers to dedicated column grid on the le
 ### <a id="bug-166"></a> 🟢 `[BUG-166]` Remove the baseline BUGS.md and CR.md from the repo
 
 - **UUID**: `bc1eac18-2989-47a9-b5c3-5b9770925c70`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `bug_report, code_review`
 - **Created**: `2026-09-27 16:28:00 UTC`
 - **Resolved**: `2026-09-27 21:15:42 UTC`
+- **Accepted**: `2026-09-27 21:15:42 UTC`
 
 #### Description
 
@@ -4683,11 +4848,12 @@ Removed baseline feedback/BUGS.md and feedback/CR.md from git and added both to 
 ### <a id="bug-167"></a> 🟢 `[BUG-167]` Flying probes test- text is mirrored horizontally
 
 - **UUID**: `832d8a76-7471-4b5b-b7db-bb7dfc6fbea8`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-27 16:29:33 UTC`
 - **Resolved**: `2026-09-27 21:15:49 UTC`
+- **Accepted**: `2026-09-27 21:15:49 UTC`
 
 #### Description
 
@@ -4706,12 +4872,13 @@ Resolved upside-down and mirrored silkscreen text in flying probes simulation. R
 ### <a id="bug-168"></a> 🟢 `[BUG-168]` Motor base is not secured in place
 
 - **UUID**: `804c93a8-a847-431f-a8c7-c80f0c0ba70b`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-09-27 19:02:18 UTC`
 - **Resolved**: `2026-09-28 02:52:27 UTC`
+- **Accepted**: `2026-09-28 02:52:27 UTC`
 
 #### Description
 
@@ -4735,12 +4902,13 @@ Updated cat_fountain measurements and provider to support BetaFPV/LAVA 1102 3x M
 ### <a id="bug-169"></a> 🟢 `[BUG-169]` Store bug attachments in Git LFS
 
 - **UUID**: `0c116abb-9428-4093-b3f7-eb014f7c8824`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `bug_report`
 - **Created**: `2026-09-27 19:07:41 UTC`
 - **Resolved**: `2026-09-28 03:16:30 UTC`
+- **Accepted**: `2026-09-28 03:16:30 UTC`
 
 #### Description
 
@@ -4755,11 +4923,12 @@ Configured Git LFS tracking for build/attachments/ and feedback/attachments/ in 
 ### <a id="bug-170"></a> 🟢 `[BUG-170]` Bug loses resolution state when I click Save in bug report tool
 
 - **UUID**: `f393313b-3aff-49ab-8738-ab0c1fbf045d`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-27 19:32:19 UTC`
 - **Resolved**: `2026-09-28 03:16:38 UTC`
+- **Accepted**: `2026-09-28 03:16:38 UTC`
 
 #### Description
 
@@ -4780,11 +4949,12 @@ Added continuous file watch on feedback/ directory in BugReportServer and reques
 ### <a id="bug-171"></a> 🟢 `[BUG-171]` Diff Viewer
 
 - **UUID**: `8db688d2-4c79-42f1-9813-b27c3b4588cc`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `INFRASTRUCTURE`
 - **Created**: `2026-09-27 23:08:51 UTC`
 - **Resolved**: `2026-09-28 03:52:03 UTC`
+- **Accepted**: `2026-09-28 03:52:03 UTC`
 
 #### Description
 
@@ -4824,12 +4994,13 @@ Implemented Quake Diff Viewer and Smartlog workstation (python src/diff_view.py)
 ### <a id="bug-172"></a> 🟢 `[BUG-172]` Allow text panels to be extended vertically
 
 - **UUID**: `b06ea08c-008d-4114-a86e-3eafb1f2e68f`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `bug_report, code_review`
 - **Created**: `2026-09-27 23:20:16 UTC`
 - **Resolved**: `2026-09-28 03:16:46 UTC`
+- **Accepted**: `2026-09-28 03:16:46 UTC`
 
 #### Description
 
@@ -4844,11 +5015,12 @@ Added interactive vertical resize drag bar to the code_review CLI terminal conso
 ### <a id="bug-173"></a> 🟢 `[BUG-173]` Multiple Netlist disconnects in schematic
 
 - **UUID**: `51d29a59-a2d9-413b-ac86-802c05b2185d`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `CRITICAL`
 - **Category**: `PCB`
 - **Created**: `2026-09-27 23:34:40 UTC`
 - **Resolved**: `2026-09-28 00:52:35 UTC`
+- **Accepted**: `2026-09-28 00:52:35 UTC`
 
 #### Description
 
@@ -4906,11 +5078,12 @@ Added pin_name and signal_name to PinModel and Wiring schema. Updated J9 and J10
 ### <a id="bug-174"></a> 🟢 `[BUG-174]` Missing GND connections in Serial Expansion connectors
 
 - **UUID**: `08f063ec-45ce-4874-97cb-38673a400506`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `CRITICAL`
 - **Category**: `PCB`
 - **Created**: `2026-09-27 23:51:10 UTC`
 - **Resolved**: `2026-09-28 00:52:41 UTC`
+- **Accepted**: `2026-09-28 00:52:41 UTC`
 
 #### Description
 
@@ -4925,11 +5098,12 @@ Corrected J10 Pin 1 (y=-28.0) and J9 Pin 7 (y=-12.0) to GND with explicit signal
 ### <a id="bug-175"></a> 🟢 `[BUG-175]` code_review.py is broken
 
 - **UUID**: `8f3cd04f-6eb9-4114-ad4c-ef5e5411d356`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `CRITICAL`
 - **Category**: `INFRASTRUCTURE`
 - **Created**: `2026-09-28 01:31:52 UTC`
 - **Resolved**: `2026-09-28 01:45:00 UTC`
+- **Accepted**: `2026-09-28 01:45:00 UTC`
 
 #### Description
 
@@ -4983,12 +5157,13 @@ Fixed `SQLiteReviewStore._init_schema()` in `src/provider/code_review/sqlite_sto
 ### <a id="bug-176"></a> 🟢 `[BUG-176]` JST connector footprints overlap with each other
 
 - **UUID**: `c0ded169-a1ec-44d9-9c1a-3901cf7d803b`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-28 02:57:58 UTC`
 - **Resolved**: `2026-09-28 08:24:09 UTC`
+- **Accepted**: `2026-09-28 08:24:09 UTC`
 
 #### Description
 
@@ -5013,12 +5188,13 @@ Re-spaced JST peripheral connectors J6-J10 along the right PCB edge with uniform
 ### <a id="bug-177"></a> 🟢 `[BUG-177]` Enclosure bottom CAD feedback
 
 - **UUID**: `8a9bd057-d325-4400-9322-7228016797fb`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `enclosure_bottom, enclosure_top`
 - **Created**: `2026-09-28 03:01:43 UTC`
 - **Resolved**: `2026-09-28 08:24:14 UTC`
+- **Accepted**: `2026-09-28 08:24:14 UTC`
 
 #### Description
 
@@ -5034,12 +5210,13 @@ Synchronized enclosure bottom right-side peripheral cutouts dynamically with upd
 ### <a id="bug-178"></a> 🟢 `[BUG-178]` Remove standalone bug_report and code_review tools
 
 - **UUID**: `6958cf40-c816-48e5-ad7c-e59cd0e73087`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `diff_view`
 - **Created**: `2026-09-28 16:39:46 UTC`
 - **Resolved**: `2026-09-28 18:03:00 UTC`
+- **Accepted**: `2026-09-28 18:03:00 UTC`
 
 #### Description
 
@@ -5063,12 +5240,13 @@ Synchronized enclosure bottom right-side peripheral cutouts dynamically with upd
 ### <a id="bug-179"></a> 🟢 `[BUG-179]` Right side ports overlap mounting holes
 
 - **UUID**: `f9b1061c-9c38-46ec-b79e-268aa4015f27`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-28 16:42:04 UTC`
 - **Resolved**: `2026-09-28 18:37:00 UTC`
+- **Accepted**: `2026-09-28 18:37:00 UTC`
 
 #### Description
 
@@ -5092,12 +5270,13 @@ Updated obstacle envelopes in `pcb.yaml`, silkscreen bus identifiers in `provide
 ### <a id="bug-180"></a> 🟢 `[BUG-180]` Resolve or suppress DRC violations
 
 - **UUID**: `ed64b689-4dfa-4a47-820a-5a08783705a3`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board, flex_tail`
 - **Created**: `2026-09-28 16:49:36 UTC`
 - **Resolved**: `2026-09-28 18:58:00 UTC`
+- **Accepted**: `2026-09-28 18:58:00 UTC`
 
 #### Description
 
@@ -5129,11 +5308,12 @@ The carrier board and flex tail have a bunch of DRC violations. Either resolve t
 ### <a id="bug-181"></a> 🟢 `[BUG-181]` Tracebacks in bug report tool
 
 - **UUID**: `fd7835d8-0fb3-48ec-bb5b-b9914bc48a72`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Created**: `2026-09-28 16:51:40 UTC`
 - **Resolved**: `2026-09-28 17:22:13 UTC`
+- **Accepted**: `2026-09-28 17:22:13 UTC`
 
 #### Description
 
@@ -5226,12 +5406,13 @@ Resolved file descriptor leak across SQLite persistence stores (SQLiteBugStore, 
 ### <a id="bug-182"></a> 🟢 `[BUG-182]` Create merge PR-75d5f929a2950f5d71d2875b10799be50b4c25a5 into v6
 
 - **UUID**: `a33cf9b2-3092-481d-871c-8c9d1f2da1d4`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-09-28 17:15:33 UTC`
 - **Resolved**: `2026-09-28 19:01:00 UTC`
+- **Accepted**: `2026-09-28 19:01:00 UTC`
 
 #### Description
 
@@ -5249,11 +5430,12 @@ Cherry pick 75d5f929a2950f5d71d2875b10799be50b4c25a5 into v6 and open a PR for i
 ### <a id="bug-183"></a> 🟢 `[BUG-183]` Carrier board design hardening
 
 - **UUID**: `cd409ae1-2683-4df8-b7a0-9800c2ea372e`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-28 17:16:27 UTC`
+- **Accepted**: `2026-09-28 17:16:27 UTC`
 
 #### Description
 
@@ -5280,11 +5462,12 @@ We have open space on the board bw J1 and J14 to harden the design:
 ### <a id="bug-184"></a> 🟢 `[BUG-184]` Pull power and GND off-sheet symbols to the sheet edge
 
 - **UUID**: `d2471a2c-8190-47f5-bff7-ee6646a65093`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-28 17:26:35 UTC`
+- **Accepted**: `2026-09-28 17:26:35 UTC`
 
 #### Description
 
@@ -5305,11 +5488,12 @@ We should refactor the schematic layout engine to pull the power off-sheet symbo
 ### <a id="bug-185"></a> 🟢 `[BUG-185]` Add commit/ammend UI to dashboard/diff_view
 
 - **UUID**: `cc901498-a34d-424f-8772-a824fc2884e7`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `diff_view, dashboard`
 - **Created**: `2026-09-28 17:27:49 UTC`
+- **Accepted**: `2026-09-28 17:27:49 UTC`
 
 #### Description
 
@@ -5330,11 +5514,12 @@ Update the dashboard/diff view with a modal commit UI which, and graft an amend 
 ### <a id="bug-186"></a> 🟢 `[BUG-186]` Support git LFS tracking in dashboard
 
 - **UUID**: `3650e51d-24a8-48cc-be1f-45e19c77fcdf`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `diff_view, dashboard`
 - **Created**: `2026-09-28 17:29:23 UTC`
+- **Accepted**: `2026-09-28 17:29:23 UTC`
 
 #### Description
 
@@ -5354,11 +5539,12 @@ Update the dashboard tool to track changes under attachments/ in LFS automatical
 ### <a id="bug-187"></a> 🟢 `[BUG-187]` Allow file and commit panes to be collapsed in VS UI
 
 - **UUID**: `e3be056f-fd68-4568-b8bb-096b7ba32bdc`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `diff_view, dashboard`
 - **Created**: `2026-09-28 17:32:02 UTC`
+- **Accepted**: `2026-09-28 17:32:02 UTC`
 
 #### Description
 
@@ -5378,11 +5564,12 @@ Allow the file and commit panes to be collapsed to the left side in the VCS UI, 
 ### <a id="bug-188"></a> 🟢 `[BUG-188]` Dashboard/diff view - loading screen
 
 - **UUID**: `b3a4a038-e367-455d-847b-5e890c369a8c`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dash_board, diff_view`
 - **Created**: `2026-09-28 17:34:17 UTC`
+- **Accepted**: `2026-09-28 17:34:17 UTC`
 
 #### Description
 
@@ -5403,11 +5590,12 @@ When the dashboard is opened the first time, the dashboard should sync SQLite da
 ### <a id="bug-189"></a> 🟢 `[BUG-189]` GPIO pin labels overlap, rendering error
 
 - **UUID**: `f8c6ebf2-de00-4d4d-9998-26b770781599`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `CRITICAL`
 - **Category**: `CAD`
 - **Component**: `enclosure_top`
 - **Created**: `2026-09-28 19:51:51 UTC`
+- **Accepted**: `2026-09-28 19:51:51 UTC`
 
 #### Description
 
@@ -5433,11 +5621,12 @@ On the enclosure top, the GPIO pin labels overlap ('1..8' overlaps 'GPIO') and t
 ### <a id="bug-190"></a> 🟢 `[BUG-190]` Clicking on the PR tag in the VCS dashboard doesn't take me to the PR in github
 
 - **UUID**: `8916f53b-ade4-460a-8ab8-ede8c3410159`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-28 19:55:42 UTC`
+- **Accepted**: `2026-09-28 19:55:42 UTC`
 
 #### Description
 
@@ -5455,11 +5644,12 @@ When I click '⎇ ORIGIN/PR520', it does not take me to the opened PR in GitHub.
 ### <a id="bug-191"></a> 🟢 `[BUG-191]` Clicking "Code Review" with multiple commits selected took me to a blank bug report page
 
 - **UUID**: `9d779486-85e3-4c89-b1ea-5e922cd9f978`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `CRITICAL`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-28 20:00:00 UTC`
+- **Accepted**: `2026-09-28 20:00:00 UTC`
 
 #### Description
 
@@ -5477,11 +5667,12 @@ Clicking "Code Review", along with multiple commits selected, took me to a blank
 ### <a id="bug-192"></a> 🟢 `[BUG-192]` Add Pull Request highlight to commit element
 
 - **UUID**: `8be4ecae-d427-4a62-a8af-0dd9c7e7e2cd`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-28 20:00:39 UTC`
+- **Accepted**: `2026-09-28 20:00:39 UTC`
 
 #### Description
 
@@ -5500,11 +5691,12 @@ Add a clickable highlight area to commit elements indicating if they have an ass
 ### <a id="bug-193"></a> 🟢 `[BUG-193]` Add "Create PR", "Unlink PR" button to VCS dashboard
 
 - **UUID**: `4946ae48-268e-4344-ae20-a9c5ab7ea333`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-28 20:02:04 UTC`
+- **Accepted**: `2026-09-28 20:02:04 UTC`
 
 #### Description
 
@@ -5529,11 +5721,12 @@ Add a "Create PR" button to the VCS dashboard. When clicked with one or more com
 ### <a id="bug-194"></a> 🟢 `[BUG-194]` Separate group for LFS tracked files
 
 - **UUID**: `88cdc854-15e0-4391-8323-9068645ea6cd`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-28 20:05:09 UTC`
+- **Accepted**: `2026-09-28 20:05:09 UTC`
 
 #### Description
 
@@ -5555,12 +5748,13 @@ Group LFS tracked files under their own grouping element in the "Changed Files" 
 ### <a id="bug-195"></a> 🟢 `[BUG-195]` Add diff pair testing in flying probes test
 
 - **UUID**: `7e2e6871-9834-410c-9043-6af958c9faca`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `SIMULATION`
 - **Component**: `flying_probe`
 - **Created**: `2026-09-28 22:09:54 UTC`
 - **Resolved**: `2026-09-29 03:09:09 UTC`
+- **Accepted**: `2026-09-29 03:09:09 UTC`
 
 #### Description
 
@@ -5572,12 +5766,13 @@ Add mutual cap compliance testing in flying probes test for flex tail: simulate 
 ### <a id="bug-196"></a> 🟢 `[BUG-196]` Allow vertical panels to be resized
 
 - **UUID**: `e15edc48-ad3f-4dec-82dd-d838ab19c15b`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-28 22:12:14 UTC`
 - **Resolved**: `2026-09-29 01:35:36 UTC`
+- **Accepted**: `2026-09-29 01:35:36 UTC`
 
 #### Description
 
@@ -5592,12 +5787,13 @@ Added resizer handles with draggable dividers and persisted panel widths in loca
 ### <a id="bug-197"></a> 🟢 `[BUG-197]` Improve branch formatting
 
 - **UUID**: `e90c4a85-57ae-4f8d-9097-1a41925a5953`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-28 22:21:40 UTC`
 - **Resolved**: `2026-09-29 01:35:40 UTC`
+- **Accepted**: `2026-09-29 01:35:40 UTC`
 
 #### Description
 
@@ -5614,11 +5810,12 @@ Added branch modal picker with mainline/release pinned section, search filter, a
 ### <a id="bug-198"></a> 🟢 `[BUG-198]` Traceback in dashboard
 
 - **UUID**: `a60b8f08-a8c3-45a9-8e25-7316b48baf97`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `CRITICAL`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-28 22:24:10 UTC`
+- **Accepted**: `2026-09-28 22:24:10 UTC`
 
 #### Description
 
@@ -5636,12 +5833,13 @@ I got a traceback in the dashboard tool by clicking "Save and Exit" from bug rep
 ### <a id="bug-199"></a> 🟢 `[BUG-199]` Add CR icon in the commit panel
 
 - **UUID**: `d836662e-ee10-444d-98ee-8e0d55ad45ef`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-28 22:26:25 UTC`
 - **Resolved**: `2026-09-29 01:35:44 UTC`
+- **Accepted**: `2026-09-29 01:35:44 UTC`
 
 #### Description
 
@@ -5656,11 +5854,12 @@ Added Jump to CR icon with open vs resolved counter badge and dynamic color stat
 ### <a id="bug-200"></a> 🟢 `[BUG-200]` Multiple scrollbars in the VCS diff view
 
 - **UUID**: `7a103da3-8ccc-4778-b967-17f6b0092a9e`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-28 22:30:40 UTC`
+- **Accepted**: `2026-09-28 22:30:40 UTC`
 
 #### Description
 
@@ -5684,10 +5883,11 @@ Multiple scrollbars are visible in the VCS diff view, when Split mode is selecte
 ### <a id="bug-201"></a> 🟢 `[BUG-201]` Multiple Diff Viewers tabs visible after a while
 
 - **UUID**: `2e0a2a85-6f73-416d-8516-4e5b0df0cd82`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-28 22:32:23 UTC`
+- **Accepted**: `2026-09-28 22:32:23 UTC`
 
 #### Description
 
@@ -5710,11 +5910,12 @@ Multiple DIff Viewer tabs are open after a few minutes of filing bugs. There sho
 ### <a id="bug-202"></a> 🟢 `[BUG-202]` Vertical scroll bar not visible in Smartlog View
 
 - **UUID**: `44eacb94-385a-410f-a874-0145466b8d69`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-28 22:34:34 UTC`
+- **Accepted**: `2026-09-28 22:34:34 UTC`
 
 #### Description
 
@@ -5737,12 +5938,13 @@ Screenshot attached. I see no vertical scrollbar visible for the smartlog or fil
 ### <a id="bug-203"></a> 🟢 `[BUG-203]` Support multiple commit selection
 
 - **UUID**: `5587d556-e20a-4119-9243-f7e6ed25e0a6`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-28 22:35:50 UTC`
 - **Resolved**: `2026-09-29 01:35:50 UTC`
+- **Accepted**: `2026-09-29 01:35:50 UTC`
 
 #### Description
 
@@ -5757,10 +5959,11 @@ Added Shift-Click contiguous range selection on commit checkboxes and table rows
 ### <a id="bug-204"></a> 🟢 `[BUG-204]` pytestt should contain only critical testing
 
 - **UUID**: `99dea2d9-0618-4e11-9f48-661da1741418`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `PCB`
 - **Created**: `2026-09-28 22:46:45 UTC`
+- **Accepted**: `2026-09-28 22:46:45 UTC`
 
 #### Description
 
@@ -5778,10 +5981,11 @@ Optimized the test suite across core test modules to keep fast `pytest` lean and
 ### <a id="bug-205"></a> 🟢 `[BUG-205]` Clicking "Code Review" opens wrong commit
 
 - **UUID**: `7e746a19-6f18-4318-9f45-a7a393aca3d6`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-28 22:51:39 UTC`
+- **Accepted**: `2026-09-28 22:51:39 UTC`
 
 #### Description
 
@@ -5799,10 +6003,11 @@ When I select commit 947e55f5 and click the "Code Review" button, the "Code Revi
 ### <a id="bug-206"></a> 🟢 `[BUG-206]` Off sheet schematic feedback
 
 - **UUID**: `ee5aacad-f05c-4d19-82b9-e69cb1854b29`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `CRITICAL`
 - **Category**: `PCB`
 - **Created**: `2026-09-28 22:54:51 UTC`
+- **Accepted**: `2026-09-28 22:54:51 UTC`
 
 #### Description
 
@@ -5844,11 +6049,12 @@ Feedback on the latest change to route off sheet connectors for power and ground
 ### <a id="bug-207"></a> 🟢 `[BUG-207]` Please add sheet 17 components to the carrier board
 
 - **UUID**: `988f1e27-2dc1-416c-a886-3a7376660984`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `CRITICAL`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-28 23:01:08 UTC`
+- **Accepted**: `2026-09-28 23:01:08 UTC`
 
 #### Description
 
@@ -5866,12 +6072,13 @@ Sheet 17 components are totally missing from the carrier board. Please add them 
 ### <a id="bug-208"></a> 🟢 `[BUG-208]` Battery cover will elide text on enclosure top
 
 - **UUID**: `d3a471dc-532e-4fe8-bb82-f4370a65fa56`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `enclosure_top`
 - **Created**: `2026-09-29 01:13:57 UTC`
 - **Resolved**: `2026-09-29 01:35:58 UTC`
+- **Accepted**: `2026-09-29 01:35:58 UTC`
 
 #### Description
 
@@ -5893,12 +6100,13 @@ Repositioned BATTERY label south of cover perimeter, aligned GPIO label above J1
 ### <a id="bug-209"></a> 🟢 `[BUG-209]` Schematic and PCB silkscreening unreadable despite DRC checks passing
 
 - **UUID**: `128614eb-9f13-4cc4-b4f3-68558e04722c`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-29 01:17:12 UTC`
 - **Resolved**: `2026-09-29 17:54:26 UTC`
+- **Accepted**: `2026-09-29 17:54:26 UTC`
 
 #### Description
 
@@ -5931,11 +6139,12 @@ Excluded LED cathode/anode net tags from PowerNetMatcher in schematic/constants.
 ### <a id="bug-210"></a> 🟢 `[BUG-210]` Capacitors and resistors missing values
 
 - **UUID**: `fa1e24e1-03cb-4760-9041-c5fe33059696`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-29 01:24:50 UTC`
+- **Accepted**: `2026-09-29 01:24:50 UTC`
 
 #### Description
 
@@ -5953,12 +6162,13 @@ Excluded LED cathode/anode net tags from PowerNetMatcher in schematic/constants.
 ### <a id="bug-211"></a> 🟢 `[BUG-211]` Update Code Review UI
 
 - **UUID**: `0e545632-95dc-4832-a34e-cd83d2a25928`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `code_review`
 - **Created**: `2026-09-29 01:37:52 UTC`
 - **Resolved**: `2026-09-29 03:00:00 UTC`
+- **Accepted**: `2026-09-29 03:00:00 UTC`
 
 #### Description
 
@@ -5970,12 +6180,13 @@ Excluded LED cathode/anode net tags from PowerNetMatcher in schematic/constants.
 ### <a id="bug-212"></a> 🟢 `[BUG-212]` Clicking on any PR past PR535 in the dashboard results in a 404 error
 
 - **UUID**: `6936b4e8-c64f-48a5-9650-32c133333403`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `CRITICAL`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-29 01:41:27 UTC`
 - **Resolved**: `2026-09-29 02:05:00 UTC`
+- **Accepted**: `2026-09-29 02:05:00 UTC`
 
 #### Description
 
@@ -5995,12 +6206,13 @@ Clicking on any PR past PR535 in the dashboard results in a 404 error.
 ### <a id="bug-213"></a> 🟢 `[BUG-213]` Update sync behavior and add rebase button to dashboard
 
 - **UUID**: `a7140768-3d4d-47f9-8217-bc5f93552e13`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-29 01:43:41 UTC`
 - **Resolved**: `2026-09-29 03:00:00 UTC`
+- **Accepted**: `2026-09-29 03:00:00 UTC`
 
 #### Description
 
@@ -6014,12 +6226,13 @@ Add a rebase button to the dashboard, when we rebase, the ancestor branch marker
 ### <a id="bug-214"></a> 🟢 `[BUG-214]` Remove PCIe end connector, add support for BTLE
 
 - **UUID**: `8f70dffb-8217-429e-a877-6eca66f8a4b7`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `PCB`
 - **Component**: `carrier_board, enclosure_bottom`
 - **Created**: `2026-09-29 02:33:47 UTC`
 - **Resolved**: `2026-09-29 17:54:33 UTC`
+- **Accepted**: `2026-09-29 17:54:33 UTC`
 
 #### Description
 
@@ -6041,11 +6254,12 @@ Removed PCIe J1 connector and enclosure cutouts; integrated u-blox NINA-B302 U11
 ### <a id="bug-215"></a> 🟢 `[BUG-215]` Corrupted UI in dashboard VCS window
 
 - **UUID**: `27c1a447-6d7e-42a9-a4a7-f70882824892`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `CRITICAL`
 - **Category**: `PCB`
 - **Component**: `dashboard`
 - **Created**: `2026-09-29 03:16:25 UTC`
+- **Accepted**: `2026-09-29 03:16:25 UTC`
 
 #### Description
 
@@ -6069,10 +6283,11 @@ Removed PCIe J1 connector and enclosure cutouts; integrated u-blox NINA-B302 U11
 ### <a id="bug-216"></a> 🟢 `[BUG-216]` Bugs reopened after clicking "Save and Exit" in dashboard
 
 - **UUID**: `dfdd9e04-21aa-4b61-a385-91cd637e5310`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `CRITICAL`
 - **Category**: `PCB`
 - **Created**: `2026-09-29 03:18:46 UTC`
+- **Accepted**: `2026-09-29 03:18:46 UTC`
 
 #### Description
 
@@ -6091,11 +6306,12 @@ I clicked "Save and Exit" in the dashboard and a bunch of extra bugs appeared. I
 ### <a id="bug-217"></a> 🟢 `[BUG-217]` Add horizontal and vertical resizes to bug report page
 
 - **UUID**: `3c74cb99-5099-494d-bb4f-50d774189cf1`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-29 03:20:15 UTC`
+- **Accepted**: `2026-09-29 03:20:15 UTC`
 
 #### Description
 
@@ -6114,11 +6330,12 @@ Add horizontal and vertical resizers to text controls in the bug report page, an
 ### <a id="bug-218"></a> 🟢 `[BUG-218]` Error creating PR
 
 - **UUID**: `86f947d2-9a83-4e3d-955a-3a9849bd3ecd`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-29 04:03:57 UTC`
+- **Accepted**: `2026-09-29 04:03:57 UTC`
 
 #### Description
 
@@ -6138,12 +6355,13 @@ When I try to create a PR for the commit 4bc4bf09 I get the associated error in 
 ### <a id="bug-219"></a> 🟢 `[BUG-219]` Move RESET out of "OVERRIDES" group
 
 - **UUID**: `e254bd81-d8b0-451c-a266-96c84d293a59`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-29 04:10:24 UTC`
 - **Resolved**: `2026-09-29 17:54:42 UTC`
+- **Accepted**: `2026-09-29 17:54:42 UTC`
 
 #### Description
 
@@ -6160,11 +6378,12 @@ Relocated SW1 RESET push button to (0, -11) directly below central MCU U1 with d
 ### <a id="bug-220"></a> 🟢 `[BUG-220]` Unexpected isolation results in flying probes test
 
 - **UUID**: `6ceab5bc-759a-49af-96a5-314d89eefa4e`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `PCB`
 - **Component**: `flex_tail`
 - **Created**: `2026-09-29 04:15:04 UTC`
+- **Accepted**: `2026-09-29 04:15:04 UTC`
 
 #### Description
 
@@ -6186,11 +6405,12 @@ Flying probes test- there's a bunch of isolation test results that are included 
 ### <a id="bug-221"></a> 🟢 `[BUG-221]` Branches missing from branch viewer
 
 - **UUID**: `733bb430-64db-4200-88ab-b6677e1c901b`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-29 05:29:21 UTC`
+- **Accepted**: `2026-09-29 05:29:21 UTC`
 
 #### Description
 
@@ -6215,12 +6435,13 @@ The main branch, and release branches v1..v5 are missing from the branch view. s
 ### <a id="bug-222"></a> 🟢 `[BUG-222]` I still see the M.2 connector on the PCB after rebuilding
 
 - **UUID**: `335ccd2f-9723-4e79-a8f5-cac7dc335926`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `CRITICAL`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-29 17:32:12 UTC`
 - **Resolved**: `2026-09-29 17:54:19 UTC`
+- **Accepted**: `2026-09-29 17:54:19 UTC`
 
 #### Description
 
@@ -6239,12 +6460,13 @@ Synchronized PCB board textures in recordings/previews/ and build/board/carrier_
 ### <a id="bug-223"></a> 🟢 `[BUG-223]` Can't comment on commit
 
 - **UUID**: `21a4faf9-7fbe-416a-87c5-0f0a11cee025`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-29 19:03:16 UTC`
 - **Resolved**: `2026-09-29 23:42:52 UTC`
+- **Accepted**: `2026-09-29 23:42:52 UTC`
 
 #### Description
 
@@ -6260,12 +6482,13 @@ Fixed _handle_add_comment and _handle_edit_comment in server.py to return status
 ### <a id="bug-224"></a> 🟢 `[BUG-224]` We should add horizontal resizers to the split commit views in the main VCS UI and code review UI
 
 - **UUID**: `d6c45ce0-5b77-4de7-bd0f-9f457ed073df`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-29 19:03:57 UTC`
 - **Resolved**: `2026-09-29 19:54:35 UTC`
+- **Accepted**: `2026-09-29 19:54:35 UTC`
 
 #### Resolution Notes
 
@@ -6276,11 +6499,12 @@ Added .sbs-split-resizer with colgroup width adjustments, drag listeners, and lo
 ### <a id="bug-225"></a> 🟢 `[BUG-225]` We should add horizontal resizers to the split commit views in the main VCS UI and code review UI
 
 - **UUID**: `630a108e-624f-4d67-970c-c4dcbdaddaf9`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Created**: `2026-09-29 19:07:50 UTC`
 - **Resolved**: `2026-09-29 23:50:13 UTC`
+- **Accepted**: `2026-09-29 23:50:13 UTC`
 
 #### Description
 
@@ -6295,11 +6519,12 @@ Added prominent vertical gripper indicator (with grab icon and highlight) and fu
 ### <a id="bug-226"></a> 🟢 `[BUG-226]` Still see stale commits in my commit list
 
 - **UUID**: `25cb2241-29c7-41c8-a81c-b731c127514f`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-29 19:13:20 UTC`
 - **Resolved**: `2026-09-29 19:54:49 UTC`
+- **Accepted**: `2026-09-29 19:54:49 UTC`
 
 #### Description
 
@@ -6314,12 +6539,13 @@ Enhanced merged commit detection across all tracking candidates in git_engine.py
 ### <a id="bug-227"></a> 🟢 `[BUG-227]` Globally disable text wrap on toolbar buttons
 
 - **UUID**: `10228d5b-d1ba-46d6-8be7-085bf4eb405e`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-29 19:38:26 UTC`
 - **Resolved**: `2026-09-29 19:55:01 UTC`
+- **Accepted**: `2026-09-29 19:55:01 UTC`
 
 #### Description
 
@@ -6341,12 +6567,13 @@ Globally disabled text wrap on .quake-btn with white-space: nowrap !important an
 ### <a id="bug-228"></a> 🟢 `[BUG-228]` Create PR-default behavior
 
 - **UUID**: `aa5264aa-2d94-43f2-9a23-9ff647cf7a4b`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-29 19:41:18 UTC`
 - **Resolved**: `2026-09-29 19:55:10 UTC`
+- **Accepted**: `2026-09-29 19:55:10 UTC`
 
 #### Description
 
@@ -6362,11 +6589,12 @@ Added Select All and Select None buttons to commit-toolbar in diff_view.html.j2,
 ### <a id="bug-229"></a> 🟢 `[BUG-229]` Create PR didn't submit PRs to GitHub
 
 - **UUID**: `d0fd36b2-e077-48b5-a9ff-4fff6b3e74a6`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-29 19:43:42 UTC`
 - **Resolved**: `2026-09-29 19:55:17 UTC`
+- **Accepted**: `2026-09-29 19:55:17 UTC`
 
 #### Description
 
@@ -6473,11 +6701,12 @@ Added prSubmitModalOverlay with progress bar and terminal log output in diff_vie
 ### <a id="bug-230"></a> 🟢 `[BUG-230]` Execution Logs and Tracebacks not preserved
 
 - **UUID**: `7884d1a8-7587-4458-ab51-0ebf659a4239`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-29 19:47:24 UTC`
 - **Resolved**: `2026-09-29 19:59:48 UTC`
+- **Accepted**: `2026-09-29 19:59:48 UTC`
 
 #### Description
 
@@ -6499,12 +6728,13 @@ Preserved logs, expected_behavior, and actual_behavior in _handle_save_bug in Da
 ### <a id="bug-231"></a> 🟢 `[BUG-231]` Our BLE module requires firmware to work
 
 - **UUID**: `ecc5b869-b081-4c35-b6e8-efa828907873`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `CRITICAL`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-29 19:52:14 UTC`
 - **Resolved**: `2026-09-29 22:10:32 UTC`
+- **Accepted**: `2026-09-29 22:10:32 UTC`
 
 #### Description
 
@@ -6527,12 +6757,13 @@ Replaced U11 with pre-flashed NINA-B312-02B, added SWD recovery header J15 at (-
 ### <a id="bug-232"></a> 🟢 `[BUG-232]` Add copy/Open in VS code buttons
 
 - **UUID**: `ab1f8baf-aee3-4bc3-97fd-300ea9d0b5c8`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-29 23:43:31 UTC`
 - **Resolved**: `2026-09-29 23:57:00 UTC`
+- **Accepted**: `2026-09-29 23:57:00 UTC`
 
 #### Description
 
@@ -6553,12 +6784,13 @@ Added Copy file path and Open in VS Code (vscode://file) action buttons next to 
 ### <a id="bug-233"></a> 🟢 `[BUG-233]` Scrollbars appear invisible int he UI theme
 
 - **UUID**: `320f3ca3-81a8-4c89-9e0e-de93e1828b50`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-29 23:45:25 UTC`
 - **Resolved**: `2026-09-29 23:57:04 UTC`
+- **Accepted**: `2026-09-29 23:57:04 UTC`
 
 #### Description
 
@@ -6579,12 +6811,13 @@ Enhanced scrollbar theme with 10px width, high-contrast warm copper/amber thumb 
 ### <a id="bug-234"></a> 🟢 `[BUG-234]` Confusing error message submitting stack PR
 
 - **UUID**: `28bd84a6-8d8d-46c4-83dd-bd5ab30e0594`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-29 23:51:57 UTC`
 - **Resolved**: `2026-09-29 23:58:23 UTC`
+- **Accepted**: `2026-09-29 23:58:23 UTC`
 
 #### Description
 
@@ -6608,12 +6841,13 @@ Invoked Sapling directly via subprocess without passing through git command wrap
 ### <a id="bug-235"></a> 🟢 `[BUG-235]` Add web icon for dashboard
 
 - **UUID**: `b34ff661-cb2b-48a6-9b58-39ea74c12b83`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-29 23:58:00 UTC`
 - **Resolved**: `2026-09-30 03:27:22 UTC`
+- **Accepted**: `2026-09-30 03:27:22 UTC`
 
 #### Description
 
@@ -6628,12 +6862,13 @@ Created high-contrast Quake-themed favicon.svg matching UI palette and served ac
 ### <a id="bug-236"></a> 🟢 `[BUG-236]` Saving extra CR feedback didn't update the CR count
 
 - **UUID**: `d881accb-47f5-4561-a19f-cb7551ab468b`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-30 00:10:37 UTC`
 - **Resolved**: `2026-09-30 03:53:39 UTC`
+- **Accepted**: `2026-09-30 03:53:39 UTC`
 
 #### Description
 
@@ -6659,11 +6894,12 @@ Fixed SQLite comment pruning and added file watch on feedback directory
 ### <a id="bug-237"></a> 🟢 `[BUG-237]` Vertical gripper in side-by-side view didn't update the split pane diff position
 
 - **UUID**: `032f563c-b369-45fe-a398-a060e6f004c5`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-30 00:12:33 UTC`
 - **Resolved**: `2026-09-30 03:27:28 UTC`
+- **Accepted**: `2026-09-30 03:27:28 UTC`
 
 #### Description
 
@@ -6689,12 +6925,13 @@ Fixed side-by-side split pane drag math to use containerRect and fixed 100% tabl
 ### <a id="bug-238"></a> 🟢 `[BUG-238]` "CR_working.md" in feedback directory
 
 - **UUID**: `5c81299f-2e28-472d-becf-6363ecacb866`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-30 02:09:05 UTC`
 - **Resolved**: `2026-09-30 03:53:52 UTC`
+- **Accepted**: `2026-09-30 03:53:52 UTC`
 
 #### Description
 
@@ -6723,12 +6960,13 @@ Auto-rename CR_working.md to CR_<commit_sha>.md on git commit
 ### <a id="bug-239"></a> 🟢 `[BUG-239]` Per-User behavior for feedback/ items
 
 - **UUID**: `97e1d011-117a-4525-988a-32e9efdfe0ac`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-30 02:27:04 UTC`
 - **Resolved**: `2026-09-30 03:54:00 UTC`
+- **Accepted**: `2026-09-30 03:54:00 UTC`
 
 #### Description
 
@@ -6748,12 +6986,13 @@ Filtered reviews and bugs by current git user unless --all-users is specified
 ### <a id="bug-240"></a> 🟢 `[BUG-240]` Argument subcommands are erroneously declared as flags
 
 - **UUID**: `5eccadc0-1e69-4833-9b74-da0dd43f414d`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `PCB`
 - **Component**: `dashboard`
 - **Created**: `2026-09-30 02:29:57 UTC`
 - **Resolved**: `2026-09-30 03:54:07 UTC`
+- **Accepted**: `2026-09-30 03:54:07 UTC`
 
 #### Description
 
@@ -6773,11 +7012,12 @@ Added action-topic subcommands to dashboard.py CLI with backward compatibility f
 ### <a id="bug-241"></a> 🟢 `[BUG-241]` Trim GEMINI.md
 
 - **UUID**: `9ac3cb2d-b8d0-43d0-84c3-20a29bcd1f74`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `GENERAL`
 - **Created**: `2026-09-30 02:50:45 UTC`
 - **Resolved**: `2026-09-30 07:03:09 UTC`
+- **Accepted**: `2026-09-30 07:03:09 UTC`
 
 #### Description
 
@@ -6800,12 +7040,13 @@ Trimmed GEMINI.md and modularized domain-specific mandates into docs/
 ### <a id="bug-242"></a> 🟢 `[BUG-242]` Reformat Code Review main toolbar
 
 - **UUID**: `7030d5bc-79e6-4ddc-9f7c-0287ba354100`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-30 03:39:43 UTC`
 - **Resolved**: `2026-09-30 03:54:15 UTC`
+- **Accepted**: `2026-09-30 03:54:15 UTC`
 
 #### Description
 
@@ -6826,12 +7067,13 @@ Moved commit and file panes under main toolbar across full width without horizon
 ### <a id="bug-243"></a> 🟢 `[BUG-243]` Add power hardening to carrier board
 
 - **UUID**: `abb5a8b9-81be-400b-b01f-935e9994e998`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-30 04:03:59 UTC`
 - **Resolved**: `2026-09-30 06:47:30 UTC`
+- **Accepted**: `2026-09-30 06:47:30 UTC`
 
 #### Description
 
@@ -6846,12 +7088,13 @@ Added decoupling caps C15, C16, C17 and ESD TVS protection diode D8 to carrier b
 ### <a id="bug-244"></a> 🟢 `[BUG-244]` Dashboard CLI should have a commit subcommand
 
 - **UUID**: `7b028ab0-6eb7-4ebd-9d06-7bdb42a366da`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-30 04:18:38 UTC`
 - **Resolved**: `2026-09-30 07:00:02 UTC`
+- **Accepted**: `2026-09-30 07:00:02 UTC`
 
 #### Description
 
@@ -6866,12 +7109,13 @@ Added commit subcommand and --commit flag to dashboard CLI for parity with sync
 ### <a id="bug-245"></a> 🟢 `[BUG-245]` Word wrap needed in diff views
 
 - **UUID**: `db331346-d050-447c-ade6-adcfce5fe91a`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-30 16:27:03 UTC`
 - **Resolved**: `2026-09-30 16:58:55 UTC`
+- **Accepted**: `2026-09-30 16:58:55 UTC`
 
 #### Description
 
@@ -6886,12 +7130,13 @@ Added word wrap toggle button, pre-wrap styling, keyboard shortcut, and persiste
 ### <a id="bug-246"></a> 🟢 `[BUG-246]` We should sync the working tree and commit panes automatically
 
 - **UUID**: `a70afa64-ae24-4926-ade3-5087ed170c8f`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-30 16:28:03 UTC`
 - **Resolved**: `2026-09-30 17:02:26 UTC`
+- **Accepted**: `2026-09-30 17:02:26 UTC`
 
 #### Description
 
@@ -6906,12 +7151,13 @@ Added automatic background synchronization for working tree, file, and commit pa
 ### <a id="bug-247"></a> 🟢 `[BUG-247]` We should just have one 'Sync' button.
 
 - **UUID**: `0bac3b8a-3b6f-4134-933d-09b01f5a998d`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-30 16:48:21 UTC`
 - **Resolved**: `2026-09-30 17:04:08 UTC`
+- **Accepted**: `2026-09-30 17:04:08 UTC`
 
 #### Description
 
@@ -6926,12 +7172,13 @@ Removed separate Sync DB button and unified git sync and feedback database sync 
 ### <a id="bug-248"></a> 🟢 `[BUG-248]` Add sort and filter menus to Bug Report field
 
 - **UUID**: `104d6406-6dc5-4ad6-ae27-f709e91956a4`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-09-30 20:19:04 UTC`
 - **Resolved**: `2026-09-30 20:43:56 UTC`
+- **Accepted**: `2026-09-30 20:43:56 UTC`
 
 #### Description
 
@@ -6946,12 +7193,13 @@ Added sort dropdown (id_asc, id_desc, severity, status, component, title) and ca
 ### <a id="bug-249"></a> 🟢 `[BUG-249]` NINA-VLOAD_SW pin not in the documentation
 
 - **UUID**: `9df28b13-3d4e-44fe-8d9e-08b76af4eec4`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-30 20:23:38 UTC`
 - **Resolved**: `2026-09-30 20:56:27 UTC`
+- **Accepted**: `2026-09-30 20:56:27 UTC`
 
 #### Description
 
@@ -6966,12 +7214,13 @@ Removed legacy VLOAD_SW net, pruned VLOAD_SW from U11 pin breakouts and Sheet 2,
 ### <a id="bug-250"></a> 🟢 `[BUG-250]` NINA-Utilize Native nRF52840 NFC on the NINA-B312
 
 - **UUID**: `e025c345-f40a-4667-b334-1438060c52ce`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-30 20:23:38 UTC`
 - **Resolved**: `2026-09-30 21:33:52 UTC`
+- **Accepted**: `2026-09-30 21:33:52 UTC`
 
 #### Description
 
@@ -6996,12 +7245,13 @@ Routed native nRF52840 NFC1/NFC2 from U11 (NINA-B312) to external tuned coil ant
 ### <a id="bug-251"></a> 🟢 `[BUG-251]` NINA-Remove J15 from BOM, mark board connector as no connect
 
 - **UUID**: `96668a3a-4193-411f-95c4-e1fac4475e41`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-30 20:31:25 UTC`
 - **Resolved**: `2026-09-30 21:43:50 UTC`
+- **Accepted**: `2026-09-30 21:43:50 UTC`
 
 #### Description
 
@@ -7016,12 +7266,13 @@ Marked J15 as DNP and no-connect, excluded from BOM export and schematic unconne
 ### <a id="bug-252"></a> 🟢 `[BUG-252]` Corrupted text or sth in diff view
 
 - **UUID**: `77ff0b95-baec-4fbf-a37f-7c7015d93ac4`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-10-01 01:39:41 UTC`
 - **Resolved**: `2026-10-01 02:27:55 UTC`
+- **Accepted**: `2026-10-01 02:27:55 UTC`
 
 #### Description
 
@@ -7042,12 +7293,13 @@ Resolved corrupted unified diff word wrap in diff_component.html.j2 and code_rev
 ### <a id="bug-253"></a> 🟢 `[BUG-253]` Traceback in dashboard
 
 - **UUID**: `78be8cf8-dd35-40ab-8a12-cef2bb18fdc4`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `CRITICAL`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-10-01 01:54:45 UTC`
 - **Resolved**: `2026-10-01 02:18:19 UTC`
+- **Accepted**: `2026-10-01 02:18:19 UTC`
 
 #### Reproduction Steps
 
@@ -7343,11 +7595,12 @@ Reconciled UUID and ID mapping during comment upsert in SQLite store and server 
 ### <a id="bug-254"></a> 🟢 `[BUG-254]` enclosure_lid.stl-review failure
 
 - **UUID**: `252fa91f-9666-44f9-9922-b331957cb402`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-10-01 03:30:11 UTC`
 - **Resolved**: `2026-10-01 04:47:58 UTC`
+- **Accepted**: `2026-10-01 04:47:58 UTC`
 
 #### Description
 
@@ -7368,12 +7621,13 @@ Increased BATTERY text font size to 4.2mm bold with 0.15mm stroke offset to guar
 ### <a id="bug-255"></a> 🟢 `[BUG-255]` sheet 8- R1 and R2 are bridged with an off sheet 3V3 connector
 
 - **UUID**: `efb13896-e701-4d8b-af7f-686ceae62652`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-10-01 04:42:38 UTC`
 - **Resolved**: `2026-10-01 05:05:49 UTC`
+- **Accepted**: `2026-10-01 05:05:49 UTC`
 
 #### Description
 
@@ -7395,12 +7649,13 @@ Removed horizontal 3V3 bridge between R1 and R2 pull-up resistors and added indi
 ### <a id="bug-256"></a> 🟢 `[BUG-256]` primary signal nets on flex tail schematic are wrong
 
 - **UUID**: `0c6cbf17-a0c9-498b-aaef-91b87ca0636a`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `flex_tail`
 - **Created**: `2026-10-01 04:44:06 UTC`
 - **Resolved**: `2026-10-01 05:13:46 UTC`
+- **Accepted**: `2026-10-01 05:13:46 UTC`
 
 #### Description
 
@@ -7455,12 +7710,13 @@ Filtered Wiring.filter_by_footprints and SchematicDiagram TOC primary signal net
 ### <a id="bug-257"></a> 🟢 `[BUG-257]` Add copy icon next to commit hashes, branch names and bug ID's
 
 - **UUID**: `8ed42648-b58a-4e4f-819d-571b034d6cc4`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-10-01 23:42:21 UTC`
 - **Resolved**: `2026-10-02 00:11:05 UTC`
+- **Accepted**: `2026-10-02 00:11:05 UTC`
 
 #### Description
 
@@ -7476,12 +7732,13 @@ Added copy icon buttons next to commit hashes, branch names, and bug IDs in diff
 ### <a id="bug-258"></a> 🟢 `[BUG-258]` CR feedback- keeps showing up as modified, only timestamp is updated
 
 - **UUID**: `2a63217e-7735-4666-bb34-2d0227427918`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `carrier_board`
 - **Created**: `2026-10-01 23:45:01 UTC`
 - **Resolved**: `2026-10-02 00:23:51 UTC`
+- **Accepted**: `2026-10-02 00:23:51 UTC`
 
 #### Description
 
@@ -7523,12 +7780,13 @@ Prevent timestamp-only rewrites of code review markdown reports (CR.md and CR_<c
 ### <a id="bug-259"></a> 🟢 `[BUG-259]` Carrier board schematic feedback-floating pins, component spacing, off sheet connectors
 
 - **UUID**: `a5d1dd65-97d5-46f7-aeb5-42bb81e7f45a`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-10-01 23:47:10 UTC`
 - **Resolved**: `2026-10-02 01:15:53 UTC`
+- **Accepted**: `2026-10-02 01:15:53 UTC`
 
 #### Description
 
@@ -7548,12 +7806,13 @@ Resolved floating pins on U10 (BYP) and U1 (D1) by removing unused pins from She
 ### <a id="bug-260"></a> 🟢 `[BUG-260]` Schematic Index-sheet names fall of edge of page
 
 - **UUID**: `7214bbbe-ebcd-4f3e-a535-521545de99b6`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-10-02 01:05:52 UTC`
 - **Resolved**: `2026-10-02 01:25:32 UTC`
+- **Accepted**: `2026-10-02 01:25:32 UTC`
 
 #### Description
 
@@ -7574,11 +7833,12 @@ Constrained Table of Contents Document Structure entry lengths to MAX_ENTRY_LEN 
 ### <a id="bug-261"></a> 🟢 `[BUG-261]` Downselection report-feedback
 
 - **UUID**: `3e4ffc46-5e7d-45e2-a3b8-f72a74b20d06`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-10-02 01:11:46 UTC`
 - **Resolved**: `2026-10-02 01:35:39 UTC`
+- **Accepted**: `2026-10-02 01:35:39 UTC`
 
 #### Description
 
@@ -7598,11 +7858,12 @@ Updated supplier PCB review deck to include minimum track spacing in mils (4.72 
 ### <a id="bug-262"></a> 🟢 `[BUG-262]` Supplier PCB guidelines
 
 - **UUID**: `1f8e5ea0-c7ef-47e7-9af4-445c643191ea`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-10-02 01:35:53 UTC`
 - **Resolved**: `2026-10-02 01:49:00 UTC`
+- **Accepted**: `2026-10-02 01:49:00 UTC`
 
 #### Description
 
@@ -7622,11 +7883,12 @@ Added Builder.package_supplier_pcb_files to automatically package supplier zip a
 ### <a id="bug-263"></a> 🟢 `[BUG-263]` CI failures-
 
 - **UUID**: `92a5457f-b5fa-49f1-a03e-29952e4c92f3`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-10-02 01:53:05 UTC`
 - **Resolved**: `2026-10-02 01:56:52 UTC`
+- **Accepted**: `2026-10-02 01:56:52 UTC`
 
 #### Description
 
@@ -7709,12 +7971,13 @@ Added gc.collect() and +5 FD margin in test_regression_bug_181 to account for py
 ### <a id="bug-264"></a> 🟢 `[BUG-264]` Tracebacks after cleaning build directory
 
 - **UUID**: `f3445cf3-06d5-449b-b456-f51c2e66a75d`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-10-02 02:17:08 UTC`
 - **Resolved**: `2026-10-02 02:34:11 UTC`
+- **Accepted**: `2026-10-02 02:34:11 UTC`
 
 #### Description
 
@@ -8624,12 +8887,13 @@ Ensure parent directories exist dynamically and initialize database schema on-de
 ### <a id="bug-265"></a> 🟢 `[BUG-265]` Simplify build logging
 
 - **UUID**: `17d15352-0155-46fa-9467-e6674b8b0f6e`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `GENERAL`
 - **Component**: `build`
 - **Created**: `2026-10-02 02:17:45 UTC`
 - **Resolved**: `2026-10-02 02:47:18 UTC`
+- **Accepted**: `2026-10-02 02:47:18 UTC`
 
 #### Description
 
@@ -8663,12 +8927,13 @@ Route individual file compilation logs to build/daemon.log via Logger.log struct
 ### <a id="bug-266"></a> 🟢 `[BUG-266]` Remove component designators for LEDs and jumpers
 
 - **UUID**: `48c31e66-3211-427a-a53d-21ed4c67bb00`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-10-02 02:19:09 UTC`
 - **Resolved**: `2026-10-02 02:56:08 UTC`
+- **Accepted**: `2026-10-02 02:56:08 UTC`
 
 #### Description
 
@@ -8689,12 +8954,13 @@ Remove opposite-side component designators D2..D7, R7..R12, JP1..JP4, and SW1 fr
 ### <a id="bug-267"></a> 🟢 `[BUG-267]` C18 and C19-too close to U11
 
 - **UUID**: `c3a62c77-f8fe-4e6b-a6ec-2efebe616aa8`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-10-02 02:20:43 UTC`
 - **Resolved**: `2026-10-02 03:21:21 UTC`
+- **Accepted**: `2026-10-02 03:21:21 UTC`
 
 #### Description
 
@@ -8715,12 +8981,13 @@ Moved C18 and C19 to X=7.0 stacked vertically outside U11 silkscreen border; upd
 ### <a id="bug-268"></a> 🟢 `[BUG-268]` I seem to have to rebuilt the carrier_board project to view PCB changes
 
 - **UUID**: `5d067dd2-ff41-469f-b2ae-8e903496bfe9`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `GENERAL`
 - **Component**: `carrier_board`
 - **Created**: `2026-10-02 03:32:34 UTC`
 - **Resolved**: `2026-10-02 03:55:26 UTC`
+- **Accepted**: `2026-10-02 03:55:26 UTC`
 
 #### Description
 
@@ -8746,12 +9013,13 @@ Propagate all PCB configuration models (omitted_silkscreen_designators, silkscre
 ### <a id="bug-269"></a> 🟢 `[BUG-269]` encode LFS attachments in a way that multiple bugs can have an attachment with the same name
 
 - **UUID**: `b19f7115-591b-4127-a9ba-fa70ec287214`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-10-02 03:42:28 UTC`
 - **Resolved**: `2026-10-02 04:43:00 UTC`
+- **Accepted**: `2026-10-02 04:43:00 UTC`
 
 #### Resolution Notes
 
@@ -8762,12 +9030,13 @@ Encode attachments scoped by bug ID under attachments/<bug_id>/<filename>, preve
 ### <a id="bug-270"></a> 🟢 `[BUG-270]` Traceback in dashboard
 
 - **UUID**: `42914bd9-4f2e-4bf5-9f58-6222c104f718`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `CRITICAL`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-10-02 14:46:11 UTC`
 - **Resolved**: `2026-10-02 15:07:57 UTC`
+- **Accepted**: `2026-10-02 15:07:57 UTC`
 
 #### Description
 
@@ -8871,11 +9140,12 @@ Handle BrokenPipeError and client disconnects gracefully in DashboardServer, Bug
 ### <a id="bug-271"></a> 🟢 `[BUG-271]` W908185AS2CN65-Supplier feedback
 
 - **UUID**: `8ffc0fad-e1a5-4e30-b587-74575c04dd75`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `CRITICAL`
 - **Category**: `PCB`
 - **Created**: `2026-10-02 14:47:31 UTC`
 - **Resolved**: `2026-10-02 15:21:02 UTC`
+- **Accepted**: `2026-10-02 15:21:02 UTC`
 
 #### Description
 
@@ -8906,12 +9176,13 @@ Split supplier submissions into dedicated per-subassembly directories and archiv
 ### <a id="bug-272"></a> 🟢 `[BUG-272]` W908185ASE67-Supplier feedback
 
 - **UUID**: `861c6a43-d2ce-4f49-967e-0c7f161bf7ba`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-10-04 16:45:58 UTC`
 - **Resolved**: `2026-10-04 17:03:12 UTC`
+- **Accepted**: `2026-10-04 17:03:12 UTC`
 
 #### Description
 
@@ -8928,12 +9199,13 @@ Split supplier submissions into dedicated per-subassembly directories and archiv
 ### <a id="bug-273"></a> 🟢 `[BUG-273]` Hit the traceback again :-(
 
 - **UUID**: `143a26af-2c88-4b5e-8e52-2e6db9ca1c2b`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-10-04 22:59:00 UTC`
 - **Resolved**: `2026-10-06 02:16:42 UTC`
+- **Accepted**: `2026-10-06 02:16:42 UTC`
 
 #### Description
 
@@ -26679,12 +26951,13 @@ Elevated soft RLIMIT_NOFILE to 65536, cached git commit diffs and stats, and sup
 ### <a id="bug-274"></a> 🟢 `[BUG-274]` Make code review, bug report views modal windows
 
 - **UUID**: `3fc9294c-ef18-4b4a-82df-ba9e8c244c81`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-10-06 01:49:36 UTC`
 - **Resolved**: `2026-10-06 02:27:00 UTC`
+- **Accepted**: `2026-10-06 02:27:00 UTC`
 
 #### Description
 
@@ -26699,12 +26972,13 @@ Converted Code Review and Bug Report workstations into modal windows over the VC
 ### <a id="bug-275"></a> 🟢 `[BUG-275]` W908185ASE69-Supplier feedback
 
 - **UUID**: `2922ea6a-39d9-45ff-9f2c-b9a232c5c4f1`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `flex_tail`
 - **Created**: `2026-10-06 01:51:20 UTC`
 - **Resolved**: `2026-10-06 03:13:44 UTC`
+- **Accepted**: `2026-10-06 03:13:44 UTC`
 
 #### Description
 
@@ -26729,12 +27003,13 @@ Confirmed and approved 1*2 panel in 64*64mm with x-out accepted. Clarified SMT-o
 ### <a id="bug-276"></a> 🟢 `[BUG-276]` PCBWay.com -- Questions with BOM file of Order #T-E70W908185A
 
 - **UUID**: `b4e4b253-945b-46ed-9bbc-9023b057c2e8`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `flex_tail`
 - **Created**: `2026-10-07 16:18:33 UTC`
 - **Resolved**: `2026-10-07 16:27:34 UTC`
+- **Accepted**: `2026-10-07 16:27:34 UTC`
 
 #### Description
 
@@ -26758,12 +27033,13 @@ Updated J2/J4 connector MPN to Hirose FH12-30S-0.5SH(55) and Digi-Key PN to HFJ1
 ### <a id="bug-277"></a> 🟢 `[BUG-277]` PCBWay.com -- Questions with BOM file of Order #T-E68W908185A
 
 - **UUID**: `2eba63f5-d236-493b-8307-39d96b743341`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board, flex_tail`
 - **Created**: `2026-10-07 16:19:40 UTC`
 - **Resolved**: `2026-10-07 16:52:29 UTC`
+- **Accepted**: `2026-10-07 16:52:29 UTC`
 
 #### Description
 
@@ -26789,12 +27065,13 @@ Implemented Excel (.xlsx) BOM export in PCBExporter matching PCBWay's template s
 ### <a id="bug-278"></a> 🟢 `[BUG-278]` Working tree actions doesn't show up unless I click an older commit
 
 - **UUID**: `064fec38-c4a1-436a-ae12-26ea26844579`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-10-07 23:26:10 UTC`
 - **Resolved**: `2026-10-08 02:43:00 UTC`
+- **Accepted**: `2026-10-08 02:43:00 UTC`
 
 #### Description
 
@@ -26809,12 +27086,13 @@ Updated diff_view.html.j2 template to dynamically render workingTreeCommitArea w
 ### <a id="bug-279"></a> 🟢 `[BUG-279]` Populate component list
 
 - **UUID**: `53d3ceb2-8a2f-4117-8fa7-f1c9c2160daa`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-10-07 23:27:07 UTC`
 - **Resolved**: `2026-10-08 02:50:24 UTC`
+- **Accepted**: `2026-10-08 02:50:24 UTC`
 
 #### Description
 
@@ -26829,12 +27107,13 @@ Added <datalist id="bug-component-list"> to bug_report.html.j2 connected to bug-
 ### <a id="bug-280"></a> 🟢 `[BUG-280]` Remediations for stuck CI tasks
 
 - **UUID**: `613d04a9-a148-4b93-9649-ab583808ad05`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `CI`
 - **Created**: `2026-10-08 19:52:26 UTC`
 - **Resolved**: `2026-10-08 20:03:46 UTC`
+- **Accepted**: `2026-10-08 20:03:46 UTC`
 
 #### Description
 
@@ -26891,12 +27170,13 @@ Implemented concurrency cancellation and ready_for_review triggers in ci-gate.ym
 ### <a id="bug-281"></a> 🟢 `[BUG-281]` Port dashboard to Eel
 
 - **UUID**: `d7565316-cfee-440b-a45b-7675e87669bd`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-10-08 20:05:01 UTC`
 - **Resolved**: `2026-10-08 20:07:07 UTC`
+- **Accepted**: `2026-10-08 20:07:07 UTC`
 
 #### Description
 
@@ -26911,11 +27191,12 @@ Integrated Eel standalone desktop window support with browser discovery, /eel.js
 ### <a id="bug-282"></a> 🟢 `[BUG-282]` Replace integer ID’s with Docker-pattern ID's
 
 - **UUID**: `7922df6a-9509-425b-bc5d-a15dd0d25786`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-10-09 20:16:02 UTC`
 - **Resolved**: `2026-10-09 21:07:42 UTC`
+- **Accepted**: `2026-10-09 21:07:42 UTC`
 
 #### Description
 
@@ -26938,12 +27219,13 @@ Replaced integer-based issue IDs with Docker-pattern IDs generated via CRNG with
 ### <a id="bug-lubricated-bristle-678"></a> 🟢 `[BUG-LUBRICATED-BRISTLE-678]` Pytest taking too long
 
 - **UUID**: `b1c765fb-12fa-4332-a9fb-97daa3379a45`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `Purest`
 - **Created**: `2026-10-09 23:28:09 UTC`
 - **Resolved**: `2026-10-09 23:36:01 UTC`
+- **Accepted**: `2026-10-09 23:36:01 UTC`
 
 #### Description
 
@@ -26958,12 +27240,13 @@ Fixed pytest worker hook in conftest.py to check whether slow tests are actually
 ### <a id="bug-translucent-larva-792"></a> 🟢 `[BUG-TRANSLUCENT-LARVA-792]` Motor clip interferes with the 1102 motor base
 
 - **UUID**: `2b7ef56e-6d35-4c8a-9c8e-6f586aea730f`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-10-10 23:00:34 UTC`
 - **Resolved**: `2026-10-11 00:28:20 UTC`
+- **Accepted**: `2026-10-11 00:28:20 UTC`
 
 #### Description
 
@@ -26987,12 +27270,13 @@ Added curved support web connecting the 10mm guide stub to the continuous right 
 ### <a id="bug-deep-burrower-108"></a> 🟢 `[BUG-DEEP-BURROWER-108]` Wiring diagram- pin discrepancy on TMC 6300
 
 - **UUID**: `4067b6ef-8bec-42fe-9c9c-680966c0b020`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `cat_fountain`
 - **Created**: `2026-10-10 23:07:44 UTC`
 - **Resolved**: `2026-10-11 00:07:45 UTC`
+- **Accepted**: `2026-10-11 00:07:45 UTC`
 
 #### Description
 
@@ -27014,12 +27298,13 @@ Renamed TMC6300 motor_driver output pins and wire endpoints from OUT1, OUT2, OUT
 ### <a id="bug-fossorial-bristle-291"></a> 🟢 `[BUG-FOSSORIAL-BRISTLE-291]` RP2040 pinout-uynreadible mess
 
 - **UUID**: `7edf7011-55ec-4e80-ac60-eb39ab7bdb30`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `CRITICAL`
 - **Category**: `PCB`
 - **Component**: `cat_fountain`
 - **Created**: `2026-10-10 23:13:31 UTC`
 - **Resolved**: `2026-10-10 23:47:06 UTC`
+- **Accepted**: `2026-10-10 23:47:06 UTC`
 
 #### Description
 
@@ -27040,12 +27325,13 @@ Simplified RP2040 pin labels on the board to just GPIO numbers (GPx) while keepi
 ### <a id="bug-proboscid-nightcrawler-523"></a> 🟢 `[BUG-PROBOSCID-NIGHTCRAWLER-523]` Some overlaps still visible on the wiring diagram
 
 - **UUID**: `5908e663-093a-415d-903a-0140e610a6d9`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `PCB`
 - **Component**: `cat_fountain`
 - **Created**: `2026-10-11 00:15:58 UTC`
 - **Resolved**: `2026-10-11 00:35:15 UTC`
+- **Accepted**: `2026-10-11 00:35:15 UTC`
 
 #### Description
 
@@ -27068,12 +27354,13 @@ Fixed component label positions in WiringDiagram to honor footprint label.positi
 ### <a id="bug-subterranean-vinegarworm-291"></a> 🟢 `[BUG-SUBTERRANEAN-VINEGARWORM-291]` There is some issue with pasting screenshots into bug reports
 
 - **UUID**: `5b7f9c34-23de-4b6d-abbe-78cc61b40c26`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `Dashboard`
 - **Created**: `2026-10-11 00:21:20 UTC`
 - **Resolved**: `2026-10-11 01:10:48 UTC`
+- **Accepted**: `2026-10-11 01:10:48 UTC`
 
 #### Description
 
@@ -27102,11 +27389,12 @@ Added collision avoidance logic on upload in server and unique timestamped filen
 ### <a id="bug-humic-centipede-711"></a> 🟢 `[BUG-HUMIC-CENTIPEDE-711]` Clean up repo
 
 - **UUID**: `33d8ef9c-5293-412b-9943-faa2d45e1b22`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `INFRASTRUCTURE`
 - **Created**: `2026-10-11 03:51:01 UTC`
 - **Resolved**: `2026-10-11 04:02:33 UTC`
+- **Accepted**: `2026-10-11 04:02:33 UTC`
 
 #### Description
 
@@ -27134,12 +27422,13 @@ Untracked root cat_fountain_wiring_diagram.svg and added /*.svg to .gitignore; r
 ### <a id="bug-bristly-setae-415"></a> 🟢 `[BUG-BRISTLY-SETAE-415]` Copy/paste does not work
 
 - **UUID**: `f5835d10-c82a-4fa7-a3d0-c8f84e8a591f`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-10-11 03:52:42 UTC`
 - **Resolved**: `2026-10-11 04:08:33 UTC`
+- **Accepted**: `2026-10-11 04:08:33 UTC`
 
 #### Description
 
@@ -27154,11 +27443,12 @@ Defined missing copyText and improved fallbackCopy with secure context checks an
 ### <a id="bug-segmented-palolo-739"></a> 🟢 `[BUG-SEGMENTED-PALOLO-739]` Questions with BOM file of Order #T-E68W908185A
 
 - **UUID**: `37c38133-836b-4a73-bf34-046b166021e8`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-10-11 18:14:05 UTC`
 - **Resolved**: `2026-10-11 18:27:36 UTC`
+- **Accepted**: `2026-10-11 18:27:36 UTC`
 
 #### Description
 
@@ -27179,12 +27469,13 @@ Answered all 7 PCBWay BOM questions in replied .xlsx and .xls attachments; updat
 ### <a id="bug-glowing-oligochaete-544"></a> 🟢 `[BUG-GLOWING-OLIGOCHAETE-544]` PCBWay.com -- Questions with BOM file of Order #T-E68W908185A
 
 - **UUID**: `60a5da6f-9268-43dd-9cce-873124a43f70`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-10-12 17:19:42 UTC`
 - **Resolved**: `2026-10-12 17:26:06 UTC`
+- **Accepted**: `2026-10-12 17:26:06 UTC`
 
 #### Description
 
@@ -27231,12 +27522,13 @@ Generated revised PCBWay quotation BOM spreadsheets (T-E68W908185A-2units-bom_te
 ### <a id="bug-writhing-vermis-367"></a> 🟢 `[BUG-WRITHING-VERMIS-367]` Update coverlay color to Black
 
 - **UUID**: `de47601c-3520-4c46-aab0-5ac7598e5967`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `flex_tail`
 - **Created**: `2026-10-14 17:03:15 UTC`
 - **Resolved**: `2026-10-14 17:16:03 UTC`
+- **Accepted**: `2026-10-14 17:16:03 UTC`
 
 #### Description
 
@@ -27251,12 +27543,13 @@ Updated flex_tail coverlay color to black across manifest.yaml, pcb.yaml, BuildF
 ### <a id="bug-fertile-sandworm-588"></a> 🟢 `[BUG-FERTILE-SANDWORM-588]` PCBWay.com -- Questions with BOM file of Order #T-E68W908185A
 
 - **UUID**: `ff912e53-deec-43f8-b3ba-3c18ad6dcefc`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-10-14 17:05:57 UTC`
 - **Resolved**: `2026-10-14 17:21:57 UTC`
+- **Accepted**: `2026-10-14 17:21:57 UTC`
 
 #### Description
 
@@ -27266,14 +27559,14 @@ Pls see attached, we should plan to consign all remaining components to them exc
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
-| `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls) | Legacy Excel 97-2004 format of replied quotation BOM |
-| `reference` | [carrier_board_bom_rev2.xlsx](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx) | Clean EDA export BOM generated directly from updated carrier board model |
 | `reference` | [carrier_board_bom_rev2.csv](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv) | CSV export of clean EDA BOM |
 | `reference` | [carrier_board_bom_rev3.xlsx](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx) | Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM) |
 | `reference` | [carrier_board_bom_rev3.csv](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv) | CSV export of clean EDA BOM Rev 3 |
 | `reference` | [digikey_order_2026-10-14.xlsx](attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx) | Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2) |
 | `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx) | Uploaded reference questions spreadsheet from PCBWay |
 | `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx) | Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16 |
+| `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls) | Legacy Excel 97-2004 format of replied quotation BOM |
+| `reference` | [carrier_board_bom_rev2.xlsx](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx) | Clean EDA export BOM generated directly from updated carrier board model |
 
 #### Resolution Notes
 
@@ -27284,12 +27577,13 @@ Consigned remaining out-of-stock components (D1, J3, U5, Y1) to PCBWay alongside
 ### <a id="bug-translucent-tapeworm-953"></a> 🟢 `[BUG-TRANSLUCENT-TAPEWORM-953]` Dashboard stuck at 20% on launch
 
 - **UUID**: `3e17a613-50d8-4c90-9e62-24e63b8f13fe`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-10-15 00:32:11 UTC`
 - **Resolved**: `2026-10-15 00:32:17 UTC`
+- **Accepted**: `2026-10-15 00:32:17 UTC`
 
 #### Description
 
@@ -27306,12 +27600,13 @@ Upon launching or restarting the dashboard workstation, the UI was stuck display
 ### <a id="bug-loamy-bristle-455"></a> 🟢 `[BUG-LOAMY-BRISTLE-455]` Elide physical address and personal email in privacy sanitizer
 
 - **UUID**: `09c3136e-35c6-442e-9708-46ac711fa0ed`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `sanitizer`
 - **Created**: `2026-10-15 00:37:10 UTC`
 - **Resolved**: `2026-10-15 00:37:11 UTC`
+- **Accepted**: `2026-10-15 00:37:11 UTC`
 
 #### Description
 
@@ -27330,12 +27625,13 @@ Extend the zero-dependency personal privacy and identity sanitizer (`src/provide
 ### <a id="bug-vermiform-crawler-442"></a> 🟢 `[BUG-VERMIFORM-CRAWLER-442]` Update issue ID generator with bug and insect themed nouns and adjectives
 
 - **UUID**: `62b936ce-96d2-49bd-ae8c-1160e14ee039`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `id_generator`
 - **Created**: `2026-10-15 04:09:20 UTC`
 - **Resolved**: `2026-10-15 04:15:08 UTC`
+- **Accepted**: `2026-10-15 04:15:08 UTC`
 
 #### Description
 
@@ -27350,12 +27646,13 @@ Updated issue ID generator compressed word lists in id_generator.py and frontend
 ### <a id="bug-hairy-wasp-932"></a> 🟢 `[BUG-HAIRY-WASP-932]` Update TMC6300 wiring to 6-PWM GPIO control and decouple SEN pin (WORM-GLIDING-BRISTLE-252)
 
 - **UUID**: `146f6268-0981-4761-ad81-d040b71ecedb`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `PCB`
 - **Component**: `cat_fountain`
 - **Created**: `2026-10-15 21:12:56 UTC`
 - **Resolved**: `2026-10-15 21:22:37 UTC`
+- **Accepted**: `2026-10-15 21:22:37 UTC`
 
 #### Description
 
@@ -27370,12 +27667,13 @@ Reconfigured TMC6300 motor driver wiring to 6-PWM GPIO control across GP16..GP21
 ### <a id="bug-camouflaged-midge-831"></a> 🟢 `[BUG-CAMOUFLAGED-MIDGE-831]` I don’t have a cyan wire color
 
 - **UUID**: `bc1f616f-c211-4848-ad74-0eb516692200`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `PCB`
 - **Component**: `cat_fountain`
 - **Created**: `2026-10-15 21:21:16 UTC`
 - **Resolved**: `2026-10-15 21:29:02 UTC`
+- **Accepted**: `2026-10-15 21:29:02 UTC`
 
 #### Description
 
@@ -27390,12 +27688,13 @@ Removed cyan wire color from cat fountain wiring diagram by changing ctrl_uh net
 ### <a id="bug-fast-katydid-792"></a> 🟢 `[BUG-FAST-KATYDID-792]` Create supplier required assembly documents-
 
 - **UUID**: `8693138a-3edf-46a0-9645-ba2dbe041841`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-10-16 21:00:50 UTC`
 - **Resolved**: `2026-10-16 21:10:43 UTC`
+- **Accepted**: `2026-10-16 21:10:43 UTC`
 
 #### Description
 
@@ -27425,11 +27724,12 @@ Replaced interim shipping guide with supplier-required assembly documents: Docum
 ### <a id="bug-flying-grasshopper-413"></a> 🟢 `[BUG-FLYING-GRASSHOPPER-413]` CI is failing
 
 - **UUID**: `ab12a306-e6a7-4bc7-8185-4638209b1a39`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-10-17 23:30:57 UTC`
 - **Resolved**: `2026-10-17 23:39:26 UTC`
+- **Accepted**: `2026-10-17 23:39:26 UTC`
 
 #### Description
 
@@ -27439,8 +27739,8 @@ See attachments below. Both nightly license compliance and CI jobs are failing
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
-| `document` | [clipboard_text_1792279938306.txt](attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279938306.txt) | Pasted text document |
 | `document` | [clipboard_text_1792279899940.txt](attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279899940.txt) | Pasted text document |
+| `document` | [clipboard_text_1792279938306.txt](attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279938306.txt) | Pasted text document |
 
 #### Resolution Notes
 
@@ -27451,11 +27751,12 @@ Fixed license compliance failure by constraining pluggy<1.7.0 for scancode-toolk
 ### <a id="bug-translucent-termite-733"></a> 🟢 `[BUG-TRANSLUCENT-TERMITE-733]` Fold directories under src/ into the repo root
 
 - **UUID**: `b7264527-1380-4b21-b750-016729009ae9`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `GENERAL`
 - **Created**: `2026-10-18 23:43:41 UTC`
 - **Resolved**: `2026-10-19 01:01:01 UTC`
+- **Accepted**: `2026-10-19 01:01:01 UTC`
 
 #### Description
 
@@ -27470,11 +27771,12 @@ Fold directories under src/ into repo root and move command scripts to tools/
 ### <a id="worm-creeping-larva-820"></a> 🟢 `[WORM-CREEPING-LARVA-820]` Regression tests are not useful
 
 - **UUID**: `c9679ffa-7211-4f3f-bea5-a57be3bc91a4`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `GENERAL`
 - **Created**: `2026-10-23 00:51:04 UTC`
 - **Resolved**: `2026-10-23 01:03:28 UTC`
+- **Accepted**: `2026-10-23 01:03:28 UTC`
 
 #### Description
 
@@ -27580,12 +27882,13 @@ Removed redundant and useless shallow regression test wrappers that only wrapped
 ### <a id="bug-vibrant-woodborer-940"></a> 🟢 `[BUG-VIBRANT-WOODBORER-940]` Create motor hub assembly
 
 - **UUID**: `c90ede81-7e1b-4c52-9ff2-529904ec722a`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-10-23 22:54:57 UTC`
 - **Resolved**: `2026-10-24 01:29:24 UTC`
+- **Accepted**: `2026-10-24 01:29:24 UTC`
 
 #### Description
 
@@ -27638,12 +27941,13 @@ Replaced motor_clip and integrated enclosed well beneath the impeller with dedic
 ### <a id="bug-springing-mosquito-703"></a> 🟢 `[BUG-SPRINGING-MOSQUITO-703]` Extend inner wall to surface of ToF sensor PCB
 
 - **UUID**: `c78f3b26-9aa7-4944-bc63-66740f0ef2db`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-10-23 23:00:18 UTC`
 - **Resolved**: `2026-10-23 23:55:57 UTC`
+- **Accepted**: `2026-10-23 23:55:57 UTC`
 
 #### Description
 
@@ -27669,12 +27973,13 @@ Extended inner wall of proximity sensor openings down 3mm to interface with top 
 ### <a id="bug-pollen-backswimmer-846"></a> 🟢 `[BUG-POLLEN-BACKSWIMMER-846]` TMC6300-clip on mounts are too big
 
 - **UUID**: `0424b68a-c813-4d2e-95c4-52985f5e20fb`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-10-23 23:05:10 UTC`
 - **Resolved**: `2026-10-24 00:59:24 UTC`
+- **Accepted**: `2026-10-24 00:59:24 UTC`
 
 #### Description
 
@@ -27689,12 +27994,13 @@ Updated TMC6300 clip mount and footprint dimensions to exact SparkFun dimensions
 ### <a id="bug-swarming-cicada-917"></a> 🟢 `[BUG-SWARMING-CICADA-917]` Replace motor room mount halls with clip mounts
 
 - **UUID**: `098d867c-1283-4051-83af-26809d6149bc`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-10-23 23:07:38 UTC`
 - **Resolved**: `2026-10-23 23:42:55 UTC`
+- **Accepted**: `2026-10-23 23:42:55 UTC`
 
 #### Description
 
@@ -27714,12 +28020,13 @@ Replaced motor room standoff mount holes with press-fit clip-in mounting posts (
 ### <a id="bug-pincered-caddisfly-769"></a> 🟢 `[BUG-PINCERED-CADDISFLY-769]` Add clip on mount for SWD header
 
 - **UUID**: `39e27e43-1d69-4cde-9de4-819864d10df9`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-10-23 23:10:52 UTC`
 - **Resolved**: `2026-10-23 23:48:48 UTC`
+- **Accepted**: `2026-10-23 23:48:48 UTC`
 
 #### Description
 

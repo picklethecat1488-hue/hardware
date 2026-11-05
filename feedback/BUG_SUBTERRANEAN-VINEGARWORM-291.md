@@ -2,12 +2,13 @@
 
 - **UUID**: `5b7f9c34-23de-4b6d-abbe-78cc61b40c26`
 - **ID**: `BUG-SUBTERRANEAN-VINEGARWORM-291`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `Dashboard`
 - **Created**: `2026-10-11 00:21:20 UTC`
 - **Resolved**: `2026-10-11 01:10:48 UTC`
+- **Accepted**: `2026-10-11 01:10:48 UTC`
 
 #### Description
 

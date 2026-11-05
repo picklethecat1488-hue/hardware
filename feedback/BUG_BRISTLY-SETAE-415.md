@@ -2,12 +2,13 @@
 
 - **UUID**: `f5835d10-c82a-4fa7-a3d0-c8f84e8a591f`
 - **ID**: `BUG-BRISTLY-SETAE-415`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-10-11 03:52:42 UTC`
 - **Resolved**: `2026-10-11 04:08:33 UTC`
+- **Accepted**: `2026-10-11 04:08:33 UTC`
 
 #### Description
 

@@ -2,11 +2,12 @@
 
 - **UUID**: `ab12a306-e6a7-4bc7-8185-4638209b1a39`
 - **ID**: `BUG-FLYING-GRASSHOPPER-413`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-10-17 23:30:57 UTC`
 - **Resolved**: `2026-10-17 23:39:26 UTC`
+- **Accepted**: `2026-10-17 23:39:26 UTC`
 
 #### Description
 
@@ -16,8 +17,8 @@ See attachments below. Both nightly license compliance and CI jobs are failing
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
-| `document` | [clipboard_text_1792279938306.txt](attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279938306.txt) | Pasted text document |
 | `document` | [clipboard_text_1792279899940.txt](attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279899940.txt) | Pasted text document |
+| `document` | [clipboard_text_1792279938306.txt](attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279938306.txt) | Pasted text document |
 
 #### Resolution Notes
 

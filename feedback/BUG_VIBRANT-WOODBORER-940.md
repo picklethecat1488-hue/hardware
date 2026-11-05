@@ -2,12 +2,13 @@
 
 - **UUID**: `c90ede81-7e1b-4c52-9ff2-529904ec722a`
 - **ID**: `BUG-VIBRANT-WOODBORER-940`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-10-23 22:54:57 UTC`
 - **Resolved**: `2026-10-24 01:29:24 UTC`
+- **Accepted**: `2026-10-24 01:29:24 UTC`
 
 #### Description
 

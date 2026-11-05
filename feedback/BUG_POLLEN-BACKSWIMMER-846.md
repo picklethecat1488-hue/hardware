@@ -2,12 +2,13 @@
 
 - **UUID**: `0424b68a-c813-4d2e-95c4-52985f5e20fb`
 - **ID**: `BUG-POLLEN-BACKSWIMMER-846`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-10-23 23:05:10 UTC`
 - **Resolved**: `2026-10-24 00:59:24 UTC`
+- **Accepted**: `2026-10-24 00:59:24 UTC`
 
 #### Description
 

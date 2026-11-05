@@ -2,12 +2,13 @@
 
 - **UUID**: `b1c765fb-12fa-4332-a9fb-97daa3379a45`
 - **ID**: `BUG-LUBRICATED-BRISTLE-678`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `Purest`
 - **Created**: `2026-10-09 23:28:09 UTC`
 - **Resolved**: `2026-10-09 23:36:01 UTC`
+- **Accepted**: `2026-10-09 23:36:01 UTC`
 
 #### Description
 
