@@ -8713,20 +8713,20 @@
       "attachments": [
         {
           "id": "att-3",
-          "filename": "carrier_board_bom_rev2.csv",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
           "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
           "size_bytes": 0,
-          "description": "CSV export of clean EDA BOM",
+          "description": "Uploaded reference questions spreadsheet from PCBWay",
           "created_at": ""
         },
         {
           "id": "att-4",
-          "filename": "carrier_board_bom_rev3.xlsx",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
           "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
           "size_bytes": 0,
-          "description": "Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM)",
+          "description": "Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16",
           "created_at": ""
         },
         {
@@ -8766,21 +8766,21 @@
           "created_at": ""
         },
         {
-          "id": "att-3",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
+          "id": "att-1",
+          "filename": "carrier_board_bom_rev2.csv",
           "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv",
           "size_bytes": 0,
-          "description": "Uploaded reference questions spreadsheet from PCBWay",
+          "description": "CSV export of clean EDA BOM",
           "created_at": ""
         },
         {
-          "id": "att-4",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
+          "id": "att-2",
+          "filename": "carrier_board_bom_rev3.xlsx",
           "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
           "size_bytes": 0,
-          "description": "Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16",
+          "description": "Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM)",
           "created_at": ""
         }
       ],
@@ -9298,9 +9298,17 @@
       "commit_ids": [
         "57973376"
       ],
-      "review_tasks": [],
+      "review_tasks": [
+        {
+          "id": "c761618a",
+          "title": "Verify hole-less PCB snap-socket frame geometry and perimeter snap groove",
+          "command": "python -m pytest projects/tests/test_cat_fountain.py -k test_regression_bug_stinging_lacewing_799_holeless_pcb_snap_socket",
+          "status": "PENDING",
+          "notes": ""
+        }
+      ],
       "created_at": "2026-11-05 14:49:40 UTC",
-      "updated_at": "2026-11-05 23:54:10 UTC",
+      "updated_at": "2026-11-05 23:54:14 UTC",
       "resolved_at": "2026-11-05 17:04:16 UTC",
       "resolution_notes": "Replaced slide-in guide rail system for hole-less PCBs with axial snap-socket frame featuring an internal perimeter snap groove and entrance lead-in chamfer, eliminating micro-gaps and assembly collision with current sensor.",
       "rejection_notes": "",
@@ -9374,7 +9382,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-2",
           "filename": "screenshot_paste_1793891547400_gyg0h.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891547400_gyg0h.png",
@@ -9394,5 +9402,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 23:54:10 UTC"
+  "updated_at": "2026-11-05 23:54:14 UTC"
 }

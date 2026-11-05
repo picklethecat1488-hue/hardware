@@ -23,6 +23,10 @@ Giving the TMC6300 mounting system as an example below, there are micro-gaps bet
 
 - `57973376`
 
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:c761618a --> Verify hole-less PCB snap-socket frame geometry and perimeter snap groove | `python -m pytest projects/tests/test_cat_fountain.py -k test_regression_bug_stinging_lacewing_799_holeless_pcb_snap_socket`
+
 #### Resolution Notes
 
 Replaced slide-in guide rail system for hole-less PCBs with axial snap-socket frame featuring an internal perimeter snap groove and entrance lead-in chamfer, eliminating micro-gaps and assembly collision with current sensor.
