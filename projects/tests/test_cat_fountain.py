@@ -55,24 +55,33 @@ class TestCatFountainProvider:
         assert "motor_hub" in provider.part
         assert "motor_clip" not in provider.part
 
-    def test_motor_hub_r_shape_relief(self, provider):
-        """Verify motor hub R-shape connector relief geometry without building full bowl (BUG-TRANSLUCENT-LARVA-792)."""
+    def test_regression_bug_lustrous_cocoon_669_simplified_motor_base(self, provider):
+        """Verify BUG-LUSTROUS-COCOON-669: Motor base design is circle unioned with rectangle for hall sensor, with 3 holes."""
         hub = provider.build_motor_hub("motor_hub")
         assert hub.part.volume > 0.0
         assert hub.part.is_valid()
 
         clip_h = provider.settings.motor_hub_thickness
-        # Relieved arm must be open at Y = -10.0 to allow connector rotation
-        assert not hub.part.is_inside((-6.0, -10.0, clip_h * 0.5))
-        # Guide stub near handle must remain solid for slide-in slot alignment
-        assert hub.part.is_inside((-6.0, -20.0, clip_h * 0.5))
-        # Opposite continuous arm must remain solid
-        assert hub.part.is_inside((6.0, -10.0, clip_h * 0.5))
-        # Support web connecting stub to continuous arm must be solid below the support curve
-        assert hub.part.is_inside((0.0, -18.0, clip_h * 0.5))
-        assert hub.part.is_inside((0.0, -14.5, clip_h * 0.5))
-        # Wire channel above support web must remain open
-        assert not hub.part.is_inside((0.0, -5.0, clip_h * 0.5))
+        r_bcd = provider.settings.motor_mount_bolt_circle_radius
+        collar_r = provider.settings.motor_hub_socket_radius - provider.settings.motor_hub_collar_clearance
+
+        # 1. Circle base is solid, no complicated south handle or arm
+        assert hub.part.is_inside((0, -collar_r * 0.5, clip_h * 0.5)), "Circular base must be solid"
+        assert not hub.part.is_inside((0, -25.0, clip_h * 0.5)), "No extended South arm / handle"
+
+        # 2. Rectangular tongue for Hall sensor mount is solid
+        assert hub.part.is_inside((0, 15.0, clip_h * 0.5)), "Hall sensor rectangular mount must be solid"
+
+        # 3. Central shaft clearance hole is open
+        assert not hub.part.is_inside((0, 0, clip_h * 0.5)), "Central shaft hole must be open"
+
+        # 4. Exactly 3 mounting holes on bottom
+        for angle in [90.0, 210.0, 330.0]:
+            rad = math.radians(angle)
+            hx = r_bcd * math.cos(rad)
+            hy = r_bcd * math.sin(rad)
+            assert not hub.part.is_inside((hx, hy, clip_h * 0.5)), f"Mounting hole at {angle}° must be open"
+            assert hub.part.is_inside((hx + 2.0, hy, clip_h * 0.5)), f"Surrounding base at {angle}° must be solid"
 
     @pytest.mark.slow
     def test_build_part_geometry(self, provider):
@@ -2149,13 +2158,18 @@ class TestCatFountainProvider:
         assert not bowl.part.is_inside((socket_in_r + 0.3, 0.0, mount_seat_z + clip_h + 2.0)), (
             "Internal annular snap groove in bowl socket wall must be open"
         )
-        # Keyway slot at +Y in socket wall is open for Hall sensor arm
-        assert not bowl.part.is_inside((0.0, socket_out_r, mount_seat_z + 1.0)), (
+        # Keyway slot at +Y in socket wall is open for Hall sensor arm and wiring
+        assert not bowl.part.is_inside((0.0, r_socket_wall, mount_seat_z + 1.0)), (
             "Keyway slot at +Y in socket wall must be open for Hall sensor platform"
         )
-        # Clearance slot at -Y in socket wall is open for motor mount plate and wiring
-        assert not bowl.part.is_inside((0.0, -socket_out_r, mount_seat_z + 1.0)), (
-            "Clearance slot at -Y in socket wall must be open for motor mount plate"
+        # Socket wall at -Y is solid (latent slide clearance cut removed per BUG-LUSTROUS-COCOON-669)
+        assert bowl.part.is_inside((0.0, -r_socket_wall, mount_seat_z + 1.0)), (
+            "Socket wall at -Y must be solid with latent slide cut removed"
+        )
+        # Bowl floor above Hall sensor mount is solid (extra box cut removed per BUG-LUSTROUS-COCOON-669)
+        t = provider.settings.bowl_thickness
+        assert bowl.part.is_inside((0.0, r_socket_wall, floor_z - t + 1.0)), (
+            "Bowl floor above hall sensor mount must be solid (no extra box cut)"
         )
 
         # Motor hub features matching circular cylindrical snap collar with annular snap ridge
