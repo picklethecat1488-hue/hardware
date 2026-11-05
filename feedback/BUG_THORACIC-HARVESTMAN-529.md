@@ -20,6 +20,10 @@ As indicated on the mechanical drawing for the 1102 18000kv motor, there are 3 s
 | `screenshot` | [screenshot_paste_1793891547400_gyg0h.png](attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891547400_gyg0h.png) | Pasted screenshot screenshot_paste_1793891547400_gyg0h.png |
 | `screenshot` | [screenshot_paste_1793891379527_mc2d2.png](attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891379527_mc2d2.png) | Pasted screenshot screenshot_paste_1793891379527_mc2d2.png |
 
+#### Attached Commits
+
+- `3768254b`
+
 #### Resolution Notes
 
 Add triangular motor strut grooves to drive hub bottom and refactor drive hub body to a 3-lobed convex hull with >=1.5mm wall thickness around all magnets, grooves, and shaft hole.

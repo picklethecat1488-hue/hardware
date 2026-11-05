@@ -8731,20 +8731,20 @@
         },
         {
           "id": "att-5",
-          "filename": "carrier_board_bom_rev3.csv",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
           "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
           "size_bytes": 0,
-          "description": "CSV export of clean EDA BOM Rev 3",
+          "description": "Legacy Excel 97-2004 format of replied quotation BOM",
           "created_at": ""
         },
         {
           "id": "att-6",
-          "filename": "digikey_order_2026-10-14.xlsx",
+          "filename": "carrier_board_bom_rev2.xlsx",
           "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
           "size_bytes": 0,
-          "description": "Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2)",
+          "description": "Clean EDA export BOM generated directly from updated carrier board model",
           "created_at": ""
         },
         {
@@ -8766,21 +8766,21 @@
           "created_at": ""
         },
         {
-          "id": "att-5",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
+          "id": "att-3",
+          "filename": "carrier_board_bom_rev3.csv",
           "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv",
           "size_bytes": 0,
-          "description": "Legacy Excel 97-2004 format of replied quotation BOM",
+          "description": "CSV export of clean EDA BOM Rev 3",
           "created_at": ""
         },
         {
-          "id": "att-6",
-          "filename": "carrier_board_bom_rev2.xlsx",
+          "id": "att-4",
+          "filename": "digikey_order_2026-10-14.xlsx",
           "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx",
           "size_bytes": 0,
-          "description": "Clean EDA export BOM generated directly from updated carrier board model",
+          "description": "Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2)",
           "created_at": ""
         }
       ],
@@ -9361,7 +9361,7 @@
         }
       ],
       "created_at": "2026-11-05 14:54:50 UTC",
-      "updated_at": "2026-11-05 23:54:22 UTC",
+      "updated_at": "",
       "resolved_at": "2026-11-05 17:09:52 UTC",
       "resolution_notes": "Simplify motor base to a circle unioned with a hall sensor mounting rectangle fitting into socket wall keyway gap; ensure 3 mounting holes on bottom; remove latent south slide cut and extra box above hall sensor in bowl.",
       "rejection_notes": "",
@@ -9401,10 +9401,12 @@
           "created_at": ""
         }
       ],
-      "commit_ids": [],
+      "commit_ids": [
+        "3768254b"
+      ],
       "review_tasks": [],
       "created_at": "2026-11-05 15:06:09 UTC",
-      "updated_at": "",
+      "updated_at": "2026-11-05 23:54:26 UTC",
       "resolved_at": "2026-11-05 17:14:12 UTC",
       "resolution_notes": "Add triangular motor strut grooves to drive hub bottom and refactor drive hub body to a 3-lobed convex hull with >=1.5mm wall thickness around all magnets, grooves, and shaft hole.",
       "rejection_notes": "",
@@ -9412,5 +9414,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 23:54:22 UTC"
+  "updated_at": "2026-11-05 23:54:26 UTC"
 }
