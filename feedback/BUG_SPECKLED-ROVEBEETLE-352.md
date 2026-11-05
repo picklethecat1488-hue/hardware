@@ -19,6 +19,10 @@ The sensor shield on the inner bowl wall is too complicated. The shape should be
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1793890121106_n89dw.png](attachments/BUG-SPECKLED-ROVEBEETLE-352/screenshot_paste_1793890121106_n89dw.png) | Pasted screenshot screenshot_paste_1793890121106_n89dw.png |
 
+#### Attached Commits
+
+- `5821d84e`
+
 #### Resolution Notes
 
 Simplify proximity sensor shield on inner bowl wall to an extruded hollow rectangle centered on pocket opening, eliminating inner lip and protruding tails.

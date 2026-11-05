@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-05 23:53:53 UTC` |
+| **Report Date** | `2026-11-05 23:53:57 UTC` |
 | **Total Issues** | `313` |
 | **Open Issues** | `0` |
 | **Resolved / Closed** | `313 (100%)` |
@@ -28098,6 +28098,10 @@ The sensor shield on the inner bowl wall is too complicated. The shape should be
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1793890121106_n89dw.png](attachments/BUG-SPECKLED-ROVEBEETLE-352/screenshot_paste_1793890121106_n89dw.png) | Pasted screenshot screenshot_paste_1793890121106_n89dw.png |
 
+#### Attached Commits
+
+- `5821d84e`
+
 #### Resolution Notes
 
 Simplify proximity sensor shield on inner bowl wall to an extruded hollow rectangle centered on pocket opening, eliminating inner lip and protruding tails.
@@ -28181,8 +28185,8 @@ As indicated on the mechanical drawing for the 1102 18000kv motor, there are 3 s
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1793891379527_mc2d2.png](attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891379527_mc2d2.png) | Pasted screenshot screenshot_paste_1793891379527_mc2d2.png |
 | `screenshot` | [screenshot_paste_1793891547400_gyg0h.png](attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891547400_gyg0h.png) | Pasted screenshot screenshot_paste_1793891547400_gyg0h.png |
+| `screenshot` | [screenshot_paste_1793891379527_mc2d2.png](attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891379527_mc2d2.png) | Pasted screenshot screenshot_paste_1793891379527_mc2d2.png |
 
 #### Resolution Notes
 

@@ -8766,7 +8766,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-7",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
@@ -8775,7 +8775,7 @@
           "created_at": ""
         },
         {
-          "id": "att-2",
+          "id": "att-8",
           "filename": "carrier_board_bom_rev2.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
@@ -9090,7 +9090,7 @@
         }
       ],
       "created_at": "2026-10-23 23:00:18 UTC",
-      "updated_at": "2026-11-05 23:53:52 UTC",
+      "updated_at": "",
       "resolved_at": "2026-11-05 15:45:39 UTC",
       "resolution_notes": "Eliminate duplicate outer window borders and resize grippers by applying .in-iframe rules to common.css and workstation templates, and add frame-busting to diff_view.",
       "rejection_notes": "",
@@ -9251,10 +9251,12 @@
           "created_at": ""
         }
       ],
-      "commit_ids": [],
+      "commit_ids": [
+        "5821d84e"
+      ],
       "review_tasks": [],
       "created_at": "2026-11-05 14:44:07 UTC",
-      "updated_at": "",
+      "updated_at": "2026-11-05 23:53:56 UTC",
       "resolved_at": "2026-11-05 16:25:54 UTC",
       "resolution_notes": "Simplify proximity sensor shield on inner bowl wall to an extruded hollow rectangle centered on pocket opening, eliminating inner lip and protruding tails.",
       "rejection_notes": "",
@@ -9354,20 +9356,20 @@
       "attachments": [
         {
           "id": "att-2",
-          "filename": "screenshot_paste_1793891379527_mc2d2.png",
-          "file_type": "screenshot",
-          "file_path": "attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891379527_mc2d2.png",
-          "size_bytes": 0,
-          "description": "Pasted screenshot screenshot_paste_1793891379527_mc2d2.png",
-          "created_at": ""
-        },
-        {
-          "id": "att-2",
           "filename": "screenshot_paste_1793891547400_gyg0h.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891547400_gyg0h.png",
           "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793891547400_gyg0h.png",
+          "created_at": ""
+        },
+        {
+          "id": "att-1",
+          "filename": "screenshot_paste_1793891379527_mc2d2.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891379527_mc2d2.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1793891379527_mc2d2.png",
           "created_at": ""
         }
       ],
@@ -9382,5 +9384,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 23:53:52 UTC"
+  "updated_at": "2026-11-05 23:53:56 UTC"
 }
