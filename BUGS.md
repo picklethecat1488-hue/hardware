@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-05 14:54:09 UTC` |
+| **Report Date** | `2026-11-05 14:54:30 UTC` |
 | **Total Issues** | `311` |
 | **Open Issues** | `4` |
 | **Resolved / Closed** | `307 (98%)` |
@@ -337,7 +337,7 @@
 - [x] **`[HIGH]`** [#BUG-VIBRANT-WOODBORER-940](#bug-vibrant-woodborer-940): Create motor hub assembly `[cat_fountain]` (`CLOSED`)
 - [ ] **`[MEDIUM]`** [#BUG-BARBED-MIDGE-630](#bug-barbed-midge-630): There are 3 outer borders in my dashboard window? `[dashboard]` (`OPEN`)
 - [x] **`[MEDIUM]`** [#BUG-SPRINGING-MOSQUITO-703](#bug-springing-mosquito-703): Extend inner wall to surface of ToF sensor PCB `[cat_fountain]` (`CLOSED`)
-- [ ] **`[MEDIUM]`** [#BUG-FEATHERED-CENTIPEDE-381](#bug-feathered-centipede-381): It takes 3-4s to save bugs now `[dashboard]` (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-FEATHERED-CENTIPEDE-381](#bug-feathered-centipede-381): It takes 10s to save bugs now `[dashboard]` (`OPEN`)
 - [x] **`[HIGH]`** [#BUG-POLLEN-BACKSWIMMER-846](#bug-pollen-backswimmer-846): TMC6300-clip on mounts are too big `[cat_fountain]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-SWARMING-CICADA-917](#bug-swarming-cicada-917): Replace motor room mount halls with clip mounts `[cat_fountain]` (`CLOSED`)
 - [x] **`[LOW]`** [#BUG-PINCERED-CADDISFLY-769](#bug-pincered-caddisfly-769): Add clip on mount for SWD header `[cat_fountain]` (`CLOSED`)
@@ -27961,7 +27961,7 @@ Extended inner wall of proximity sensor openings down 3mm to interface with top 
 
 ---
 
-### <a id="bug-feathered-centipede-381"></a> 🔴 `[BUG-FEATHERED-CENTIPEDE-381]` It takes 3-4s to save bugs now
+### <a id="bug-feathered-centipede-381"></a> 🔴 `[BUG-FEATHERED-CENTIPEDE-381]` It takes 10s to save bugs now
 
 - **UUID**: `decd4cc3-3a98-4552-917e-d4b0cb668001`
 - **Status**: `OPEN`
@@ -27969,6 +27969,10 @@ Extended inner wall of proximity sensor openings down 3mm to interface with top 
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-10-23 23:04:38 UTC`
+
+#### Description
+
+IDK why this is, but saving and updating bugs takes extremely long now...
 
 ---
 

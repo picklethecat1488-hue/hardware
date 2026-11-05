@@ -9114,12 +9114,12 @@
     {
       "id": "BUG-FEATHERED-CENTIPEDE-381",
       "uuid": "decd4cc3-3a98-4552-917e-d4b0cb668001",
-      "title": "It takes 3-4s to save bugs now",
+      "title": "It takes 10s to save bugs now",
       "status": "OPEN",
       "severity": "MEDIUM",
       "category": "INFRASTRUCTURE",
       "component": "dashboard",
-      "description": "",
+      "description": "IDK why this is, but saving and updating bugs takes extremely long now...",
       "reproduction_steps": [],
       "expected_behavior": "",
       "actual_behavior": "",
@@ -9128,7 +9128,7 @@
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-10-23 23:04:38 UTC",
-      "updated_at": "",
+      "updated_at": "2026-11-05 14:54:28 UTC",
       "resolved_at": null,
       "resolution_notes": "",
       "rejection_notes": "",
@@ -9276,5 +9276,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 14:54:07 UTC"
+  "updated_at": "2026-11-05 14:54:28 UTC"
 }
