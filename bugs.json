@@ -9242,30 +9242,6 @@
       "rejected_at": null
     },
     {
-      "id": "BUG-AGILE-CATERPILLAR-346",
-      "uuid": "aead28e4-2393-4154-b478-d0913c0005aa",
-      "title": "New Bug Report",
-      "status": "OPEN",
-      "severity": "MEDIUM",
-      "category": "PCB",
-      "component": "",
-      "description": "",
-      "reproduction_steps": [],
-      "expected_behavior": "",
-      "actual_behavior": "",
-      "logs": "",
-      "attachments": [],
-      "commit_ids": [],
-      "review_tasks": [],
-      "created_at": "2026-11-05 14:49:40 UTC",
-      "updated_at": "2026-11-05 14:49:40 UTC",
-      "resolved_at": null,
-      "resolution_notes": "",
-      "rejection_notes": null,
-      "accepted_at": null,
-      "rejected_at": null
-    },
-    {
       "id": "BUG-STINGING-LACEWING-799",
       "uuid": "1843fe5a-0485-4e4c-a4e0-f555e9af7e1a",
       "title": "New Bug Report",
@@ -9290,5 +9266,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 14:50:42 UTC"
+  "updated_at": "2026-11-05 14:50:53 UTC"
 }
