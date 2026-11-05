@@ -6,9 +6,9 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-05 15:06:00 UTC` |
-| **Total Issues** | `312` |
-| **Open Issues** | `5` |
+| **Report Date** | `2026-11-05 15:06:12 UTC` |
+| **Total Issues** | `313` |
+| **Open Issues** | `6` |
 | **Resolved / Closed** | `307 (98%)` |
 
 ## Issues by Severity
@@ -17,14 +17,14 @@
 | :--- | :---: | :--- |
 | **`[CRITICAL]`** | 20 | System crashes, build failures, blockages, or electrical shorts. |
 | **`[HIGH]`** | 31 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
-| **`[MEDIUM]`** | 233 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
+| **`[MEDIUM]`** | 234 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
 | **`[LOW]`** | 28 | Minor aesthetic imperfections or documentation notes. |
 
 ## Issues by Category
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 170 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`PCB`** | 171 | Schematics, routing, footprints, nets, DRC, silkscreen. |
 | **`CAD`** | 36 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 11 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
 | **`INFRASTRUCTURE`** | 83 | Build tooling, compilers, test runners, headless tools. |
@@ -344,6 +344,7 @@
 - [ ] **`[MEDIUM]`** [#BUG-SPECKLED-ROVEBEETLE-352](#bug-speckled-rovebeetle-352): Sensor shield design on inner bowl wall is too complicated `[cat_fountain]` (`OPEN`)
 - [ ] **`[MEDIUM]`** [#BUG-STINGING-LACEWING-799](#bug-stinging-lacewing-799): Mounting system for hole-less PCBs is too complicated `[cat_fountain]` (`OPEN`)
 - [ ] **`[HIGH]`** [#BUG-LUSTROUS-COCOON-669](#bug-lustrous-cocoon-669): Motor base design is way too complicated `[cat_fountain]` (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-THORACIC-HARVESTMAN-529](#bug-thoracic-harvestman-529): New Bug Report (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -28118,5 +28119,15 @@ Defects circled in red.
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1793890876309_0c9ae.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png) | Pasted screenshot screenshot_paste_1793890876309_0c9ae.png |
 | `screenshot` | [screenshot_paste_1793890911006_wvg54.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png) | Pasted screenshot screenshot_paste_1793890911006_wvg54.png |
+
+---
+
+### <a id="bug-thoracic-harvestman-529"></a> 🔴 `[BUG-THORACIC-HARVESTMAN-529]` New Bug Report
+
+- **UUID**: `cdda94d6-e538-437c-9940-01516226d9ab`
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-11-05 15:06:09 UTC`
 
 ---
