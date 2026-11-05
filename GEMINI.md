@@ -43,15 +43,11 @@ Host anvil
 ```
 
 ### Usage Guidelines & Shared Workstation Configuration
-1. **Shared Cloud Runner & Configuration**: Cloud instances are provisioned on Vast.ai with the basic Ubuntu image (`ubuntu:22.04`) and shared across `firmware`, `hardware`, and `SSD` via the global runner script (`~/.local/bin/anvil`) and shared configuration (`~/.anvil.env` in `$HOME`). Remote repositories reside in `/workspace/<repo>` if `/workspace` is available, falling back to `$HOME/<repo>`.
-2. **Instance Provisioning & Release**: Use `bin/anvil provision` to automatically rent an instance, configure SSH port mapping, and update `~/.anvil.env`. Use `bin/anvil release` to destroy the instance and reset configuration.
-3. **Automated Remote Bootstrapping**: Newly provisioned instances automatically run `bin/anvil bootstrap` to install essential build toolchains (`build-essential`, `cmake`, `pkg-config`), Rust, and persistent Miniforge on `/workspace/miniforge3` (creating the `cq` environment).
-4. **Remote Execution**: Use `bin/anvil run "<command>"` or SSH targeting `anvil` to run full test suites (`pytest`), slow physics benchmarks (`pytest -m "slow"`), large JAX SPH simulation grids, parameter sweeps, and integration smoke tests (`python tools/smoke.py`).
-5. **Conda Environment & Binaries**: On `anvil`, execute commands within the `cq` conda environment using `conda run -n cq --no-capture-output <command>`.
-6. **Preceding Run Cancellation**: Before initiating a new remote execution or benchmark on `anvil`, ensure any active or stale background runs of the same command are cancelled or terminated (`bin/anvil stop`) to avoid cloud resource contention and duplicate processing.
-7. **Artifact Synchronization**: Use `bin/anvil pull <remote_path> [local_dest]` or `bin/anvil stages` to download generated logs, RRD recordings, and inspection figures into the local workspace.
-8. **Lock File Tracking (`~/.anvil.lock`)**: All active remote commands automatically register execution in `~/.anvil.lock` in `$HOME` to signal active utilization.
-9. **Close of Business (COB) Auto-Release Mandate**: To prevent unnecessary cloud spend and accidental overnight charges, any rented Vast.ai instance claim MUST be automatically released at Close of Business (COB) or when idle if no processes are using it (`bin/anvil auto-release` or `bin/anvil release`). Never leave rented cloud GPU/container instances running overnight or unattended.
+1. **Shared Configuration & Provisioning**: Cloud instances are provisioned on Vast.ai (`ubuntu:22.04`) via `bin/anvil provision` / `bin/anvil release` and shared across `firmware`, `hardware`, and `SSD` using `~/.anvil.env` in `$HOME`. Remote paths dynamically resolve to `/workspace/<repo>` (fallback `$HOME/<repo>`).
+2. **Automated Remote Bootstrapping**: `bin/anvil bootstrap` automatically installs build toolchains (`build-essential`, `cmake`, `pkg-config`), Rust, and persistent Miniforge on `/workspace/miniforge3` (creating the `cq` conda environment).
+3. **Remote Execution**: Use `bin/anvil run "<command>"` or SSH targeting `anvil` to run full test suites (`pytest`), slow physics benchmarks (`pytest -m "slow"`), large JAX SPH simulation grids, parameter sweeps, and integration smoke tests (`python tools/smoke.py`). Commands execute within the `cq` conda environment via `conda run -n cq --no-capture-output <command>`.
+4. **Preceding Run Cancellation & Artifact Sync**: Ensure preceding runs of the same command are cancelled (`bin/anvil stop`) before initiating a new remote execution. Use `bin/anvil pull <remote_path> [local_dest]` or `bin/anvil stages` to download generated logs, RRD recordings, and inspection figures into the local workspace.
+5. **Lock File Tracking & COB Auto-Release Mandate**: Track active execution in `~/.anvil.lock` in `$HOME`. Any rented Vast.ai instance claim MUST be automatically released at Close of Business (COB) or when idle if no processes are using it (`bin/anvil auto-release` or `bin/anvil release`). Never leave cloud instances running unattended or overnight. See [docs/remote_cloud_runner.md](docs/remote_cloud_runner.md) for full architecture and protocol specifications.
 
 ---
 
@@ -130,6 +126,15 @@ Host anvil
 ### 6. Codebase & Text Search Tooling (`ag`)
 * **Mandatory Silver Searcher Usage**: Always use The Silver Searcher (`ag`) for all text searches, codebase queries, pattern matching, and symbol lookups across the repository. Do NOT use `grep`, `egrep`, `fgrep`, or other ad-hoc search commands when searching repository files.
 
+### 7. Bidirectional Dashboard & Script Cross-Patching Mandate
+* **Automatic Cross-Repository Synchronization**: Any bug fix, feature enhancement, styling update, or refactoring applied to developer scripts, tooling, or dashboard components in one repository (`firmware` or `hardware`) that is applicable to the other repository MUST be automatically cross-patched and mirrored into that repository, and vice versa.
+* **Synchronized Subsystems**: This includes, but is not limited to:
+  - Remote cloud runner and lifecycle orchestration (`bin/anvil`, `tools/vast_manager.py`, `~/.anvil.env`, `~/.anvil.lock`).
+  - VCS web workstation and dashboard backends (`tools/dashboard.py`, `provider/vcs/git_engine.py`, `provider/worm_report/`, `provider/bug_report/`).
+  - Shared workstation templates (`diff_view.html.j2`, `diff_component.html.j2`, `code_review.html.j2`, `worm_report.html.j2`, `bug_report.html.j2`).
+  - Smartlog DAG tree rendering, commit selection, node highlighting, and author identity sanitization.
+* **Zero Disparity**: Never allow dashboard bug fixes or tooling improvements (such as node highlighting, reverse-proxying, detached branch persistence, or SSH port handling) to remain isolated in one repository when the other repository shares the same architecture or template.
+
 ---
 
 ## Modular Subsystem & Domain Architecture Guides
@@ -156,3 +161,11 @@ To minimize global context overhead and prevent unnecessary token burn, domain- 
    - Jinja2 code generation, dedicated template directory structures, and error guardrails.
    - Review session feedback persistence and atomic SQLite backing store.
    - Structured bug tracking, Git LFS attachments, and VCS CLI subcommand parity.
+   - Bidirectional dashboard and script cross-patching mandate.
+
+5. [Remote Cloud Runner & Vast.ai Architecture](docs/remote_cloud_runner.md)
+   - Vast.ai container provisioning, lifecycle hooks, and shared `~/.anvil.env` configuration.
+   - Dynamic `/workspace` persistent storage detection and fallback paths.
+   - Remote dependency bootstrapping (`build-essential`, Rust, Miniforge, CUDA).
+   - Activity lock tracking (`~/.anvil.lock`), port forwarding, and COB auto-release protocols.
+
