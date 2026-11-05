@@ -8712,24 +8712,6 @@
       "logs": "",
       "attachments": [
         {
-          "id": "att-1",
-          "filename": "carrier_board_bom_rev3.csv",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv",
-          "size_bytes": 0,
-          "description": "CSV export of clean EDA BOM Rev 3",
-          "created_at": ""
-        },
-        {
-          "id": "att-2",
-          "filename": "digikey_order_2026-10-14.xlsx",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx",
-          "size_bytes": 0,
-          "description": "Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2)",
-          "created_at": ""
-        },
-        {
           "id": "att-3",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
           "file_type": "reference",
@@ -8781,6 +8763,24 @@
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
           "size_bytes": 0,
           "description": "Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16",
+          "created_at": ""
+        },
+        {
+          "id": "att-1",
+          "filename": "carrier_board_bom_rev3.csv",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv",
+          "size_bytes": 0,
+          "description": "CSV export of clean EDA BOM Rev 3",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "digikey_order_2026-10-14.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx",
+          "size_bytes": 0,
+          "description": "Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2)",
           "created_at": ""
         }
       ],
@@ -8953,19 +8953,19 @@
       "logs": "",
       "attachments": [
         {
-          "id": "att-1",
-          "filename": "clipboard_text_1792279899940.txt",
+          "id": "att-2",
+          "filename": "clipboard_text_1792279938306.txt",
           "file_type": "document",
-          "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279899940.txt",
+          "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279938306.txt",
           "size_bytes": 0,
           "description": "Pasted text document",
           "created_at": ""
         },
         {
-          "id": "att-2",
-          "filename": "clipboard_text_1792279938306.txt",
+          "id": "att-1",
+          "filename": "clipboard_text_1792279899940.txt",
           "file_type": "document",
-          "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279938306.txt",
+          "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279899940.txt",
           "size_bytes": 0,
           "description": "Pasted text document",
           "created_at": ""
@@ -9237,7 +9237,7 @@
       "updated_at": "2026-11-05 15:05:58 UTC",
       "resolved_at": null,
       "resolution_notes": "",
-      "rejection_notes": null,
+      "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
     },
@@ -9271,7 +9271,7 @@
       "updated_at": "2026-11-05 15:02:26 UTC",
       "resolved_at": null,
       "resolution_notes": "",
-      "rejection_notes": null,
+      "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
     },
@@ -9314,7 +9314,7 @@
       "updated_at": "2026-11-05 15:02:01 UTC",
       "resolved_at": null,
       "resolution_notes": "",
-      "rejection_notes": null,
+      "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
     },
@@ -9357,10 +9357,10 @@
       "updated_at": "2026-11-05 15:12:38 UTC",
       "resolved_at": null,
       "resolution_notes": "",
-      "rejection_notes": null,
+      "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 15:16:26 UTC"
+  "updated_at": "2026-11-05 15:21:32 UTC"
 }
