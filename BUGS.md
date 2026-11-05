@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-05 17:09:53 UTC` |
+| **Report Date** | `2026-11-05 17:14:13 UTC` |
 | **Total Issues** | `313` |
-| **Open Issues** | `1` |
-| **Resolved / Closed** | `312 (99%)` |
+| **Open Issues** | `0` |
+| **Resolved / Closed** | `313 (100%)` |
 
 ## Issues by Severity
 
@@ -344,7 +344,7 @@
 - [x] **`[MEDIUM]`** [#BUG-SPECKLED-ROVEBEETLE-352](#bug-speckled-rovebeetle-352): Sensor shield design on inner bowl wall is too complicated `[cat_fountain]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-STINGING-LACEWING-799](#bug-stinging-lacewing-799): Mounting system for hole-less PCBs is too complicated `[cat_fountain]` (`RESOLVED`)
 - [x] **`[HIGH]`** [#BUG-LUSTROUS-COCOON-669](#bug-lustrous-cocoon-669): Motor base design is way too complicated `[cat_fountain]` (`RESOLVED`)
-- [ ] **`[MEDIUM]`** [#BUG-THORACIC-HARVESTMAN-529](#bug-thoracic-harvestman-529): Add grooves for triangular motor struts to drive hub `[cat_fountain]` (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-THORACIC-HARVESTMAN-529](#bug-thoracic-harvestman-529): Add grooves for triangular motor struts to drive hub `[cat_fountain]` (`RESOLVED`)
 
 ## Detailed Issue Log
 
@@ -27567,10 +27567,10 @@ Pls see attached, we should plan to consign all remaining components to them exc
 | `reference` | [digikey_order_2026-10-14.xlsx](attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx) | Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2) |
 | `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls) | Legacy Excel 97-2004 format of replied quotation BOM |
 | `reference` | [carrier_board_bom_rev2.xlsx](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx) | Clean EDA export BOM generated directly from updated carrier board model |
-| `reference` | [carrier_board_bom_rev2.csv](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv) | CSV export of clean EDA BOM |
-| `reference` | [carrier_board_bom_rev3.xlsx](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx) | Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM) |
 | `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx) | Uploaded reference questions spreadsheet from PCBWay |
 | `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx) | Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16 |
+| `reference` | [carrier_board_bom_rev2.csv](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv) | CSV export of clean EDA BOM |
+| `reference` | [carrier_board_bom_rev3.xlsx](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx) | Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM) |
 
 #### Resolution Notes
 
@@ -28138,8 +28138,8 @@ Defects circled in red.
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1793890876309_0c9ae.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png) | Pasted screenshot screenshot_paste_1793890876309_0c9ae.png |
 | `screenshot` | [screenshot_paste_1793890911006_wvg54.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png) | Pasted screenshot screenshot_paste_1793890911006_wvg54.png |
+| `screenshot` | [screenshot_paste_1793890876309_0c9ae.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png) | Pasted screenshot screenshot_paste_1793890876309_0c9ae.png |
 
 #### Resolution Notes
 
@@ -28147,14 +28147,15 @@ Simplify motor base to a circle unioned with a hall sensor mounting rectangle fi
 
 ---
 
-### <a id="bug-thoracic-harvestman-529"></a> 🔴 `[BUG-THORACIC-HARVESTMAN-529]` Add grooves for triangular motor struts to drive hub
+### <a id="bug-thoracic-harvestman-529"></a> 🟢 `[BUG-THORACIC-HARVESTMAN-529]` Add grooves for triangular motor struts to drive hub
 
 - **UUID**: `cdda94d6-e538-437c-9940-01516226d9ab`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-05 15:06:09 UTC`
+- **Resolved**: `2026-11-05 17:14:12 UTC`
 
 #### Description
 
@@ -28166,5 +28167,9 @@ As indicated on the mechanical drawing for the 1102 18000kv motor, there are 3 s
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1793891379527_mc2d2.png](attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891379527_mc2d2.png) | Pasted screenshot screenshot_paste_1793891379527_mc2d2.png |
 | `screenshot` | [screenshot_paste_1793891547400_gyg0h.png](attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891547400_gyg0h.png) | Pasted screenshot screenshot_paste_1793891547400_gyg0h.png |
+
+#### Resolution Notes
+
+Add triangular motor strut grooves to drive hub bottom and refactor drive hub body to a 3-lobed convex hull with >=1.5mm wall thickness around all magnets, grooves, and shaft hole.
 
 ---

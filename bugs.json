@@ -8749,24 +8749,6 @@
         },
         {
           "id": "att-7",
-          "filename": "carrier_board_bom_rev2.csv",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv",
-          "size_bytes": 0,
-          "description": "CSV export of clean EDA BOM",
-          "created_at": ""
-        },
-        {
-          "id": "att-8",
-          "filename": "carrier_board_bom_rev3.xlsx",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
-          "size_bytes": 0,
-          "description": "Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM)",
-          "created_at": ""
-        },
-        {
-          "id": "att-1",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
@@ -8775,12 +8757,30 @@
           "created_at": ""
         },
         {
-          "id": "att-2",
+          "id": "att-8",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
           "size_bytes": 0,
           "description": "Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16",
+          "created_at": ""
+        },
+        {
+          "id": "att-5",
+          "filename": "carrier_board_bom_rev2.csv",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv",
+          "size_bytes": 0,
+          "description": "CSV export of clean EDA BOM",
+          "created_at": ""
+        },
+        {
+          "id": "att-6",
+          "filename": "carrier_board_bom_rev3.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
+          "size_bytes": 0,
+          "description": "Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM)",
           "created_at": ""
         }
       ],
@@ -8953,7 +8953,7 @@
       "logs": "",
       "attachments": [
         {
-          "id": "att-2",
+          "id": "att-1",
           "filename": "clipboard_text_1792279938306.txt",
           "file_type": "document",
           "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279938306.txt",
@@ -8962,7 +8962,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-2",
           "filename": "clipboard_text_1792279899940.txt",
           "file_type": "document",
           "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279899940.txt",
@@ -9290,28 +9290,28 @@
       "logs": "",
       "attachments": [
         {
-          "id": "09e303b3",
-          "filename": "screenshot_paste_1793890876309_0c9ae.png",
-          "file_type": "screenshot",
-          "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png",
-          "size_bytes": 318112,
-          "description": "Pasted screenshot screenshot_paste_1793890876309_0c9ae.png",
-          "created_at": "2026-11-05 15:01:16 UTC"
-        },
-        {
-          "id": "d82cab67",
+          "id": "att-2",
           "filename": "screenshot_paste_1793890911006_wvg54.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png",
-          "size_bytes": 278934,
+          "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793890911006_wvg54.png",
-          "created_at": "2026-11-05 15:01:51 UTC"
+          "created_at": ""
+        },
+        {
+          "id": "att-1",
+          "filename": "screenshot_paste_1793890876309_0c9ae.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1793890876309_0c9ae.png",
+          "created_at": ""
         }
       ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-05 14:54:50 UTC",
-      "updated_at": "2026-11-05 15:02:01 UTC",
+      "updated_at": "",
       "resolved_at": "2026-11-05 17:09:52 UTC",
       "resolution_notes": "Simplify motor base to a circle unioned with a hall sensor mounting rectangle fitting into socket wall keyway gap; ensure 3 mounting holes on bottom; remove latent south slide cut and extra box above hall sensor in bowl.",
       "rejection_notes": "",
@@ -9322,7 +9322,7 @@
       "id": "BUG-THORACIC-HARVESTMAN-529",
       "uuid": "cdda94d6-e538-437c-9940-01516226d9ab",
       "title": "Add grooves for triangular motor struts to drive hub",
-      "status": "OPEN",
+      "status": "RESOLVED",
       "severity": "MEDIUM",
       "category": "CAD",
       "component": "cat_fountain",
@@ -9355,12 +9355,12 @@
       "review_tasks": [],
       "created_at": "2026-11-05 15:06:09 UTC",
       "updated_at": "2026-11-05 15:12:38 UTC",
-      "resolved_at": null,
-      "resolution_notes": "",
+      "resolved_at": "2026-11-05 17:14:12 UTC",
+      "resolution_notes": "Add triangular motor strut grooves to drive hub bottom and refactor drive hub body to a 3-lobed convex hull with >=1.5mm wall thickness around all magnets, grooves, and shaft hole.",
       "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 17:09:52 UTC"
+  "updated_at": "2026-11-05 17:14:12 UTC"
 }
