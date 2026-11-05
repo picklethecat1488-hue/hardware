@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-05 14:49:31 UTC` |
-| **Total Issues** | `310` |
-| **Open Issues** | `3` |
-| **Resolved / Closed** | `307 (99%)` |
+| **Report Date** | `2026-11-05 14:49:43 UTC` |
+| **Total Issues** | `313` |
+| **Open Issues** | `6` |
+| **Resolved / Closed** | `307 (98%)` |
 
 ## Issues by Severity
 
@@ -17,14 +17,14 @@
 | :--- | :---: | :--- |
 | **`[CRITICAL]`** | 20 | System crashes, build failures, blockages, or electrical shorts. |
 | **`[HIGH]`** | 30 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
-| **`[MEDIUM]`** | 232 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
+| **`[MEDIUM]`** | 235 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
 | **`[LOW]`** | 28 | Minor aesthetic imperfections or documentation notes. |
 
 ## Issues by Category
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 170 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`PCB`** | 173 | Schematics, routing, footprints, nets, DRC, silkscreen. |
 | **`CAD`** | 34 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 11 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
 | **`INFRASTRUCTURE`** | 83 | Build tooling, compilers, test runners, headless tools. |
@@ -342,6 +342,9 @@
 - [x] **`[MEDIUM]`** [#BUG-SWARMING-CICADA-917](#bug-swarming-cicada-917): Replace motor room mount halls with clip mounts `[cat_fountain]` (`CLOSED`)
 - [x] **`[LOW]`** [#BUG-PINCERED-CADDISFLY-769](#bug-pincered-caddisfly-769): Add clip on mount for SWD header `[cat_fountain]` (`CLOSED`)
 - [ ] **`[MEDIUM]`** [#BUG-SPECKLED-ROVEBEETLE-352](#bug-speckled-rovebeetle-352): Sensor shield design on inner bowl wall is too complicated `[cat_fountain]` (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-SWARMING-TERMITE-504](#bug-swarming-termite-504): New Bug Report (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-AGILE-CATERPILLAR-346](#bug-agile-caterpillar-346): New Bug Report (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-STINGING-LACEWING-799](#bug-stinging-lacewing-799): New Bug Report (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -28063,5 +28066,35 @@ The sensor shield on the inner bowl wall is too complicated. The shape should be
 | Type | Filename | Description |
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1793890121106_n89dw.png](attachments/BUG-SPECKLED-ROVEBEETLE-352/screenshot_paste_1793890121106_n89dw.png) | Pasted screenshot screenshot_paste_1793890121106_n89dw.png |
+
+---
+
+### <a id="bug-swarming-termite-504"></a> 🔴 `[BUG-SWARMING-TERMITE-504]` New Bug Report
+
+- **UUID**: `84541ae5-9faf-47c2-9a06-f2c05f31e394`
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-11-05 14:49:40 UTC`
+
+---
+
+### <a id="bug-agile-caterpillar-346"></a> 🔴 `[BUG-AGILE-CATERPILLAR-346]` New Bug Report
+
+- **UUID**: `aead28e4-2393-4154-b478-d0913c0005aa`
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-11-05 14:49:40 UTC`
+
+---
+
+### <a id="bug-stinging-lacewing-799"></a> 🔴 `[BUG-STINGING-LACEWING-799]` New Bug Report
+
+- **UUID**: `1843fe5a-0485-4e4c-a4e0-f555e9af7e1a`
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-11-05 14:49:40 UTC`
 
 ---
