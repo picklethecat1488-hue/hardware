@@ -2201,3 +2201,58 @@ class TestCatFountainProvider:
         assert bowl.part.is_inside((tmc_x, tmc_y - half_slide - 1.0, floor_z - t - tmc_sh - 1.0)), (
             "TMC6300 snap socket must feature a solid front frame wall"
         )
+
+    def test_regression_bug_thoracic_harvestman_529_drive_hub_grooves_and_hull(self, provider):
+        """Verify BUG-THORACIC-HARVESTMAN-529: Drive hub has triangular motor strut grooves and 3-lobed convex hull body."""
+        # 1. Config properties exist
+        assert hasattr(provider.settings, "drive_hub_min_wall")
+        assert hasattr(provider.settings, "drive_hub_strut_groove_width")
+        assert hasattr(provider.settings, "drive_hub_strut_groove_depth")
+        assert hasattr(provider.settings, "drive_hub_strut_groove_length")
+        assert provider.settings.drive_hub_min_wall >= 1.5, "Minimum wall thickness must be >= 1.5mm"
+
+        hub = provider.build_drive_hub("drive_hub")
+        assert hub.part.volume > 0.0
+        assert hub.part.is_valid()
+        solid = hub.part
+
+        ring_r = provider.settings.magnet_ring_radius
+        hub_h = provider.settings.magnet_thickness + provider.settings.magnet_clearance + 0.8
+        mr = provider.settings.magnet_radius + provider.settings.magnet_clearance
+        groove_d = provider.settings.drive_hub_strut_groove_depth
+
+        # 2. Central shaft hole is open
+        assert not solid.is_inside((0.0, 0.0, 0.5)), "Central shaft hole must be open"
+
+        # 3. 3-lobed convex hull shape: solid at magnet lobes, hollow between lobes
+        for angle in [0, 120, 240]:
+            rad = math.radians(angle)
+            # Lobe tip around magnet is solid
+            tip_r = ring_r + mr + 0.5  # ~12.6mm
+            assert solid.is_inside((tip_r * math.cos(rad), tip_r * math.sin(rad), hub_h * 0.5)), (
+                f"Magnet lobe at {angle}° must be solid at r={tip_r}"
+            )
+
+        # Region between lobes (e.g. at 60°, 180°, 300° at r=10.0mm) is hollow
+        for angle in [60, 180, 300]:
+            rad = math.radians(angle)
+            assert not solid.is_inside((10.0 * math.cos(rad), 10.0 * math.sin(rad), hub_h * 0.5)), (
+                f"Region between lobes at {angle}° must be hollowed out (convex hull per-lobe design)"
+            )
+
+        # 4. Triangular strut grooves on the bottom (Z < groove_d)
+        for angle in [0, 120, 240]:
+            rad = math.radians(angle)
+            # Center of groove is open (subtracted)
+            gx = 3.5 * math.cos(rad)
+            gy = 3.5 * math.sin(rad)
+            assert not solid.is_inside((gx, gy, groove_d * 0.5)), (
+                f"Motor strut groove at {angle}° must be open on bottom"
+            )
+            # Lateral wall around groove is solid (>= 1.5mm wall)
+            # Tangent offset of 2.0mm from groove centerline
+            wx = gx - 2.0 * math.sin(rad)
+            wy = gy + 2.0 * math.cos(rad)
+            assert solid.is_inside((wx, wy, groove_d * 0.5)), (
+                f"Lateral wall beside groove at {angle}° must be solid with >=1.5mm wall"
+            )

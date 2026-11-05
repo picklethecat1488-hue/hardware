@@ -214,6 +214,10 @@ drive_hub_recess_depth: 5.3
 drive_hub_standoff_radius: 1.5
 drive_hub_thrust_collar_radius: 1.5
 drive_hub_standoff_height: 0.8
+drive_hub_min_wall: 1.5
+drive_hub_strut_groove_width: 1.5
+drive_hub_strut_groove_depth: 0.6
+drive_hub_strut_groove_length: 6.0
 speed_sensor_pocket_y: 18.5
 bottom_cover_opening_width: 20.0
 motor_hub_width: 17.6

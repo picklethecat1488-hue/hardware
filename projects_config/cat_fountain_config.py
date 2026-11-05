@@ -885,6 +885,26 @@ class CatFountainConfig(BaseModel):
         return float(self._raw_data.get("drive_hub_standoff_height", 0.8))
 
     @cached_property
+    def drive_hub_min_wall(self) -> float:
+        """Return the minimum wall thickness around drive hub magnets and grooves."""
+        return float(self._raw_data.get("drive_hub_min_wall", 1.5))
+
+    @cached_property
+    def drive_hub_strut_groove_width(self) -> float:
+        """Return the width of triangular motor strut grooves on drive hub bottom."""
+        return float(self._raw_data.get("drive_hub_strut_groove_width", 1.5))
+
+    @cached_property
+    def drive_hub_strut_groove_depth(self) -> float:
+        """Return the depth of triangular motor strut grooves on drive hub bottom."""
+        return float(self._raw_data.get("drive_hub_strut_groove_depth", 0.6))
+
+    @cached_property
+    def drive_hub_strut_groove_length(self) -> float:
+        """Return the length of triangular motor strut grooves on drive hub bottom."""
+        return float(self._raw_data.get("drive_hub_strut_groove_length", 6.0))
+
+    @cached_property
     def bottom_cover_opening_width(self) -> float:
         """Return the width of the bottom cover side opening."""
         return float(self._raw_data.get("bottom_cover_opening_width", 20.0))

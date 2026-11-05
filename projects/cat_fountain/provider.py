@@ -1210,7 +1210,6 @@ class CatFountainProvider(Provider):
         self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
         """Build the dry-side magnet drive hub mounted on the motor D-shaft."""
-        hub_r = self.settings.impeller_radius + self.settings.magnet_radius + 1.6
         hub_h = self.settings.magnet_thickness + self.settings.magnet_clearance + 0.8
         standoff_h = self.settings.drive_hub_standoff_height
         mr = self.settings.magnet_radius + self.settings.magnet_clearance
@@ -1219,8 +1218,26 @@ class CatFountainProvider(Provider):
         thrust_r = self.settings.drive_hub_thrust_collar_radius
         shaft_r = self.settings.drive_hub_shaft_radius
 
+        min_wall = self.settings.drive_hub_min_wall
+        lobe_r = mr + min_wall
+        center_r = 4.5
+        groove_w = self.settings.drive_hub_strut_groove_width
+        groove_d = self.settings.drive_hub_strut_groove_depth
+        groove_l = self.settings.drive_hub_strut_groove_length
+
         with BuildPart() as hub:
-            Cylinder(radius=hub_r, height=hub_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+            # 1. 3-lobed convex hull body with minimum 1.5mm wall thickness around magnets, grooves, and center hole (BUG-THORACIC-HARVESTMAN-529)
+            with BuildSketch() as sketch:
+                for i in range(self.settings.magnet_count):
+                    angle = i * (360.0 / self.settings.magnet_count)
+                    rad = math.radians(angle)
+                    with BuildSketch() as arm:
+                        Circle(radius=center_r)
+                        with Locations((ring_r * math.cos(rad), ring_r * math.sin(rad))):
+                            Circle(radius=lobe_r)
+                        make_hull()
+                    add(arm.sketch)
+            extrude(sketch.sketch, amount=hub_h)
 
             # Central PTFE/POM thrust collar directly around 1.5mm motor shaft collar at R <= 1.5mm
             # Dropping contact radius from R = 15.6mm down to R <= 1.5mm reduces friction torque by over 90%
@@ -1228,12 +1245,14 @@ class CatFountainProvider(Provider):
                 with Locations((0, 0, hub_h)):
                     Cylinder(radius=thrust_r, height=standoff_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
-            # Motor shaft hole with generous print-shrinkage clearance for smooth hand press-fit
+            # Motor shaft through-hole
             total_h = hub_h + standoff_h
-            with BuildSketch() as hole_sketch:
-                Circle(radius=shaft_r)
-            ext_hole = extrude(hole_sketch.sketch, amount=total_h + 2.0, mode=Mode.PRIVATE)
-            hub.part -= Location((0, 0, -1.0)) * ext_hole
+            Cylinder(
+                radius=shaft_r,
+                height=total_h + 2.0,
+                align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                mode=Mode.SUBTRACT,
+            )
 
             # Magnet pockets on the top face (Z = hub_h)
             for i in range(self.settings.magnet_count):
@@ -1243,6 +1262,19 @@ class CatFountainProvider(Provider):
                         # Pockets cut downward into the cylinder
                         Cylinder(
                             radius=mr, height=mt, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT
+                        )
+
+            # Triangular motor strut grooves on the bottom face (Z = 0) to prevent torque slippage (BUG-THORACIC-HARVESTMAN-529)
+            for i in range(self.settings.magnet_count):
+                angle = i * (360.0 / self.settings.magnet_count)
+                with Locations(Location((0, 0, 0)) * Rot(0, 0, angle)):
+                    with Locations((groove_l / 2.0, 0, 0)):
+                        Box(
+                            groove_l,
+                            groove_w,
+                            groove_d,
+                            align=(Align.CENTER, Align.CENTER, Align.MIN),
+                            mode=Mode.SUBTRACT,
                         )
 
             URDFMetadata(
