@@ -626,6 +626,7 @@
           <option value="150%">150%</option>
         </select>
       </div>
+      <span class="quake-badge" style="background:#1b120c; border:1px solid var(--quake-gold); color:var(--quake-gold); font-size:9.5px; padding:3px 8px;">Branch: <strong>bugs</strong></span>
       <button class="quake-btn quake-btn-default" onclick="syncFeedback()">🔄 Sync Feedback</button>
       <button class="quake-btn quake-btn-default" onclick="newBug()">+ New Bug</button>
       <button class="quake-btn quake-btn-gold" id="btn-save-exit" onclick="saveAndExit()">💾 Save and Exit</button>
@@ -694,6 +695,32 @@
 
     <!-- Content Area -->
     <div class="content-area">
+      <!-- Functional Review Action Banner -->
+      <div id="review-action-banner" class="form-section quake-card review-banner" style="display:none; border:2px solid var(--quake-gold); background:rgba(218,165,32,0.12); margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <div>
+            <div style="font-size:12px; font-weight:700; color:var(--quake-gold); letter-spacing:1px; display:flex; align-items:center; gap:8px;">
+              <span>⚡ FUNCTIONAL REVIEW REQUIRED</span>
+              <span style="font-size:9.5px; background:var(--quake-gold); color:#000; padding:2px 6px; border-radius:2px; font-weight:800;">AWAITING EVALUATION</span>
+            </div>
+            <div style="font-size:11px; color:#ddd; margin-top:4px;">
+              Verify functionality, run demo commands below, and inspect visual previews before accepting fix.
+            </div>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button class="quake-btn quake-btn-green" style="font-weight:700; padding:6px 16px; font-size:10px;" onclick="acceptActiveBug()">✔ ACCEPT FIX</button>
+            <button class="quake-btn quake-btn-red" style="font-weight:700; padding:6px 16px; font-size:10px;" onclick="rejectActiveBug()">✖ REJECT FIX</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rejection Feedback Card -->
+      <div id="rejection-feedback-card" class="form-section quake-card rejection-banner" style="display:none; border:2px solid #ff4444; background:rgba(255,68,68,0.12); margin-bottom:12px;">
+        <div class="section-title" style="color:#ff6666;">
+          <span>⚠ REJECTION FEEDBACK - FIX REJECTED BY REVIEWER</span>
+        </div>
+        <div id="rejection-feedback-text" style="color:#fff; font-size:11px; white-space:pre-wrap; line-height:1.5;"></div>
+      </div>
       <!-- Bug Identity Section -->
       <div class="form-section quake-card">
         <div class="section-title">
@@ -825,6 +852,31 @@
           <label>Fix Details & Commit References</label>
           <textarea id="bug-resolution" placeholder="Document root cause, code changes made, and test regression verifications..."></textarea>
         </div>
+      </div>
+
+      <!-- Attached Commits Section -->
+      <div class="form-section quake-card" id="attached-commits-section">
+        <div class="section-title">
+          <span>Attached Commits</span>
+        </div>
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+          <input type="text" id="input-attach-commit" placeholder="Git commit SHA (e.g. 7f3b89a)..." style="flex:1;">
+          <button class="quake-btn quake-btn-default" onclick="attachCommitToActiveBug()">+ Attach Commit</button>
+        </div>
+        <div id="attached-commits-list" class="commits-list" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+      </div>
+
+      <!-- Functional Review Checklist & Demo Commands -->
+      <div class="form-section quake-card" id="review-tasks-section">
+        <div class="section-title">
+          <span>Review Tasks & Functional Checklist</span>
+        </div>
+        <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+          <input type="text" id="input-task-title" placeholder="Task title / verification requirement..." style="flex:2; min-width:200px;">
+          <input type="text" id="input-task-command" placeholder="Demo command (e.g. python tools/view.py cat_fountain:pcb)..." style="flex:3; min-width:250px; font-family:var(--font-mono);">
+          <button class="quake-btn quake-btn-default" onclick="addTaskToActiveBug()">+ Add Task</button>
+        </div>
+        <div id="review-tasks-list" class="tasks-list"></div>
       </div>
     </div>
   </div>
@@ -990,10 +1042,9 @@
       const searchInput = document.getElementById("search-input");
       const query = (searchInput ? searchInput.value || "" : "").toLowerCase();
       let list = (db.bugs || []).filter(bug => {
-        const isResolved = (bug.status === "RESOLVED" || bug.status === "CLOSED");
-        if (currentFilter === "open" && (isResolved || bug.status === "PLANNED")) return false;
+        if (currentFilter === "open" && (bug.status === "CLOSED" || bug.status === "PLANNED")) return false;
         if (currentFilter === "planned" && bug.status !== "PLANNED") return false;
-        if (currentFilter === "resolved" && !isResolved) return false;
+        if (currentFilter === "resolved" && (bug.status !== "RESOLVED" && bug.status !== "CLOSED")) return false;
         if (currentCategoryFilter && currentCategoryFilter !== "ALL" && bug.category !== currentCategoryFilter) return false;
         if (currentSeverityFilter && currentSeverityFilter !== "ALL" && bug.severity !== currentSeverityFilter) return false;
         if (query && !bug.title.toLowerCase().includes(query) && !bug.id.toLowerCase().includes(query) && !(bug.component || "").toLowerCase().includes(query)) {
@@ -1083,7 +1134,11 @@
         else if (bug.severity === "LOW") sevBadgeClass = "quake-badge quake-badge-muted";
 
         let stBadgeClass = "quake-badge quake-badge-amber";
-        if (bug.status === "RESOLVED" || bug.status === "CLOSED") {
+        let stDisplay = bug.status;
+        if (bug.status === "RESOLVED") {
+          stBadgeClass = "quake-badge quake-badge-gold";
+          stDisplay = "AWAITING REVIEW";
+        } else if (bug.status === "CLOSED") {
           stBadgeClass = "quake-badge quake-badge-green";
         } else if (bug.status === "PLANNED") {
           stBadgeClass = "quake-badge quake-badge-muted";
@@ -1093,7 +1148,7 @@
           <div class="bug-item-top">
             <span class="bug-id">${bug.id} <button class="copy-icon-btn copy-badge-btn" onclick="event.stopPropagation(); copyText('${bug.id}')" title="Copy Bug ID ${bug.id}">📋</button></span>
             <span class="${sevBadgeClass}">${bug.severity}</span>
-            <span class="${stBadgeClass}">${bug.status}</span>
+            <span class="${stBadgeClass}">${stDisplay}</span>
           </div>
           <div class="bug-item-title">${bug.title || "Untitled Bug"}</div>
         `;
@@ -1116,6 +1171,25 @@
       if (bugIdDisp) bugIdDisp.textContent = `[${bug.id}]`;
       if (btnCopyActiveBug) btnCopyActiveBug.style.display = "inline-flex";
 
+      // Functional Review Action Banner
+      const reviewBanner = document.getElementById("review-action-banner");
+      if (reviewBanner) {
+        reviewBanner.style.display = (bug.status === "RESOLVED") ? "block" : "none";
+      }
+
+      // Rejection Feedback Alert
+      const rejCard = document.getElementById("rejection-feedback-card");
+      const rejText = document.getElementById("rejection-feedback-text");
+      if (rejCard && rejText) {
+        if (bug.rejection_notes && bug.rejection_notes.trim()) {
+          rejCard.style.display = "block";
+          const rejTime = bug.rejected_at ? `[${bug.rejected_at}]\n` : "";
+          rejText.textContent = `${rejTime}${bug.rejection_notes}`;
+        } else {
+          rejCard.style.display = "none";
+        }
+      }
+
       document.getElementById("bug-title").value = bug.title || "";
       document.getElementById("bug-severity").value = bug.severity || "MEDIUM";
       document.getElementById("bug-status").value = bug.status || "OPEN";
@@ -1129,7 +1203,232 @@
       document.getElementById("bug-resolution").value = bug.resolution_notes || "";
 
       renderAttachments(bug.attachments || []);
+      renderAttachedCommits(bug.commit_ids || []);
+      renderReviewTasks(bug.review_tasks || []);
       autoResizeAllTextareas();
+    }
+
+    async function acceptActiveBug() {
+      if (!activeBugId) return;
+      const notes = prompt("Optional acceptance notes (leave blank if none):", "");
+      if (notes === null) return;
+      try {
+        const res = await fetch("/api/bugs/accept", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: activeBugId, notes: notes.trim() })
+        });
+        const data = await res.json();
+        if (data.status === "ok") {
+          const bug = db.bugs.find(b => b.id === activeBugId);
+          if (bug) {
+            bug.status = "CLOSED";
+            bug.accepted_at = data.bug.accepted_at;
+            if (data.bug.resolution_notes) bug.resolution_notes = data.bug.resolution_notes;
+          }
+          loadActiveBug();
+          renderBugList();
+          updateMetrics();
+          showToast(`Bug [${activeBugId}] accepted and closed.`);
+        } else {
+          showToast(data.error || "Failed to accept bug");
+        }
+      } catch (err) {
+        showToast("Error accepting bug: " + err);
+      }
+    }
+
+    async function rejectActiveBug() {
+      if (!activeBugId) return;
+      const notes = prompt("Enter rejection feedback (explain why the fix failed validation):", "");
+      if (!notes || !notes.trim()) {
+        alert("Rejection feedback is required to reject a fix.");
+        return;
+      }
+      try {
+        const res = await fetch("/api/bugs/reject", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: activeBugId, notes: notes.trim() })
+        });
+        const data = await res.json();
+        if (data.status === "ok") {
+          const bug = db.bugs.find(b => b.id === activeBugId);
+          if (bug) {
+            bug.status = "OPEN";
+            bug.rejected_at = data.bug.rejected_at;
+            bug.rejection_notes = data.bug.rejection_notes;
+          }
+          loadActiveBug();
+          renderBugList();
+          updateMetrics();
+          showToast(`Bug [${activeBugId}] rejected and reopened.`);
+        } else {
+          showToast(data.error || "Failed to reject bug");
+        }
+      } catch (err) {
+        showToast("Error rejecting bug: " + err);
+      }
+    }
+
+    async function attachCommitToActiveBug() {
+      if (!activeBugId) return;
+      const input = document.getElementById("input-attach-commit");
+      const commitSha = (input ? input.value : "").trim();
+      if (!commitSha) {
+        showToast("Please enter a commit SHA");
+        return;
+      }
+      try {
+        const res = await fetch("/api/bugs/attach_commit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: activeBugId, commit_id: commitSha })
+        });
+        const data = await res.json();
+        if (data.status === "ok") {
+          const bug = db.bugs.find(b => b.id === activeBugId);
+          if (bug) bug.commit_ids = data.bug.commit_ids || [];
+          input.value = "";
+          renderAttachedCommits(bug.commit_ids || []);
+          showToast(`Attached commit ${commitSha}`);
+        } else {
+          showToast(data.error || "Failed to attach commit");
+        }
+      } catch (err) {
+        showToast("Error attaching commit: " + err);
+      }
+    }
+
+    function renderAttachedCommits(commitIds) {
+      const container = document.getElementById("attached-commits-list");
+      if (!container) return;
+      container.innerHTML = "";
+      if (!commitIds || !commitIds.length) {
+        container.innerHTML = '<span style="font-size:10px; color:var(--quake-text-dim);">No commits attached yet.</span>';
+        return;
+      }
+      commitIds.forEach(cid => {
+        const chip = document.createElement("div");
+        chip.style.cssText = "display:inline-flex; align-items:center; gap:6px; background:#1b120c; border:1px solid var(--quake-gold); border-radius:3px; padding:4px 8px; font-family:var(--font-mono); font-size:10px;";
+        chip.innerHTML = `
+          <a href="/?commit=${encodeURIComponent(cid)}" target="_blank" style="color:var(--quake-gold); text-decoration:none; font-weight:700;">🔍 ${cid.slice(0, 10)}</a>
+          <button class="copy-icon-btn copy-badge-btn" onclick="copyText('${cid}')" title="Copy commit SHA">📋</button>
+        `;
+        container.appendChild(chip);
+      });
+    }
+
+    async function addTaskToActiveBug() {
+      if (!activeBugId) return;
+      const titleInput = document.getElementById("input-task-title");
+      const cmdInput = document.getElementById("input-task-command");
+      const title = (titleInput ? titleInput.value : "").trim();
+      const cmd = (cmdInput ? cmdInput.value : "").trim();
+      if (!title) {
+        showToast("Task title is required");
+        return;
+      }
+      try {
+        const res = await fetch("/api/bugs/add_task", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: activeBugId, title: title, command: cmd })
+        });
+        const data = await res.json();
+        if (data.status === "ok") {
+          const bug = db.bugs.find(b => b.id === activeBugId);
+          if (bug) bug.review_tasks = data.bug.review_tasks || [];
+          if (titleInput) titleInput.value = "";
+          if (cmdInput) cmdInput.value = "";
+          renderReviewTasks(bug.review_tasks || []);
+          showToast("Task added.");
+        } else {
+          showToast(data.error || "Failed to add task");
+        }
+      } catch (err) {
+        showToast("Error adding task: " + err);
+      }
+    }
+
+    async function toggleTaskStatus(taskId, currentStatus) {
+      if (!activeBugId) return;
+      const newStatus = (currentStatus === "COMPLETED") ? "PENDING" : "COMPLETED";
+      try {
+        const res = await fetch("/api/bugs/update_task", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: activeBugId, task_id: taskId, status: newStatus })
+        });
+        const data = await res.json();
+        if (data.status === "ok") {
+          const bug = db.bugs.find(b => b.id === activeBugId);
+          if (bug) bug.review_tasks = data.bug.review_tasks || [];
+          renderReviewTasks(bug.review_tasks || []);
+        }
+      } catch (err) {
+        showToast("Error updating task: " + err);
+      }
+    }
+
+    async function runTaskCommand(taskId, command) {
+      const outBox = document.getElementById(`task-output-${taskId}`);
+      if (outBox) {
+        outBox.style.display = "block";
+        outBox.textContent = "▶ Executing command...";
+      }
+      try {
+        const res = await fetch("/api/bugs/run_command", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: activeBugId, command: command })
+        });
+        const data = await res.json();
+        if (outBox) {
+          const text = (data.stdout || "") + (data.stderr ? "\n[STDERR]\n" + data.stderr : "");
+          outBox.textContent = `[Exit Code ${data.exit_code}]\n` + (text || "(No output)");
+        }
+        if (data.status === "ok") {
+          showToast("Command succeeded.");
+        } else {
+          showToast("Command completed with error.");
+        }
+      } catch (err) {
+        if (outBox) outBox.textContent = "Error executing command: " + err;
+        showToast("Execution failed: " + err);
+      }
+    }
+
+    function renderReviewTasks(tasks) {
+      const container = document.getElementById("review-tasks-list");
+      if (!container) return;
+      container.innerHTML = "";
+      if (!tasks || !tasks.length) {
+        container.innerHTML = '<span style="font-size:10px; color:var(--quake-text-dim);">No review tasks defined yet.</span>';
+        return;
+      }
+      tasks.forEach(task => {
+        const isDone = task.status === "COMPLETED";
+        const item = document.createElement("div");
+        item.style.cssText = "background:#120a05; border:1px solid #331f0f; border-radius:3px; padding:8px 10px; margin-bottom:8px;";
+        const cmdPart = task.command ? `
+          <div style="display:flex; align-items:center; gap:8px; margin-top:6px; background:#000; border:1px solid #222; border-radius:2px; padding:4px 8px;">
+            <code style="font-family:var(--font-mono); font-size:10px; color:var(--quake-gold); flex:1; overflow-x:auto;">${task.command}</code>
+            <button class="quake-btn quake-btn-default" style="font-size:9px; padding:2px 8px;" onclick="copyText('${task.command.replace(/'/g, "\\'")}')">Copy</button>
+            <button class="quake-btn quake-btn-green" style="font-size:9px; padding:2px 8px;" onclick="runTaskCommand('${task.id}', '${task.command.replace(/'/g, "\\'")}')">▶ Run Demo</button>
+          </div>
+          <pre id="task-output-${task.id}" style="display:none; margin-top:6px; background:#080503; border:1px solid #331f0f; padding:6px; font-family:var(--font-mono); font-size:9.5px; color:#ccc; max-height:160px; overflow-y:auto; white-space:pre-wrap;"></pre>
+        ` : '';
+        item.innerHTML = `
+          <div style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" ${isDone ? "checked" : ""} onchange="toggleTaskStatus('${task.id}', '${task.status}')" style="cursor:pointer; width:14px; height:14px;">
+            <span style="font-size:11px; font-weight:600; color:${isDone ? "var(--quake-text-dim)" : "#fff"}; text-decoration:${isDone ? "line-through" : "none"}; flex:1;">${task.title}</span>
+            <span class="quake-badge ${isDone ? "quake-badge-green" : (task.status === "FAILED" ? "quake-badge-red" : "quake-badge-muted")}">${task.status}</span>
+          </div>
+          ${cmdPart}
+        `;
+        container.appendChild(item);
+      });
     }
 
 

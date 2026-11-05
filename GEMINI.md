@@ -31,24 +31,27 @@ pytest
 
 ## Remote Cloud Server (`anvil`)
 
-For resource-intensive workloads, parameter sweeps, fluid dynamics simulations, integration smoke tests (`python tools/smoke.py`), validation experiments, and data collection, the `anvil` cloud server is available:
+For resource-intensive workloads, parameter sweeps, fluid dynamics simulations, integration smoke tests (`python tools/smoke.py`), validation experiments, and data collection, the `anvil` cloud server is available via Vast.ai:
 
 ```ssh-config
 Host anvil
-  HostName <anvil-ip>
-  User ubuntu
-  IdentityFile "~/.ssh/FLINT'S KEY.pem"
-  IdentitiesOnly yes
-  ServerAliveInterval 30
-  ServerAliveCountMax 10
-  TCPKeepAlive yes
+  HostName <vast-ssh-host>
+  Port <vast-ssh-port>
+  User root
+  IdentityFile "~/.ssh/id_rsa"
   StrictHostKeyChecking accept-new
 ```
 
-### Usage Guidelines
-1. **Remote Execution**: Use `bin/anvil run "<command>"` or SSH targeting `ubuntu@anvil` (or `ssh anvil`) to run full test suites (`pytest`), slow physics benchmarks (`pytest -m "slow"`), large JAX SPH simulation grids, parameter sweeps, and integration smoke tests (`python tools/smoke.py`).
-2. **Conda Environment & Binaries**: On `anvil`, execute commands within the `cq` conda environment using `conda run -n cq --no-capture-output <command>` (prefer relative executable names like `python`, `pytest`, `ruff` over absolute paths).
-3. **Preceding Run Cancellation**: Before initiating a new remote execution or benchmark on `anvil`, ensure any active or stale background runs of the same command are cancelled or terminated to avoid cloud resource contention and duplicate processing.
+### Usage Guidelines & Shared Workstation Configuration
+1. **Shared Cloud Runner & Configuration**: Cloud instances are provisioned on Vast.ai with the basic Ubuntu image (`ubuntu:22.04`) and shared across `firmware`, `hardware`, and `SSD` via the global runner script (`~/.local/bin/anvil`) and shared configuration (`~/.anvil.env` in `$HOME`). Remote repositories reside in `/workspace/<repo>` if `/workspace` is available, falling back to `$HOME/<repo>`.
+2. **Instance Provisioning & Release**: Use `bin/anvil provision` to automatically rent an instance, configure SSH port mapping, and update `~/.anvil.env`. Use `bin/anvil release` to destroy the instance and reset configuration.
+3. **Automated Remote Bootstrapping**: Newly provisioned instances automatically run `bin/anvil bootstrap` to install essential build toolchains (`build-essential`, `cmake`, `pkg-config`), Rust, and persistent Miniforge on `/workspace/miniforge3` (creating the `cq` environment).
+4. **Remote Execution**: Use `bin/anvil run "<command>"` or SSH targeting `anvil` to run full test suites (`pytest`), slow physics benchmarks (`pytest -m "slow"`), large JAX SPH simulation grids, parameter sweeps, and integration smoke tests (`python tools/smoke.py`).
+5. **Conda Environment & Binaries**: On `anvil`, execute commands within the `cq` conda environment using `conda run -n cq --no-capture-output <command>`.
+6. **Preceding Run Cancellation**: Before initiating a new remote execution or benchmark on `anvil`, ensure any active or stale background runs of the same command are cancelled or terminated (`bin/anvil stop`) to avoid cloud resource contention and duplicate processing.
+7. **Artifact Synchronization**: Use `bin/anvil pull <remote_path> [local_dest]` or `bin/anvil stages` to download generated logs, RRD recordings, and inspection figures into the local workspace.
+8. **Lock File Tracking (`~/.anvil.lock`)**: All active remote commands automatically register execution in `~/.anvil.lock` in `$HOME` to signal active utilization.
+9. **Close of Business (COB) Auto-Release Mandate**: To prevent unnecessary cloud spend and accidental overnight charges, any rented Vast.ai instance claim MUST be automatically released at Close of Business (COB) or when idle if no processes are using it (`bin/anvil auto-release` or `bin/anvil release`). Never leave rented cloud GPU/container instances running overnight or unattended.
 
 ---
 

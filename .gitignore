@@ -11,7 +11,12 @@ scancode-report.json
 TODO.md
 recordings/
 *.rrd
-feedback/BUGS.md
-feedback/CR.md
-feedback/CR_working.md
+# Bug and review tracking (decoupled to detached git branch 'bugs')
+feedback/
 /*.svg
+
+# Anvil Cloud Runner Environment & Lock Files
+.anvil.env
+.anvil.env.*
+!.anvil.env.example
+.anvil.lock*

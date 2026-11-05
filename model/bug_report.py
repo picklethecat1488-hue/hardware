@@ -43,6 +43,14 @@ class BugCategory(StrEnum):
     GENERAL = "GENERAL"
 
 
+class ReviewTaskStatus(StrEnum):
+    """Lifecycle status for a functional review task."""
+
+    PENDING = "PENDING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
 class BugAttachmentModel(BaseModel):
     """File attachment (log, screenshot, CAD artifact, reference) associated with a bug."""
 
@@ -53,6 +61,16 @@ class BugAttachmentModel(BaseModel):
     size_bytes: int = 0
     description: str = ""
     created_at: str = ""
+
+
+class ReviewTaskModel(BaseModel):
+    """A functional verification or review task for a bug."""
+
+    id: str = Field(default_factory=lambda: str(uuid_pkg.uuid4())[:8])
+    title: str
+    command: str = ""  # Shell command or visualization action to demo functionality
+    status: ReviewTaskStatus = ReviewTaskStatus.PENDING
+    notes: str = ""
 
 
 class BugReportModel(BaseModel):
@@ -71,10 +89,15 @@ class BugReportModel(BaseModel):
     actual_behavior: str = ""
     logs: str = ""
     attachments: List[BugAttachmentModel] = Field(default_factory=list)
+    commit_ids: List[str] = Field(default_factory=list)
+    review_tasks: List[ReviewTaskModel] = Field(default_factory=list)
     created_at: str = ""
     updated_at: str = ""
     resolved_at: Optional[str] = None
     resolution_notes: str = ""
+    rejection_notes: Optional[str] = None
+    accepted_at: Optional[str] = None
+    rejected_at: Optional[str] = None
 
 
 class BugDatabaseModel(BaseModel):

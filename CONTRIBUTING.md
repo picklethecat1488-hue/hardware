@@ -297,6 +297,22 @@ pytest
 python build.py
 ```
 
+### Remote Cloud Execution (`bin/anvil` / Vast.ai)
+For offloading heavy simulation grids, parameter sweeps, and full test suites to the cloud server:
+```bash
+bin/anvil provision                # Rent Vast.ai Ubuntu instance and configure ~/.anvil.env
+bin/anvil bootstrap                # Install build tools, Rust, Miniforge, and cq conda env on remote VM
+bin/anvil status                   # Check instance health, IP/port, GPU, and lock state
+bin/anvil sync                     # Sync repository to cloud container (/workspace/hardware)
+bin/anvil pytest [args...]         # Run pytest remotely in the cq conda environment
+bin/anvil simulate [args...]       # Run simulation on remote GPU and auto-download results
+bin/anvil stages                   # Sync staged .rrd checkpoint recordings
+bin/anvil smoke                    # Run integration smoke tests remotely
+bin/anvil auto-release             # Release instance if idle or past Close of Business (COB)
+bin/anvil release                  # Destroy rented instance and clean up ~/.anvil.env
+bin/anvil stop                     # Clean up remote processes on anvil
+```
+
 **Note:** All CI gates (tests, linting, and build checks) must pass successfully in the GitHub Actions workflow before a pull request can be merged.
 
 ## Interactive Code Review

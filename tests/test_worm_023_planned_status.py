@@ -65,7 +65,8 @@ def test_cli_list_bugs_open_excludes_planned() -> None:
 
     assert "BUG-101" in output, "Open bug should be listed"
     assert "BUG-102" not in output, "Planned bug must be excluded when open_only=True"
-    assert "BUG-103" not in output, "Resolved bug must be excluded when open_only=True"
+    assert "BUG-103" in output, "Resolved bug awaiting review is listed in open/review view"
+    assert "AWAITING REVIEW" in output
 
 
 def test_cli_planned_argument() -> None:

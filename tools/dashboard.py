@@ -42,7 +42,14 @@ if str(_tools_dir) not in sys.path:
 if str(_repo_dir) not in sys.path:
     sys.path.insert(0, str(_repo_dir))
 
-from model.bug_report import BugCategory, BugReportModel, BugSeverity, BugStatus
+from model.bug_report import (
+    BugCategory,
+    BugReportModel,
+    BugSeverity,
+    BugStatus,
+    ReviewTaskModel,
+    ReviewTaskStatus,
+)
 from model.code_review import CommentModel, ReviewSeverity, ReviewStatus
 from provider.dashboard.server import DashboardServer, ensure_high_fd_limit
 from provider.vcs.git_engine import GitEngine, extract_line_snippet, get_git_root
@@ -59,6 +66,11 @@ def parse_arguments(args: Optional[List[str]] = None) -> argparse.Namespace:
         "commit",
         "add-bug",
         "resolve-bug",
+        "accept-bug",
+        "reject-bug",
+        "attach-commit",
+        "add-task",
+        "resolve-task",
         "add-comment",
         "resolve-comment",
         "set-verdict",
@@ -364,6 +376,43 @@ def parse_arguments(args: Optional[List[str]] = None) -> argparse.Namespace:
     p_res_b.add_argument("id", nargs="?", default="", help="Bug ID (e.g. BUG-001).")
     p_res_b.add_argument("--id", dest="bug_id", default="", help="Bug ID.")
     p_res_b.add_argument("--notes", default="", help="Resolution notes.")
+
+    # accept-bug
+    p_acc_b = subparsers.add_parser("accept-bug", help="Accept a resolved bug and transition to CLOSED.")
+    p_acc_b.add_argument("id", nargs="?", default="", help="Bug ID to accept (e.g. BUG-001).")
+    p_acc_b.add_argument("--id", dest="bug_id", default="", help="Bug ID.")
+    p_acc_b.add_argument("--notes", default="", help="Optional acceptance note.")
+
+    # reject-bug
+    p_rej_b = subparsers.add_parser("reject-bug", help="Reject a resolved bug and reopen it with feedback.")
+    p_rej_b.add_argument("id", nargs="?", default="", help="Bug ID to reject (e.g. BUG-001).")
+    p_rej_b.add_argument("--id", dest="bug_id", default="", help="Bug ID.")
+    p_rej_b.add_argument("--notes", default="", help="Rejection feedback explaining why the fix was rejected.")
+
+    # attach-commit
+    p_att_c = subparsers.add_parser("attach-commit", help="Attach a git commit hash to a bug report.")
+    p_att_c.add_argument("id", nargs="?", default="", help="Bug ID (e.g. BUG-001).")
+    p_att_c.add_argument("commit", nargs="?", default="", help="Commit hash to attach.")
+    p_att_c.add_argument("--id", dest="bug_id", default="", help="Bug ID.")
+    p_att_c.add_argument("--commit", dest="commit_id", default="", help="Commit hash to attach.")
+
+    # add-task
+    p_add_t = subparsers.add_parser("add-task", help="Add a review task or functional checklist item to a bug.")
+    p_add_t.add_argument("id", nargs="?", default="", help="Bug ID (e.g. BUG-001).")
+    p_add_t.add_argument("--id", dest="bug_id", default="", help="Bug ID.")
+    p_add_t.add_argument("--title", required=True, help="Task title / description.")
+    p_add_t.add_argument("--command", default="", help="Optional shell or demo command.")
+
+    # resolve-task
+    p_res_t = subparsers.add_parser("resolve-task", help="Update the status of a review task.")
+    p_res_t.add_argument("id", nargs="?", default="", help="Bug ID (e.g. BUG-001).")
+    p_res_t.add_argument("--id", dest="bug_id", default="", help="Bug ID.")
+    p_res_t.add_argument("--task-id", required=True, help="Task ID.")
+    p_res_t.add_argument(
+        "--status", choices=["PENDING", "COMPLETED", "FAILED"], default=None, help="Explicit target status."
+    )
+    p_res_t.add_argument("--failed", action="store_true", help="Mark task as FAILED instead of COMPLETED.")
+    p_res_t.add_argument("--notes", default="", help="Optional task execution notes.")
 
     # add-comment
     p_add_c = subparsers.add_parser("add-comment", help="Quickly add a review comment.")
@@ -681,7 +730,7 @@ def print_cli_bugs(
     curr_user = engine.get_current_user() if engine else {"name": "", "email": ""}
     filtered = []
     for b in bugs:
-        if open_only and b.status in (BugStatus.RESOLVED, BugStatus.CLOSED, BugStatus.PLANNED):
+        if open_only and b.status in (BugStatus.CLOSED, BugStatus.PLANNED):
             continue
         if planned_only and b.status != BugStatus.PLANNED:
             continue
@@ -706,13 +755,16 @@ def print_cli_bugs(
         filtered.append(b)
 
     for b in filtered:
-        chk = "[X]" if b.status in (BugStatus.RESOLVED, BugStatus.CLOSED) else "[ ]"
+        chk = "[X]" if b.status == BugStatus.CLOSED else ("[?]" if b.status == BugStatus.RESOLVED else "[ ]")
         comp = f" ({b.component})" if b.component else ""
-        print(f"  {chk} [{b.id}] [{b.severity.value}] [{b.category.value}] {b.title}{comp} -> {b.status.value}")
+        status_disp = "RESOLVED (AWAITING REVIEW)" if b.status == BugStatus.RESOLVED else b.status.value
+        print(f"  {chk} [{b.id}] [{b.severity.value}] [{b.category.value}] {b.title}{comp} -> {status_disp}")
 
-    total_open = sum(1 for b in filtered if b.status not in (BugStatus.RESOLVED, BugStatus.CLOSED, BugStatus.PLANNED))
+    total_open = sum(1 for b in filtered if b.status not in (BugStatus.CLOSED, BugStatus.PLANNED))
+    awaiting_review = sum(1 for b in filtered if b.status == BugStatus.RESOLVED)
     total_all = len(filtered)
-    print(f"\nShowing {len(filtered)} issues ({total_open} open, {total_all} total).\n")
+    review_info = f", {awaiting_review} awaiting review" if awaiting_review else ""
+    print(f"\nShowing {len(filtered)} issues ({total_open} open/review{review_info}, {total_all} total).\n")
 
 
 def print_cli_reviews(
@@ -848,7 +900,17 @@ def main(cli_args: Optional[List[str]] = None) -> None:
         or commits_arg
     )
     is_bug_cmd = bool(
-        subcmd in ("list-bugs", "add-bug", "resolve-bug")
+        subcmd
+        in (
+            "list-bugs",
+            "add-bug",
+            "resolve-bug",
+            "accept-bug",
+            "reject-bug",
+            "attach-commit",
+            "add-task",
+            "resolve-task",
+        )
         or getattr(args, "bugs", False)
         or getattr(args, "planned", False)
         or getattr(args, "add_bug", None)
@@ -1016,6 +1078,124 @@ def main(cli_args: Optional[List[str]] = None) -> None:
                 bug.resolution_notes = args.notes
             server.bug_server.save_and_sync()
             print(f"Resolved bug [{bug.id}]: {bug.title}")
+            return
+        case "accept-bug":
+            bug_id = getattr(args, "bug_id", "") or getattr(args, "id", "")
+            if not bug_id:
+                print("Error: Bug ID is required.", file=sys.stderr)
+                sys.exit(1)
+            bug = server.bug_server.database.get_bug(bug_id)
+            if not bug:
+                print(f"Bug '{bug_id}' not found in database.", file=sys.stderr)
+                sys.exit(1)
+            bug.status = BugStatus.CLOSED
+            now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            bug.accepted_at = now_str
+            notes = getattr(args, "notes", "").strip()
+            if notes:
+                if bug.resolution_notes:
+                    bug.resolution_notes += f"\n\n**Acceptance Note**: {notes}"
+                else:
+                    bug.resolution_notes = f"**Acceptance Note**: {notes}"
+            bug.updated_at = now_str
+            server.bug_server.save_and_sync()
+            print(f"Accepted and closed bug [{bug.id}]: {bug.title}")
+            return
+        case "reject-bug":
+            bug_id = getattr(args, "bug_id", "") or getattr(args, "id", "")
+            if not bug_id:
+                print("Error: Bug ID is required.", file=sys.stderr)
+                sys.exit(1)
+            bug = server.bug_server.database.get_bug(bug_id)
+            if not bug:
+                print(f"Bug '{bug_id}' not found in database.", file=sys.stderr)
+                sys.exit(1)
+            notes = getattr(args, "notes", "").strip()
+            if not notes:
+                print("Error: Rejection notes are required (--notes).", file=sys.stderr)
+                sys.exit(1)
+            bug.status = BugStatus.OPEN
+            bug.resolved_at = None
+            now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            bug.rejected_at = now_str
+            bug.rejection_notes = notes
+            bug.updated_at = now_str
+            server.bug_server.save_and_sync()
+            print(f"Rejected bug [{bug.id}], returned to OPEN: {bug.title}")
+            return
+        case "attach-commit":
+            bug_id = getattr(args, "bug_id", "") or getattr(args, "id", "")
+            cid = getattr(args, "commit", "") or getattr(args, "commit_id", "")
+            if not bug_id:
+                print("Error: Bug ID is required.", file=sys.stderr)
+                sys.exit(1)
+            if not cid:
+                print("Error: Commit hash is required.", file=sys.stderr)
+                sys.exit(1)
+            bug = server.bug_server.database.get_bug(bug_id)
+            if not bug:
+                print(f"Bug '{bug_id}' not found in database.", file=sys.stderr)
+                sys.exit(1)
+            if cid not in bug.commit_ids:
+                bug.commit_ids.append(cid)
+            bug.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            server.bug_server.save_and_sync()
+            print(f"Attached commit {cid} to [{bug.id}]. Total attached: {len(bug.commit_ids)}")
+            return
+        case "add-task":
+            bug_id = getattr(args, "bug_id", "") or getattr(args, "id", "")
+            if not bug_id:
+                print("Error: Bug ID is required.", file=sys.stderr)
+                sys.exit(1)
+            title = getattr(args, "title", "").strip()
+            if not title:
+                print("Error: Task title is required (--title).", file=sys.stderr)
+                sys.exit(1)
+            bug = server.bug_server.database.get_bug(bug_id)
+            if not bug:
+                print(f"Bug '{bug_id}' not found in database.", file=sys.stderr)
+                sys.exit(1)
+            cmd = getattr(args, "command", "").strip()
+            task = ReviewTaskModel(title=title, command=cmd)
+            bug.review_tasks.append(task)
+            bug.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            server.bug_server.save_and_sync()
+            print(f"Added review task [{task.id}] to [{bug.id}]: {task.title}")
+            return
+        case "resolve-task":
+            bug_id = getattr(args, "bug_id", "") or getattr(args, "id", "")
+            tid = getattr(args, "task_id", "").strip()
+            if not bug_id:
+                print("Error: Bug ID is required.", file=sys.stderr)
+                sys.exit(1)
+            if not tid:
+                print("Error: Task ID is required (--task-id).", file=sys.stderr)
+                sys.exit(1)
+            bug = server.bug_server.database.get_bug(bug_id)
+            if not bug:
+                print(f"Bug '{bug_id}' not found in database.", file=sys.stderr)
+                sys.exit(1)
+            target_task = None
+            for t in bug.review_tasks:
+                if t.id == tid:
+                    target_task = t
+                    break
+            if not target_task:
+                print(f"Task '{tid}' not found on bug [{bug.id}].", file=sys.stderr)
+                sys.exit(1)
+            target_status = getattr(args, "status", None)
+            if target_status:
+                target_task.status = ReviewTaskStatus(target_status)
+            elif getattr(args, "failed", False):
+                target_task.status = ReviewTaskStatus.FAILED
+            else:
+                target_task.status = ReviewTaskStatus.COMPLETED
+            notes = getattr(args, "notes", "")
+            if notes:
+                target_task.notes = notes
+            bug.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            server.bug_server.save_and_sync()
+            print(f"Updated task [{target_task.id}] on [{bug.id}] -> {target_task.status}")
             return
         case "add-comment":
             body = getattr(args, "comment_body", "") or getattr(args, "body", "")
