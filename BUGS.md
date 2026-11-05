@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-05 23:54:27 UTC` |
+| **Report Date** | `2026-11-05 23:54:31 UTC` |
 | **Total Issues** | `313` |
 | **Open Issues** | `0` |
 | **Resolved / Closed** | `313 (100%)` |
@@ -27563,14 +27563,14 @@ Pls see attached, we should plan to consign all remaining components to them exc
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
-| `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx) | Uploaded reference questions spreadsheet from PCBWay |
-| `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx) | Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16 |
+| `reference` | [carrier_board_bom_rev3.csv](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv) | CSV export of clean EDA BOM Rev 3 |
+| `reference` | [digikey_order_2026-10-14.xlsx](attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx) | Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2) |
 | `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls) | Legacy Excel 97-2004 format of replied quotation BOM |
 | `reference` | [carrier_board_bom_rev2.xlsx](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx) | Clean EDA export BOM generated directly from updated carrier board model |
 | `reference` | [carrier_board_bom_rev2.csv](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv) | CSV export of clean EDA BOM |
 | `reference` | [carrier_board_bom_rev3.xlsx](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx) | Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM) |
-| `reference` | [carrier_board_bom_rev3.csv](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv) | CSV export of clean EDA BOM Rev 3 |
-| `reference` | [digikey_order_2026-10-14.xlsx](attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx) | Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2) |
+| `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx) | Uploaded reference questions spreadsheet from PCBWay |
+| `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx) | Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16 |
 
 #### Resolution Notes
 
@@ -28211,6 +28211,10 @@ As indicated on the mechanical drawing for the 1102 18000kv motor, there are 3 s
 #### Attached Commits
 
 - `3768254b`
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:fdc44925 --> Verify triangular motor strut grooves on drive hub bottom and 3-lobed convex hull body | `python -m pytest projects/tests/test_cat_fountain.py -k test_regression_bug_thoracic_harvestman_529_drive_hub_grooves_and_hull`
 
 #### Resolution Notes
 

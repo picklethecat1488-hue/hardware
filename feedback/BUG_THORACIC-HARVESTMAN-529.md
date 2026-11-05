@@ -24,6 +24,10 @@ As indicated on the mechanical drawing for the 1102 18000kv motor, there are 3 s
 
 - `3768254b`
 
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:fdc44925 --> Verify triangular motor strut grooves on drive hub bottom and 3-lobed convex hull body | `python -m pytest projects/tests/test_cat_fountain.py -k test_regression_bug_thoracic_harvestman_529_drive_hub_grooves_and_hull`
+
 #### Resolution Notes
 
 Add triangular motor strut grooves to drive hub bottom and refactor drive hub body to a 3-lobed convex hull with >=1.5mm wall thickness around all magnets, grooves, and shaft hole.
