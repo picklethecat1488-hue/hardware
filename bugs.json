@@ -8766,7 +8766,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-7",
           "filename": "carrier_board_bom_rev2.csv",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv",
@@ -8775,7 +8775,7 @@
           "created_at": ""
         },
         {
-          "id": "att-2",
+          "id": "att-8",
           "filename": "carrier_board_bom_rev3.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
@@ -9308,7 +9308,7 @@
         }
       ],
       "created_at": "2026-11-05 14:49:40 UTC",
-      "updated_at": "2026-11-05 23:54:14 UTC",
+      "updated_at": "",
       "resolved_at": "2026-11-05 17:04:16 UTC",
       "resolution_notes": "Replaced slide-in guide rail system for hole-less PCBs with axial snap-socket frame featuring an internal perimeter snap groove and entrance lead-in chamfer, eliminating micro-gaps and assembly collision with current sensor.",
       "rejection_notes": "",
@@ -9348,10 +9348,12 @@
           "created_at": ""
         }
       ],
-      "commit_ids": [],
+      "commit_ids": [
+        "7185e819"
+      ],
       "review_tasks": [],
       "created_at": "2026-11-05 14:54:50 UTC",
-      "updated_at": "",
+      "updated_at": "2026-11-05 23:54:18 UTC",
       "resolved_at": "2026-11-05 17:09:52 UTC",
       "resolution_notes": "Simplify motor base to a circle unioned with a hall sensor mounting rectangle fitting into socket wall keyway gap; ensure 3 mounting holes on bottom; remove latent south slide cut and extra box above hall sensor in bowl.",
       "rejection_notes": "",
@@ -9374,20 +9376,20 @@
       "attachments": [
         {
           "id": "att-2",
-          "filename": "screenshot_paste_1793891379527_mc2d2.png",
-          "file_type": "screenshot",
-          "file_path": "attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891379527_mc2d2.png",
-          "size_bytes": 0,
-          "description": "Pasted screenshot screenshot_paste_1793891379527_mc2d2.png",
-          "created_at": ""
-        },
-        {
-          "id": "att-2",
           "filename": "screenshot_paste_1793891547400_gyg0h.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891547400_gyg0h.png",
           "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793891547400_gyg0h.png",
+          "created_at": ""
+        },
+        {
+          "id": "att-1",
+          "filename": "screenshot_paste_1793891379527_mc2d2.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891379527_mc2d2.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1793891379527_mc2d2.png",
           "created_at": ""
         }
       ],
@@ -9402,5 +9404,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 23:54:14 UTC"
+  "updated_at": "2026-11-05 23:54:18 UTC"
 }

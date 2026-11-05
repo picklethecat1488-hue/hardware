@@ -26,6 +26,10 @@ Defects circled in red.
 | `screenshot` | [screenshot_paste_1793890911006_wvg54.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png) | Pasted screenshot screenshot_paste_1793890911006_wvg54.png |
 | `screenshot` | [screenshot_paste_1793890876309_0c9ae.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png) | Pasted screenshot screenshot_paste_1793890876309_0c9ae.png |
 
+#### Attached Commits
+
+- `7185e819`
+
 #### Resolution Notes
 
 Simplify motor base to a circle unioned with a hall sensor mounting rectangle fitting into socket wall keyway gap; ensure 3 mounting holes on bottom; remove latent south slide cut and extra box above hall sensor in bowl.
