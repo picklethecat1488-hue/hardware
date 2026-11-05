@@ -8712,7 +8712,7 @@
       "logs": "",
       "attachments": [
         {
-          "id": "att-3",
+          "id": "att-1",
           "filename": "carrier_board_bom_rev3.csv",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv",
@@ -8721,7 +8721,7 @@
           "created_at": ""
         },
         {
-          "id": "att-4",
+          "id": "att-2",
           "filename": "digikey_order_2026-10-14.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx",
@@ -8730,25 +8730,7 @@
           "created_at": ""
         },
         {
-          "id": "att-5",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
-          "size_bytes": 0,
-          "description": "Uploaded reference questions spreadsheet from PCBWay",
-          "created_at": ""
-        },
-        {
-          "id": "att-6",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
-          "size_bytes": 0,
-          "description": "Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16",
-          "created_at": ""
-        },
-        {
-          "id": "att-7",
+          "id": "att-3",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
@@ -8757,7 +8739,7 @@
           "created_at": ""
         },
         {
-          "id": "att-8",
+          "id": "att-4",
           "filename": "carrier_board_bom_rev2.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
@@ -8766,7 +8748,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-5",
           "filename": "carrier_board_bom_rev2.csv",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv",
@@ -8775,12 +8757,30 @@
           "created_at": ""
         },
         {
-          "id": "att-2",
+          "id": "att-6",
           "filename": "carrier_board_bom_rev3.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
           "size_bytes": 0,
           "description": "Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM)",
+          "created_at": ""
+        },
+        {
+          "id": "att-7",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
+          "size_bytes": 0,
+          "description": "Uploaded reference questions spreadsheet from PCBWay",
+          "created_at": ""
+        },
+        {
+          "id": "att-8",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
+          "size_bytes": 0,
+          "description": "Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16",
           "created_at": ""
         }
       ],
@@ -8953,19 +8953,19 @@
       "logs": "",
       "attachments": [
         {
-          "id": "att-2",
-          "filename": "clipboard_text_1792279938306.txt",
+          "id": "att-1",
+          "filename": "clipboard_text_1792279899940.txt",
           "file_type": "document",
-          "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279938306.txt",
+          "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279899940.txt",
           "size_bytes": 0,
           "description": "Pasted text document",
           "created_at": ""
         },
         {
-          "id": "att-1",
-          "filename": "clipboard_text_1792279899940.txt",
+          "id": "att-2",
+          "filename": "clipboard_text_1792279938306.txt",
           "file_type": "document",
-          "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279899940.txt",
+          "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279938306.txt",
           "size_bytes": 0,
           "description": "Pasted text document",
           "created_at": ""
@@ -9362,5 +9362,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 15:14:03 UTC"
+  "updated_at": "2026-11-05 15:16:04 UTC"
 }
