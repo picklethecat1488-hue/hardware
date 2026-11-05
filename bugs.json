@@ -9331,21 +9331,11 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [
-        {
-          "id": "40820920",
-          "filename": "clipboard_text_1793891371006.txt",
-          "file_type": "document",
-          "file_path": "attachments/BUG-THORACIC-HARVESTMAN-529/clipboard_text_1793891371006.txt",
-          "size_bytes": 520,
-          "description": "Pasted text document",
-          "created_at": "2026-11-05 15:09:31 UTC"
-        }
-      ],
+      "attachments": [],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-05 15:06:09 UTC",
-      "updated_at": "2026-11-05 15:09:31 UTC",
+      "updated_at": "2026-11-05 15:09:42 UTC",
       "resolved_at": null,
       "resolution_notes": "",
       "rejection_notes": null,
@@ -9353,5 +9343,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 15:09:31 UTC"
+  "updated_at": "2026-11-05 15:09:42 UTC"
 }
