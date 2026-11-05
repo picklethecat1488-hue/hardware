@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-05 14:49:07 UTC` |
+| **Report Date** | `2026-11-05 14:49:19 UTC` |
 | **Total Issues** | `310` |
 | **Open Issues** | `3` |
 | **Resolved / Closed** | `307 (99%)` |
@@ -341,7 +341,7 @@
 - [x] **`[HIGH]`** [#BUG-POLLEN-BACKSWIMMER-846](#bug-pollen-backswimmer-846): TMC6300-clip on mounts are too big `[cat_fountain]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-SWARMING-CICADA-917](#bug-swarming-cicada-917): Replace motor room mount halls with clip mounts `[cat_fountain]` (`CLOSED`)
 - [x] **`[LOW]`** [#BUG-PINCERED-CADDISFLY-769](#bug-pincered-caddisfly-769): Add clip on mount for SWD header `[cat_fountain]` (`CLOSED`)
-- [ ] **`[MEDIUM]`** [#BUG-SPECKLED-ROVEBEETLE-352](#bug-speckled-rovebeetle-352): Sensor shield on inner bowl wall is too complicated `[cat_fountain]` (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-SPECKLED-ROVEBEETLE-352](#bug-speckled-rovebeetle-352): Sensor shield design on inner bowl wall is too complicated `[cat_fountain]` (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -28045,7 +28045,7 @@ Added clip-on mounting boss for Treedix JTAG/SWD Breakout Board Adapter (19.1x13
 
 ---
 
-### <a id="bug-speckled-rovebeetle-352"></a> 🔴 `[BUG-SPECKLED-ROVEBEETLE-352]` Sensor shield on inner bowl wall is too complicated
+### <a id="bug-speckled-rovebeetle-352"></a> 🔴 `[BUG-SPECKLED-ROVEBEETLE-352]` Sensor shield design on inner bowl wall is too complicated
 
 - **UUID**: `e4f40739-f0ba-495c-9426-ad99f73a67d0`
 - **Status**: `OPEN`

@@ -1,4 +1,4 @@
-# 🔴 `[BUG-SPECKLED-ROVEBEETLE-352]` Sensor shield on inner bowl wall is too complicated
+# 🔴 `[BUG-SPECKLED-ROVEBEETLE-352]` Sensor shield design on inner bowl wall is too complicated
 
 - **UUID**: `e4f40739-f0ba-495c-9426-ad99f73a67d0`
 - **ID**: `BUG-SPECKLED-ROVEBEETLE-352`
