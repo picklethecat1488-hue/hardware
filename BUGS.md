@@ -6,9 +6,9 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-05 14:54:30 UTC` |
-| **Total Issues** | `311` |
-| **Open Issues** | `4` |
+| **Report Date** | `2026-11-05 14:54:52 UTC` |
+| **Total Issues** | `312` |
+| **Open Issues** | `5` |
 | **Resolved / Closed** | `307 (98%)` |
 
 ## Issues by Severity
@@ -17,14 +17,14 @@
 | :--- | :---: | :--- |
 | **`[CRITICAL]`** | 20 | System crashes, build failures, blockages, or electrical shorts. |
 | **`[HIGH]`** | 30 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
-| **`[MEDIUM]`** | 233 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
+| **`[MEDIUM]`** | 234 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
 | **`[LOW]`** | 28 | Minor aesthetic imperfections or documentation notes. |
 
 ## Issues by Category
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 171 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`PCB`** | 172 | Schematics, routing, footprints, nets, DRC, silkscreen. |
 | **`CAD`** | 34 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 11 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
 | **`INFRASTRUCTURE`** | 83 | Build tooling, compilers, test runners, headless tools. |
@@ -343,6 +343,7 @@
 - [x] **`[LOW]`** [#BUG-PINCERED-CADDISFLY-769](#bug-pincered-caddisfly-769): Add clip on mount for SWD header `[cat_fountain]` (`CLOSED`)
 - [ ] **`[MEDIUM]`** [#BUG-SPECKLED-ROVEBEETLE-352](#bug-speckled-rovebeetle-352): Sensor shield design on inner bowl wall is too complicated `[cat_fountain]` (`OPEN`)
 - [ ] **`[MEDIUM]`** [#BUG-STINGING-LACEWING-799](#bug-stinging-lacewing-799): Mounting system for hole-less PCBs is too complicated (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-LUSTROUS-COCOON-669](#bug-lustrous-cocoon-669): New Bug Report (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -28088,5 +28089,15 @@ Giving the TMC6300 mounting system as an example below, there are micro-gaps bet
 | Type | Filename | Description |
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1793890436150_8301p.png](attachments/BUG-STINGING-LACEWING-799/screenshot_paste_1793890436150_8301p.png) | Pasted screenshot screenshot_paste_1793890436150_8301p.png |
+
+---
+
+### <a id="bug-lustrous-cocoon-669"></a> 🔴 `[BUG-LUSTROUS-COCOON-669]` New Bug Report
+
+- **UUID**: `13875eb9-23cd-4e48-8250-856f02d7bfa1`
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-11-05 14:54:50 UTC`
 
 ---
