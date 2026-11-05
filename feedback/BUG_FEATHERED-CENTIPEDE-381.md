@@ -13,6 +13,10 @@
 
 IDK why this is, but saving and updating bugs takes extremely long now...
 
+#### Attached Commits
+
+- `95811f16`
+
 #### Resolution Notes
 
 Optimized bug persistence and detached branch commits: 1) Batch git index updates via 'git update-index --index-info' instead of per-bug subprocess calls; 2) In-memory SHA-1 computation and direct blob persistence; 3) Incremental dirty bug saving in SQLite and markdown exporter; reducing save times from >12s to sub-second.
