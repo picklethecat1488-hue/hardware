@@ -173,3 +173,18 @@ body {
   z-index: 99999;
   pointer-events: none;
 }
+
+/* Iframe Context & Nested Border Prevention (BUG-BARBED-MIDGE-630) */
+html.in-iframe,
+body.in-iframe,
+html.in-iframe body {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+html.in-iframe .window-resize-gripper,
+body.in-iframe .window-resize-gripper,
+.in-iframe .window-resize-gripper {
+  display: none !important;
+}
+

@@ -3453,3 +3453,36 @@ def test_diff_view_optimizations_polling_and_file_priority() -> None:
         "conflicts[0]?.path || staged[0]?.path || unstaged[0]?.path || untracked[0]?.path || lfs[0]?.path ||"
         " feedback[0]?.path;" in tpl_text
     )
+
+
+def test_regression_bug_barbed_midge_630_iframe_border_prevention() -> None:
+    """Verify BUG-BARBED-MIDGE-630: nested borders and resize grippers are suppressed when embedded in iframes."""
+    static_css = Path(__file__).resolve().parent.parent / "provider" / "code_review" / "static" / "common.css"
+    css_content = static_css.read_text(encoding="utf-8")
+    assert "html.in-iframe" in css_content
+    assert "body.in-iframe" in css_content
+    assert "border: none !important;" in css_content
+    assert "box-shadow: none !important;" in css_content
+    assert "display: none !important;" in css_content
+
+    tpl_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    for tmpl in ["diff_view.html.j2", "code_review.html.j2", "bug_report.html.j2"]:
+        content = (tpl_dir / tmpl).read_text(encoding="utf-8")
+        assert "html.in-iframe" in content, f"{tmpl} missing html.in-iframe style rule"
+        assert "body.in-iframe" in content, f"{tmpl} missing body.in-iframe style rule"
+        assert 'document.documentElement.classList.add("in-iframe");' in content, (
+            f"{tmpl} missing iframe class detection script"
+        )
+
+    # Frame busting in diff_view.html.j2 to prevent multi-level nested diff views
+    diff_text = (tpl_dir / "diff_view.html.j2").read_text(encoding="utf-8")
+    assert "if (window.top && window.top !== window)" in diff_text
+    assert "window.top.location.href = window.location.href;" in diff_text
+
+    # Top target navigation in code review and bug report close buttons
+    cr_text = (tpl_dir / "code_review.html.j2").read_text(encoding="utf-8")
+    bug_text = (tpl_dir / "bug_report.html.j2").read_text(encoding="utf-8")
+    assert 'target="hardware_vcs_diff_viewer"' in cr_text
+    assert 'target="hardware_vcs_diff_viewer"' in bug_text
+    assert "window.top.location.href = " in cr_text
+    assert "window.top.location.href = " in bug_text

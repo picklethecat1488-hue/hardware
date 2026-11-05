@@ -16,6 +16,14 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
   <link rel="shortcut icon" href="/static/favicon.ico">
   <link rel="stylesheet" href="/static/common.css">
+  <script>
+    if (window.self !== window.top) {
+      document.documentElement.classList.add("in-iframe");
+      window.addEventListener("DOMContentLoaded", () => {
+        if (document.body) document.body.classList.add("in-iframe");
+      });
+    }
+  </script>
   <style>
     html { font-size: 80%; }
     /* =========================================================
@@ -68,6 +76,18 @@
       overflow: hidden;
       border: 2px solid var(--quake-border-mid);
       box-shadow: inset 0 0 0 1px rgba(255, 184, 0, 0.2), 0 0 10px rgba(200, 122, 50, 0.1);
+    }
+
+    html.in-iframe,
+    html.in-iframe body,
+    body.in-iframe {
+      border: none !important;
+      box-shadow: none !important;
+    }
+    html.in-iframe .window-resize-gripper,
+    body.in-iframe .window-resize-gripper,
+    .in-iframe .window-resize-gripper {
+      display: none !important;
     }
 
     /* Window Resize Gripper (WORM-027) */
@@ -1621,7 +1641,11 @@
         window.opener.focus();
         window.close();
       } else {
-        window.location.href = "/";
+        if (window.top && window.top !== window) {
+          window.top.location.href = "/";
+        } else {
+          window.location.href = "/";
+        }
       }
       try {
         window.parent.postMessage({ action: "close_workstation", type: "close_modal" }, "*");
