@@ -23,6 +23,10 @@ The sensor shield on the inner bowl wall is too complicated. The shape should be
 
 - `5821d84e`
 
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:e2b5ae71 --> Verify simplified extruded hollow rectangle proximity sensor shield and no bottom cover collision | `python -m pytest projects/tests/test_cat_fountain.py -k test_regression_bug_springing_mosquito_703_proximity_sensor_inner_wall_extension`
+
 #### Resolution Notes
 
 Simplify proximity sensor shield on inner bowl wall to an extruded hollow rectangle centered on pocket opening, eliminating inner lip and protruding tails.

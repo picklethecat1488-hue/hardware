@@ -8749,24 +8749,6 @@
         },
         {
           "id": "att-7",
-          "filename": "carrier_board_bom_rev3.csv",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv",
-          "size_bytes": 0,
-          "description": "CSV export of clean EDA BOM Rev 3",
-          "created_at": ""
-        },
-        {
-          "id": "att-8",
-          "filename": "digikey_order_2026-10-14.xlsx",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx",
-          "size_bytes": 0,
-          "description": "Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2)",
-          "created_at": ""
-        },
-        {
-          "id": "att-7",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
@@ -8781,6 +8763,24 @@
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
           "size_bytes": 0,
           "description": "Clean EDA export BOM generated directly from updated carrier board model",
+          "created_at": ""
+        },
+        {
+          "id": "att-5",
+          "filename": "carrier_board_bom_rev3.csv",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv",
+          "size_bytes": 0,
+          "description": "CSV export of clean EDA BOM Rev 3",
+          "created_at": ""
+        },
+        {
+          "id": "att-6",
+          "filename": "digikey_order_2026-10-14.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx",
+          "size_bytes": 0,
+          "description": "Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2)",
           "created_at": ""
         }
       ],
@@ -9254,9 +9254,17 @@
       "commit_ids": [
         "5821d84e"
       ],
-      "review_tasks": [],
+      "review_tasks": [
+        {
+          "id": "e2b5ae71",
+          "title": "Verify simplified extruded hollow rectangle proximity sensor shield and no bottom cover collision",
+          "command": "python -m pytest projects/tests/test_cat_fountain.py -k test_regression_bug_springing_mosquito_703_proximity_sensor_inner_wall_extension",
+          "status": "PENDING",
+          "notes": ""
+        }
+      ],
       "created_at": "2026-11-05 14:44:07 UTC",
-      "updated_at": "2026-11-05 23:53:56 UTC",
+      "updated_at": "2026-11-05 23:54:01 UTC",
       "resolved_at": "2026-11-05 16:25:54 UTC",
       "resolution_notes": "Simplify proximity sensor shield on inner bowl wall to an extruded hollow rectangle centered on pocket opening, eliminating inner lip and protruding tails.",
       "rejection_notes": "",
@@ -9364,7 +9372,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-2",
           "filename": "screenshot_paste_1793891379527_mc2d2.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891379527_mc2d2.png",
@@ -9384,5 +9392,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 23:53:56 UTC"
+  "updated_at": "2026-11-05 23:54:01 UTC"
 }
