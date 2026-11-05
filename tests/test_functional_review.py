@@ -5,6 +5,7 @@ from pathlib import Path
 import sqlite3
 import subprocess
 import threading
+import time
 import urllib.request
 import pytest
 
@@ -723,3 +724,72 @@ def test_api_migrate_legacy_bugs(tmp_path: Path) -> None:
         server.server_close()
         server.shutdown()
         t.join(timeout=2.0)
+
+
+def test_bug_server_fast_incremental_save_regression(tmp_path: Path) -> None:
+    """Verify incremental dirty bug save and detached branch commits execute in sub-second time.
+
+    Guards against regression BUG-FEATHERED-CENTIPEDE-381 where saving took >10s due to
+    per-bug subprocess spawning across all historical bugs.
+    """
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init", "-b", "main"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "User"], cwd=repo_dir, check=True)
+    subprocess.run(["git", "config", "user.email", "user@workspace"], cwd=repo_dir, check=True)
+    (repo_dir / "README.md").write_text("# Test Repo\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=repo_dir, check=True)
+    subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=repo_dir, check=True, capture_output=True)
+
+    feedback_dir = repo_dir / "feedback"
+    feedback_dir.mkdir(parents=True, exist_ok=True)
+    db_file = repo_dir / "bugs.sqlite"
+
+    # Populate 50 test bugs
+    bugs = [
+        BugReportModel(
+            id=f"BUG-FAST-{i:03d}",
+            title=f"Fast Bug {i}",
+            status=BugStatus.OPEN,
+            severity=BugSeverity.LOW,
+            category=BugCategory.INFRASTRUCTURE,
+        )
+        for i in range(50)
+    ]
+    db = BugDatabaseModel(title="Bench DB", bugs=bugs)
+    store = SQLiteBugStore(db_path=db_file)
+    store.save_database(db)
+
+    server = BugReportServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        feedback_dir=feedback_dir,
+        sqlite_file=db_file,
+    )
+    # Initial full save
+    server.save_and_sync()
+
+    # Now modify one bug and test incremental dirty save performance
+    target_bug = server.database.get_bug("BUG-FAST-010")
+    target_bug.status = BugStatus.RESOLVED
+    target_bug.resolution_notes = "Fixed performance regression"
+
+    t0 = time.perf_counter()
+    server.save_and_sync(dirty_bug_ids=[target_bug.id])
+    elapsed = time.perf_counter() - t0
+
+    assert elapsed < 3.0, f"Incremental save took {elapsed:.2f}s, expected < 3.0s"
+
+    # Verify updated bug is saved in SQLite, markdown, and detached branch
+    reloaded_bug = server.sqlite_store.get_bug("BUG-FAST-010")
+    assert reloaded_bug is not None
+    assert reloaded_bug.status == BugStatus.RESOLVED
+    assert reloaded_bug.resolution_notes == "Fixed performance regression"
+
+    detached_store = DetachedBranchBugStore(repo_dir)
+    loaded_detached = detached_store.load_database()
+    assert loaded_detached is not None
+    detached_target = loaded_detached.get_bug("BUG-FAST-010")
+    assert detached_target is not None
+    assert detached_target.status == BugStatus.RESOLVED

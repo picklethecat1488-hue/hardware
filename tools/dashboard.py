@@ -1079,7 +1079,7 @@ def main(cli_args: Optional[List[str]] = None) -> None:
                 description=args.description,
             )
             server.bug_server.database.add_or_update(bug)
-            server.bug_server.save_and_sync()
+            server.bug_server.save_and_sync(dirty_bug_ids=[bug.id])
             print(f"Registered bug [{bug.id}]: {bug.title} ({bug.severity.value})")
             return
         case "resolve-bug":
@@ -1095,7 +1095,7 @@ def main(cli_args: Optional[List[str]] = None) -> None:
             bug.resolved_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
             if getattr(args, "notes", ""):
                 bug.resolution_notes = args.notes
-            server.bug_server.save_and_sync()
+            server.bug_server.save_and_sync(dirty_bug_ids=[bug.id])
             print(f"Resolved bug [{bug.id}]: {bug.title}")
             return
         case "accept-bug":
@@ -1117,7 +1117,7 @@ def main(cli_args: Optional[List[str]] = None) -> None:
                 else:
                     bug.resolution_notes = f"**Acceptance Note**: {notes}"
             bug.updated_at = now_str
-            server.bug_server.save_and_sync()
+            server.bug_server.save_and_sync(dirty_bug_ids=[bug.id])
             print(f"Accepted and closed bug [{bug.id}]: {bug.title}")
             return
         case "reject-bug":
@@ -1139,7 +1139,7 @@ def main(cli_args: Optional[List[str]] = None) -> None:
             bug.rejected_at = now_str
             bug.rejection_notes = notes
             bug.updated_at = now_str
-            server.bug_server.save_and_sync()
+            server.bug_server.save_and_sync(dirty_bug_ids=[bug.id])
             print(f"Rejected bug [{bug.id}], returned to OPEN: {bug.title}")
             return
         case "attach-commit":
@@ -1158,7 +1158,7 @@ def main(cli_args: Optional[List[str]] = None) -> None:
             if cid not in bug.commit_ids:
                 bug.commit_ids.append(cid)
             bug.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-            server.bug_server.save_and_sync()
+            server.bug_server.save_and_sync(dirty_bug_ids=[bug.id])
             print(f"Attached commit {cid} to [{bug.id}]. Total attached: {len(bug.commit_ids)}")
             return
         case "add-task":
@@ -1178,7 +1178,7 @@ def main(cli_args: Optional[List[str]] = None) -> None:
             task = ReviewTaskModel(title=title, command=cmd)
             bug.review_tasks.append(task)
             bug.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-            server.bug_server.save_and_sync()
+            server.bug_server.save_and_sync(dirty_bug_ids=[bug.id])
             print(f"Added review task [{task.id}] to [{bug.id}]: {task.title}")
             return
         case "resolve-task":
@@ -1213,7 +1213,7 @@ def main(cli_args: Optional[List[str]] = None) -> None:
             if notes:
                 target_task.notes = notes
             bug.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-            server.bug_server.save_and_sync()
+            server.bug_server.save_and_sync(dirty_bug_ids=[bug.id])
             print(f"Updated task [{target_task.id}] on [{bug.id}] -> {target_task.status}")
             return
         case "migrate-resolved-bugs":
@@ -1250,7 +1250,7 @@ def main(cli_args: Optional[List[str]] = None) -> None:
                 migrated_count += 1
 
             if migrated_count > 0:
-                server.bug_server.save_and_sync()
+                server.bug_server.save_and_sync(dirty_bug_ids=[b.id for b in candidates])
 
             print(f"\nSuccessfully migrated {migrated_count} legacy resolved bug(s) to CLOSED status.\n")
             return
