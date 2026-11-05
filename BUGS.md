@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-05 14:54:52 UTC` |
+| **Report Date** | `2026-11-05 15:01:18 UTC` |
 | **Total Issues** | `312` |
 | **Open Issues** | `5` |
 | **Resolved / Closed** | `307 (98%)` |
@@ -16,16 +16,16 @@
 | Severity | Count | Meaning |
 | :--- | :---: | :--- |
 | **`[CRITICAL]`** | 20 | System crashes, build failures, blockages, or electrical shorts. |
-| **`[HIGH]`** | 30 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
-| **`[MEDIUM]`** | 234 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
+| **`[HIGH]`** | 31 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
+| **`[MEDIUM]`** | 233 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
 | **`[LOW]`** | 28 | Minor aesthetic imperfections or documentation notes. |
 
 ## Issues by Category
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 172 | Schematics, routing, footprints, nets, DRC, silkscreen. |
-| **`CAD`** | 34 | 3D geometry, step models, enclosures, mechanical assembly. |
+| **`PCB`** | 171 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`CAD`** | 35 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 11 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
 | **`INFRASTRUCTURE`** | 83 | Build tooling, compilers, test runners, headless tools. |
 | **`UI`** | 2 | Web dashboards, CLI viewers, review interfaces. |
@@ -343,7 +343,7 @@
 - [x] **`[LOW]`** [#BUG-PINCERED-CADDISFLY-769](#bug-pincered-caddisfly-769): Add clip on mount for SWD header `[cat_fountain]` (`CLOSED`)
 - [ ] **`[MEDIUM]`** [#BUG-SPECKLED-ROVEBEETLE-352](#bug-speckled-rovebeetle-352): Sensor shield design on inner bowl wall is too complicated `[cat_fountain]` (`OPEN`)
 - [ ] **`[MEDIUM]`** [#BUG-STINGING-LACEWING-799](#bug-stinging-lacewing-799): Mounting system for hole-less PCBs is too complicated (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-LUSTROUS-COCOON-669](#bug-lustrous-cocoon-669): New Bug Report (`OPEN`)
+- [ ] **`[HIGH]`** [#BUG-LUSTROUS-COCOON-669](#bug-lustrous-cocoon-669): Motor base design is way too complicated `[cat_fountain]` (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -28092,12 +28092,29 @@ Giving the TMC6300 mounting system as an example below, there are micro-gaps bet
 
 ---
 
-### <a id="bug-lustrous-cocoon-669"></a> 🔴 `[BUG-LUSTROUS-COCOON-669]` New Bug Report
+### <a id="bug-lustrous-cocoon-669"></a> 🔴 `[BUG-LUSTROUS-COCOON-669]` Motor base design is way too complicated
 
 - **UUID**: `13875eb9-23cd-4e48-8250-856f02d7bfa1`
 - **Status**: `OPEN`
-- **Severity**: `MEDIUM`
-- **Category**: `PCB`
+- **Severity**: `HIGH`
+- **Category**: `CAD`
+- **Component**: `cat_fountain`
 - **Created**: `2026-11-05 14:54:50 UTC`
+
+#### Description
+
+The design of the motor base is way too complicated. The overall design should be a circle unioned with a rectangle to mount the hall sensor on. The hall sensor mount should fit into a gap in the motor wall to prevent rotation during spinning. 
+
+There should be a total of 3 mounting holes on the bottom. All cabling can be routed through the opening on the side of the motor wall created for the hall sensor.
+
+Additionally, there’s latent cuts in the bottom of the bowl from when the drive hub had to slide in from the side that need to be removed, as well as an extra box above the hall sensor mounting point.
+
+Defects circled in red.
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [screenshot_paste_1793890876309_0c9ae.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png) | Pasted screenshot screenshot_paste_1793890876309_0c9ae.png |
 
 ---

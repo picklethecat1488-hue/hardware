@@ -9278,21 +9278,31 @@
     {
       "id": "BUG-LUSTROUS-COCOON-669",
       "uuid": "13875eb9-23cd-4e48-8250-856f02d7bfa1",
-      "title": "New Bug Report",
+      "title": "Motor base design is way too complicated",
       "status": "OPEN",
-      "severity": "MEDIUM",
-      "category": "PCB",
-      "component": "",
-      "description": "",
+      "severity": "HIGH",
+      "category": "CAD",
+      "component": "cat_fountain",
+      "description": "The design of the motor base is way too complicated. The overall design should be a circle unioned with a rectangle to mount the hall sensor on. The hall sensor mount should fit into a gap in the motor wall to prevent rotation during spinning. \n\nThere should be a total of 3 mounting holes on the bottom. All cabling can be routed through the opening on the side of the motor wall created for the hall sensor.\n\nAdditionally, there’s latent cuts in the bottom of the bowl from when the drive hub had to slide in from the side that need to be removed, as well as an extra box above the hall sensor mounting point.\n\nDefects circled in red.",
       "reproduction_steps": [],
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "09e303b3",
+          "filename": "screenshot_paste_1793890876309_0c9ae.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png",
+          "size_bytes": 318112,
+          "description": "Pasted screenshot screenshot_paste_1793890876309_0c9ae.png",
+          "created_at": "2026-11-05 15:01:16 UTC"
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-05 14:54:50 UTC",
-      "updated_at": "2026-11-05 14:54:50 UTC",
+      "updated_at": "2026-11-05 15:01:16 UTC",
       "resolved_at": null,
       "resolution_notes": "",
       "rejection_notes": null,
@@ -9300,5 +9310,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 14:54:50 UTC"
+  "updated_at": "2026-11-05 15:01:16 UTC"
 }
