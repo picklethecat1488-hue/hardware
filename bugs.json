@@ -4,7 +4,7 @@
   "bugs": [
     {
       "id": "BUG-OPEN-003",
-      "uuid": "5b38bfdc-5c3b-4984-b0b5-85f18f2ced37",
+      "uuid": "3ec2d5b8-35ac-412b-9fae-2d91a05391c1",
       "title": "Open defect",
       "status": "OPEN",
       "severity": "LOW",
@@ -18,7 +18,7 @@
       "attachments": [],
       "commit_ids": [],
       "review_tasks": [],
-      "created_at": "2026-11-05 15:28:52 UTC",
+      "created_at": "",
       "updated_at": "",
       "resolved_at": null,
       "resolution_notes": "",
@@ -28,7 +28,7 @@
     },
     {
       "id": "BUG-LEGACY-001",
-      "uuid": "305daf9c-8dd5-4545-844d-5ea8a706b7e7",
+      "uuid": "d42d2571-2e63-4188-a7f6-8112588f68e4",
       "title": "Legacy resolved bug",
       "status": "CLOSED",
       "severity": "MEDIUM",
@@ -43,7 +43,7 @@
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-01 10:00:00 UTC",
-      "updated_at": "",
+      "updated_at": "2026-11-05 15:29:16 UTC",
       "resolved_at": "2026-09-01 12:00:00 UTC",
       "resolution_notes": "",
       "rejection_notes": "",
@@ -52,9 +52,9 @@
     },
     {
       "id": "BUG-RECENT-002",
-      "uuid": "958fff61-d311-45ab-ae79-38741c39b0fa",
+      "uuid": "ff4db370-6188-419d-b76e-dfdbb71d792d",
       "title": "Recently resolved bug awaiting review",
-      "status": "CLOSED",
+      "status": "RESOLVED",
       "severity": "HIGH",
       "category": "CAD",
       "component": "",
@@ -71,9 +71,9 @@
       "resolved_at": "2026-11-05 14:20:00 UTC",
       "resolution_notes": "",
       "rejection_notes": "",
-      "accepted_at": "2026-11-05 14:20:00 UTC",
+      "accepted_at": null,
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 15:28:53 UTC"
+  "updated_at": "2026-11-05 15:29:16 UTC"
 }
