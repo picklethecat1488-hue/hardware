@@ -246,14 +246,20 @@
 
   .diff-sbs-row.row-delete td.old-code,
   .diff-sbs-row.row-delete td.old-lineno,
-  .diff-sbs-row.row-delete td.old-marker {
+  .diff-sbs-row.row-delete td.old-marker,
+  .diff-sbs-row.row-del td.old-code,
+  .diff-sbs-row.row-del td.old-lineno,
+  .diff-sbs-row.row-del td.old-marker {
     background: rgba(239, 68, 68, 0.22);
     color: #fca5a5;
   }
 
   .diff-sbs-row.row-insert td.new-code,
   .diff-sbs-row.row-insert td.new-lineno,
-  .diff-sbs-row.row-insert td.new-marker {
+  .diff-sbs-row.row-insert td.new-marker,
+  .diff-sbs-row.row-add td.new-code,
+  .diff-sbs-row.row-add td.new-lineno,
+  .diff-sbs-row.row-add td.new-marker {
     background: rgba(34, 197, 94, 0.22);
     color: #86efac;
   }
@@ -339,15 +345,27 @@
   }
 
   .diff-unified-row.add,
-  .diff-unified-row.insert {
+  .diff-unified-row.insert,
+  .diff-unified-row.row-add,
+  .diff-unified-row.row-insert {
     background: rgba(34, 197, 94, 0.22);
     color: #86efac;
   }
   .diff-unified-row.del,
-  .diff-unified-row.delete {
+  .diff-unified-row.delete,
+  .diff-unified-row.row-del,
+  .diff-unified-row.row-delete {
     background: rgba(239, 68, 68, 0.22);
     color: #fca5a5;
   }
+  .diff-unified-row.del .diff-unified-marker,
+  .diff-unified-row.delete .diff-unified-marker,
+  .diff-unified-row.row-del .diff-unified-marker,
+  .diff-unified-row.row-delete .diff-unified-marker { color: #fca5a5; }
+  .diff-unified-row.add .diff-unified-marker,
+  .diff-unified-row.insert .diff-unified-marker,
+  .diff-unified-row.row-add .diff-unified-marker,
+  .diff-unified-row.row-insert .diff-unified-marker { color: #86efac; }
 
   /* Binary Diff Presentation */
   .diff-binary-box {
