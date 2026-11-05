@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-05 14:43:41 UTC` |
+| **Report Date** | `2026-11-05 14:44:00 UTC` |
 | **Total Issues** | `3` |
 | **Open Issues** | `1` |
 | **Resolved / Closed** | `2 (66%)` |
@@ -34,23 +34,22 @@
 
 - [ ] **`[LOW]`** [#BUG-OPEN-003](#bug-open-003): Open defect (`OPEN`)
 - [x] **`[MEDIUM]`** [#BUG-LEGACY-001](#bug-legacy-001): Legacy resolved bug (`CLOSED`)
-- [x] **`[HIGH]`** [#BUG-RECENT-002](#bug-recent-002): Recently resolved bug awaiting review (`CLOSED`)
+- [x] **`[HIGH]`** [#BUG-RECENT-002](#bug-recent-002): Recently resolved bug awaiting review (`RESOLVED`)
 
 ## Detailed Issue Log
 
 ### <a id="bug-open-003"></a> 🔴 `[BUG-OPEN-003]` Open defect
 
-- **UUID**: `eb36c77c-dc0a-4d58-8638-cf39b31ba64d`
+- **UUID**: `804418ea-94dc-4375-8321-fa80e9fb8152`
 - **Status**: `OPEN`
 - **Severity**: `LOW`
 - **Category**: `UI`
-- **Created**: `2026-11-05 14:41:44 UTC`
 
 ---
 
 ### <a id="bug-legacy-001"></a> 🟢 `[BUG-LEGACY-001]` Legacy resolved bug
 
-- **UUID**: `485b0281-9a91-4797-8083-9c40eda0ddea`
+- **UUID**: `83ae7912-42c7-4f6e-9ef5-ba7989dfb27d`
 - **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
@@ -62,12 +61,11 @@
 
 ### <a id="bug-recent-002"></a> 🟢 `[BUG-RECENT-002]` Recently resolved bug awaiting review
 
-- **UUID**: `9fe62658-64d4-4b22-9bad-258460102246`
-- **Status**: `CLOSED`
+- **UUID**: `5864db04-660b-42a0-b7c9-3bf38a80854f`
+- **Status**: `RESOLVED`
 - **Severity**: `HIGH`
 - **Category**: `CAD`
 - **Created**: `2026-11-05 14:15:00 UTC`
 - **Resolved**: `2026-11-05 14:20:00 UTC`
-- **Accepted**: `2026-11-05 14:20:00 UTC`
 
 ---
