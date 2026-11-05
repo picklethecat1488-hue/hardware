@@ -8749,24 +8749,6 @@
         },
         {
           "id": "att-7",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
-          "size_bytes": 0,
-          "description": "Legacy Excel 97-2004 format of replied quotation BOM",
-          "created_at": ""
-        },
-        {
-          "id": "att-8",
-          "filename": "carrier_board_bom_rev2.xlsx",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
-          "size_bytes": 0,
-          "description": "Clean EDA export BOM generated directly from updated carrier board model",
-          "created_at": ""
-        },
-        {
-          "id": "att-1",
           "filename": "carrier_board_bom_rev2.csv",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv",
@@ -8775,12 +8757,30 @@
           "created_at": ""
         },
         {
-          "id": "att-2",
+          "id": "att-8",
           "filename": "carrier_board_bom_rev3.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
           "size_bytes": 0,
           "description": "Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM)",
+          "created_at": ""
+        },
+        {
+          "id": "att-5",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
+          "size_bytes": 0,
+          "description": "Legacy Excel 97-2004 format of replied quotation BOM",
+          "created_at": ""
+        },
+        {
+          "id": "att-6",
+          "filename": "carrier_board_bom_rev2.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
+          "size_bytes": 0,
+          "description": "Clean EDA export BOM generated directly from updated carrier board model",
           "created_at": ""
         }
       ],
@@ -8954,18 +8954,18 @@
       "attachments": [
         {
           "id": "att-2",
-          "filename": "clipboard_text_1792279938306.txt",
+          "filename": "clipboard_text_1792279899940.txt",
           "file_type": "document",
-          "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279938306.txt",
+          "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279899940.txt",
           "size_bytes": 0,
           "description": "Pasted text document",
           "created_at": ""
         },
         {
           "id": "att-1",
-          "filename": "clipboard_text_1792279899940.txt",
+          "filename": "clipboard_text_1792279938306.txt",
           "file_type": "document",
-          "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279899940.txt",
+          "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279938306.txt",
           "size_bytes": 0,
           "description": "Pasted text document",
           "created_at": ""
@@ -9222,19 +9222,19 @@
       "logs": "",
       "attachments": [
         {
-          "id": "76d0436b",
+          "id": "att-1",
           "filename": "screenshot_paste_1793890121106_n89dw.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-SPECKLED-ROVEBEETLE-352/screenshot_paste_1793890121106_n89dw.png",
-          "size_bytes": 177523,
+          "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793890121106_n89dw.png",
-          "created_at": "2026-11-05 14:48:41 UTC"
+          "created_at": ""
         }
       ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-05 14:44:07 UTC",
-      "updated_at": "2026-11-05 15:05:58 UTC",
+      "updated_at": "",
       "resolved_at": "2026-11-05 16:25:54 UTC",
       "resolution_notes": "Simplify proximity sensor shield on inner bowl wall to an extruded hollow rectangle centered on pocket opening, eliminating inner lip and protruding tails.",
       "rejection_notes": "",
@@ -9245,7 +9245,7 @@
       "id": "BUG-STINGING-LACEWING-799",
       "uuid": "1843fe5a-0485-4e4c-a4e0-f555e9af7e1a",
       "title": "Mounting system for hole-less PCBs is too complicated",
-      "status": "OPEN",
+      "status": "RESOLVED",
       "severity": "MEDIUM",
       "category": "CAD",
       "component": "cat_fountain",
@@ -9269,8 +9269,8 @@
       "review_tasks": [],
       "created_at": "2026-11-05 14:49:40 UTC",
       "updated_at": "2026-11-05 15:02:26 UTC",
-      "resolved_at": null,
-      "resolution_notes": "",
+      "resolved_at": "2026-11-05 17:04:16 UTC",
+      "resolution_notes": "Replaced slide-in guide rail system for hole-less PCBs with axial snap-socket frame featuring an internal perimeter snap groove and entrance lead-in chamfer, eliminating micro-gaps and assembly collision with current sensor.",
       "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
@@ -9362,5 +9362,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 16:25:54 UTC"
+  "updated_at": "2026-11-05 17:04:16 UTC"
 }

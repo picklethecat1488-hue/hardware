@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-05 16:25:55 UTC` |
+| **Report Date** | `2026-11-05 17:04:16 UTC` |
 | **Total Issues** | `313` |
-| **Open Issues** | `3` |
-| **Resolved / Closed** | `310 (99%)` |
+| **Open Issues** | `2` |
+| **Resolved / Closed** | `311 (99%)` |
 
 ## Issues by Severity
 
@@ -342,7 +342,7 @@
 - [x] **`[MEDIUM]`** [#BUG-SWARMING-CICADA-917](#bug-swarming-cicada-917): Replace motor room mount halls with clip mounts `[cat_fountain]` (`CLOSED`)
 - [x] **`[LOW]`** [#BUG-PINCERED-CADDISFLY-769](#bug-pincered-caddisfly-769): Add clip on mount for SWD header `[cat_fountain]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-SPECKLED-ROVEBEETLE-352](#bug-speckled-rovebeetle-352): Sensor shield design on inner bowl wall is too complicated `[cat_fountain]` (`RESOLVED`)
-- [ ] **`[MEDIUM]`** [#BUG-STINGING-LACEWING-799](#bug-stinging-lacewing-799): Mounting system for hole-less PCBs is too complicated `[cat_fountain]` (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-STINGING-LACEWING-799](#bug-stinging-lacewing-799): Mounting system for hole-less PCBs is too complicated `[cat_fountain]` (`RESOLVED`)
 - [ ] **`[HIGH]`** [#BUG-LUSTROUS-COCOON-669](#bug-lustrous-cocoon-669): Motor base design is way too complicated `[cat_fountain]` (`OPEN`)
 - [ ] **`[MEDIUM]`** [#BUG-THORACIC-HARVESTMAN-529](#bug-thoracic-harvestman-529): Add grooves for triangular motor struts to drive hub `[cat_fountain]` (`OPEN`)
 
@@ -27567,10 +27567,10 @@ Pls see attached, we should plan to consign all remaining components to them exc
 | `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx) | Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16 |
 | `reference` | [carrier_board_bom_rev3.csv](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv) | CSV export of clean EDA BOM Rev 3 |
 | `reference` | [digikey_order_2026-10-14.xlsx](attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx) | Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2) |
-| `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls) | Legacy Excel 97-2004 format of replied quotation BOM |
-| `reference` | [carrier_board_bom_rev2.xlsx](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx) | Clean EDA export BOM generated directly from updated carrier board model |
 | `reference` | [carrier_board_bom_rev2.csv](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv) | CSV export of clean EDA BOM |
 | `reference` | [carrier_board_bom_rev3.xlsx](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx) | Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM) |
+| `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls) | Legacy Excel 97-2004 format of replied quotation BOM |
+| `reference` | [carrier_board_bom_rev2.xlsx](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx) | Clean EDA export BOM generated directly from updated carrier board model |
 
 #### Resolution Notes
 
@@ -27743,8 +27743,8 @@ See attachments below. Both nightly license compliance and CI jobs are failing
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
-| `document` | [clipboard_text_1792279938306.txt](attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279938306.txt) | Pasted text document |
 | `document` | [clipboard_text_1792279899940.txt](attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279899940.txt) | Pasted text document |
+| `document` | [clipboard_text_1792279938306.txt](attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279938306.txt) | Pasted text document |
 
 #### Resolution Notes
 
@@ -28088,14 +28088,15 @@ Simplify proximity sensor shield on inner bowl wall to an extruded hollow rectan
 
 ---
 
-### <a id="bug-stinging-lacewing-799"></a> 🔴 `[BUG-STINGING-LACEWING-799]` Mounting system for hole-less PCBs is too complicated
+### <a id="bug-stinging-lacewing-799"></a> 🟢 `[BUG-STINGING-LACEWING-799]` Mounting system for hole-less PCBs is too complicated
 
 - **UUID**: `1843fe5a-0485-4e4c-a4e0-f555e9af7e1a`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-05 14:49:40 UTC`
+- **Resolved**: `2026-11-05 17:04:16 UTC`
 
 #### Description
 
@@ -28106,6 +28107,10 @@ Giving the TMC6300 mounting system as an example below, there are micro-gaps bet
 | Type | Filename | Description |
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1793890436150_8301p.png](attachments/BUG-STINGING-LACEWING-799/screenshot_paste_1793890436150_8301p.png) | Pasted screenshot screenshot_paste_1793890436150_8301p.png |
+
+#### Resolution Notes
+
+Replaced slide-in guide rail system for hole-less PCBs with axial snap-socket frame featuring an internal perimeter snap groove and entrance lead-in chamfer, eliminating micro-gaps and assembly collision with current sensor.
 
 ---
 
