@@ -136,8 +136,8 @@ def test_search_offers_filters_min_tops_and_max_cost(monkeypatch) -> None:
     mock_offers = [
         {"id": 1, "gpu_name": "GTX 1080", "total_flops": 12.0, "dph_total": 0.15},  # Low TOPS (junk)
         {"id": 2, "gpu_name": "H100 SXM", "total_flops": 700.0, "dph_total": 4.50},  # Overpriced
-        {"id": 3, "gpu_name": "RTX 4090", "total_flops": 82.5, "dph_total": 0.45},   # Ideal match
-        {"id": 4, "gpu_name": "RTX 3090", "total_flops": 71.0, "dph_total": 0.28},   # Ideal match
+        {"id": 3, "gpu_name": "RTX 4090", "total_flops": 82.5, "dph_total": 0.45},  # Ideal match
+        {"id": 4, "gpu_name": "RTX 3090", "total_flops": 71.0, "dph_total": 0.28},  # Ideal match
     ]
 
     import tools.vast_manager as vm
