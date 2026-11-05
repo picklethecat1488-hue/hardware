@@ -9297,12 +9297,21 @@
           "size_bytes": 318112,
           "description": "Pasted screenshot screenshot_paste_1793890876309_0c9ae.png",
           "created_at": "2026-11-05 15:01:16 UTC"
+        },
+        {
+          "id": "d82cab67",
+          "filename": "screenshot_paste_1793890911006_wvg54.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png",
+          "size_bytes": 278934,
+          "description": "Pasted screenshot screenshot_paste_1793890911006_wvg54.png",
+          "created_at": "2026-11-05 15:01:51 UTC"
         }
       ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-05 14:54:50 UTC",
-      "updated_at": "2026-11-05 15:01:16 UTC",
+      "updated_at": "2026-11-05 15:01:51 UTC",
       "resolved_at": null,
       "resolution_notes": "",
       "rejection_notes": null,
@@ -9310,5 +9319,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 15:01:16 UTC"
+  "updated_at": "2026-11-05 15:01:51 UTC"
 }
