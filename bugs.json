@@ -8712,6 +8712,24 @@
       "logs": "",
       "attachments": [
         {
+          "id": "att-1",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
+          "size_bytes": 0,
+          "description": "Legacy Excel 97-2004 format of replied quotation BOM",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "carrier_board_bom_rev2.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
+          "size_bytes": 0,
+          "description": "Clean EDA export BOM generated directly from updated carrier board model",
+          "created_at": ""
+        },
+        {
           "id": "att-3",
           "filename": "carrier_board_bom_rev2.csv",
           "file_type": "reference",
@@ -8763,24 +8781,6 @@
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx",
           "size_bytes": 0,
           "description": "Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2)",
-          "created_at": ""
-        },
-        {
-          "id": "att-1",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
-          "size_bytes": 0,
-          "description": "Legacy Excel 97-2004 format of replied quotation BOM",
-          "created_at": ""
-        },
-        {
-          "id": "att-2",
-          "filename": "carrier_board_bom_rev2.xlsx",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
-          "size_bytes": 0,
-          "description": "Clean EDA export BOM generated directly from updated carrier board model",
           "created_at": ""
         }
       ],
@@ -8953,19 +8953,19 @@
       "logs": "",
       "attachments": [
         {
-          "id": "att-2",
-          "filename": "clipboard_text_1792279899940.txt",
+          "id": "att-1",
+          "filename": "clipboard_text_1792279938306.txt",
           "file_type": "document",
-          "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279899940.txt",
+          "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279938306.txt",
           "size_bytes": 0,
           "description": "Pasted text document",
           "created_at": ""
         },
         {
-          "id": "att-1",
-          "filename": "clipboard_text_1792279938306.txt",
+          "id": "att-2",
+          "filename": "clipboard_text_1792279899940.txt",
           "file_type": "document",
-          "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279938306.txt",
+          "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279899940.txt",
           "size_bytes": 0,
           "description": "Pasted text document",
           "created_at": ""
@@ -9128,7 +9128,7 @@
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-10-23 23:04:38 UTC",
-      "updated_at": "2026-11-05 14:54:28 UTC",
+      "updated_at": "",
       "resolved_at": "2026-11-05 15:32:56 UTC",
       "resolution_notes": "Optimized bug persistence and detached branch commits: 1) Batch git index updates via 'git update-index --index-info' instead of per-bug subprocess calls; 2) In-memory SHA-1 computation and direct blob persistence; 3) Incremental dirty bug saving in SQLite and markdown exporter; reducing save times from >12s to sub-second.",
       "rejection_notes": "",
@@ -9237,7 +9237,7 @@
       "updated_at": "2026-11-05 15:05:58 UTC",
       "resolved_at": null,
       "resolution_notes": "",
-      "rejection_notes": "",
+      "rejection_notes": null,
       "accepted_at": null,
       "rejected_at": null
     },
@@ -9271,7 +9271,7 @@
       "updated_at": "2026-11-05 15:02:26 UTC",
       "resolved_at": null,
       "resolution_notes": "",
-      "rejection_notes": "",
+      "rejection_notes": null,
       "accepted_at": null,
       "rejected_at": null
     },
@@ -9314,7 +9314,7 @@
       "updated_at": "2026-11-05 15:02:01 UTC",
       "resolved_at": null,
       "resolution_notes": "",
-      "rejection_notes": "",
+      "rejection_notes": null,
       "accepted_at": null,
       "rejected_at": null
     },
@@ -9357,10 +9357,10 @@
       "updated_at": "2026-11-05 15:12:38 UTC",
       "resolved_at": null,
       "resolution_notes": "",
-      "rejection_notes": "",
+      "rejection_notes": null,
       "accepted_at": null,
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 15:32:56 UTC"
+  "updated_at": "2026-11-05 15:33:07 UTC"
 }
