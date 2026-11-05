@@ -358,50 +358,70 @@ class CatFountainProvider(Provider):
                                 mode=Mode.SUBTRACT,
                             )
 
-            # Helper function to generate a 3D-printed two-sided slide-in card guide
+            # Helper function to generate a 3D-printed snap-fit socket for hole-less PCBs (BUG-STINGING-LACEWING-799)
             def add_pcb_clip(
                 center_x: float,
                 center_y: float,
-                board_span: float,  # Board width across the guide rails (along X)
-                board_slide: float,  # Board length along slide direction (along Y)
+                board_span: float,  # Board width along X
+                board_slide: float,  # Board length along Y
                 standoff_h: float,
                 label: str,
             ):
-                stop_wall = self.settings.pcb_clip_stop_wall
-                detent_lip = self.settings.pcb_clip_detent_lip
-                track_w = board_slide + stop_wall
-                track_l = 3.0
-                track_h = standoff_h + 3.2
+                wall_t = 2.0
+                pcb_t = 1.6
+                clearance = 0.2
+                snap_depth = 0.35
+                snap_h = 1.8
+                total_h = standoff_h + pcb_t + 1.0
 
-                half_span = board_span / 2.0
-                track_center_x = half_span + 0.5
-                slot_center_x = half_span - 0.25
+                outer_x = board_span + 2.0 * wall_t
+                outer_y = board_slide + 2.0 * wall_t
+                inner_x = board_span + clearance
+                inner_y = board_slide + clearance
 
                 with Locations((center_x, center_y, floor_z - t)):
-                    # 1. Base plate connecting the two guide tracks (recessed to save material and provide airflow)
-                    Box(board_span - 2.5, board_slide - 2.0, standoff_h, align=(Align.CENTER, Align.CENTER, Align.MAX))
+                    # 1. Solid outer socket frame extending from ceiling
+                    Box(outer_x, outer_y, total_h, align=(Align.CENTER, Align.CENTER, Align.MAX))
 
-                    # 2. Left and Right guide tracks (extended at +Y for positive stop wall)
-                    with Locations((-track_center_x, stop_wall / 2.0, 0), (track_center_x, stop_wall / 2.0, 0)):
-                        Box(track_l, track_w, track_h, align=(Align.CENTER, Align.CENTER, Align.MAX))
+                    # 2. Central cavity for components and airflow (through the standoff region)
+                    Box(
+                        board_span - 3.0,
+                        board_slide - 3.0,
+                        total_h + 0.1,
+                        align=(Align.CENTER, Align.CENTER, Align.MAX),
+                        mode=Mode.SUBTRACT,
+                    )
 
-                    # 3. Guide slots inside left/right tracks (open at entrance -Y, closed at +Y)
-                    slot_len = board_slide + 1.0
-                    slot_y_center = -0.5
-                    with Locations((0, slot_y_center, -standoff_h)):
-                        with Locations((-slot_center_x, 0, 0), (slot_center_x, 0, 0)):
-                            Box(
-                                1.5,
-                                slot_len,
-                                1.85,
-                                align=(Align.CENTER, Align.CENTER, Align.MAX),
-                                mode=Mode.SUBTRACT,
-                            )
+                    # 3. PCB seating pocket (from -standoff_h down through bottom)
+                    with Locations((0, 0, -standoff_h)):
+                        Box(
+                            inner_x,
+                            inner_y,
+                            total_h - standoff_h + 0.1,
+                            align=(Align.CENTER, Align.CENTER, Align.MAX),
+                            mode=Mode.SUBTRACT,
+                        )
 
-                    # 4. Inward snap detent lips at entrance (-Y) to lock PCB in place
-                    with Locations((0, -board_slide / 2.0 + 0.5, -standoff_h)):
-                        with Locations((-half_span + detent_lip / 2.0, 0, 0), (half_span - detent_lip / 2.0, 0, 0)):
-                            Box(detent_lip, 1.2, 1.6, align=(Align.CENTER, Align.CENTER, Align.MAX))
+                    # 4. Internal snap-fit groove in socket walls (matching lid and bottom cover snap groove style)
+                    # Located at the PCB seating position so PCB perimeter edges act as the inner snap ring
+                    with Locations((0, 0, -standoff_h)):
+                        Box(
+                            inner_x + snap_depth * 2.0,
+                            inner_y + snap_depth * 2.0,
+                            snap_h,
+                            align=(Align.CENTER, Align.CENTER, Align.MAX),
+                            mode=Mode.SUBTRACT,
+                        )
+
+                    # 5. Lead-in entry chamfer at bottom opening for smooth snap-in insertion
+                    with Locations((0, 0, -total_h + 0.4)):
+                        Box(
+                            inner_x + 0.8,
+                            inner_y + 0.8,
+                            0.8,
+                            align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                            mode=Mode.SUBTRACT,
+                        )
 
                 # Add engraved label (move to opposite side of board to avoid proximity to CURRENT)
                 label_y_offset = board_slide / 2.0 + 5.0

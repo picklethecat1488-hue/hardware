@@ -2015,6 +2015,38 @@ class TestCatFountainProvider:
                     f"ToF sensor mount at dy={dy}, dz={dz} must have a solid press-fit post"
                 )
 
+    def test_regression_bug_stinging_lacewing_799_holeless_pcb_snap_socket(self, provider):
+        """Verify BUG-STINGING-LACEWING-799: Hole-less PCB mount (TMC6300) uses axial snap-socket frame instead of slide rails."""
+        bowl = provider.build_bowl("bowl")
+        assert bowl.part.volume > 0.0
+        assert bowl.part.is_valid()
+
+        floor_z = provider.settings.floor_z
+        t = provider.settings.bowl_thickness
+        ceiling_z = floor_z - t
+
+        # TMC6300 center and dimensions
+        cx = 50.0
+        cy = 15.0
+        span = provider.settings.motor_driver_spacing_y  # 15.24 along X
+        slide = provider.settings.motor_driver_spacing_x  # 20.32 along Y
+        sh = provider.settings.motor_driver_standoff_height  # 4.0
+
+        # 1. Outer socket frame walls must be solid (no micro-gaps)
+        pt_wall_x = (cx + span / 2.0 + 1.0, cy, ceiling_z - (sh + 0.5))
+        assert bowl.part.is_inside(pt_wall_x), "TMC6300 snap socket X frame wall must be solid"
+
+        pt_wall_y = (cx, cy + slide / 2.0 + 1.0, ceiling_z - (sh + 0.5))
+        assert bowl.part.is_inside(pt_wall_y), "TMC6300 snap socket Y frame wall must be solid"
+
+        # 2. Central cavity through standoff height must be open for component clearance and airflow
+        pt_center_air = (cx, cy, ceiling_z - sh / 2.0)
+        assert not bowl.part.is_inside(pt_center_air), "TMC6300 central cavity must be hollow for component airflow"
+
+        # 3. Axial insertion path from bottom must be open (does not require sliding from -Y where CURRENT sensor sits)
+        pt_bottom_entry = (cx, cy, ceiling_z - (sh + 1.0))
+        assert not bowl.part.is_inside(pt_bottom_entry), "TMC6300 snap socket must be open axially from below"
+
     def test_regression_bug_vibrant_woodborer_940_motor_hub_assembly(self, provider):
         """Verify BUG-VIBRANT-WOODBORER-940: Motor hub assembly combining motor, clip, hub, and Hall sensor."""
         from build123d import Part
@@ -2139,18 +2171,19 @@ class TestCatFountainProvider:
             "Motor hub collar must feature an external annular snap ridge to engage socket groove"
         )
 
-        # 7. TMC6300 slide clip features positive back stop wall and retention detent lip
+        # 7. TMC6300 hole-less PCB snap socket features outer frame walls and internal snap groove retention (BUG-STINGING-LACEWING-799)
         t = provider.settings.bowl_thickness
         tmc_x, tmc_y = 50.0, 15.0
         tmc_span = provider.settings.motor_driver_spacing_y
         tmc_slide = provider.settings.motor_driver_spacing_x
         tmc_sh = provider.settings.motor_driver_standoff_height
         half_span = tmc_span / 2.0
+        half_slide = tmc_slide / 2.0
         # Positive back stop wall at +Y is solid
-        assert bowl.part.is_inside(
-            (tmc_x + half_span + 0.5, tmc_y + tmc_slide / 2.0 + 1.0, floor_z - t - tmc_sh - 1.0)
-        ), "TMC6300 clip must feature a solid positive back stop wall"
-        # Retention detent lip at -Y is solid
-        assert bowl.part.is_inside(
-            (tmc_x - half_span + 0.3, tmc_y - tmc_slide / 2.0 + 0.5, floor_z - t - tmc_sh - 1.0)
-        ), "TMC6300 clip must feature an inward retention detent lip"
+        assert bowl.part.is_inside((tmc_x + half_span + 0.5, tmc_y + half_slide + 1.0, floor_z - t - tmc_sh - 1.0)), (
+            "TMC6300 snap socket must feature a solid positive back stop wall"
+        )
+        # Front frame wall at -Y is solid (BUG-STINGING-LACEWING-799 full frame)
+        assert bowl.part.is_inside((tmc_x, tmc_y - half_slide - 1.0, floor_z - t - tmc_sh - 1.0)), (
+            "TMC6300 snap socket must feature a solid front frame wall"
+        )
