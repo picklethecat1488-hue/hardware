@@ -4,7 +4,8 @@
 - **ID**: `BUG-STINGING-LACEWING-799`
 - **Status**: `OPEN`
 - **Severity**: `MEDIUM`
-- **Category**: `PCB`
+- **Category**: `CAD`
+- **Component**: `cat_fountain`
 - **Created**: `2026-11-05 14:49:40 UTC`
 
 #### Description

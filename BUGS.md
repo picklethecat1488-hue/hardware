@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-05 15:02:04 UTC` |
+| **Report Date** | `2026-11-05 15:02:28 UTC` |
 | **Total Issues** | `312` |
 | **Open Issues** | `5` |
 | **Resolved / Closed** | `307 (98%)` |
@@ -24,8 +24,8 @@
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 171 | Schematics, routing, footprints, nets, DRC, silkscreen. |
-| **`CAD`** | 35 | 3D geometry, step models, enclosures, mechanical assembly. |
+| **`PCB`** | 170 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`CAD`** | 36 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 11 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
 | **`INFRASTRUCTURE`** | 83 | Build tooling, compilers, test runners, headless tools. |
 | **`UI`** | 2 | Web dashboards, CLI viewers, review interfaces. |
@@ -342,7 +342,7 @@
 - [x] **`[MEDIUM]`** [#BUG-SWARMING-CICADA-917](#bug-swarming-cicada-917): Replace motor room mount halls with clip mounts `[cat_fountain]` (`CLOSED`)
 - [x] **`[LOW]`** [#BUG-PINCERED-CADDISFLY-769](#bug-pincered-caddisfly-769): Add clip on mount for SWD header `[cat_fountain]` (`CLOSED`)
 - [ ] **`[MEDIUM]`** [#BUG-SPECKLED-ROVEBEETLE-352](#bug-speckled-rovebeetle-352): Sensor shield design on inner bowl wall is too complicated `[cat_fountain]` (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-STINGING-LACEWING-799](#bug-stinging-lacewing-799): Mounting system for hole-less PCBs is too complicated (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-STINGING-LACEWING-799](#bug-stinging-lacewing-799): Mounting system for hole-less PCBs is too complicated `[cat_fountain]` (`OPEN`)
 - [ ] **`[HIGH]`** [#BUG-LUSTROUS-COCOON-669](#bug-lustrous-cocoon-669): Motor base design is way too complicated `[cat_fountain]` (`OPEN`)
 
 ## Detailed Issue Log
@@ -28077,7 +28077,8 @@ The sensor shield on the inner bowl wall is too complicated. The shape should be
 - **UUID**: `1843fe5a-0485-4e4c-a4e0-f555e9af7e1a`
 - **Status**: `OPEN`
 - **Severity**: `MEDIUM`
-- **Category**: `PCB`
+- **Category**: `CAD`
+- **Component**: `cat_fountain`
 - **Created**: `2026-11-05 14:49:40 UTC`
 
 #### Description
