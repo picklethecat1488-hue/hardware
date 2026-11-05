@@ -1946,7 +1946,7 @@ class TestCatFountainProvider:
         )
 
     def test_regression_bug_springing_mosquito_703_proximity_sensor_inner_wall_extension(self, provider):
-        """Verify BUG-SPRINGING-MOSQUITO-703: Extend inner wall of proximity sensor openings down 3mm to ToF PCB."""
+        """Verify BUG-SPRINGING-MOSQUITO-703 & BUG-SPECKLED-ROVEBEETLE-352: Sensor shield is an extruded hollow rectangle without inner lip or tails."""
         from build123d import Location
 
         assert hasattr(provider.settings, "proximity_sensor_inner_wall_extension"), (
@@ -1960,27 +1960,46 @@ class TestCatFountainProvider:
 
         r = provider.settings.bowl_radius
         t = provider.settings.bowl_thickness
-        ext_h = provider.settings.proximity_sensor_inner_wall_extension
 
-        # Point inside the 3mm inner wall extension at the top of the opening (dz = 5.0 - ext_h / 2 = 3.5)
-        # at X = -5.0 (interfacing with the top surface of the ToF sensor PCB at X = -6.0)
-        pt_wall_loc = Location((r - t / 2.0 - 3.0, 0, 16.0), (0, -30, 0)) * Location((-5.0, 0, 5.0 - ext_h / 2.0))
-        pt_wall = (pt_wall_loc.position.X, pt_wall_loc.position.Y, pt_wall_loc.position.Z)
+        base_loc = Location((r - t / 2.0 - 3.0, 0, 16.0), (0, -30, 0))
 
-        assert bowl.part.is_inside(pt_wall), (
-            "Inner wall of proximity sensor opening must be extended down 3mm to interface with top of ToF sensor PCB"
+        # Optical aperture must be completely open without inner lip (BUG-SPECKLED-ROVEBEETLE-352)
+        pt_center_loc = base_loc * Location((-5.0, 0, -2.0))
+        assert not bowl.part.is_inside(
+            (pt_center_loc.position.X, pt_center_loc.position.Y, pt_center_loc.position.Z)
+        ), "Sensor aperture center must remain open"
+
+        pt_lip_loc = base_loc * Location((-5.0, 0, 3.5))
+        assert not bowl.part.is_inside((pt_lip_loc.position.X, pt_lip_loc.position.Y, pt_lip_loc.position.Z)), (
+            "Inner bowl wall must not have an inner lip protruding into sensor aperture"
         )
 
-        # Enclosing sidewalls shielding optical sensor from ambient motor room LED light (Finding 1)
-        y_side = (provider.settings.proximity_sensor_pocket_width + 2.0) / 2.0
-        pt_left_loc = Location((r - t / 2.0 - 3.0, 0, 16.0), (0, -30, 0)) * Location((-4.0, y_side, 0.0))
-        pt_left = (pt_left_loc.position.X, pt_left_loc.position.Y, pt_left_loc.position.Z)
-        assert bowl.part.is_inside(pt_left), "Left enclosing sidewall of ToF sensor must be solid"
+        # Extruded hollow rectangle shield enclosing walls (top, bottom, left, right)
+        pt_top_loc = base_loc * Location((-4.0, 0, 6.0))
+        assert bowl.part.is_inside((pt_top_loc.position.X, pt_top_loc.position.Y, pt_top_loc.position.Z)), (
+            "Top enclosing wall of sensor shield must be solid"
+        )
 
-        # Center of opening remains open aperture for ToF sensor beam
-        pt_center_loc = Location((r - t / 2.0 - 3.0, 0, 16.0), (0, -30, 0)) * Location((-5.0, 0, 0.0))
-        pt_center = (pt_center_loc.position.X, pt_center_loc.position.Y, pt_center_loc.position.Z)
-        assert not bowl.part.is_inside(pt_center), "Proximity sensor optical aperture center must remain open"
+        pt_bot_loc = base_loc * Location((-4.0, 0, -10.0))
+        assert bowl.part.is_inside((pt_bot_loc.position.X, pt_bot_loc.position.Y, pt_bot_loc.position.Z)), (
+            "Bottom enclosing wall of sensor shield must be solid"
+        )
+
+        pt_left_loc = base_loc * Location((-4.0, 7.0, -2.0))
+        assert bowl.part.is_inside((pt_left_loc.position.X, pt_left_loc.position.Y, pt_left_loc.position.Z)), (
+            "Left enclosing sidewall of sensor shield must be solid"
+        )
+
+        pt_right_loc = base_loc * Location((-4.0, -7.0, -2.0))
+        assert bowl.part.is_inside((pt_right_loc.position.X, pt_right_loc.position.Y, pt_right_loc.position.Z)), (
+            "Right enclosing sidewall of sensor shield must be solid"
+        )
+
+        # No protruding tails beyond top of extruded hollow rectangle
+        pt_tail_loc = base_loc * Location((-4.0, 0, 8.0))
+        assert not bowl.part.is_inside((pt_tail_loc.position.X, pt_tail_loc.position.Y, pt_tail_loc.position.Z)), (
+            "Sensor shield must not have protruding tails beyond rectangular profile"
+        )
 
         # Press-fit mounting posts on ToF sensor standoffs (Finding 5)
         shaft_h = provider.settings.pcb_mounting_post_height - provider.settings.pcb_mounting_post_flare_height

@@ -613,35 +613,26 @@ class CatFountainProvider(Provider):
                                 mode=Mode.SUBTRACT,
                             )
 
-                        # Extend inner wall to enclose each side of ToF sensor against ambient light noise (Finding 1)
-                        if ext_h > 0.0:
-                            with Locations(Location((-4.0, 0, 5.0 - ext_h / 2.0))):
-                                # Top inner wall interface
+                        # Sensor shield on the inner bowl wall: extruded hollow rectangle (BUG-SPECKLED-ROVEBEETLE-352)
+                        side_wall_t = 2.0
+                        pocket_w = self.settings.proximity_sensor_pocket_width
+                        pocket_h = self.settings.proximity_sensor_pocket_height
+                        with Locations(Location((-4.0, 0, -2.0))):
+                            with BuildPart(mode=Mode.PRIVATE) as shield_part:
                                 Box(
                                     4.0,
-                                    self.settings.proximity_sensor_pocket_width,
-                                    ext_h,
+                                    pocket_w + side_wall_t * 2.0,
+                                    pocket_h + side_wall_t * 2.0,
                                     align=(Align.CENTER, Align.CENTER, Align.CENTER),
                                 )
-                            # Side enclosing walls on left (+Y) and right (-Y) to shield optical sensor from ambient LED light
-                            side_wall_t = 2.0
-                            y_offset = (self.settings.proximity_sensor_pocket_width + side_wall_t) / 2.0
-                            with Locations(Location((-4.0, y_offset, 0)), Location((-4.0, -y_offset, 0))):
                                 Box(
-                                    4.0,
-                                    side_wall_t,
-                                    self.settings.proximity_sensor_pocket_height + ext_h,
+                                    4.0 + 0.1,
+                                    pocket_w,
+                                    pocket_h,
                                     align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                                    mode=Mode.SUBTRACT,
                                 )
-                            # Bottom enclosing wall (-Z)
-                            z_bottom_offset = -(self.settings.proximity_sensor_pocket_height + ext_h) / 2.0
-                            with Locations(Location((-4.0, 0, z_bottom_offset))):
-                                Box(
-                                    4.0,
-                                    self.settings.proximity_sensor_pocket_width + side_wall_t * 2.0,
-                                    side_wall_t,
-                                    align=(Align.CENTER, Align.CENTER, Align.CENTER),
-                                )
+                            add(shield_part)
 
                         # Press-fit mounting standoffs on the INSIDE of the bowl wall (Finding 5)
                         post_r = self.settings.pcb_mounting_post_diameter / 2.0
@@ -706,6 +697,15 @@ class CatFountainProvider(Provider):
                                 merged_shape = bowl.part + trimmed_standoffs
                                 # Ensure final returned shape is a Part object, wrapping the internal Solid
                                 bowl.part = Part(children=merged_shape.solids(), label=target)
+
+            # Ensure dry compartment clearance for bottom cover (Z <= 4.0)
+            with Locations((0, 0, 0)):
+                Cylinder(
+                    radius=r - t + 0.5,
+                    height=4.0,
+                    align=(Align.CENTER, Align.CENTER, Align.MIN),
+                    mode=Mode.SUBTRACT,
+                )
 
             with URDFMetadata(
                 label=target,
