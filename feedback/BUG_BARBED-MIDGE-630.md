@@ -15,6 +15,10 @@
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1792806350220_dct9c.png](attachments/BUG-BARBED-MIDGE-630/screenshot_paste_1792806350220_dct9c.png) | Pasted screenshot screenshot_paste_1792806350220_dct9c.png |
 
+#### Attached Commits
+
+- `bf875947`
+
 #### Resolution Notes
 
 Eliminate duplicate outer window borders and resize grippers by applying .in-iframe rules to common.css and workstation templates, and add frame-busting to diff_view.

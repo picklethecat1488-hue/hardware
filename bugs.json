@@ -8731,20 +8731,20 @@
         },
         {
           "id": "att-5",
-          "filename": "carrier_board_bom_rev2.csv",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
           "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
           "size_bytes": 0,
-          "description": "CSV export of clean EDA BOM",
+          "description": "Uploaded reference questions spreadsheet from PCBWay",
           "created_at": ""
         },
         {
           "id": "att-6",
-          "filename": "carrier_board_bom_rev3.xlsx",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
           "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
           "size_bytes": 0,
-          "description": "Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM)",
+          "description": "Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16",
           "created_at": ""
         },
         {
@@ -8766,21 +8766,21 @@
           "created_at": ""
         },
         {
-          "id": "att-5",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
+          "id": "att-3",
+          "filename": "carrier_board_bom_rev2.csv",
           "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv",
           "size_bytes": 0,
-          "description": "Uploaded reference questions spreadsheet from PCBWay",
+          "description": "CSV export of clean EDA BOM",
           "created_at": ""
         },
         {
-          "id": "att-6",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
+          "id": "att-4",
+          "filename": "carrier_board_bom_rev3.xlsx",
           "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
           "size_bytes": 0,
-          "description": "Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16",
+          "description": "Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM)",
           "created_at": ""
         }
       ],
@@ -9077,10 +9077,12 @@
           "created_at": ""
         }
       ],
-      "commit_ids": [],
+      "commit_ids": [
+        "bf875947"
+      ],
       "review_tasks": [],
       "created_at": "2026-10-23 23:00:18 UTC",
-      "updated_at": "",
+      "updated_at": "2026-11-05 23:53:48 UTC",
       "resolved_at": "2026-11-05 15:45:39 UTC",
       "resolution_notes": "Eliminate duplicate outer window borders and resize grippers by applying .in-iframe rules to common.css and workstation templates, and add frame-busting to diff_view.",
       "rejection_notes": "",
@@ -9138,7 +9140,7 @@
         }
       ],
       "created_at": "2026-10-23 23:04:38 UTC",
-      "updated_at": "2026-11-05 23:53:44 UTC",
+      "updated_at": "",
       "resolved_at": "2026-11-05 15:32:56 UTC",
       "resolution_notes": "Optimized bug persistence and detached branch commits: 1) Batch git index updates via 'git update-index --index-info' instead of per-bug subprocess calls; 2) In-memory SHA-1 computation and direct blob persistence; 3) Incremental dirty bug saving in SQLite and markdown exporter; reducing save times from >12s to sub-second.",
       "rejection_notes": "",
@@ -9372,5 +9374,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 23:53:44 UTC"
+  "updated_at": "2026-11-05 23:53:48 UTC"
 }
