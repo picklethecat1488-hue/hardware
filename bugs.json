@@ -18,7 +18,7 @@
       "attachments": [],
       "commit_ids": [],
       "review_tasks": [],
-      "created_at": "",
+      "created_at": "2026-11-05 14:48:01 UTC",
       "updated_at": "",
       "resolved_at": null,
       "resolution_notes": "",
@@ -43,7 +43,7 @@
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-01 10:00:00 UTC",
-      "updated_at": "2026-11-05 14:47:59 UTC",
+      "updated_at": "",
       "resolved_at": "2026-09-01 12:00:00 UTC",
       "resolution_notes": "",
       "rejection_notes": "",
@@ -54,7 +54,7 @@
       "id": "BUG-RECENT-002",
       "uuid": "63e6ad62-77cb-4ee8-8594-09d80815b08c",
       "title": "Recently resolved bug awaiting review",
-      "status": "RESOLVED",
+      "status": "CLOSED",
       "severity": "HIGH",
       "category": "CAD",
       "component": "",
@@ -67,13 +67,13 @@
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-05 14:15:00 UTC",
-      "updated_at": "",
+      "updated_at": "2026-11-05 14:48:01 UTC",
       "resolved_at": "2026-11-05 14:20:00 UTC",
       "resolution_notes": "",
       "rejection_notes": "",
-      "accepted_at": null,
+      "accepted_at": "2026-11-05 14:20:00 UTC",
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 14:47:59 UTC"
+  "updated_at": "2026-11-05 14:48:01 UTC"
 }

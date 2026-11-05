@@ -2,8 +2,9 @@
 
 - **UUID**: `63e6ad62-77cb-4ee8-8594-09d80815b08c`
 - **ID**: `BUG-RECENT-002`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `CAD`
 - **Created**: `2026-11-05 14:15:00 UTC`
 - **Resolved**: `2026-11-05 14:20:00 UTC`
+- **Accepted**: `2026-11-05 14:20:00 UTC`
