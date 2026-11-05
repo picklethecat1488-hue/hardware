@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-05 15:09:55 UTC` |
+| **Report Date** | `2026-11-05 15:12:29 UTC` |
 | **Total Issues** | `313` |
 | **Open Issues** | `6` |
 | **Resolved / Closed** | `307 (98%)` |
@@ -28133,12 +28133,13 @@ Defects circled in red.
 
 #### Description
 
-As indicated on the mechanical drawing for the 1102 18000kv motor, there are 3 struts on the top of the motor frame which connect to the drive shaft. Can we add a triangular groove pattern with central hole to the bottom of the drive hub so that the struts can be fit into the drive hub bottom to prevent torque slippage without gluing. Additionally, can we revise the design of the drive hub to be a convex hull with minimum 1.5mm wall thickness around all magnets, grooves, and mounting holes.
+As indicated on the mechanical drawing for the 1102 18000kv motor, there are 3 struts on the top of the motor frame which connect to the drive shaft. Can we add a triangular groove pattern with central hole to the bottom of the drive hub so that the struts can be fit into the drive hub bottom to prevent torque slippage without gluing. Additionally, can we revise the design of the drive hub to be a convex hull with minimum 1.5mm wall thickness around all magnets, grooves, and mounting holes. Desired shape outlined in green on the existing drive hub in one of the attached screenshots.
 
 #### Attachments & References
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1793891379527_mc2d2.png](attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891379527_mc2d2.png) | Pasted screenshot screenshot_paste_1793891379527_mc2d2.png |
+| `screenshot` | [screenshot_paste_1793891547400_gyg0h.png](attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891547400_gyg0h.png) | Pasted screenshot screenshot_paste_1793891547400_gyg0h.png |
 
 ---
