@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-05 15:28:51 UTC` |
+| **Report Date** | `2026-11-05 15:28:52 UTC` |
 | **Total Issues** | `3` |
 | **Open Issues** | `1` |
 | **Resolved / Closed** | `2 (66%)` |
@@ -44,6 +44,7 @@
 - **Status**: `OPEN`
 - **Severity**: `LOW`
 - **Category**: `UI`
+- **Created**: `2026-11-05 15:28:52 UTC`
 
 ---
 
