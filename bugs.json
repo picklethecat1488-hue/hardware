@@ -8712,7 +8712,7 @@
       "logs": "",
       "attachments": [
         {
-          "id": "att-3",
+          "id": "att-1",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
@@ -8721,7 +8721,7 @@
           "created_at": ""
         },
         {
-          "id": "att-4",
+          "id": "att-2",
           "filename": "carrier_board_bom_rev2.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
@@ -8730,7 +8730,7 @@
           "created_at": ""
         },
         {
-          "id": "att-5",
+          "id": "att-3",
           "filename": "carrier_board_bom_rev2.csv",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv",
@@ -8739,7 +8739,7 @@
           "created_at": ""
         },
         {
-          "id": "att-6",
+          "id": "att-4",
           "filename": "carrier_board_bom_rev3.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
@@ -8748,7 +8748,7 @@
           "created_at": ""
         },
         {
-          "id": "att-7",
+          "id": "att-5",
           "filename": "carrier_board_bom_rev3.csv",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv",
@@ -8757,7 +8757,7 @@
           "created_at": ""
         },
         {
-          "id": "att-8",
+          "id": "att-6",
           "filename": "digikey_order_2026-10-14.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx",
@@ -8766,7 +8766,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-7",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
@@ -8775,7 +8775,7 @@
           "created_at": ""
         },
         {
-          "id": "att-2",
+          "id": "att-8",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
@@ -8953,7 +8953,7 @@
       "logs": "",
       "attachments": [
         {
-          "id": "att-2",
+          "id": "att-1",
           "filename": "clipboard_text_1792279938306.txt",
           "file_type": "document",
           "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279938306.txt",
@@ -8962,7 +8962,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-2",
           "filename": "clipboard_text_1792279899940.txt",
           "file_type": "document",
           "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279899940.txt",
@@ -9208,5 +9208,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 14:26:31 UTC"
+  "updated_at": "2026-11-05 14:27:03 UTC"
 }
