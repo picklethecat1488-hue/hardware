@@ -16,8 +16,8 @@ See attachments below. Both nightly license compliance and CI jobs are failing
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
-| `document` | [clipboard_text_1792279899940.txt](attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279899940.txt) | Pasted text document |
 | `document` | [clipboard_text_1792279938306.txt](attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279938306.txt) | Pasted text document |
+| `document` | [clipboard_text_1792279899940.txt](attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279899940.txt) | Pasted text document |
 
 #### Resolution Notes
 
