@@ -30,6 +30,10 @@ Defects circled in red.
 
 - `7185e819`
 
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:35ad5e26 --> Verify simplified motor base circle + rectangle geometry, 3 mounting holes, and removed latent bowl cuts | `python -m pytest projects/tests/test_cat_fountain.py -k 'test_regression_bug_lustrous_cocoon_669 or test_regression_bug_vibrant_woodborer_940'`
+
 #### Resolution Notes
 
 Simplify motor base to a circle unioned with a hall sensor mounting rectangle fitting into socket wall keyway gap; ensure 3 mounting holes on bottom; remove latent south slide cut and extra box above hall sensor in bowl.
