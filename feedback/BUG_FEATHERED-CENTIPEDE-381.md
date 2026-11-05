@@ -17,6 +17,10 @@ IDK why this is, but saving and updating bugs takes extremely long now...
 
 - `95811f16`
 
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:01009b32 --> Verify bug saving latency on detached branch is under 1 second | `python -m pytest tests/test_dashboard.py -k test_detached_branch_save_latency`
+
 #### Resolution Notes
 
 Optimized bug persistence and detached branch commits: 1) Batch git index updates via 'git update-index --index-info' instead of per-bug subprocess calls; 2) In-memory SHA-1 computation and direct blob persistence; 3) Incremental dirty bug saving in SQLite and markdown exporter; reducing save times from >12s to sub-second.

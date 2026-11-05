@@ -8749,24 +8749,6 @@
         },
         {
           "id": "att-7",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
-          "size_bytes": 0,
-          "description": "Uploaded reference questions spreadsheet from PCBWay",
-          "created_at": ""
-        },
-        {
-          "id": "att-8",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
-          "size_bytes": 0,
-          "description": "Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16",
-          "created_at": ""
-        },
-        {
-          "id": "att-7",
           "filename": "carrier_board_bom_rev3.csv",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv",
@@ -8781,6 +8763,24 @@
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx",
           "size_bytes": 0,
           "description": "Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2)",
+          "created_at": ""
+        },
+        {
+          "id": "att-5",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
+          "size_bytes": 0,
+          "description": "Uploaded reference questions spreadsheet from PCBWay",
+          "created_at": ""
+        },
+        {
+          "id": "att-6",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
+          "size_bytes": 0,
+          "description": "Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16",
           "created_at": ""
         }
       ],
@@ -9128,9 +9128,17 @@
       "commit_ids": [
         "95811f16"
       ],
-      "review_tasks": [],
+      "review_tasks": [
+        {
+          "id": "01009b32",
+          "title": "Verify bug saving latency on detached branch is under 1 second",
+          "command": "python -m pytest tests/test_dashboard.py -k test_detached_branch_save_latency",
+          "status": "PENDING",
+          "notes": ""
+        }
+      ],
       "created_at": "2026-10-23 23:04:38 UTC",
-      "updated_at": "2026-11-05 23:53:40 UTC",
+      "updated_at": "2026-11-05 23:53:44 UTC",
       "resolved_at": "2026-11-05 15:32:56 UTC",
       "resolution_notes": "Optimized bug persistence and detached branch commits: 1) Batch git index updates via 'git update-index --index-info' instead of per-bug subprocess calls; 2) In-memory SHA-1 computation and direct blob persistence; 3) Incremental dirty bug saving in SQLite and markdown exporter; reducing save times from >12s to sub-second.",
       "rejection_notes": "",
@@ -9335,21 +9343,21 @@
       "logs": "",
       "attachments": [
         {
-          "id": "att-1",
-          "filename": "screenshot_paste_1793891547400_gyg0h.png",
-          "file_type": "screenshot",
-          "file_path": "attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891547400_gyg0h.png",
-          "size_bytes": 0,
-          "description": "Pasted screenshot screenshot_paste_1793891547400_gyg0h.png",
-          "created_at": ""
-        },
-        {
           "id": "att-2",
           "filename": "screenshot_paste_1793891379527_mc2d2.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891379527_mc2d2.png",
           "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793891379527_mc2d2.png",
+          "created_at": ""
+        },
+        {
+          "id": "att-1",
+          "filename": "screenshot_paste_1793891547400_gyg0h.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891547400_gyg0h.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1793891547400_gyg0h.png",
           "created_at": ""
         }
       ],
@@ -9364,5 +9372,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 23:53:40 UTC"
+  "updated_at": "2026-11-05 23:53:44 UTC"
 }
