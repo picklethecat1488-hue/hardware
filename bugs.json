@@ -9125,7 +9125,7 @@
       "id": "BUG-FEATHERED-CENTIPEDE-381",
       "uuid": "decd4cc3-3a98-4552-917e-d4b0cb668001",
       "title": "It takes 10s to save bugs now",
-      "status": "RESOLVED",
+      "status": "CLOSED",
       "severity": "MEDIUM",
       "category": "INFRASTRUCTURE",
       "component": "dashboard",
@@ -9148,11 +9148,11 @@
         }
       ],
       "created_at": "2026-10-23 23:04:38 UTC",
-      "updated_at": "",
+      "updated_at": "2026-11-06 00:18:51 UTC",
       "resolved_at": "2026-11-05 15:32:56 UTC",
       "resolution_notes": "Optimized bug persistence and detached branch commits: 1) Batch git index updates via 'git update-index --index-info' instead of per-bug subprocess calls; 2) In-memory SHA-1 computation and direct blob persistence; 3) Incremental dirty bug saving in SQLite and markdown exporter; reducing save times from >12s to sub-second.",
       "rejection_notes": "",
-      "accepted_at": null,
+      "accepted_at": "2026-11-06 00:18:51 UTC",
       "rejected_at": null
     },
     {
@@ -9431,5 +9431,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 00:18:47 UTC"
+  "updated_at": "2026-11-06 00:18:51 UTC"
 }
