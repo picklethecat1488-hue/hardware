@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 00:15:51 UTC` |
+| **Report Date** | `2026-11-06 00:16:51 UTC` |
 | **Total Issues** | `313` |
-| **Open Issues** | `0` |
-| **Resolved / Closed** | `313 (100%)` |
+| **Open Issues** | `1` |
+| **Resolved / Closed** | `312 (99%)` |
 
 ## Issues by Severity
 
@@ -343,7 +343,7 @@
 - [x] **`[LOW]`** [#BUG-PINCERED-CADDISFLY-769](#bug-pincered-caddisfly-769): Add clip on mount for SWD header `[cat_fountain]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-SPECKLED-ROVEBEETLE-352](#bug-speckled-rovebeetle-352): Sensor shield design on inner bowl wall is too complicated `[cat_fountain]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-STINGING-LACEWING-799](#bug-stinging-lacewing-799): Mounting system for hole-less PCBs is too complicated `[cat_fountain]` (`RESOLVED`)
-- [x] **`[HIGH]`** [#BUG-LUSTROUS-COCOON-669](#bug-lustrous-cocoon-669): Motor base design is way too complicated `[cat_fountain]` (`RESOLVED`)
+- [ ] **`[HIGH]`** [#BUG-LUSTROUS-COCOON-669](#bug-lustrous-cocoon-669): Motor base design is way too complicated `[cat_fountain]` (`OPEN`)
 - [x] **`[MEDIUM]`** [#BUG-THORACIC-HARVESTMAN-529](#bug-thoracic-harvestman-529): Add grooves for triangular motor struts to drive hub `[cat_fountain]` (`CLOSED`)
 
 ## Detailed Issue Log
@@ -28146,15 +28146,15 @@ Replaced slide-in guide rail system for hole-less PCBs with axial snap-socket fr
 
 ---
 
-### <a id="bug-lustrous-cocoon-669"></a> 🟢 `[BUG-LUSTROUS-COCOON-669]` Motor base design is way too complicated
+### <a id="bug-lustrous-cocoon-669"></a> 🔴 `[BUG-LUSTROUS-COCOON-669]` Motor base design is way too complicated
 
 - **UUID**: `13875eb9-23cd-4e48-8250-856f02d7bfa1`
-- **Status**: `RESOLVED`
+- **Status**: `OPEN`
 - **Severity**: `HIGH`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-05 14:54:50 UTC`
-- **Resolved**: `2026-11-06 00:15:49 UTC`
+- **Rejected**: `2026-11-06 00:16:51 UTC`
 
 #### Description
 

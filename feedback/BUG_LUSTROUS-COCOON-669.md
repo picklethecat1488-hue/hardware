@@ -1,13 +1,13 @@
-# 🟢 `[BUG-LUSTROUS-COCOON-669]` Motor base design is way too complicated
+# 🔴 `[BUG-LUSTROUS-COCOON-669]` Motor base design is way too complicated
 
 - **UUID**: `13875eb9-23cd-4e48-8250-856f02d7bfa1`
 - **ID**: `BUG-LUSTROUS-COCOON-669`
-- **Status**: `RESOLVED`
+- **Status**: `OPEN`
 - **Severity**: `HIGH`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-05 14:54:50 UTC`
-- **Resolved**: `2026-11-06 00:15:49 UTC`
+- **Rejected**: `2026-11-06 00:16:51 UTC`
 
 #### Description
 
