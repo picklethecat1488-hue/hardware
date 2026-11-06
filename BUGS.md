@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 06:44:06 UTC` |
+| **Report Date** | `2026-11-06 06:45:19 UTC` |
 | **Total Issues** | `317` |
 | **Open Issues** | `2` |
 | **Resolved / Closed** | `315 (99%)` |
@@ -24,10 +24,10 @@
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 171 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`PCB`** | 170 | Schematics, routing, footprints, nets, DRC, silkscreen. |
 | **`CAD`** | 39 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 11 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
-| **`INFRASTRUCTURE`** | 83 | Build tooling, compilers, test runners, headless tools. |
+| **`INFRASTRUCTURE`** | 84 | Build tooling, compilers, test runners, headless tools. |
 | **`UI`** | 2 | Web dashboards, CLI viewers, review interfaces. |
 
 ## Issue Checklist
@@ -348,7 +348,7 @@
 - [x] **`[MEDIUM]`** [#BUG-SPECKLED-ROACH-49](#bug-speckled-roach-49): Pump cover should snap into place `[cat_fountain]` (`CLOSED`)
 - [x] **`[LOW]`** [#BUG-GLOWING-WASP-133](#bug-glowing-wasp-133): Cat fountain-refactor and simplify code `[cat_fountain]` (`CLOSED`)
 - [ ] **`[MEDIUM]`** [#BUG-FIERCE-LONGHORN-849](#bug-fierce-longhorn-849): SWD and TMC6300 mounts- unsufficient snap ring overlap `[cat_fountain]` (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-SHINING-SILVERFISH-89](#bug-shining-silverfish-89): New Bug Report (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-SHINING-SILVERFISH-89](#bug-shining-silverfish-89): Attachments show up in the diff view `[dashboard]` (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -28333,12 +28333,23 @@ There is insufficient snap ring overlap to hold the SWD and TMC6300 boards in pl
 
 ---
 
-### <a id="bug-shining-silverfish-89"></a> 🔴 `[BUG-SHINING-SILVERFISH-89]` New Bug Report
+### <a id="bug-shining-silverfish-89"></a> 🔴 `[BUG-SHINING-SILVERFISH-89]` Attachments show up in the diff view
 
 - **UUID**: `4f9fe270-0b4f-4ff7-acce-8b9e66188e1c`
 - **Status**: `OPEN`
 - **Severity**: `MEDIUM`
-- **Category**: `PCB`
+- **Category**: `INFRASTRUCTURE`
+- **Component**: `dashboard`
 - **Created**: `2026-11-06 06:44:04 UTC`
+
+#### Description
+
+Attachment LFS changes show up in the diff view. Can we ensure that attachments are stored in the bug branches (refs/heads/bugs and ref/heads/worms) and migrate existing attachments, if needed?
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [screenshot_paste_1793947517131_gdv1n.png](attachments/BUG-SHINING-SILVERFISH-89/screenshot_paste_1793947517131_gdv1n.png) | Pasted screenshot screenshot_paste_1793947517131_gdv1n.png |
 
 ---

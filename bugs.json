@@ -9543,21 +9543,31 @@
     {
       "id": "BUG-SHINING-SILVERFISH-89",
       "uuid": "4f9fe270-0b4f-4ff7-acce-8b9e66188e1c",
-      "title": "New Bug Report",
+      "title": "Attachments show up in the diff view",
       "status": "OPEN",
       "severity": "MEDIUM",
-      "category": "PCB",
-      "component": "",
-      "description": "",
+      "category": "INFRASTRUCTURE",
+      "component": "dashboard",
+      "description": "Attachment LFS changes show up in the diff view. Can we ensure that attachments are stored in the bug branches (refs/heads/bugs and ref/heads/worms) and migrate existing attachments, if needed?",
       "reproduction_steps": [],
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "ad2fdb9c",
+          "filename": "screenshot_paste_1793947517131_gdv1n.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-SHINING-SILVERFISH-89/screenshot_paste_1793947517131_gdv1n.png",
+          "size_bytes": 107473,
+          "description": "Pasted screenshot screenshot_paste_1793947517131_gdv1n.png",
+          "created_at": "2026-11-06 06:45:17 UTC"
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-06 06:44:04 UTC",
-      "updated_at": "2026-11-06 06:44:04 UTC",
+      "updated_at": "2026-11-06 06:45:17 UTC",
       "resolved_at": null,
       "resolution_notes": "",
       "rejection_notes": null,
@@ -9565,5 +9575,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 06:44:04 UTC"
+  "updated_at": "2026-11-06 06:45:17 UTC"
 }
