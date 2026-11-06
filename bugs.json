@@ -9057,7 +9057,7 @@
       "id": "BUG-BARBED-MIDGE-630",
       "uuid": "e4da4b73-81ef-4863-baf3-d4af7519adfc",
       "title": "There are 3 outer borders in my dashboard window?",
-      "status": "RESOLVED",
+      "status": "CLOSED",
       "severity": "MEDIUM",
       "category": "INFRASTRUCTURE",
       "component": "dashboard",
@@ -9090,11 +9090,11 @@
         }
       ],
       "created_at": "2026-10-23 23:00:18 UTC",
-      "updated_at": "",
+      "updated_at": "2026-11-06 00:18:47 UTC",
       "resolved_at": "2026-11-05 15:45:39 UTC",
       "resolution_notes": "Eliminate duplicate outer window borders and resize grippers by applying .in-iframe rules to common.css and workstation templates, and add frame-busting to diff_view.",
       "rejection_notes": "",
-      "accepted_at": null,
+      "accepted_at": "2026-11-06 00:18:47 UTC",
       "rejected_at": null
     },
     {
@@ -9431,5 +9431,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 00:18:37 UTC"
+  "updated_at": "2026-11-06 00:18:47 UTC"
 }

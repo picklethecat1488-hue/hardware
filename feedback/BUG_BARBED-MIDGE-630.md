@@ -2,12 +2,13 @@
 
 - **UUID**: `e4da4b73-81ef-4863-baf3-d4af7519adfc`
 - **ID**: `BUG-BARBED-MIDGE-630`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-10-23 23:00:18 UTC`
 - **Resolved**: `2026-11-05 15:45:39 UTC`
+- **Accepted**: `2026-11-06 00:18:47 UTC`
 
 #### Attachments & References
 

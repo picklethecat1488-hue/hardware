@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 00:18:38 UTC` |
+| **Report Date** | `2026-11-06 00:18:47 UTC` |
 | **Total Issues** | `313` |
 | **Open Issues** | `1` |
 | **Resolved / Closed** | `312 (99%)` |
@@ -335,7 +335,7 @@
 - [x] **`[LOW]`** [#BUG-TRANSLUCENT-TERMITE-733](#bug-translucent-termite-733): Fold directories under src/ into the repo root (`CLOSED`)
 - [x] **`[HIGH]`** [#WORM-CREEPING-LARVA-820](#worm-creeping-larva-820): Regression tests are not useful (`CLOSED`)
 - [x] **`[HIGH]`** [#BUG-VIBRANT-WOODBORER-940](#bug-vibrant-woodborer-940): Create motor hub assembly `[cat_fountain]` (`CLOSED`)
-- [x] **`[MEDIUM]`** [#BUG-BARBED-MIDGE-630](#bug-barbed-midge-630): There are 3 outer borders in my dashboard window? `[dashboard]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-BARBED-MIDGE-630](#bug-barbed-midge-630): There are 3 outer borders in my dashboard window? `[dashboard]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-SPRINGING-MOSQUITO-703](#bug-springing-mosquito-703): Extend inner wall to surface of ToF sensor PCB `[cat_fountain]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-FEATHERED-CENTIPEDE-381](#bug-feathered-centipede-381): It takes 10s to save bugs now `[dashboard]` (`RESOLVED`)
 - [x] **`[HIGH]`** [#BUG-POLLEN-BACKSWIMMER-846](#bug-pollen-backswimmer-846): TMC6300-clip on mounts are too big `[cat_fountain]` (`CLOSED`)
@@ -27928,12 +27928,13 @@ Replaced motor_clip and integrated enclosed well beneath the impeller with dedic
 ### <a id="bug-barbed-midge-630"></a> 🟢 `[BUG-BARBED-MIDGE-630]` There are 3 outer borders in my dashboard window?
 
 - **UUID**: `e4da4b73-81ef-4863-baf3-d4af7519adfc`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-10-23 23:00:18 UTC`
 - **Resolved**: `2026-11-05 15:45:39 UTC`
+- **Accepted**: `2026-11-06 00:18:47 UTC`
 
 #### Attachments & References
 
