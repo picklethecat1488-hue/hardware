@@ -31,6 +31,7 @@ Additionally, we should add holes on each wall to allow a small tool such as an 
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:142f51c1 --> Inspect SWD and TMC6300 snap sockets in 3D viewer | `python tools/view.py cat_fountain/product:view`
+- [ ] <!-- task:cf11ee9f --> Inspect SWD and TMC6300 snap sockets in 3D viewer for tool removal openings on all 4 walls | `python tools/view.py cat_fountain/product:view`
 
 #### Resolution Notes
 

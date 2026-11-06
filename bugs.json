@@ -8731,33 +8731,6 @@
         },
         {
           "id": "att-6",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
-          "size_bytes": 0,
-          "description": "Legacy Excel 97-2004 format of replied quotation BOM",
-          "created_at": ""
-        },
-        {
-          "id": "att-7",
-          "filename": "digikey_order_2026-10-14.xlsx",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx",
-          "size_bytes": 0,
-          "description": "Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2)",
-          "created_at": ""
-        },
-        {
-          "id": "att-8",
-          "filename": "carrier_board_bom_rev3.csv",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv",
-          "size_bytes": 0,
-          "description": "CSV export of clean EDA BOM Rev 3",
-          "created_at": ""
-        },
-        {
-          "id": "att-6",
           "filename": "carrier_board_bom_rev2.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
@@ -8781,6 +8754,33 @@
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv",
           "size_bytes": 0,
           "description": "CSV export of clean EDA BOM",
+          "created_at": ""
+        },
+        {
+          "id": "att-3",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
+          "size_bytes": 0,
+          "description": "Legacy Excel 97-2004 format of replied quotation BOM",
+          "created_at": ""
+        },
+        {
+          "id": "att-4",
+          "filename": "digikey_order_2026-10-14.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx",
+          "size_bytes": 0,
+          "description": "Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2)",
+          "created_at": ""
+        },
+        {
+          "id": "att-5",
+          "filename": "carrier_board_bom_rev3.csv",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv",
+          "size_bytes": 0,
+          "description": "CSV export of clean EDA BOM Rev 3",
           "created_at": ""
         }
       ],
@@ -9331,6 +9331,15 @@
       "attachments": [
         {
           "id": "att-3",
+          "filename": "screenshot_paste_1793890876309_0c9ae.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1793890876309_0c9ae.png",
+          "created_at": ""
+        },
+        {
+          "id": "att-1",
           "filename": "screenshot_paste_1793924149979_7f535.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png",
@@ -9345,15 +9354,6 @@
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png",
           "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793890911006_wvg54.png",
-          "created_at": ""
-        },
-        {
-          "id": "att-3",
-          "filename": "screenshot_paste_1793890876309_0c9ae.png",
-          "file_type": "screenshot",
-          "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png",
-          "size_bytes": 0,
-          "description": "Pasted screenshot screenshot_paste_1793890876309_0c9ae.png",
           "created_at": ""
         }
       ],
@@ -9550,10 +9550,17 @@
           "command": "python tools/view.py cat_fountain/product:view",
           "status": "PENDING",
           "notes": ""
+        },
+        {
+          "id": "cf11ee9f",
+          "title": "Inspect SWD and TMC6300 snap sockets in 3D viewer for tool removal openings on all 4 walls",
+          "command": "python tools/view.py cat_fountain/product:view",
+          "status": "PENDING",
+          "notes": ""
         }
       ],
       "created_at": "2026-11-06 06:40:24 UTC",
-      "updated_at": "2026-11-06 20:35:16 UTC",
+      "updated_at": "2026-11-06 20:35:44 UTC",
       "resolved_at": "2026-11-06 20:35:10 UTC",
       "resolution_notes": "Added 6x2mm tool removal apertures on each wall beneath PCB for easy board extraction with an Allen wrench",
       "rejection_notes": "Configured pcb_snap_socket_cutout_margin to 0.4mm for positive snap ring overlap holding SWD and TMC6300 boards\n\nRejected— the side openings for inserting a board removal tool into the mount are missing from the design.",
@@ -9707,5 +9714,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 20:35:16 UTC"
+  "updated_at": "2026-11-06 20:35:44 UTC"
 }
