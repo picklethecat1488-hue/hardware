@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 17:15:25 UTC` |
+| **Report Date** | `2026-11-06 17:16:05 UTC` |
 | **Total Issues** | `320` |
 | **Open Issues** | `1` |
 | **Resolved / Closed** | `319 (99%)` |
@@ -24,10 +24,10 @@
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 171 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`PCB`** | 170 | Schematics, routing, footprints, nets, DRC, silkscreen. |
 | **`CAD`** | 39 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 11 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
-| **`INFRASTRUCTURE`** | 85 | Build tooling, compilers, test runners, headless tools. |
+| **`INFRASTRUCTURE`** | 86 | Build tooling, compilers, test runners, headless tools. |
 | **`UI`** | 2 | Web dashboards, CLI viewers, review interfaces. |
 
 ## Issue Checklist
@@ -351,7 +351,7 @@
 - [x] **`[MEDIUM]`** [#BUG-SHINING-SILVERFISH-89](#bug-shining-silverfish-89): Attachments show up in the diff view `[dashboard]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-BRISTLY-CENTIPEDE-327](#bug-bristly-centipede-327): Add modal progress UIs for repo and bug actions `[dashboard]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-LUSTROUS-HORSEFLY-593](#bug-lustrous-horsefly-593): Rename GEMINI.md to AGENTS.md (`CLOSED`)
-- [ ] **`[MEDIUM]`** [#BUG-DIURNAL-ANT-667](#bug-diurnal-ant-667): New Bug Report (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-DIURNAL-ANT-667](#bug-diurnal-ant-667): Opening commits in bug report workstation-broken `[dashboard]` (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -28443,12 +28443,19 @@ Renamed GEMINI.md to AGENTS.md and updated all documentation and test references
 
 ---
 
-### <a id="bug-diurnal-ant-667"></a> 🔴 `[BUG-DIURNAL-ANT-667]` New Bug Report
+### <a id="bug-diurnal-ant-667"></a> 🔴 `[BUG-DIURNAL-ANT-667]` Opening commits in bug report workstation-broken
 
 - **UUID**: `11c9c5fd-5d11-49fd-98dd-55d1692ee65d`
 - **Status**: `OPEN`
 - **Severity**: `MEDIUM`
-- **Category**: `PCB`
+- **Category**: `INFRASTRUCTURE`
+- **Component**: `dashboard`
 - **Created**: `2026-11-06 17:15:23 UTC`
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [screenshot_paste_1793985363740_q9986.png](attachments/BUG-DIURNAL-ANT-667/screenshot_paste_1793985363740_q9986.png) | Pasted screenshot screenshot_paste_1793985363740_q9986.png |
 
 ---
