@@ -87,7 +87,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1789867312215.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789867312215.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-20 01:21:09 UTC",
@@ -137,7 +147,53 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1789867505406.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789867505406.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "pasted_screenshot_1789867556390.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789867556390.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-3",
+          "filename": "pasted_screenshot_1789867639596.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789867639596.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-4",
+          "filename": "pasted_screenshot_1789867860482.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789867860482.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-5",
+          "filename": "pasted_screenshot_1789867999679.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789867999679.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-20 01:23:52 UTC",
@@ -161,7 +217,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1789868156788.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789868156788.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-20 01:25:11 UTC",
@@ -185,7 +251,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1789867754836.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789867754836.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-20 01:28:48 UTC",
@@ -233,7 +309,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1789868481294.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789868481294.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-20 01:39:07 UTC",
@@ -257,7 +343,26 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1789868744526.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789868744526.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "capacitive_hatch_diagram.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/capacitive_hatch_diagram.png",
+          "size_bytes": 0,
+          "description": "Uploaded screenshot capacitive_hatch_diagram.png",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-20 01:44:52 UTC",
@@ -305,7 +410,26 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1789869225983.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789869225983.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "pasted_screenshot_1789869344830.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789869344830.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-20 01:53:06 UTC",
@@ -353,7 +477,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1789869750753.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789869750753.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-20 02:02:06 UTC",
@@ -412,7 +546,26 @@
       "expected_behavior": "Both boards should be populated with tracks and vias, so I can review them",
       "actual_behavior": "All components on both boards are dangling",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1789920322587.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789920322587.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "pasted_screenshot_1789920363199.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789920363199.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-20 16:04:39 UTC",
@@ -436,7 +589,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1789920480272.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789920480272.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-20 16:07:41 UTC",
@@ -460,7 +623,17 @@
       "expected_behavior": "_Not specified_",
       "actual_behavior": "VBUS should connect to the VBUS symbol, GND should connect to the GND symbol",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1789920581752.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789920581752.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-20 16:09:29 UTC",
@@ -484,7 +657,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1789920680993.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789920680993.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-20 16:11:09 UTC",
@@ -508,7 +691,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1789920833115.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789920833115.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-20 16:13:36 UTC",
@@ -532,7 +725,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1789920975728.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789920975728.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-20 16:15:22 UTC",
@@ -556,7 +759,26 @@
       "expected_behavior": "-Add a pull up section to the schematic page for I2C",
       "actual_behavior": "_Not specified_",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1789921025511.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789921025511.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "pasted_screenshot_1789921141794.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789921141794.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-20 16:16:33 UTC",
@@ -606,7 +828,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1789938186701.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789938186701.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-20 16:20:46 UTC",
@@ -630,7 +862,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1789938241466.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789938241466.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-20 21:03:41 UTC",
@@ -654,7 +896,26 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1789938444644.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789938444644.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "pasted_screenshot_1789938495363.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789938495363.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-20 21:07:01 UTC",
@@ -680,7 +941,35 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1789938564172.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789938564172.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "pasted_screenshot_1789938728396.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789938728396.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-3",
+          "filename": "pasted_screenshot_1789938798951.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789938798951.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-20 21:09:18 UTC",
@@ -730,7 +1019,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "image.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/image.png",
+          "size_bytes": 0,
+          "description": "Uploaded screenshot image.png",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-20 21:21:39 UTC",
@@ -802,7 +1101,35 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1789946955958.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789946955958.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "pasted_screenshot_1789946984207.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789946984207.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-3",
+          "filename": "pasted_screenshot_1789947243956.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789947243956.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-20 21:27:13 UTC",
@@ -826,7 +1153,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1789947049458.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789947049458.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-20 23:29:47 UTC",
@@ -874,7 +1211,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1789947443867.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789947443867.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-20 23:36:53 UTC",
@@ -898,7 +1245,35 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_document_1789947830211.txt",
+          "file_type": "document",
+          "file_path": "build/attachments/pasted_document_1789947830211.txt",
+          "size_bytes": 0,
+          "description": "Pasted text document",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "flex_tail-drc.rpt",
+          "file_type": "reference",
+          "file_path": "build/attachments/flex_tail-drc.rpt",
+          "size_bytes": 0,
+          "description": "Uploaded reference flex_tail-drc.rpt",
+          "created_at": ""
+        },
+        {
+          "id": "att-3",
+          "filename": "carrier_board-drc.rpt",
+          "file_type": "reference",
+          "file_path": "build/attachments/carrier_board-drc.rpt",
+          "size_bytes": 0,
+          "description": "Uploaded reference carrier_board-drc.rpt",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-20 23:37:51 UTC",
@@ -1258,7 +1633,26 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "W25N01GV Rev R 070323.pdf",
+          "file_type": "document",
+          "file_path": "build/attachments/W25N01GV Rev R 070323.pdf",
+          "size_bytes": 0,
+          "description": "Uploaded document W25N01GV Rev R 070323.pdf",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "MCXNP184M150F70.pdf",
+          "file_type": "document",
+          "file_path": "build/attachments/MCXNP184M150F70.pdf",
+          "size_bytes": 0,
+          "description": "Uploaded document MCXNP184M150F70.pdf",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-21 03:01:44 UTC",
@@ -1282,7 +1676,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "bq24074.pdf",
+          "file_type": "document",
+          "file_path": "build/attachments/bq24074.pdf",
+          "size_bytes": 0,
+          "description": "Uploaded document bq24074.pdf",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-21 03:06:00 UTC",
@@ -1378,7 +1782,17 @@
       "expected_behavior": "All new ICs and connectors placed on board",
       "actual_behavior": "No new components from the downselection review are placed on board",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790045953631.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790045953631.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-21 04:43:55 UTC",
@@ -1402,7 +1816,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1789966040784.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789966040784.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-21 04:47:04 UTC",
@@ -1474,7 +1898,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1789966351542.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1789966351542.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-21 04:50:11 UTC",
@@ -1720,7 +2154,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790015168061.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790015168061.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-21 18:25:23 UTC",
@@ -1842,7 +2286,44 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790045994113.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790045994113.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "pasted_screenshot_1790046087008.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790046087008.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-3",
+          "filename": "pasted_screenshot_1790046134444.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790046134444.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-4",
+          "filename": "pasted_screenshot_1790046211771.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790046211771.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-22 02:59:42 UTC",
@@ -1890,7 +2371,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790046385642.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790046385642.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-22 03:06:00 UTC",
@@ -1914,7 +2405,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790132888424.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790132888424.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-23 03:07:50 UTC",
@@ -2084,7 +2585,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790283157382.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790283157382.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-24 20:52:26 UTC",
@@ -2108,7 +2619,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790283246209.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790283246209.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-24 20:53:44 UTC",
@@ -2132,7 +2653,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790283360253.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790283360253.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-24 20:55:50 UTC",
@@ -2180,7 +2711,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790283685004.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790283685004.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-24 21:01:11 UTC",
@@ -2204,7 +2745,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790283903996.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790283903996.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-24 21:04:04 UTC",
@@ -2228,7 +2779,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790284014503.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790284014503.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-24 21:06:52 UTC",
@@ -2400,7 +2961,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790298848779.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790298848779.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-25 01:14:00 UTC",
@@ -2448,7 +3019,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790299068920.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790299068920.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-25 01:17:38 UTC",
@@ -2496,7 +3077,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790358624572.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790358624572.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-25 17:50:20 UTC",
@@ -2520,7 +3111,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790358758039.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790358758039.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-25 17:52:29 UTC",
@@ -2544,7 +3145,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790358938072.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790358938072.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-25 17:55:30 UTC",
@@ -2568,7 +3179,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790359052357.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790359052357.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-25 17:57:20 UTC",
@@ -2592,7 +3213,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790359136802.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790359136802.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-25 17:58:48 UTC",
@@ -2616,7 +3247,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790359293290.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790359293290.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-25 18:01:12 UTC",
@@ -2640,7 +3281,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790364991115.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790364991115.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-25 19:35:13 UTC",
@@ -2664,7 +3315,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790365115426.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790365115426.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-25 19:37:35 UTC",
@@ -2688,7 +3349,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790365165371.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790365165371.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-25 19:39:13 UTC",
@@ -2736,7 +3407,26 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "carrier_board_bottom.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/carrier_board_bottom.png",
+          "size_bytes": 0,
+          "description": "Uploaded screenshot carrier_board_bottom.png",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "carrier_board_top.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/carrier_board_top.png",
+          "size_bytes": 0,
+          "description": "Uploaded screenshot carrier_board_top.png",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-25 19:51:08 UTC",
@@ -2760,7 +3450,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790366404771.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790366404771.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-25 19:56:17 UTC",
@@ -2784,7 +3484,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790366854184.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790366854184.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-25 19:59:39 UTC",
@@ -2808,7 +3518,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790372559666.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790372559666.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-25 21:42:13 UTC",
@@ -2832,7 +3552,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "image.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/image.png",
+          "size_bytes": 0,
+          "description": "Uploaded screenshot image.png",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-25 22:15:53 UTC",
@@ -2856,7 +3586,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790375160222.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790375160222.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-25 22:25:07 UTC",
@@ -2904,7 +3644,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790375665424.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790375665424.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-25 22:32:22 UTC",
@@ -2952,7 +3702,26 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "$ python src/view.py test_board/carrier_board:pcb\npybullet build time: Oct 20 2025 08:05:00\n🖥️ Viewing KiCad file: /Users/<username>/gh/hardware/build/board/test_board/carrier_board.kicad_pcb \n✨ Opened in VS Code (KiCode): carrier_board.kicad_pcb \n👁️ Showing test_board_carrier_board_pcb \n▶ + \n✔ Done Visualizing...\n(cq)",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790376206914.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790376206914.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "pasted_screenshot_1790376296765.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790376296765.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-25 22:37:58 UTC",
@@ -3002,7 +3771,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790387403584.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790387403584.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-26 01:49:51 UTC",
@@ -3122,7 +3901,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790391040013.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790391040013.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-26 02:49:53 UTC",
@@ -3146,7 +3935,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790391213203.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790391213203.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-26 02:52:07 UTC",
@@ -3170,7 +3969,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790391477791.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790391477791.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-26 02:57:12 UTC",
@@ -3194,7 +4003,26 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790445012556.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790445012556.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "pasted_screenshot_1790445149239.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790445149239.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-26 17:37:29 UTC",
@@ -3218,7 +4046,17 @@
       "expected_behavior": "The battery holder is created from 3 rounded rectangles",
       "actual_behavior": "The battery holder is created from 1 rounded rectangles",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790444379020.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790444379020.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-26 17:37:44 UTC",
@@ -3266,7 +4104,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790445678469.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790445678469.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-26 17:57:02 UTC",
@@ -3290,7 +4138,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790445761429.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790445761429.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-26 18:01:36 UTC",
@@ -3388,7 +4246,35 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "pybullet build time: Oct 20 2025 08:05:00\n🛠️ Compiling parts: test_board/carrier_board, test_board/flex_tail, test_board/enclosure_bottom, test_board/enclosure_lid, test_board/led_cover, test_board/battery_cover \n📄 Saved build/stl/test_board/carrier_board.stl \n📄 Saved build/stl/test_board/enclosure_bottom.stl \n📄 Saved build/obj/test_board/carrier_board.obj \n📄 Saved build/stl/test_board/battery_cover.stl \n🤖 Compiling URDFs: test_board/carrier_board, test_board/flex_tail, test_board/battery_cover, test_board/product \n📄 Saved build/urdf/test_board/carrier_board.urdf \n🤖 Running Simulation (Ctrl-C to exit)... \n🛑 Simulation terminated: All 7 flying probe test points completed successfully \n✔ Done Visualizing...\n(cq)",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790446532263.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790446532263.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "pasted_screenshot_1790472643701.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790472643701.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-3",
+          "filename": "pasted_screenshot_1790478828337.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790478828337.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-26 18:15:08 UTC",
@@ -3462,7 +4348,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790457630983.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790457630983.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-26 21:18:49 UTC",
@@ -3486,7 +4382,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790472825887.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790472825887.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-27 01:33:20 UTC",
@@ -3510,7 +4416,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "$ python src/config.py 'carrier_board/*'\npybullet build time: Oct 20 2025 08:05:00\n⚙️ Configuring carrier_board/route \n⚡ Auto-routed carrier: 1545 trace segments (4204.85 mm total) and 407 vias. \n⚡ Auto-routed flex: 44 trace segments (206.13 mm total) and 0 vias. \n💾 Persisted routing to /Users/<username>/gh/hardware/src/projects/carrier_board/routing.yaml and .env \n⚙️ Saved environment to .env \n✔ Done Configuring...\n(cq) \n\n$ python src/view.py carrier_board/flex_tail:pcb\npybullet build time: Oct 20 2025 08:05:00\n🖥️ Viewing KiCad file: /Users/<username>/gh/hardware/build/board/carrier_board/flex_tail.kicad_pcb \n✨ Opened in VS Code (KiCode): flex_tail.kicad_pcb \n👁️ Showing carrier_board_flex_tail_pcb \n▶ + \n✔ Done Visualizing...\n(cq)",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790473011710.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790473011710.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-27 01:36:34 UTC",
@@ -3534,7 +4450,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790478673311.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790478673311.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-27 01:42:13 UTC",
@@ -3558,7 +4484,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790474255304.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790474255304.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-27 01:56:46 UTC",
@@ -3632,7 +4568,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790480948261.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790480948261.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-27 03:45:04 UTC",
@@ -3684,7 +4630,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790481436497.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790481436497.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-27 03:55:36 UTC",
@@ -3738,7 +4694,17 @@
       "expected_behavior": "view.py should visualize pre-routed traces from routing_flex.yaml in O(1) time without running the router.",
       "actual_behavior": "view.py triggered A* routing across all carrier nets without board footprint scoping, causing deadlock.",
       "logs": "RuntimeError: A* router could not find collision-free path for net 'GND' from (0.00, 0.00) [F.Cu] to (-5.50, -8.00) [F.Cu]",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "flex_fail_overlap.png",
+          "file_type": "screenshot",
+          "file_path": "build/flex_fail_overlap.png",
+          "size_bytes": 0,
+          "description": "Visual artifact of routing collision",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-27 16:27:07 UTC",
@@ -3765,7 +4731,17 @@
       "expected_behavior": "USB-C connector mouth must face board edge outward (-X) with receptacle pins facing board interior (+X).",
       "actual_behavior": "Connector mouth faced -Y with shield pins facing board edge.",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "j_usb_must_face_board_edge.png",
+          "file_type": "screenshot",
+          "file_path": "build/j_usb_must_face_board_edge.png",
+          "size_bytes": 0,
+          "description": "Incorrect J_USB orientation review screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-27 16:27:07 UTC",
@@ -3792,7 +4768,26 @@
       "expected_behavior": "Silkscreen text must be placed with collision avoidance keepouts clear of component pads and adjacent text.",
       "actual_behavior": "Text rendered overlapping pads ('TP_GNDTP_TX0_N') and discrete component labels collided ('C3 R_BOO5').",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "test_points_silkscreen_overlap.png",
+          "file_type": "screenshot",
+          "file_path": "build/test_points_silkscreen_overlap.png",
+          "size_bytes": 0,
+          "description": "Overlapping test point silkscreen",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "multiple_discrete_antenna.png",
+          "file_type": "screenshot",
+          "file_path": "build/multiple_discrete_antenna.png",
+          "size_bytes": 0,
+          "description": "Discrete component labels colliding",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-27 16:27:07 UTC",
@@ -3819,7 +4814,17 @@
       "expected_behavior": "C1 must decouple U2 power pin with stitching vias to 3V3 and GND planes.",
       "actual_behavior": "C1 had isolated pads with no traces or vias connecting to copper planes.",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "c1_dangling.png",
+          "file_type": "screenshot",
+          "file_path": "build/c1_dangling.png",
+          "size_bytes": 0,
+          "description": "Dangling C1 decoupling capacitor",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-27 16:27:07 UTC",
@@ -3846,7 +4851,17 @@
       "expected_behavior": "Piezo speaker must have circular silkscreen boundary and be located near mounting hole MH2.",
       "actual_behavior": "Rectangular pin header footprint rendered at [-22.0, 26.0].",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "fix_spk2_placement.png",
+          "file_type": "screenshot",
+          "file_path": "build/fix_spk2_placement.png",
+          "size_bytes": 0,
+          "description": "Review screenshot requesting round piezo silkscreen",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-27 16:27:07 UTC",
@@ -3955,7 +4970,17 @@
       "expected_behavior": "Table cells should enforce max-width: 0 and overflow-x: auto to wrap cleanly without breaking container layout.",
       "actual_behavior": "Text expanded uncontrollably beyond viewport width.",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "overlapping_text.png",
+          "file_type": "screenshot",
+          "file_path": "build/overlapping_text.png",
+          "size_bytes": 0,
+          "description": "Overlapping text in split view screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-27 16:27:07 UTC",
@@ -3981,7 +5006,17 @@
       "expected_behavior": "_Not specified_",
       "actual_behavior": "Flex tail should not intersect with the bottom or top of enclosure",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790004918049.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790004918049.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-27 16:27:07 UTC",
@@ -4079,7 +5114,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790535919844.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790535919844.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-27 19:02:18 UTC",
@@ -4127,7 +5172,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "image.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/image.png",
+          "size_bytes": 0,
+          "description": "Uploaded screenshot image.png",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-27 19:32:19 UTC",
@@ -4151,7 +5206,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790568918278.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790568918278.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-27 23:08:51 UTC",
@@ -4202,7 +5267,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790552121064.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790552121064.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-27 23:34:40 UTC",
@@ -4278,7 +5353,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790564470388.png",
+          "file_type": "screenshot",
+          "file_path": "build/attachments/pasted_screenshot_1790564470388.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-28 02:57:58 UTC",
@@ -4374,7 +5459,26 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "carrier_board-drc.rpt",
+          "file_type": "reference",
+          "file_path": "build/attachments/carrier_board-drc.rpt",
+          "size_bytes": 0,
+          "description": "Updated clean carrier_board-drc.rpt (0 violations)",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "flex_tail-drc.rpt",
+          "file_type": "reference",
+          "file_path": "build/attachments/flex_tail-drc.rpt",
+          "size_bytes": 0,
+          "description": "Updated clean flex_tail-drc.rpt (0 violations)",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-28 16:49:36 UTC",
@@ -4590,7 +5694,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790625153073.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790625153073.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-28 19:51:51 UTC",
@@ -4854,7 +5968,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790634671150.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790634671150.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-28 22:30:40 UTC",
@@ -4878,7 +6002,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790634771653.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790634771653.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-28 22:32:23 UTC",
@@ -4902,7 +6036,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790634905359.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790634905359.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-28 22:34:34 UTC",
@@ -4998,7 +6142,35 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790636178362.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790636178362.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "pasted_screenshot_1790636255586.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790636255586.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-3",
+          "filename": "pasted_screenshot_1790636366486.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790636366486.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-28 22:54:51 UTC",
@@ -5046,7 +6218,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790644520721.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790644520721.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-29 01:13:57 UTC",
@@ -5075,7 +6257,35 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790644800591.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790644800591.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "pasted_screenshot_1790645062449.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790645062449.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-3",
+          "filename": "carrier_board_top_bug209_fixed.png",
+          "file_type": "preview",
+          "file_path": "recordings/previews/carrier_board_top_bug209_fixed.png",
+          "size_bytes": 0,
+          "description": "High-resolution fixed board texture",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-29 01:17:12 UTC",
@@ -5219,7 +6429,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790651818964.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790651818964.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-29 03:16:25 UTC",
@@ -5365,7 +6585,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790659781121.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790659781121.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-29 05:29:21 UTC",
@@ -5511,7 +6741,26 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790710739020.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790710739020.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "pasted_screenshot_1790710768949.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790710768949.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-29 19:38:26 UTC",
@@ -5612,7 +6861,35 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790711704163.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790711704163.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "pasted_screenshot_1790711777076.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790711777076.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        },
+        {
+          "id": "att-3",
+          "filename": "u-blox_NINA-B30_datasheet.pdf",
+          "file_type": "document",
+          "file_path": "attachments/u-blox_NINA-B30_datasheet.pdf",
+          "size_bytes": 0,
+          "description": "Uploaded document u-blox_NINA-B30_datasheet.pdf",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-29 19:52:14 UTC",
@@ -5636,7 +6913,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790725427077.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790725427077.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-29 23:43:31 UTC",
@@ -5660,7 +6947,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790725528764.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790725528764.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-29 23:45:25 UTC",
@@ -5732,7 +7029,17 @@
       "expected_behavior": "CR count should have increased to 1/4",
       "actual_behavior": "CR count stayed at 1/1",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790727075474.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790727075474.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-30 00:10:37 UTC",
@@ -5756,7 +7063,17 @@
       "expected_behavior": "When I click and hold on the gripper, the X position of the gripper should follow the mouse",
       "actual_behavior": "It seemed to go in the opposite direction of the mouse",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790727267913.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790727267913.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-30 00:12:33 UTC",
@@ -5879,7 +7196,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790739590554.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790739590554.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-09-30 03:39:43 UTC",
@@ -6119,7 +7446,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790818791618.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790818791618.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-10-01 01:39:41 UTC",
@@ -6169,7 +7506,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790825414866.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790825414866.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-10-01 03:30:11 UTC",
@@ -6193,7 +7540,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790829835444.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790829835444.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-10-01 04:42:38 UTC",
@@ -6217,7 +7574,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "3. Primary Signal Nets\n GND (89 pins)  3V3 (36 pins)  VBUS (5 pins)  VBUS_CHG (4 pins)\n VBAT (5 pins)  CC1 (2 pins)  CC2 (2 pins)  AUDIO_EN (3 pins)\n PERIPH_EN (2 pins)  PERIPH_3V3 (7 pins)  EXP_INT_I2C (2 pins)  EXP_INT_I3C (2 pins)\n EXP_INT_I3C1 (2 pins)  EXP_INT_SPI (2 pins)  CAP_INT (2 pins)  I2C_SCL (3 pins)\n I2C_SDA (3 pins)  OSC_IN (3 pins)  OSC_OUT (3 pins)  NRST (5 pins)\n FTDI_NRST (2 pins)  BOOT0 (4 pins)  FTDI_BOOT0 (2 pins)  LED_VBAT_K (2 pins)\n LED_VBUS_K (2 pins)  LED_3V3_K (2 pins)  LED_AUD_K (2 pins)  LED_PERIPH_K (2 pins)\n LED_MCU_K (2 pins)  BLE_RX (2 pins)  BLE_RTS (2 pins)  BLE_TX (2 pins)\n BLE_CTS (2 pins)  BLE_RESET_N (2 pins)  BLE_SWDCLK (2 pins)  BLE_SWDIO (2 pins)\n NFC1 (3 pins)  NFC2 (3 pins)  CAP_SHIELD (3 pins)  CAP_TX2 (3 pins)\n CAP_TX1 (3 pins)  CAP_TX0 (3 pins)  CAP_RX3 (3 pins)  CAP_RX2 (3 pins)\n CAP_RX1 (3 pins)  CAP_RX0 (3 pins)  CAP_CT8 (2 pins)  PDM_CLK (2 pins)\n PDM_DAT (2 pins)  PDM_LRCLK (2 pins)  SPK_P (2 pins)  SPK_N (2 pins)\nPage 2 of 4\nflex_tail | FLEX | 6-Layer Stackup | Rev: 1.0\n3. Primary Signal Nets (Cont. - Page 2 of 2)\n VREGD (2 pins)  VREGA (2 pins)  I2C0_SCL (3 pins)  I2C0_SDA (3 pins)\n FUEL_ALRT (2 pins)  LED_R (2 pins)  LED_G (2 pins)  LED_B (2 pins)\n FLEX0_A_CS0_N (2 pins)  FLEX0_A_IO2 (2 pins)  FLEX0_A_IO3 (2 pins)  FLEX0_A_IO1 (2 pins)\n FLEX0_A_IO0 (2 pins)  FLEX0_A_SCK (2 pins)  SWD_CLK (2 pins)  SWD_DIO (2 pins)\n I2C2_SCL (2 pins)  I2C2_SDA (2 pins)  I3C1_SCL (2 pins)  I3C1_SDA (2 pins)\n I3C0_SCL (2 pins)  I3C0_SDA (2 pins)  SPI0_CS_N (2 pins)  SPI0_MISO (2 pins)\n SPI0_MOSI (2 pins)  SPI0_SCK (2 pins)  UART0_CTS (2 pins)  UART0_RTS (2 pins)\n UART0_TXD (2 pins)  UART0_RXD (2 pins)  USB_DP (2 pins)  USB_DM (2 pins)\n FTDI_3V3 (2 pins)  DTR_N (2 pins)  DSR_N (2 pins)  DCD_N (2 pins)\n CBUS4 (2 pins)  CBUS2 (2 pins)  CBUS3 (2 pins)  CBUS5 (2 pins)\n CBUS6 (2 pins)  CBUS7 (2 pins)  OSCI (2 pins)  GPIO0 (2 pins)\n GPIO1 (2 pins)  GPIO2 (2 pins)  GPIO3 (2 pins)",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790829938024.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790829938024.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-10-01 04:44:06 UTC",
@@ -6313,7 +7680,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790903212489.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790903212489.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-10-02 01:05:52 UTC",
@@ -6459,7 +7836,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790907607655.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790907607655.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-10-02 02:19:09 UTC",
@@ -6483,7 +7870,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790907669247.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/pasted_screenshot_1790907669247.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-10-02 02:20:43 UTC",
@@ -6507,7 +7904,17 @@
       "expected_behavior": "$ python src/view.py carrier_board/carrier_board:pcb",
       "actual_behavior": "$ python src/build.py \"carrier_board/*\"",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "daemon.log",
+          "file_type": "document",
+          "file_path": "attachments/daemon.log",
+          "size_bytes": 0,
+          "description": "Uploaded document daemon.log",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-10-02 03:32:34 UTC",
@@ -6579,7 +7986,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "pasted_screenshot_1790952643338.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-271/pasted_screenshot_1790952643338.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-10-02 14:47:31 UTC",
@@ -6675,7 +8092,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "W908185ASE69.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-275/W908185ASE69.png",
+          "size_bytes": 0,
+          "description": "Uploaded screenshot W908185ASE69.png",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-10-06 01:51:20 UTC",
@@ -6699,7 +8126,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "T-E70W908185A-2units-bom_templates(2026-10-07) question.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-276/T-E70W908185A-2units-bom_templates(2026-10-07) question.xlsx",
+          "size_bytes": 0,
+          "description": "Uploaded reference T-E70W908185A-2units-bom_templates(2026-10-07) question.xlsx",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-10-07 16:18:33 UTC",
@@ -6723,7 +8160,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "Sample_BOM_PCBWay.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-277/Sample_BOM_PCBWay.xlsx",
+          "size_bytes": 0,
+          "description": "Uploaded reference Sample_BOM_PCBWay.xlsx",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-10-07 16:19:40 UTC",
@@ -6891,7 +8338,26 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "image.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-TRANSLUCENT-LARVA-792/image.png",
+          "size_bytes": 0,
+          "description": "Uploaded screenshot image.png",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "Untitled 4.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-TRANSLUCENT-LARVA-792/Untitled 4.png",
+          "size_bytes": 0,
+          "description": "Uploaded screenshot Untitled 4.png",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-10-10 23:00:34 UTC",
@@ -6915,7 +8381,26 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "image.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-DEEP-BURROWER-108/image.png",
+          "size_bytes": 0,
+          "description": "Uploaded screenshot image.png",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "Untitled.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-DEEP-BURROWER-108/Untitled.png",
+          "size_bytes": 0,
+          "description": "Uploaded screenshot Untitled.png",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-10-10 23:07:44 UTC",
@@ -6939,7 +8424,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "image.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-FOSSORIAL-BRISTLE-291/image.png",
+          "size_bytes": 0,
+          "description": "Uploaded screenshot image.png",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-10-10 23:13:31 UTC",
@@ -6963,7 +8458,35 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "Untitled 3.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-PROBOSCID-NIGHTCRAWLER-523/Untitled 3.png",
+          "size_bytes": 0,
+          "description": "Uploaded screenshot Untitled 3.png",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "Untitled 1.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-PROBOSCID-NIGHTCRAWLER-523/Untitled 1.png",
+          "size_bytes": 0,
+          "description": "Uploaded screenshot Untitled 1.png",
+          "created_at": ""
+        },
+        {
+          "id": "att-3",
+          "filename": "Untitled 2.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-PROBOSCID-NIGHTCRAWLER-523/Untitled 2.png",
+          "size_bytes": 0,
+          "description": "Uploaded screenshot Untitled 2.png",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-10-11 00:15:58 UTC",
@@ -7068,7 +8591,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-11) questions.xls",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-SEGMENTED-PALOLO-739/T-E68W908185A-2units-bom_templates(2026-10-11) questions.xls",
+          "size_bytes": 0,
+          "description": "Uploaded reference T-E68W908185A-2units-bom_templates(2026-10-11) questions.xls",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-10-11 18:14:05 UTC",
@@ -7092,7 +8625,44 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-12)_rev1.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-GLOWING-OLIGOCHAETE-544/T-E68W908185A-2units-bom_templates(2026-10-12)_rev1.xlsx",
+          "size_bytes": 0,
+          "description": "Revised quotation BOM spreadsheet with U1/U2 consignment notes, IQS7222C101QNR substitution, and 3225-4P crystal",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-12)_rev1.xls",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-GLOWING-OLIGOCHAETE-544/T-E68W908185A-2units-bom_templates(2026-10-12)_rev1.xls",
+          "size_bytes": 0,
+          "description": "Legacy Excel 97-2004 format of revised quotation BOM",
+          "created_at": ""
+        },
+        {
+          "id": "att-3",
+          "filename": "carrier_board_bom_rev1.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-GLOWING-OLIGOCHAETE-544/carrier_board_bom_rev1.xlsx",
+          "size_bytes": 0,
+          "description": "Clean EDA export BOM generated directly from updated carrier board model matching PCBWay schema",
+          "created_at": ""
+        },
+        {
+          "id": "att-4",
+          "filename": "carrier_board_bom_rev1.csv",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-GLOWING-OLIGOCHAETE-544/carrier_board_bom_rev1.csv",
+          "size_bytes": 0,
+          "description": "CSV export of clean EDA BOM",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-10-12 17:19:42 UTC",
@@ -7184,6 +8754,33 @@
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
           "size_bytes": 0,
           "description": "Uploaded reference questions spreadsheet from PCBWay",
+          "created_at": ""
+        },
+        {
+          "id": "att-1",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
+          "size_bytes": 0,
+          "description": "Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
+          "size_bytes": 0,
+          "description": "Legacy Excel 97-2004 format of replied quotation BOM",
+          "created_at": ""
+        },
+        {
+          "id": "att-3",
+          "filename": "digikey_order_2026-10-14.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx",
+          "size_bytes": 0,
+          "description": "Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2)",
           "created_at": ""
         }
       ],
@@ -7354,7 +8951,26 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "clipboard_text_1792279938306.txt",
+          "file_type": "document",
+          "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279938306.txt",
+          "size_bytes": 0,
+          "description": "Pasted text document",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "clipboard_text_1792279899940.txt",
+          "file_type": "document",
+          "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279899940.txt",
+          "size_bytes": 0,
+          "description": "Pasted text document",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-10-17 23:30:57 UTC",
@@ -7450,7 +9066,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "screenshot_paste_1792806350220_dct9c.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-BARBED-MIDGE-630/screenshot_paste_1792806350220_dct9c.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1792806350220_dct9c.png",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [
         "bf875947"
       ],
@@ -7614,7 +9240,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "screenshot_paste_1793890121106_n89dw.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-SPECKLED-ROVEBEETLE-352/screenshot_paste_1793890121106_n89dw.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1793890121106_n89dw.png",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [
         "5821d84e"
       ],
@@ -7648,7 +9284,17 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "screenshot_paste_1793890436150_8301p.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-STINGING-LACEWING-799/screenshot_paste_1793890436150_8301p.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1793890436150_8301p.png",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [
         "57973376"
       ],
@@ -7690,6 +9336,24 @@
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png",
           "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793890911006_wvg54.png",
+          "created_at": ""
+        },
+        {
+          "id": "att-1",
+          "filename": "screenshot_paste_1793890876309_0c9ae.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1793890876309_0c9ae.png",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "screenshot_paste_1793924149979_7f535.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1793924149979_7f535.png",
           "created_at": ""
         }
       ],
@@ -7734,7 +9398,26 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "att-1",
+          "filename": "screenshot_paste_1793891547400_gyg0h.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891547400_gyg0h.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1793891547400_gyg0h.png",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "screenshot_paste_1793891379527_mc2d2.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891379527_mc2d2.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1793891379527_mc2d2.png",
+          "created_at": ""
+        }
+      ],
       "commit_ids": [
         "3768254b"
       ],
@@ -7845,6 +9528,15 @@
           "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793948449522_d1ck8.png",
           "created_at": ""
+        },
+        {
+          "id": "att-1",
+          "filename": "screenshot_paste_1793947358948_g28nw.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793947358948_g28nw.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1793947358948_g28nw.png",
+          "created_at": ""
         }
       ],
       "commit_ids": [
@@ -7892,9 +9584,17 @@
         }
       ],
       "commit_ids": [],
-      "review_tasks": [],
+      "review_tasks": [
+        {
+          "id": "29d45ad5",
+          "title": "Verify attachments are excluded from diff view and stored on refs/heads/bugs",
+          "command": "git status --porcelain",
+          "status": "PENDING",
+          "notes": ""
+        }
+      ],
       "created_at": "2026-11-06 06:44:04 UTC",
-      "updated_at": "",
+      "updated_at": "2026-11-06 14:01:45 UTC",
       "resolved_at": null,
       "resolution_notes": "",
       "rejection_notes": "",
@@ -7950,5 +9650,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 07:10:54 UTC"
+  "updated_at": "2026-11-06 14:01:45 UTC"
 }

@@ -17,3 +17,7 @@ Attachment LFS changes show up in the diff view. Can we ensure that attachments 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1793947517131_gdv1n.png](attachments/BUG-SHINING-SILVERFISH-89/screenshot_paste_1793947517131_gdv1n.png) | Pasted screenshot screenshot_paste_1793947517131_gdv1n.png |
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:29d45ad5 --> Verify attachments are excluded from diff view and stored on refs/heads/bugs | `git status --porcelain`
