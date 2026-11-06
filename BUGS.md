@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 06:36:15 UTC` |
-| **Total Issues** | `315` |
-| **Open Issues** | `0` |
-| **Resolved / Closed** | `315 (100%)` |
+| **Report Date** | `2026-11-06 06:40:26 UTC` |
+| **Total Issues** | `316` |
+| **Open Issues** | `1` |
+| **Resolved / Closed** | `315 (99%)` |
 
 ## Issues by Severity
 
@@ -17,14 +17,14 @@
 | :--- | :---: | :--- |
 | **`[CRITICAL]`** | 20 | System crashes, build failures, blockages, or electrical shorts. |
 | **`[HIGH]`** | 31 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
-| **`[MEDIUM]`** | 235 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
+| **`[MEDIUM]`** | 236 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
 | **`[LOW]`** | 29 | Minor aesthetic imperfections or documentation notes. |
 
 ## Issues by Category
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 170 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`PCB`** | 171 | Schematics, routing, footprints, nets, DRC, silkscreen. |
 | **`CAD`** | 38 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 11 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
 | **`INFRASTRUCTURE`** | 83 | Build tooling, compilers, test runners, headless tools. |
@@ -347,6 +347,7 @@
 - [x] **`[MEDIUM]`** [#BUG-THORACIC-HARVESTMAN-529](#bug-thoracic-harvestman-529): Add grooves for triangular motor struts to drive hub `[cat_fountain]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-SPECKLED-ROACH-49](#bug-speckled-roach-49): Pump cover should snap into place `[cat_fountain]` (`CLOSED`)
 - [x] **`[LOW]`** [#BUG-GLOWING-WASP-133](#bug-glowing-wasp-133): Cat fountain-refactor and simplify code `[cat_fountain]` (`CLOSED`)
+- [ ] **`[MEDIUM]`** [#BUG-FIERCE-LONGHORN-849](#bug-fierce-longhorn-849): New Bug Report (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -28307,5 +28308,15 @@ Can we clean up and optimize this code?
 #### Resolution Notes
 
 Refactored repeated snap ring and pocket tool patterns into reusable helpers make_snap_ring and make_filleted_pocket_tool
+
+---
+
+### <a id="bug-fierce-longhorn-849"></a> 🔴 `[BUG-FIERCE-LONGHORN-849]` New Bug Report
+
+- **UUID**: `04ef79bc-f57b-442f-8969-9dba1c94909f`
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-11-06 06:40:24 UTC`
 
 ---
