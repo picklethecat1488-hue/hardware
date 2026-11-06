@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 00:17:32 UTC` |
+| **Report Date** | `2026-11-06 00:18:20 UTC` |
 | **Total Issues** | `313` |
 | **Open Issues** | `1` |
 | **Resolved / Closed** | `312 (99%)` |
@@ -342,7 +342,7 @@
 - [x] **`[MEDIUM]`** [#BUG-SWARMING-CICADA-917](#bug-swarming-cicada-917): Replace motor room mount halls with clip mounts `[cat_fountain]` (`CLOSED`)
 - [x] **`[LOW]`** [#BUG-PINCERED-CADDISFLY-769](#bug-pincered-caddisfly-769): Add clip on mount for SWD header `[cat_fountain]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-SPECKLED-ROVEBEETLE-352](#bug-speckled-rovebeetle-352): Sensor shield design on inner bowl wall is too complicated `[cat_fountain]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-STINGING-LACEWING-799](#bug-stinging-lacewing-799): Mounting system for hole-less PCBs is too complicated `[cat_fountain]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-STINGING-LACEWING-799](#bug-stinging-lacewing-799): Mounting system for hole-less PCBs is too complicated `[cat_fountain]` (`CLOSED`)
 - [ ] **`[HIGH]`** [#BUG-LUSTROUS-COCOON-669](#bug-lustrous-cocoon-669): Motor base design is way too complicated `[cat_fountain]` (`OPEN`)
 - [x] **`[MEDIUM]`** [#BUG-THORACIC-HARVESTMAN-529](#bug-thoracic-harvestman-529): Add grooves for triangular motor struts to drive hub `[cat_fountain]` (`CLOSED`)
 
@@ -28115,12 +28115,13 @@ Simplify proximity sensor shield on inner bowl wall to an extruded hollow rectan
 ### <a id="bug-stinging-lacewing-799"></a> 🟢 `[BUG-STINGING-LACEWING-799]` Mounting system for hole-less PCBs is too complicated
 
 - **UUID**: `1843fe5a-0485-4e4c-a4e0-f555e9af7e1a`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-05 14:49:40 UTC`
 - **Resolved**: `2026-11-05 17:04:16 UTC`
+- **Accepted**: `2026-11-06 00:18:19 UTC`
 
 #### Description
 
