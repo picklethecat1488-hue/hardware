@@ -83,6 +83,19 @@ class TestCatFountainProvider:
             assert not hub.part.is_inside((hx, hy, clip_h * 0.5)), f"Mounting hole at {angle}° must be open"
             assert hub.part.is_inside((hx + 2.0, hy, clip_h * 0.5)), f"Surrounding base at {angle}° must be solid"
 
+        # 5. Bowl socket keyway slot cuts cleanly through socket wall with zero thin slivers at inner curved corners
+        bowl = provider.build_bowl("bowl")
+        assert bowl.part.is_valid()
+        floor_z = provider.settings.floor_z
+        t = provider.settings.bowl_thickness
+        z = floor_z - t - 5.0
+        # Points inside keyway opening at Y = 16.8 (where curved inner wall was previously leaving thin slivers) must be open
+        assert not bowl.part.is_inside((7.5, 16.8, z)), "Right corner of keyway slot must not have thin sliver wall"
+        assert not bowl.part.is_inside((-7.5, 16.8, z)), "Left corner of keyway slot must not have thin sliver wall"
+        # Socket wall outside the keyway width (X = 8.5) must remain solid
+        assert bowl.part.is_inside((8.5, 16.8, z)), "Socket wall outside keyway must remain solid"
+        assert bowl.part.is_inside((-8.5, 16.8, z)), "Socket wall outside keyway must remain solid"
+
     @pytest.mark.slow
     def test_build_part_geometry(self, provider):
         """Verify that build_fountain produces valid geometry."""

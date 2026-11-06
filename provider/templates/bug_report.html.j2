@@ -1255,6 +1255,7 @@
     async function acceptActiveBug() {
       if (!activeBugId) return;
       try {
+        await saveActiveBug();
         const res = await fetch("/api/bugs/accept", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1283,10 +1284,12 @@
     async function rejectActiveBug() {
       if (!activeBugId) return;
       try {
+        const currentNotes = document.getElementById("bug-resolution") ? document.getElementById("bug-resolution").value.trim() : "";
+        await saveActiveBug();
         const res = await fetch("/api/bugs/reject", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: activeBugId, notes: "" })
+          body: JSON.stringify({ id: activeBugId, notes: currentNotes })
         });
         const data = await res.json();
         if (data.status === "ok") {

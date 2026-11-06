@@ -316,11 +316,12 @@ class CatFountainProvider(Provider):
 
             # Keyway slot at North (+Y) in socket wall allowing Hall sensor platform and cabling to pass through (BUG-LUSTROUS-COCOON-669)
             # Fits hall sensor mount to prevent rotation during spinning without cutting into the bowl floor above ceiling_z.
+            # Cut from Y = 0 (well inside hollow bore radius 18mm) outwards past the socket wall to eliminate thin sliver walls at the curved corners
             keyway_w = self.settings.hall_sensor_spacing_x + 6.0
-            with Locations((0, socket_in_r - 0.5, floor_z - t)):
+            with Locations((0, 0, floor_z - t)):
                 Box(
                     keyway_w,
-                    socket_wall + 3.0,
+                    socket_out_r + 5.0,
                     socket_h + 1.0,
                     align=(Align.CENTER, Align.MIN, Align.MAX),
                     mode=Mode.SUBTRACT,
