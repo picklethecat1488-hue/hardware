@@ -4,7 +4,8 @@
 - **ID**: `BUG-FIERCE-LONGHORN-849`
 - **Status**: `OPEN`
 - **Severity**: `MEDIUM`
-- **Category**: `PCB`
+- **Category**: `CAD`
+- **Component**: `cat_fountain`
 - **Created**: `2026-11-06 06:40:24 UTC`
 
 #### Description

@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 06:42:58 UTC` |
+| **Report Date** | `2026-11-06 06:43:36 UTC` |
 | **Total Issues** | `316` |
 | **Open Issues** | `1` |
 | **Resolved / Closed** | `315 (99%)` |
@@ -24,8 +24,8 @@
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 171 | Schematics, routing, footprints, nets, DRC, silkscreen. |
-| **`CAD`** | 38 | 3D geometry, step models, enclosures, mechanical assembly. |
+| **`PCB`** | 170 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`CAD`** | 39 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 11 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
 | **`INFRASTRUCTURE`** | 83 | Build tooling, compilers, test runners, headless tools. |
 | **`UI`** | 2 | Web dashboards, CLI viewers, review interfaces. |
@@ -347,7 +347,7 @@
 - [x] **`[MEDIUM]`** [#BUG-THORACIC-HARVESTMAN-529](#bug-thoracic-harvestman-529): Add grooves for triangular motor struts to drive hub `[cat_fountain]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-SPECKLED-ROACH-49](#bug-speckled-roach-49): Pump cover should snap into place `[cat_fountain]` (`CLOSED`)
 - [x] **`[LOW]`** [#BUG-GLOWING-WASP-133](#bug-glowing-wasp-133): Cat fountain-refactor and simplify code `[cat_fountain]` (`CLOSED`)
-- [ ] **`[MEDIUM]`** [#BUG-FIERCE-LONGHORN-849](#bug-fierce-longhorn-849): SWD and TMC6300 mounts- unsufficient snap ring overlap (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-FIERCE-LONGHORN-849](#bug-fierce-longhorn-849): SWD and TMC6300 mounts- unsufficient snap ring overlap `[cat_fountain]` (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -28316,7 +28316,8 @@ Refactored repeated snap ring and pocket tool patterns into reusable helpers mak
 - **UUID**: `04ef79bc-f57b-442f-8969-9dba1c94909f`
 - **Status**: `OPEN`
 - **Severity**: `MEDIUM`
-- **Category**: `PCB`
+- **Category**: `CAD`
+- **Component**: `cat_fountain`
 - **Created**: `2026-11-06 06:40:24 UTC`
 
 #### Description
