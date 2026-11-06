@@ -25,7 +25,7 @@ Opening a commit in the bug report station doesn’t go to the code review windo
 
 #### Review Tasks & Functional Checklist
 
-- [ ] <!-- task:e358784d --> Launch dashboard, open BUG-DIURNAL-ANT-667, click attached commit chip to verify it jumps directly to Code Review with '◀ Back to BUG-DIURNAL-ANT-667' button in toolbar | `python tools/dashboard.py --bugs`
+- [x] <!-- task:e358784d --> Launch dashboard, open BUG-DIURNAL-ANT-667, click attached commit chip to verify it jumps directly to Code Review with '◀ Back to BUG-DIURNAL-ANT-667' button in toolbar | `python tools/dashboard.py --bugs`
 
 #### Resolution Notes
 

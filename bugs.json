@@ -9711,12 +9711,12 @@
           "id": "e358784d",
           "title": "Launch dashboard, open BUG-DIURNAL-ANT-667, click attached commit chip to verify it jumps directly to Code Review with '◀ Back to BUG-DIURNAL-ANT-667' button in toolbar",
           "command": "python tools/dashboard.py --bugs",
-          "status": "PENDING",
+          "status": "COMPLETED",
           "notes": ""
         }
       ],
       "created_at": "2026-11-06 17:15:23 UTC",
-      "updated_at": "2026-11-06 17:17:11 UTC",
+      "updated_at": "2026-11-06 23:51:44 UTC",
       "resolved_at": "2026-11-06 20:42:14 UTC",
       "resolution_notes": "Attached commits in Bug Report now navigate directly to Code Review for that commit, and Code Review provides toolbar and header buttons to return to the Bug Report workstation",
       "rejection_notes": null,
@@ -9724,5 +9724,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 23:50:36 UTC"
+  "updated_at": "2026-11-06 23:51:45 UTC"
 }
