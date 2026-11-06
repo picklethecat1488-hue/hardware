@@ -16,6 +16,13 @@ The motor clip interferes with the 1102 motor base; it is not possible to rotate
 
 — Reopened this one. Can you please add some extra support where I indicated in the newly attached screenshot?
 
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [image.png](attachments/BUG-TRANSLUCENT-LARVA-792/image.png) | Uploaded screenshot image.png |
+| `screenshot` | [Untitled 4.png](attachments/BUG-TRANSLUCENT-LARVA-792/Untitled 4.png) | Uploaded screenshot Untitled 4.png |
+
 #### Resolution Notes
 
 Added curved support web connecting the 10mm guide stub to the continuous right arm along the indicated radius curve (radius 15mm, rising 6mm from Y=-16 to Y=-10), providing solid mechanical bracing while keeping the side connector cutout open for motor base installation.

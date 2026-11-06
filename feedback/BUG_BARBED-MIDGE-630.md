@@ -10,6 +10,12 @@
 - **Resolved**: `2026-11-05 15:45:39 UTC`
 - **Accepted**: `2026-11-06 00:18:47 UTC`
 
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [screenshot_paste_1792806350220_dct9c.png](attachments/BUG-BARBED-MIDGE-630/screenshot_paste_1792806350220_dct9c.png) | Pasted screenshot screenshot_paste_1792806350220_dct9c.png |
+
 #### Attached Commits
 
 - `bf875947`

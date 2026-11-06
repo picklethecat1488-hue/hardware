@@ -19,6 +19,7 @@ Additionally, we should add holes on each wall to allow a small tool such as an 
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
+| `screenshot` | [screenshot_paste_1793947358948_g28nw.png](attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793947358948_g28nw.png) | Pasted screenshot screenshot_paste_1793947358948_g28nw.png |
 | `screenshot` | [screenshot_paste_1793948449522_d1ck8.png](attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793948449522_d1ck8.png) | Pasted screenshot screenshot_paste_1793948449522_d1ck8.png |
 
 #### Attached Commits
