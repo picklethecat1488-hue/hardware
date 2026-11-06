@@ -8757,7 +8757,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-6",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
@@ -8766,7 +8766,7 @@
           "created_at": ""
         },
         {
-          "id": "att-2",
+          "id": "att-7",
           "filename": "carrier_board_bom_rev3.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
@@ -8775,7 +8775,7 @@
           "created_at": ""
         },
         {
-          "id": "att-3",
+          "id": "att-8",
           "filename": "carrier_board_bom_rev2.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
@@ -9339,7 +9339,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-2",
           "filename": "screenshot_paste_1793890876309_0c9ae.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png",
@@ -9348,7 +9348,7 @@
           "created_at": ""
         },
         {
-          "id": "att-2",
+          "id": "att-3",
           "filename": "screenshot_paste_1793924149979_7f535.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png",
@@ -9530,7 +9530,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-2",
           "filename": "screenshot_paste_1793947358948_g28nw.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793947358948_g28nw.png",
@@ -9703,10 +9703,12 @@
           "created_at": ""
         }
       ],
-      "commit_ids": [],
+      "commit_ids": [
+        "44ebc5c6"
+      ],
       "review_tasks": [],
       "created_at": "2026-11-06 17:15:23 UTC",
-      "updated_at": "",
+      "updated_at": "2026-11-06 20:42:21 UTC",
       "resolved_at": "2026-11-06 20:42:14 UTC",
       "resolution_notes": "Attached commits in Bug Report now navigate directly to Code Review for that commit, and Code Review provides toolbar and header buttons to return to the Bug Report workstation",
       "rejection_notes": "",
@@ -9714,5 +9716,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 20:42:14 UTC"
+  "updated_at": "2026-11-06 20:42:21 UTC"
 }

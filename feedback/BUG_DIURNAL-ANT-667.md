@@ -19,6 +19,10 @@ Opening a commit in the bug report station doesn’t go to the code review windo
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1793985363740_q9986.png](attachments/BUG-DIURNAL-ANT-667/screenshot_paste_1793985363740_q9986.png) | Pasted screenshot screenshot_paste_1793985363740_q9986.png |
 
+#### Attached Commits
+
+- `44ebc5c6`
+
 #### Resolution Notes
 
 Attached commits in Bug Report now navigate directly to Code Review for that commit, and Code Review provides toolbar and header buttons to return to the Bug Report workstation
