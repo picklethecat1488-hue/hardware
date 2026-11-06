@@ -8757,7 +8757,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-6",
           "filename": "carrier_board_bom_rev3.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
@@ -8766,7 +8766,7 @@
           "created_at": ""
         },
         {
-          "id": "att-2",
+          "id": "att-7",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
@@ -8775,7 +8775,7 @@
           "created_at": ""
         },
         {
-          "id": "att-3",
+          "id": "att-8",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
@@ -9339,7 +9339,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-2",
           "filename": "screenshot_paste_1793890911006_wvg54.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png",
@@ -9348,7 +9348,7 @@
           "created_at": ""
         },
         {
-          "id": "att-2",
+          "id": "att-3",
           "filename": "screenshot_paste_1793890876309_0c9ae.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png",
@@ -9442,7 +9442,7 @@
       "id": "BUG-SPECKLED-ROACH-49",
       "uuid": "5f81d6b7-6ce8-4fd3-a1c5-54e9ee014af2",
       "title": "Pump cover should snap into place",
-      "status": "OPEN",
+      "status": "RESOLVED",
       "severity": "MEDIUM",
       "category": "CAD",
       "component": "cat_fountain",
@@ -9463,9 +9463,9 @@
         }
       ],
       "created_at": "2026-11-06 04:28:00 UTC",
-      "updated_at": "2026-11-06 04:54:42 UTC",
-      "resolved_at": null,
-      "resolution_notes": "",
+      "updated_at": "",
+      "resolved_at": "2026-11-06 04:54:50 UTC",
+      "resolution_notes": "Added annular snap-fit ridge to pump cover downward lip and matching internal snap groove to casing recess on bowl (BUG-SPECKLED-ROACH-49)",
       "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
@@ -9495,5 +9495,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 04:54:42 UTC"
+  "updated_at": "2026-11-06 04:54:50 UTC"
 }

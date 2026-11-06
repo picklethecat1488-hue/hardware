@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 04:54:43 UTC` |
+| **Report Date** | `2026-11-06 04:54:51 UTC` |
 | **Total Issues** | `315` |
-| **Open Issues** | `2` |
-| **Resolved / Closed** | `313 (99%)` |
+| **Open Issues** | `1` |
+| **Resolved / Closed** | `314 (99%)` |
 
 ## Issues by Severity
 
@@ -345,7 +345,7 @@
 - [x] **`[MEDIUM]`** [#BUG-STINGING-LACEWING-799](#bug-stinging-lacewing-799): Mounting system for hole-less PCBs is too complicated `[cat_fountain]` (`CLOSED`)
 - [x] **`[HIGH]`** [#BUG-LUSTROUS-COCOON-669](#bug-lustrous-cocoon-669): Motor base design is way too complicated `[cat_fountain]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-THORACIC-HARVESTMAN-529](#bug-thoracic-harvestman-529): Add grooves for triangular motor struts to drive hub `[cat_fountain]` (`CLOSED`)
-- [ ] **`[MEDIUM]`** [#BUG-SPECKLED-ROACH-49](#bug-speckled-roach-49): Pump cover should snap into place `[cat_fountain]` (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-SPECKLED-ROACH-49](#bug-speckled-roach-49): Pump cover should snap into place `[cat_fountain]` (`RESOLVED`)
 - [ ] **`[LOW]`** [#BUG-GLOWING-WASP-133](#bug-glowing-wasp-133): Cat fountain-refactor and simplify code `[cat_fountain]` (`OPEN`)
 
 ## Detailed Issue Log
@@ -28234,14 +28234,15 @@ Add triangular motor strut grooves to drive hub bottom and refactor drive hub bo
 
 ---
 
-### <a id="bug-speckled-roach-49"></a> 🔴 `[BUG-SPECKLED-ROACH-49]` Pump cover should snap into place
+### <a id="bug-speckled-roach-49"></a> 🟢 `[BUG-SPECKLED-ROACH-49]` Pump cover should snap into place
 
 - **UUID**: `5f81d6b7-6ce8-4fd3-a1c5-54e9ee014af2`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-06 04:28:00 UTC`
+- **Resolved**: `2026-11-06 04:54:50 UTC`
 
 #### Description
 
@@ -28250,6 +28251,10 @@ Right now, the pump cover may move freely up and down the shaft. We should use t
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:a6119fc8 --> Inspect assembled cat fountain pump cover snap fit on volute casing | `python tools/view.py cat_fountain/product:view`
+
+#### Resolution Notes
+
+Added annular snap-fit ridge to pump cover downward lip and matching internal snap groove to casing recess on bowl (BUG-SPECKLED-ROACH-49)
 
 ---
 
