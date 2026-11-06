@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 14:01:45 UTC` |
+| **Report Date** | `2026-11-06 14:01:54 UTC` |
 | **Total Issues** | `319` |
-| **Open Issues** | `3` |
-| **Resolved / Closed** | `316 (99%)` |
+| **Open Issues** | `2` |
+| **Resolved / Closed** | `317 (99%)` |
 
 ## Issues by Severity
 
@@ -348,7 +348,7 @@
 - [x] **`[MEDIUM]`** [#BUG-SPECKLED-ROACH-49](#bug-speckled-roach-49): Pump cover should snap into place `[cat_fountain]` (`CLOSED`)
 - [x] **`[LOW]`** [#BUG-GLOWING-WASP-133](#bug-glowing-wasp-133): Cat fountain-refactor and simplify code `[cat_fountain]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-FIERCE-LONGHORN-849](#bug-fierce-longhorn-849): SWD and TMC6300 mounts- unsufficient snap ring overlap `[cat_fountain]` (`RESOLVED`)
-- [ ] **`[MEDIUM]`** [#BUG-SHINING-SILVERFISH-89](#bug-shining-silverfish-89): Attachments show up in the diff view `[dashboard]` (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-SHINING-SILVERFISH-89](#bug-shining-silverfish-89): Attachments show up in the diff view `[dashboard]` (`RESOLVED`)
 - [ ] **`[MEDIUM]`** [#BUG-BRISTLY-CENTIPEDE-327](#bug-bristly-centipede-327): Add modal progress UIs for repo and bug actions `[dashboard]` (`OPEN`)
 - [ ] **`[MEDIUM]`** [#BUG-LUSTROUS-HORSEFLY-593](#bug-lustrous-horsefly-593): Rename GEMINI.md to AGENTS.md (`OPEN`)
 
@@ -28351,14 +28351,15 @@ Configured pcb_snap_socket_cutout_margin to 0.4mm for positive snap ring overlap
 
 ---
 
-### <a id="bug-shining-silverfish-89"></a> 🔴 `[BUG-SHINING-SILVERFISH-89]` Attachments show up in the diff view
+### <a id="bug-shining-silverfish-89"></a> 🟢 `[BUG-SHINING-SILVERFISH-89]` Attachments show up in the diff view
 
 - **UUID**: `4f9fe270-0b4f-4ff7-acce-8b9e66188e1c`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-11-06 06:44:04 UTC`
+- **Resolved**: `2026-11-06 14:01:54 UTC`
 
 #### Description
 
@@ -28373,6 +28374,10 @@ Attachment LFS changes show up in the diff view. Can we ensure that attachments 
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:29d45ad5 --> Verify attachments are excluded from diff view and stored on refs/heads/bugs | `git status --porcelain`
+
+#### Resolution Notes
+
+Decoupled attachments to dedicated refs/heads/bugs detached branch, added attachments to .gitignore, hid attachments from git_engine diff view, and added checkout_attachments restoration.
 
 ---
 

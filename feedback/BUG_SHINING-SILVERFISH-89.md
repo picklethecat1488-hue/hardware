@@ -1,12 +1,13 @@
-# 🔴 `[BUG-SHINING-SILVERFISH-89]` Attachments show up in the diff view
+# 🟢 `[BUG-SHINING-SILVERFISH-89]` Attachments show up in the diff view
 
 - **UUID**: `4f9fe270-0b4f-4ff7-acce-8b9e66188e1c`
 - **ID**: `BUG-SHINING-SILVERFISH-89`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-11-06 06:44:04 UTC`
+- **Resolved**: `2026-11-06 14:01:54 UTC`
 
 #### Description
 
@@ -21,3 +22,7 @@ Attachment LFS changes show up in the diff view. Can we ensure that attachments 
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:29d45ad5 --> Verify attachments are excluded from diff view and stored on refs/heads/bugs | `git status --porcelain`
+
+#### Resolution Notes
+
+Decoupled attachments to dedicated refs/heads/bugs detached branch, added attachments to .gitignore, hid attachments from git_engine diff view, and added checkout_attachments restoration.

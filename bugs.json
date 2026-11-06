@@ -8757,7 +8757,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-6",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
@@ -8766,7 +8766,7 @@
           "created_at": ""
         },
         {
-          "id": "att-2",
+          "id": "att-7",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
@@ -8775,7 +8775,7 @@
           "created_at": ""
         },
         {
-          "id": "att-3",
+          "id": "att-8",
           "filename": "digikey_order_2026-10-14.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx",
@@ -9339,7 +9339,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-2",
           "filename": "screenshot_paste_1793890876309_0c9ae.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png",
@@ -9348,7 +9348,7 @@
           "created_at": ""
         },
         {
-          "id": "att-2",
+          "id": "att-3",
           "filename": "screenshot_paste_1793924149979_7f535.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png",
@@ -9530,7 +9530,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-2",
           "filename": "screenshot_paste_1793947358948_g28nw.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793947358948_g28nw.png",
@@ -9563,7 +9563,7 @@
       "id": "BUG-SHINING-SILVERFISH-89",
       "uuid": "4f9fe270-0b4f-4ff7-acce-8b9e66188e1c",
       "title": "Attachments show up in the diff view",
-      "status": "OPEN",
+      "status": "RESOLVED",
       "severity": "MEDIUM",
       "category": "INFRASTRUCTURE",
       "component": "dashboard",
@@ -9594,9 +9594,9 @@
         }
       ],
       "created_at": "2026-11-06 06:44:04 UTC",
-      "updated_at": "2026-11-06 14:01:45 UTC",
-      "resolved_at": null,
-      "resolution_notes": "",
+      "updated_at": "",
+      "resolved_at": "2026-11-06 14:01:54 UTC",
+      "resolution_notes": "Decoupled attachments to dedicated refs/heads/bugs detached branch, added attachments to .gitignore, hid attachments from git_engine diff view, and added checkout_attachments restoration.",
       "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
@@ -9650,5 +9650,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 14:01:45 UTC"
+  "updated_at": "2026-11-06 14:01:54 UTC"
 }
