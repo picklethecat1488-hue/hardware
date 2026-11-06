@@ -299,8 +299,8 @@ class CatFountainProvider(Provider):
 
             # Central solid boss and guide post for the isolated impeller
             with Locations((0, 0, floor_z)):
-                # Static guide post (radius 2.5mm, height 12.0mm)
-                Cylinder(radius=pin_r + 1.5, height=2.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                # Static guide post (radius pin_r, height 12.0mm on shoulder pin_r + 1.0mm)
+                Cylinder(radius=pin_r + 1.0, height=2.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
                 Cylinder(radius=pin_r, height=12.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
             # Groove-style cylindrical mounting socket for dedicated motor hub assembly (BUG-VIBRANT-WOODBORER-940)
@@ -403,36 +403,30 @@ class CatFountainProvider(Provider):
                 snap_h = 1.8
                 total_h = standoff_h + pcb_t + 1.0
 
+                cutout_margin = self.settings.pcb_snap_socket_cutout_margin
+
                 outer_x = board_span + 2.0 * wall_t
                 outer_y = board_slide + 2.0 * wall_t
                 inner_x = board_span + clearance
                 inner_y = board_slide + clearance
+                cutout_x = board_span - cutout_margin
+                cutout_y = board_slide - cutout_margin
 
                 with Locations((center_x, center_y, floor_z - t)):
                     # 1. Solid outer socket frame extending from ceiling
                     Box(outer_x, outer_y, total_h, align=(Align.CENTER, Align.CENTER, Align.MAX))
 
-                    # 2. Central cavity for components and airflow (through the standoff region)
+                    # 2. Central cutout surrounding the boards with small margin (0.1mm - 0.5mm) per BUG-FIERCE-LONGHORN-849
                     Box(
-                        board_span - 3.0,
-                        board_slide - 3.0,
+                        cutout_x,
+                        cutout_y,
                         total_h + 0.1,
                         align=(Align.CENTER, Align.CENTER, Align.MAX),
                         mode=Mode.SUBTRACT,
                     )
 
-                    # 3. PCB seating pocket (from -standoff_h down through bottom)
-                    with Locations((0, 0, -standoff_h)):
-                        Box(
-                            inner_x,
-                            inner_y,
-                            total_h - standoff_h + 0.1,
-                            align=(Align.CENTER, Align.CENTER, Align.MAX),
-                            mode=Mode.SUBTRACT,
-                        )
-
-                    # 4. Internal snap-fit groove in socket walls (matching lid and bottom cover snap groove style)
-                    # Located at the PCB seating position so PCB perimeter edges act as the inner snap ring
+                    # 3. PCB seating pocket (from -standoff_h down through PCB thickness)
+                    # Creates internal snap-fit groove with positive retaining lip below and ceiling shelf above
                     with Locations((0, 0, -standoff_h)):
                         Box(
                             inner_x + snap_depth * 2.0,
@@ -442,13 +436,13 @@ class CatFountainProvider(Provider):
                             mode=Mode.SUBTRACT,
                         )
 
-                    # 5. Lead-in entry chamfer at bottom opening for smooth snap-in insertion
-                    with Locations((0, 0, -total_h + 0.4)):
+                    # 4. Lead-in entry chamfer at bottom opening for smooth snap-in insertion
+                    with Locations((0, 0, -total_h)):
                         Box(
-                            inner_x + 0.8,
-                            inner_y + 0.8,
-                            0.8,
-                            align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                            cutout_x + 0.6,
+                            cutout_y + 0.6,
+                            0.3,
+                            align=(Align.CENTER, Align.CENTER, Align.MIN),
                             mode=Mode.SUBTRACT,
                         )
 
@@ -871,22 +865,41 @@ class CatFountainProvider(Provider):
         impeller_r = hub_r + 4.0
         pin_r = self.settings.impeller_shaft_radius
         pin_clearance = self.settings.impeller_shaft_clearance
-        sleeve_r = 4.5
+        sleeve_r = self.settings.impeller_sleeve_radius
         mr = self.settings.magnet_radius + self.settings.magnet_clearance
         mt = self.settings.magnet_thickness + self.settings.magnet_clearance
         ring_r = self.settings.magnet_ring_radius
+        min_wall = 1.5
+        lobe_r = mr + min_wall
+        center_r = 4.0
+        num_blades = self.settings.impeller_blades
+        blade_h = 4.0
+        blade_len = (ring_r + lobe_r) - sleeve_r
 
         with BuildPart() as impeller:
-            # Impeller Hub base (carrying the magnets)
-            with Locations((0, 0, 0)):
-                Cylinder(radius=hub_r, height=hub_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+            # 1. 3-lobed convex hull base carrying the magnets (minimizes inertia and startup torque)
+            with BuildSketch() as sketch:
+                for i in range(self.settings.magnet_count):
+                    angle = i * (360.0 / self.settings.magnet_count)
+                    rad = math.radians(angle)
+                    with BuildSketch() as arm:
+                        Circle(radius=center_r)
+                        with Locations((ring_r * math.cos(rad), ring_r * math.sin(rad))):
+                            Circle(radius=lobe_r)
+                        make_hull()
+                    add(arm.sketch)
+            extrude(amount=hub_h)
 
-            # Central guide post sleeve (protrudes up to 10.0mm for stability on the post)
+            # 2. Central guide post sleeve (protrudes up for axial stability on the slim pin)
             with Locations((0, 0, 0)):
-                Cylinder(radius=sleeve_r, height=10.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                Cylinder(
+                    radius=sleeve_r,
+                    height=self.settings.impeller_sleeve_height,
+                    align=(Align.CENTER, Align.CENTER, Align.MIN),
+                )
 
-            # Subtract guide post central hole (with generous clearance for free rotation after resin coating)
-            # Rests directly on top of the bowl's 2.0mm post flange shoulder, elevating the base disk 2.0mm off the floor
+            # 3. Subtract guide post central hole (with generous clearance for free rotation after resin coating)
+            # Rests directly on top of the bowl's 2.0mm post flange shoulder, elevating the base 2.0mm off the floor
             Cylinder(
                 radius=pin_r + pin_clearance,
                 height=14.0,
@@ -894,7 +907,7 @@ class CatFountainProvider(Provider):
                 mode=Mode.SUBTRACT,
             )
 
-            # Subtract 4 magnet pockets on the bottom face of the base disk
+            # 4. Subtract magnet pockets on the bottom face of each lobe
             for i in range(self.settings.magnet_count):
                 angle = i * (360.0 / self.settings.magnet_count)
                 with Locations(Rot(0, 0, angle)):
@@ -903,11 +916,8 @@ class CatFountainProvider(Provider):
                             radius=mr, height=mt, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
                         )
 
-            # Add radial blades on the top face of the hub base (Z = hub_h)
-            # Starting directly at the central hub sleeve (sleeve_r) with zero empty space
-            blade_h = 4.0
-            blade_len = hub_r - sleeve_r
-            num_blades = self.settings.impeller_blades
+            # 5. Add 3 radial blades on the top face of the hub base (Z = hub_h)
+            # Situated directly atop the 3 lobes of the convex hull base starting at the central sleeve
             for i in range(num_blades):
                 angle = i * (360.0 / num_blades)
                 with Locations(Location((0, 0, hub_h)) * Rot(0, 0, angle)):

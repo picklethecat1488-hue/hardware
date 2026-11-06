@@ -905,7 +905,8 @@ apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     nodejs \
-    git-lfs
+    git-lfs \
+    blender
 
 git lfs install || true
 git config --global --add safe.directory '*' || true

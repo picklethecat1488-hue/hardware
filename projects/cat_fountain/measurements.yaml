@@ -55,11 +55,12 @@ tube_lid_clearance: 0.1
 # ==========================================
 impeller_radius: 9.0
 impeller_height: 68.0
-impeller_shaft_radius: 2.5
-impeller_shaft_clearance: 0.30
+impeller_shaft_radius: 1.0
+impeller_shaft_clearance: 0.25
 impeller_base_height: 6.0
 impeller_sleeve_height: 10.0
-impeller_blades: 6
+impeller_sleeve_radius: 2.75
+impeller_blades: 3
 impeller_clearance: 0.4
 vane_twist: -15.0
 motor_target: 130.0
@@ -178,6 +179,9 @@ hall_sensor_standoff_height: 4.0
 swd_board_length: 19.1
 swd_board_width: 13.7
 swd_board_standoff_height: 2.0
+
+# Snap-Fit PCB Sockets
+pcb_snap_socket_cutout_margin: 0.4
 
 # ==========================================
 # 10. Magnetic Centrifugal Pump Redesign
