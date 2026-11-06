@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 06:40:26 UTC` |
+| **Report Date** | `2026-11-06 06:42:40 UTC` |
 | **Total Issues** | `316` |
 | **Open Issues** | `1` |
 | **Resolved / Closed** | `315 (99%)` |
@@ -347,7 +347,7 @@
 - [x] **`[MEDIUM]`** [#BUG-THORACIC-HARVESTMAN-529](#bug-thoracic-harvestman-529): Add grooves for triangular motor struts to drive hub `[cat_fountain]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-SPECKLED-ROACH-49](#bug-speckled-roach-49): Pump cover should snap into place `[cat_fountain]` (`CLOSED`)
 - [x] **`[LOW]`** [#BUG-GLOWING-WASP-133](#bug-glowing-wasp-133): Cat fountain-refactor and simplify code `[cat_fountain]` (`CLOSED`)
-- [ ] **`[MEDIUM]`** [#BUG-FIERCE-LONGHORN-849](#bug-fierce-longhorn-849): New Bug Report (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-FIERCE-LONGHORN-849](#bug-fierce-longhorn-849): SWD and TMC6300 mounts- unsufficient snap ring overlap (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -28311,12 +28311,22 @@ Refactored repeated snap ring and pocket tool patterns into reusable helpers mak
 
 ---
 
-### <a id="bug-fierce-longhorn-849"></a> 🔴 `[BUG-FIERCE-LONGHORN-849]` New Bug Report
+### <a id="bug-fierce-longhorn-849"></a> 🔴 `[BUG-FIERCE-LONGHORN-849]` SWD and TMC6300 mounts- unsufficient snap ring overlap
 
 - **UUID**: `04ef79bc-f57b-442f-8969-9dba1c94909f`
 - **Status**: `OPEN`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-11-06 06:40:24 UTC`
+
+#### Description
+
+There is insufficient snap ring overlap to hold the SWD and TMC6300 boards in place. The width and height of the cutout surrounding the boards should be the width and height of the boards - some very small margin (.1mm-.5mm). Attached screenshot showing the defects in red.
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [screenshot_paste_1793947358948_g28nw.png](attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793947358948_g28nw.png) | Pasted screenshot screenshot_paste_1793947358948_g28nw.png |
 
 ---

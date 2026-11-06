@@ -1,4 +1,4 @@
-# 🔴 `[BUG-FIERCE-LONGHORN-849]` New Bug Report
+# 🔴 `[BUG-FIERCE-LONGHORN-849]` SWD and TMC6300 mounts- unsufficient snap ring overlap
 
 - **UUID**: `04ef79bc-f57b-442f-8969-9dba1c94909f`
 - **ID**: `BUG-FIERCE-LONGHORN-849`
@@ -6,3 +6,13 @@
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-11-06 06:40:24 UTC`
+
+#### Description
+
+There is insufficient snap ring overlap to hold the SWD and TMC6300 boards in place. The width and height of the cutout surrounding the boards should be the width and height of the boards - some very small margin (.1mm-.5mm). Attached screenshot showing the defects in red.
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [screenshot_paste_1793947358948_g28nw.png](attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793947358948_g28nw.png) | Pasted screenshot screenshot_paste_1793947358948_g28nw.png |
