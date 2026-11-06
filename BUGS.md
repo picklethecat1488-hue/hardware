@@ -44,6 +44,7 @@
 - **Status**: `OPEN`
 - **Severity**: `LOW`
 - **Category**: `UI`
+- **Created**: `2026-11-06 00:03:11 UTC`
 
 ---
 
