@@ -37,15 +37,6 @@ Please note that the minimum buy-in on DigiKey for the IQS7222A is 8,000 units, 
 Greetings
 Could you please send us rev bom in xls/xlsx format?
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `reference` | [T-E68W908185A-2units-bom_templates(2026-10-12)_rev1.xlsx](attachments/BUG-GLOWING-OLIGOCHAETE-544/T-E68W908185A-2units-bom_templates(2026-10-12)_rev1.xlsx) | Revised quotation BOM spreadsheet with U1/U2 consignment notes, IQS7222C101QNR substitution, and 3225-4P crystal |
-| `reference` | [T-E68W908185A-2units-bom_templates(2026-10-12)_rev1.xls](attachments/BUG-GLOWING-OLIGOCHAETE-544/T-E68W908185A-2units-bom_templates(2026-10-12)_rev1.xls) | Legacy Excel 97-2004 format of revised quotation BOM |
-| `reference` | [carrier_board_bom_rev1.xlsx](attachments/BUG-GLOWING-OLIGOCHAETE-544/carrier_board_bom_rev1.xlsx) | Clean EDA export BOM generated directly from updated carrier board model matching PCBWay schema |
-| `reference` | [carrier_board_bom_rev1.csv](attachments/BUG-GLOWING-OLIGOCHAETE-544/carrier_board_bom_rev1.csv) | CSV export of clean EDA BOM |
-
 #### Resolution Notes
 
 Generated revised PCBWay quotation BOM spreadsheets (T-E68W908185A-2units-bom_templates(2026-10-12)_rev1.xlsx/.xls) and clean EDA engineering BOM exports (carrier_board_bom_rev1.xlsx/.csv) with IQS7222C101QNR substitution, U1/U2 customer consignment deductions, 3225-4P crystal update, and DNP J15; added regression test test_regression_bug_glowing_oligochaete_544_rev_bom_export.

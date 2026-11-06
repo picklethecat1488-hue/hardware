@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 07:10:55 UTC` |
+| **Report Date** | `2026-11-06 13:57:58 UTC` |
 | **Total Issues** | `319` |
 | **Open Issues** | `3` |
 | **Resolved / Closed** | `316 (99%)` |
@@ -418,12 +418,6 @@ Added comprehensive clipboard paste handling for screenshots, PDFs, logs, code, 
 
 J_USB is missing pads, has overlapping drill holes, and silkscreen falls off the board edge. R_CC1 and R_CC2 silkscreens need to be place further away from the connectr
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1789867312215.png](build/attachments/pasted_screenshot_1789867312215.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Redesigned USB-C-16P footprint with surface-mount pads for signal/power lines, eliminated overlapping drill holes, adjusted J_USB position to [-25.0, 0.0] so silkscreen stays within board edge, and moved R_CC1/R_CC2 to [-17.0, ±4.5] clear of connector.
@@ -472,16 +466,6 @@ Added bug status filtering (OPEN, ALL, RESOLVED) in web dashboard with OPEN acti
 
 1. $ python src/view.py test_board/carrier_pcb:pcb
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1789867505406.png](build/attachments/pasted_screenshot_1789867505406.png) | Pasted screenshot |
-| `screenshot` | [pasted_screenshot_1789867556390.png](build/attachments/pasted_screenshot_1789867556390.png) | Pasted screenshot |
-| `screenshot` | [pasted_screenshot_1789867639596.png](build/attachments/pasted_screenshot_1789867639596.png) | Pasted screenshot |
-| `screenshot` | [pasted_screenshot_1789867860482.png](build/attachments/pasted_screenshot_1789867860482.png) | Pasted screenshot |
-| `screenshot` | [pasted_screenshot_1789867999679.png](build/attachments/pasted_screenshot_1789867999679.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Completed auto-routing for carrier board with 0 DRC violations. Added copper regions on internal layers to tie power and ground pins directly to low-impedance planes, eliminating floating stubs and net antennas ending at vias. All routes persisted to routing.yaml and verified with DRC.
@@ -497,12 +481,6 @@ Completed auto-routing for carrier board with 0 DRC violations. Added copper reg
 - **Created**: `2026-09-20 01:25:11 UTC`
 - **Resolved**: `2026-09-20 01:36:16 UTC`
 - **Accepted**: `2026-09-20 01:36:16 UTC`
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1789868156788.png](build/attachments/pasted_screenshot_1789868156788.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -523,12 +501,6 @@ Updated kicad_pcb.j2 to position reference silkscreen text at +drill_mm (bottom)
 #### Description
 
 For junctions of traces (3 or more connections) all 3 trace segments should be straightened, not rounded at the junction
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1789867754836.png](build/attachments/pasted_screenshot_1789867754836.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -597,12 +569,6 @@ Ensured set_port defaults to integer 3939 instead of None, filtered ocp_vscode c
 Move the flex tail connector to the board edge, move all silk screening (J_FLEX, flex tail board ID, pin hole) under the flex tail connector
 Double check that the silkscreen border for the flex tail connector pads matches the required connector geometry exactly
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1789868481294.png](build/attachments/pasted_screenshot_1789868481294.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Repositioned J_FLEX to the carrier board edge at [0.0, -22.75, 0.0] and moved reference silkscreen, flex board ID, and pin 1 indicator underneath the connector body. Expanded FPC-30P-0.5MM dimensions in ic.yaml to [21.6, 4.5, 1.2] to match exact physical connector envelope.
@@ -631,13 +597,6 @@ The shield ring for CH0-3 is too close to the cross hatch area and will need to 
 The shield ring for CH3 crosses the shield ring for CH2
 
 None of the capacitive eletrodes are being routed to the flex connector
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1789868744526.png](build/attachments/pasted_screenshot_1789868744526.png) | Pasted screenshot |
-| `screenshot` | [capacitive_hatch_diagram.png](build/attachments/capacitive_hatch_diagram.png) | Uploaded screenshot capacitive_hatch_diagram.png |
 
 #### Resolution Notes
 
@@ -688,13 +647,6 @@ Updated build_flex_tail CAD shape generation in test_board provider.py using Bui
 - add a third page for the LDO
 - make schematic text, symbols and margins small to maximuize sheet space available
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1789869225983.png](build/attachments/pasted_screenshot_1789869225983.png) | Pasted screenshot |
-| `screenshot` | [pasted_screenshot_1789869344830.png](build/attachments/pasted_screenshot_1789869344830.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Broke schematic into 7 dedicated functional pages (USB-C Interface, 3.3V LDO Regulation, Power Distribution & Load Switch, High-Speed I/O, Microcontroller Clock/Reset/Boot, Audio Subsystem, and Capacitive Sensing). Restricted transistor logic table strictly to Q-prefixed FETs (eliminating false U3 truth table). Positioned R_CC1, R_CC2, and shunt capacitors vertically with shared GND symbols, combined multiple GND and VBUS pins into single bus trunks with single symbols, and wired same-sheet signal lines directly to pins.
@@ -732,12 +684,6 @@ Implemented check_schematic() in PCBDesignRulesChecker and hooked into check_all
 - **Created**: `2026-09-20 02:02:06 UTC`
 - **Resolved**: `2026-09-20 02:40:00 UTC`
 - **Accepted**: `2026-09-20 02:40:00 UTC`
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1789869750753.png](build/attachments/pasted_screenshot_1789869750753.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -800,13 +746,6 @@ When I view the carrier board and flex tail PCBs, both show no traces or vais. N
 - **Expected**: Both boards should be populated with tracks and vias, so I can review them
 - **Actual**: All components on both boards are dangling
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1789920322587.png](build/attachments/pasted_screenshot_1789920322587.png) | Pasted screenshot |
-| `screenshot` | [pasted_screenshot_1789920363199.png](build/attachments/pasted_screenshot_1789920363199.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Loaded pre-routed traces and vias from routing.yaml and routing_flex.yaml in view.py and exporter.py, populating all copper tracks and vias on both carrier board and flex tail in the KiCode viewer and 3D CAD without dangling components.
@@ -826,12 +765,6 @@ Loaded pre-routed traces and vias from routing.yaml and routing_flex.yaml in vie
 #### Description
 
 When I build and view the test board diagram, flex tail is placed in the middle of the carrier board. It should be placed exactly as if it was mounted on the carrier board, instead
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1789920480272.png](build/attachments/pasted_screenshot_1789920480272.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -858,12 +791,6 @@ Two VBUS and GND pins on J_USB are not connected to their respective schematic s
 - **Expected**: _Not specified_
 - **Actual**: VBUS should connect to the VBUS symbol, GND should connect to the GND symbol
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1789920581752.png](build/attachments/pasted_screenshot_1789920581752.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Added VBUS2 and GND2 pins to J_USB in wiring.yaml and tied them to their respective VBUS and GND schematic symbols on Sheet 1 in pcb.yaml, with corresponding plane stitching in routing.yaml.
@@ -883,12 +810,6 @@ Added VBUS2 and GND2 pins to J_USB in wiring.yaml and tied them to their respect
 #### Description
 
 there is a schemattic antenna on the GND network under decoupling caps. please correct if this is not expected, and the decoupling caps should be located nearer toward the center of the page
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1789920680993.png](build/attachments/pasted_screenshot_1789920680993.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -911,12 +832,6 @@ Repositioned decoupling capacitor bank toward page center on Sheet 2 and elimina
 Multiple caps on sheet 5 are open on one side, and overlap other symbols on the schematic page: C_RST, C_OSC1, C_OST2
 Multiple symbols overlap other symbology and this should have resulted in a DRC violation: R_BOOT, C_OST1
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1789920833115.png](build/attachments/pasted_screenshot_1789920833115.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Closed open capacitor lead gaps on Sheet 5 (C_RST, C_OSC1, C_OSC2) connecting leads directly to plates. Separated passives onto distinct breakout stubs and channels with >=14mm clearance. Integrated passive symbols into SCHEMATIC_SYMBOL_OVERLAP DRC check.
@@ -936,12 +851,6 @@ Closed open capacitor lead gaps on Sheet 5 (C_RST, C_OSC1, C_OSC2) connecting le
 #### Description
 
 move U1 to the right of U4 under SPK1 and connect pins on page with lines: PDM_DAT, PDM_CLK, PDM_LRCLK
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1789920975728.png](build/attachments/pasted_screenshot_1789920975728.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -968,13 +877,6 @@ The cap sense connections between U4 and J4 overlap with each other frequently
 
 - **Expected**: -Add a pull up section to the schematic page for I2C
 - **Actual**: _Not specified_
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1789921025511.png](build/attachments/pasted_screenshot_1789921025511.png) | Pasted screenshot |
-| `screenshot` | [pasted_screenshot_1789921141794.png](build/attachments/pasted_screenshot_1789921141794.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -1024,12 +926,6 @@ Attached outline_polygon from CAD shape to PCBBoard in TestBoardProvider.flex_ta
 
 Schematic sheet 3
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1789938186701.png](build/attachments/pasted_screenshot_1789938186701.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Separated decoupling capacitor bank to base_x=35.0 on the left and Q1 truth table to base_x=135.0 on the right, completely resolving symbol overlap on Sheet 3.
@@ -1051,12 +947,6 @@ Separated decoupling capacitor bank to base_x=35.0 on the left and Q1 truth tabl
 - C_RST is too close to U1
 - OSC_OUT from U1 overlaps with Y1, but does not correct directly with OSC_OUT pin on Y1
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1789938241466.png](build/attachments/pasted_screenshot_1789938241466.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Offset capacitor RefDes and value text clear of plate width (text_x_off=4.8), increased C_RST (C11) clearance to U1 (cand_x offset to 28.0), and added pin_sides for Y1 and U1 on Sheet 5 so crystal signals connect directly without crossing the crystal body.
@@ -1076,13 +966,6 @@ Offset capacitor RefDes and value text clear of plate width (text_x_off=4.8), in
 
 - I2C pull up resistors section has overlapping placement with U1 and needs to be moved further away, and also has a few text overlaps
 - VREG on U2 overlaps wiwth J2 on the way to the ground symbol
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1789938444644.png](build/attachments/pasted_screenshot_1789938444644.png) | Pasted screenshot |
-| `screenshot` | [pasted_screenshot_1789938495363.png](build/attachments/pasted_screenshot_1789938495363.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -1110,14 +993,6 @@ Increased I2C pullup card height and moved title to top with >7mm clearance abov
 #### Reproduction Steps
 
 1. $ python src/view.py test_board/flex_tail:pcb
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1789938564172.png](build/attachments/pasted_screenshot_1789938564172.png) | Pasted screenshot |
-| `screenshot` | [pasted_screenshot_1789938728396.png](build/attachments/pasted_screenshot_1789938728396.png) | Pasted screenshot |
-| `screenshot` | [pasted_screenshot_1789938798951.png](build/attachments/pasted_screenshot_1789938798951.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -1165,12 +1040,6 @@ Root caused and fixed inner copper plane refilling (In1.Cu GND, In3.Cu 3V3), inv
 #### Description
 
 TP_GND is not connected to ground. It is acting as a drill hole, not a test point
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [image.png](build/attachments/image.png) | Uploaded screenshot image.png |
 
 #### Resolution Notes
 
@@ -1246,14 +1115,6 @@ Flex Tail - J4, CH0
 Carrier Board - U1, multple BGA pads have copper bridges from traces
 Add DRC to ensure that traces have clearance between the nearest pad
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1789946955958.png](build/attachments/pasted_screenshot_1789946955958.png) | Pasted screenshot |
-| `screenshot` | [pasted_screenshot_1789946984207.png](build/attachments/pasted_screenshot_1789946984207.png) | Pasted screenshot |
-| `screenshot` | [pasted_screenshot_1789947243956.png](build/attachments/pasted_screenshot_1789947243956.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Added pad-to-trace clearance padding in PCBAutoRouter obstacle grid and implemented check_clearances_and_overlaps in drc.py, verifying zero trace-to-pad bridges across carrier and flex tail boards.
@@ -1273,12 +1134,6 @@ Added pad-to-trace clearance padding in PCBAutoRouter obstacle grid and implemen
 #### Description
 
 See example screenshots on flex tail. Vias are floating outside the board edge, not connected to anything. Add DRC to ensure all vias are placed on the board and connected to traces on multiple layers.
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1789947049458.png](build/attachments/pasted_screenshot_1789947049458.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -1316,12 +1171,6 @@ Implemented BuildSilkscreen CM in provider.py and silkscreen() method on TestBoa
 
 See example screenshot, ensure the footprint and board placement are correct
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1789947443867.png](build/attachments/pasted_screenshot_1789947443867.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Aligned U1 BGA-196 footprint to canonical 14x14 0.8mm pitch grid in ic.yaml, and prioritized interstitial via dogbone candidate offsets (+-0.4, +-0.4) in PCBAutoRouter to place stitching vias exactly at (-0.8, 0.0) and (0.8, 0.0).
@@ -1341,14 +1190,6 @@ Aligned U1 BGA-196 footprint to canonical 14x14 0.8mm pitch grid in ic.yaml, and
 #### Description
 
 Output kicad DRC reports under build/rpt and parse them after running kicad DRC checks to check for DRC errrors and fail build if kicad reports a DRC error. DRC reports (attached from last build) contain multiple DRC violations that our DRC engine does not catch. Address bugs in our DRC engine, fix DRC violations, and retest
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `document` | [pasted_document_1789947830211.txt](build/attachments/pasted_document_1789947830211.txt) | Pasted text document |
-| `reference` | [flex_tail-drc.rpt](build/attachments/flex_tail-drc.rpt) | Uploaded reference flex_tail-drc.rpt |
-| `reference` | [carrier_board-drc.rpt](build/attachments/carrier_board-drc.rpt) | Uploaded reference carrier_board-drc.rpt |
 
 #### Resolution Notes
 
@@ -1684,13 +1525,6 @@ Verified all 5 required power-on sequencing steps and documented in Downselectio
 See 4.3.2 FlexSPI specifications from attached datasheet
 Measurements are with a load of 15pf and an input slew rate of 1 V/ns.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `document` | [W25N01GV Rev R 070323.pdf](build/attachments/W25N01GV Rev R 070323.pdf) | Uploaded document W25N01GV Rev R 070323.pdf |
-| `document` | [MCXNP184M150F70.pdf](build/attachments/MCXNP184M150F70.pdf) | Uploaded document MCXNP184M150F70.pdf |
-
 #### Resolution Notes
 
 Implemented Dual-Channel FlexSPI architecture connecting Winbond W25N01GV 1Gb serial NAND. Channel A (Port 3 balls B17, D14, E14, F15, F17, F16, D17 DQS) and Channel B (Port 2 balls H3, J3, K3, K1, K2, L2, H1 DQS) supporting interleaved parallel flash (up to 100 MB/s) and Dual-SPI (208 Mbps). Verified AC timing against MCX N947 Section 4.3.2 specifications under 15 pF load and 1 V/ns slew rate, confirming positive setup/hold margins at 100 MHz SDR Overdrive mode.
@@ -1710,12 +1544,6 @@ Implemented Dual-Channel FlexSPI architecture connecting Winbond W25N01GV 1Gb se
 #### Description
 
 Connect /CHG to the MCU so that we can reliably transition between Sleep and Active states when the charger is connected.
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `document` | [bq24074.pdf](build/attachments/bq24074.pdf) | Uploaded document bq24074.pdf |
 
 #### Resolution Notes
 
@@ -1807,12 +1635,6 @@ Apply component downselection results and PCB updates form ./src/projects/test_b
 - **Expected**: All new ICs and connectors placed on board
 - **Actual**: No new components from the downselection review are placed on board
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790045953631.png](build/attachments/pasted_screenshot_1790045953631.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Applied NXP MCXN947VDF in VFBGA-184 (184 pins, 0.50mm pitch) to test_board wiring.yaml, added VFBGA-184 footprint to footprints/ic.yaml, verified 100% component downselection coverage and pinmux alignment with Table 93.
@@ -1834,12 +1656,6 @@ Applied NXP MCXN947VDF in VFBGA-184 (184 pins, 0.50mm pitch) to test_board wirin
 The attached screenshot shows a capacitor connected to OSC_OUT is flying off the schematic page. 
 - Update the schematic page to correctly locate all components
 - Add a schematic DRC to ensure all symbology all fits within the schematic page borders
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1789966040784.png](build/attachments/pasted_screenshot_1789966040784.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -1902,12 +1718,6 @@ Verified JST-PH battery connector J13 and C13 decoupling capacitor placement, VB
 #### Description
 
 Looks related to BUG-068. The pull up resistors are hanging off the schematic page making the page unpriuntable.
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1789966351542.png](build/attachments/pasted_screenshot_1789966351542.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -2139,12 +1949,6 @@ Carrier board auto-routed with zero drc.py and zero KiCad DRC violations.
 
 On sheet 7, the two I2C pullup resistors overlap. Fix this issue, then add a schematic DRC two ensure no two schematic symbols overlap.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790015168061.png](build/attachments/pasted_screenshot_1790015168061.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Fixed Sheet 7 I2C pullup resistor overlap by setting col_gap 50.0, spacing channel pullups by 14mm, and hooked up compute_symbol_bounding_boxes in SchematicDiagram to check_schematic DRC.
@@ -2275,15 +2079,6 @@ Attached screenshots for all issues identified:
 - every component past sheet 15 (page 20) is unconnected to anything. components must all be connected to conform to the test board 2.0 system architecture
 Update DRC engine to catch issues identified above, and fix.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790045994113.png](build/attachments/pasted_screenshot_1790045994113.png) | Pasted screenshot |
-| `screenshot` | [pasted_screenshot_1790046087008.png](build/attachments/pasted_screenshot_1790046087008.png) | Pasted screenshot |
-| `screenshot` | [pasted_screenshot_1790046134444.png](build/attachments/pasted_screenshot_1790046134444.png) | Pasted screenshot |
-| `screenshot` | [pasted_screenshot_1790046211771.png](build/attachments/pasted_screenshot_1790046211771.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Clamped symbol heights in SchematicDiagram to avoid page bottom overflow (cy >= 18.0) and dynamically scaled pin pitch; constrained decoupling capacitor cards to base_x <= 195.0 - card_w + 12.0 avoiding title block collisions (X: [200, 285]); added title block keepout, sheet header keepout, and global dangling component rules to DRC engine (SCHEMATIC_TITLE_BLOCK_COLLISION, SCHEMATIC_HEADER_COLLISION, SCHEMATIC_DANGLING_COMPONENT); connected all components past sheet 15 in test_board wiring.yaml to architecture nets; added test_regression_bug_088_schematic_defects_and_drc.
@@ -2326,12 +2121,6 @@ Reorganized carrier board schematic pages into 11 functional subsystem sheets co
 - The side enclosure cutouts on enclosure bottom should have rounded edges. 
 - The enclosure top should contain some sort of battery mount, either on the inside or outside, with a top cutout to allow the battery connector through
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790046385642.png](build/attachments/pasted_screenshot_1790046385642.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Spaced SWD cutout (swd_y = -15.0mm, swd_w = 8.0mm) from USB-C cutout with >= 5.0mm solid wall barrier, applied 0.8mm corner fillets to all enclosure bottom side cutouts (USB, SWD, periph, M.2), and added battery retention mount cradle and J13 pass-through cutout to enclosure lid with dedicated regression test.
@@ -2352,12 +2141,6 @@ Spaced SWD cutout (swd_y = -15.0mm, swd_w = 8.0mm) from USB-C cutout with >= 5.0
 #### Description
 
 The diff bar has scrollbars on every line making it very difficult to read diffs on small displays. Please place the horizontal scrollbar on the bottom
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790132888424.png](build/attachments/pasted_screenshot_1790132888424.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -2540,12 +2323,6 @@ Redirected PCB DRC routing violations to board/<provider>/<subassembly>_drc_viol
 
 C9
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790283157382.png](build/attachments/pasted_screenshot_1790283157382.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Increased horizontal separation between crystal load capacitors C9 and C10 to 18mm on Sheet 3 to eliminate passive overlap.
@@ -2566,12 +2343,6 @@ Increased horizontal separation between crystal load capacitors C9 and C10 to 18
 
 Sheet 4-FLEXSPI wires should route around U8 and connect to the pins without off-sheet symbols. Both pins are on the same sheet. The routing should not obstruct text labels. Please update the schematic router and learnings for future schematic drawings.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790283246209.png](build/attachments/pasted_screenshot_1790283246209.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Added concentric detour routing under U8 for Sheet 4 FLEXSPI signals to eliminate off-sheet connectors.
@@ -2591,12 +2362,6 @@ Added concentric detour routing under U8 for Sheet 4 FLEXSPI signals to eliminat
 #### Description
 
 SCL and SDA lines overlap on sheet 6. Update schematic router and learnings so that the SCL net crosses over SDA cleanly and follows a parallel path into 6
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790283360253.png](build/attachments/pasted_screenshot_1790283360253.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -2638,12 +2403,6 @@ Cleaned up Sheet 7 capacitive touch routing on U2 and J2 with direct orthogonal 
 
 PCIE_TX0_P has an unexpected bend that causes it to overlap PCIE_TX0_N. PCIE_TX0_P should route straight across to from J1 to U1 with no bend. Both MIPI_DATA0 differential lanes should route around U1 to J2, under U1, without using off sheet connectors. Please update the router and learnings so this type of mistake cannot happen in the future.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790283685004.png](build/attachments/pasted_screenshot_1790283685004.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Routed Sheet 9 PCIE differential pairs straight across and detoured MIPI signals under U1 cleanly.
@@ -2664,12 +2423,6 @@ Routed Sheet 9 PCIE differential pairs straight across and detoured MIPI signals
 
 Components on this page are too densely packed. Please create a second expansion header page for J8-J10
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790283903996.png](build/attachments/pasted_screenshot_1790283903996.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Split dense Serial Bus Expansion Headers into Sheet 10 (I2C & I3C) and Sheet 11 (SPI, UART & CAN), updating all downstream sheets and TOC.
@@ -2689,12 +2442,6 @@ Split dense Serial Bus Expansion Headers into Sheet 10 (I2C & I3C) and Sheet 11 
 #### Description
 
 GPIO0, GPIO1, and GPIO5 should route cleanly around U1 into J14 without off-sheet connectors.
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790284014503.png](build/attachments/pasted_screenshot_1790284014503.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -2856,12 +2603,6 @@ Updated expansion headers J9 and J10 to JST-PH-6P connectors with 2.0mm pitch in
 
 Pasted a screenshot. Is this supposed to be the logo? Seems like a silkscreen error too me
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790298848779.png](build/attachments/pasted_screenshot_1790298848779.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Exported unfilled silkscreen rectangles as 4 explicit gr_line strokes to avoid KiCad 8 / KiCode fill none lavender block rendering bug.
@@ -2904,12 +2645,6 @@ Updated test board docs with recommended PKCELL LP352438 350mAh LiPo battery mod
 
 See attached screenshot, carrier board serial expansion cutouts overlap with each other causing the model to have burrs
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790299068920.png](build/attachments/pasted_screenshot_1790299068920.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Parameterized enclosure peripheral cutouts in measurements.yaml, adjusted J10 offset to eliminate overlap burrs and ensure solid separating walls.
@@ -2951,12 +2686,6 @@ Implemented markdown parser, database merger, R+M+W sync, and file watcher on BU
 
 U10 decoupling caps overlap J1. Move U10 and related components to a new sheet page. Rename SENSOR_EN and SENSOR_3V3 to PERIPH_EN and PERIPH_3V3
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790358624572.png](build/attachments/pasted_screenshot_1790358624572.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Moved U10 to dedicated Peripheral Power sheet; renamed SENSOR_EN/3V3 to PERIPH_EN/3V3.
@@ -2976,12 +2705,6 @@ Moved U10 to dedicated Peripheral Power sheet; renamed SENSOR_EN/3V3 to PERIPH_E
 #### Description
 
 SWDIO and SWCLK should route over top U9 from U1 to J5, right now they are routing straight thru U9 making the schematic harder to read. 3Both power nets symbols (VBUS and 3V#) should be placed above U9 and J5 so that they can dogleg into U0
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790358758039.png](build/attachments/pasted_screenshot_1790358758039.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -3003,12 +2726,6 @@ Enhanced detour routing over U9 and placed power net symbols vertically above U9
 
 Remove SWO routing from U1 and J5. We do not need to support SWO. Remove NRST routing from U9 to J5.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790358938072.png](build/attachments/pasted_screenshot_1790358938072.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Pruned SWD_SWO net and pruned NRST routing from U9:23 and J5:10.
@@ -3028,12 +2745,6 @@ Pruned SWD_SWO net and pruned NRST routing from U9:23 and J5:10.
 #### Description
 
 On sheet 6, LED_R has a routing conflict with GND. LED_R should route over GND and dogleg into D1
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790359052357.png](build/attachments/pasted_screenshot_1790359052357.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -3055,12 +2766,6 @@ Configured U6 pin sides with outputs 6-8 on right and GND on left, eliminating r
 
 On sheet 7, CAP_RX2, CAP_TX2, and CAP_TX3 all overlap each other. Is there a a bulk routing PCB symbol we can use to bridge U2 cap signals to J2? Otherwise, I think these symbols need to be moved to the other side of J2 so they can route over and around that component to resolve the overlaps.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790359136802.png](build/attachments/pasted_screenshot_1790359136802.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Aligned J2 pin breakout order with U2 on Capacitive Sensing sheet.
@@ -3080,12 +2785,6 @@ Aligned J2 pin breakout order with U2 on Capacitive Sensing sheet.
 #### Description
 
 C8 has overlaps with audio routing on sheet 8. Move it to the power regulation and distribution section, and note what it is for.
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790359293290.png](build/attachments/pasted_screenshot_1790359293290.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -3107,12 +2806,6 @@ Moved C8 from Audio Subsystem to 3.3V Power Regulation sheet in pcb.yaml.
 
 Move MIPI_CLK differential pins on J2 to the right side, so the route cleanly under J2 and do not overlap the MIPI data pins
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790364991115.png](build/attachments/pasted_screenshot_1790364991115.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Moved MIPI CLK differential pins to right side of J2.
@@ -3133,12 +2826,6 @@ Moved MIPI CLK differential pins to right side of J2.
 
 Update connector style on J6-J8 to JST-PH-6P. Create separate sheet pages for each expansion connector so that the wires do not overlap.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790365115426.png](build/attachments/pasted_screenshot_1790365115426.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Configured JST-PH-6P connector style on J6-J8 and created 5 dedicated expansion sheets in pcb.yaml.
@@ -3158,12 +2845,6 @@ Configured JST-PH-6P connector style on J6-J8 and created 5 dedicated expansion 
 #### Description
 
 Fix the GPIO wire routing on sheet 12 so that GPIO0 and GPIO1 route over the top of U1 into J14 and avoid intersecting other GPIO wires. Align GPIO2..GPIO4 on U1 with GPIO2..GPIO4 on J14 horizontally so that that bank of GPIOs route straight across without doglegging.
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790365165371.png](build/attachments/pasted_screenshot_1790365165371.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -3256,13 +2937,6 @@ Added obj export to carrier_board and flex_tail in manifest.yaml for flying prob
 
 When we load the PCB objects in rerun, is it possible to texture them with the PCB top and bottom sides so that probe points can be visually identified? Example carrier board textures are attached
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [carrier_board_bottom.png](build/attachments/carrier_board_bottom.png) | Uploaded screenshot carrier_board_bottom.png |
-| `screenshot` | [carrier_board_top.png](build/attachments/carrier_board_top.png) | Uploaded screenshot carrier_board_top.png |
-
 #### Resolution Notes
 
 Added top and bottom PCB textures to test_board/textures/ and bound them in PyBullet and Rerun.
@@ -3283,12 +2957,6 @@ Added top and bottom PCB textures to test_board/textures/ and bound them in PyBu
 
 Multiple component designators are overlapping pads or mounting holes. Circled them on this diagram. I propose that we create an algorithm which can intelligently place component designators on the board without overlapping any bar copper regions or holes, and add a DRC to validate this!
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790366404771.png](build/attachments/pasted_screenshot_1790366404771.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Updated DRC engine to rotate footprint pins via _get_pin_absolute_pos and inverted footprint rotation on silkscreen labels.
@@ -3308,12 +2976,6 @@ Updated DRC engine to rotate footprint pins via _get_pin_absolute_pos and invert
 #### Description
 
 Some component designators on the PCB are duplicated. Each component should have only a single designator. We need to implement a fix for this one ASAP. There are duplicate designators on the top and bottom (included a screenshot only of the bottom)
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790366854184.png](build/attachments/pasted_screenshot_1790366854184.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -3336,12 +2998,6 @@ Deduplicated silkscreen text export in exporter.py when matching component footp
 
 In the Changed Files UI section, newly added files under newly added subfolders do not display. Attached screenshot
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790372559666.png](build/attachments/pasted_screenshot_1790372559666.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Added --untracked-files=all flag to git status command in git_utils.py so all untracked files in newly created folders are returned and visible in the Changed Files section.
@@ -3363,12 +3019,6 @@ Added --untracked-files=all flag to git status command in git_utils.py so all un
 
 Can we connect NRST to the FTDI so that BOOT0 after gets asserted we can toggle NRST to get into ISP mode without power cycling the board manually ?
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [image.png](build/attachments/image.png) | Uploaded screenshot image.png |
-
 #### Resolution Notes
 
 Connected FTDI CBUS0 (U9 pin 23) to MCU NRST net in wiring.yaml and added schematic breakout on Sheet 6 of pcb.yaml.
@@ -3388,12 +3038,6 @@ Connected FTDI CBUS0 (U9 pin 23) to MCU NRST net in wiring.yaml and added schema
 #### Description
 
 On J8 all I3C wires overlap with each other. Can we reverse the order of wires on J8 and move U1 down slightly so that the I3C data and interrupt lines route cleanly straight across to U1 without doglegging?
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790375160222.png](build/attachments/pasted_screenshot_1790375160222.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -3435,12 +3079,6 @@ Added SCHEMATIC_WIRE_COLLINEAR_OVERLAP check to schematic DRC engine and updated
 #### Description
 
 Create an expansion carrier mounting system, and implement a connector endpoint for the enclosure bottom. The purpose is so that when we add expansion boards to the test board carrier, they have something to securely mount onto. These could be similar to the snap fit system used for the cat fountain components (lid, bowl and bottom), just a ring that runs around the connector cutouts.
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790375665424.png](build/attachments/pasted_screenshot_1790375665424.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -3502,13 +3140,6 @@ pybullet build time: Oct 20 2025 08:05:00
 ✔ Done Visualizing...
 (cq)
 ```
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790376206914.png](build/attachments/pasted_screenshot_1790376206914.png) | Pasted screenshot |
-| `screenshot` | [pasted_screenshot_1790376296765.png](build/attachments/pasted_screenshot_1790376296765.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -3607,12 +3238,6 @@ Updated flying probe simulator to use rr.Scalars for multi-channel logging, made
 #### Description
 
 Reviewing uncommitted changes, in bullet.py I see the horizontal scrollbar is extremely long in Split View. We should probably enforce a cutoff if a line of text is too long
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790387403584.png](build/attachments/pasted_screenshot_1790387403584.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -3718,12 +3343,6 @@ Extended enclosure_bottom under flex tail with supporting plane parameterized vi
 
 In the product view, it looks like the flex tail is too wide to fit in the ZIF connector. Screenshot attached
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790391040013.png](build/attachments/pasted_screenshot_1790391040013.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Updated J2 connector obstacle dimensions to [25.0, 5.0, 2.0] in pcb.yaml to perfectly accommodate the 24mm wide flex tail mating tab with zero DRC violations.
@@ -3750,12 +3369,6 @@ There is no cutout for the PCIE connector:
 
 Screenshot attached
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790391213203.png](build/attachments/pasted_screenshot_1790391213203.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Added floor pass-through cutout for M.2 PCIE connector J1 in enclosure_bottom floor parameterized via enclosure_m2_cutout_length in measurements.yaml.
@@ -3777,12 +3390,6 @@ Added floor pass-through cutout for M.2 PCIE connector J1 in enclosure_bottom fl
 
 The peripheral cutouts located on the board right side should all have the same width, height, and spacing apart from each other.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790391477791.png](build/attachments/pasted_screenshot_1790391477791.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Equalized peripheral connector cutouts in enclosure_bottom right wall to uniform length 10.0mm and height 5.0mm parameterized via enclosure_periph_cutout_length and enclosure_periph_cutout_height.
@@ -3803,13 +3410,6 @@ Equalized peripheral connector cutouts in enclosure_bottom right wall to uniform
 #### Description
 
 -The cutout region for J1 is missing from the design. See the circled gray region, and the insertion diagram showing the expected cutout region for insertion
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790445012556.png](build/attachments/pasted_screenshot_1790445012556.png) | Pasted screenshot |
-| `screenshot` | [pasted_screenshot_1790445149239.png](build/attachments/pasted_screenshot_1790445149239.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -3838,12 +3438,6 @@ In the current design, the battery wire will be visible from the top of the boar
 
 - **Expected**: The battery holder is created from 3 rounded rectangles
 - **Actual**: The battery holder is created from 1 rounded rectangles
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790444379020.png](build/attachments/pasted_screenshot_1790444379020.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -3887,12 +3481,6 @@ Removed MIPI camera differential pairs and nets from wiring.yaml, pcb.yaml, rout
 
 This project is a generic test board meant for firmware bringup and component evaluations. Change the flex ribbon design so that it has a 5 button slider, action button, and proximity sensor. Diagram attached. The slider, action button, and proximity regions should be labeled and outlined with silkscreen
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790445678469.png](build/attachments/pasted_screenshot_1790445678469.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Updated flex ribbon design with 5-button slider (S1-S5), ACTION button, PROX sensor, silkscreen borders/labels, and synchronized routing_flex.yaml.
@@ -3913,12 +3501,6 @@ Updated flex ribbon design with 5-button slider (S1-S5), ACTION button, PROX sen
 #### Description
 
 The nearly added flex ribbon support does not connect with the enclosure bottom.
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790445761429.png](build/attachments/pasted_screenshot_1790445761429.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -4040,14 +3622,6 @@ pybullet build time: Oct 20 2025 08:05:00
 (cq)
 ```
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790446532263.png](build/attachments/pasted_screenshot_1790446532263.png) | Pasted screenshot |
-| `screenshot` | [pasted_screenshot_1790472643701.png](build/attachments/pasted_screenshot_1790472643701.png) | Pasted screenshot |
-| `screenshot` | [pasted_screenshot_1790478828337.png](build/attachments/pasted_screenshot_1790478828337.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Tessellated CAD planar faces directly to align textured PCB mesh with exact board outline and corrected UV coordinate mapping.
@@ -4119,12 +3693,6 @@ Renamed test_board package to carrier_board across source files, configs, docume
 
 Pasted a screenshot from the texture. Ensure these glyphs do not overlap each other.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790457630983.png](build/attachments/pasted_screenshot_1790457630983.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Repositioned SLIDER silkscreen text to (0.0, 11.5) to maintain full clearance (>14mm) from S3 button silkscreen glyph.
@@ -4145,12 +3713,6 @@ Repositioned SLIDER silkscreen text to (0.0, 11.5) to maintain full clearance (>
 #### Description
 
 J1 is missing thru holes on the PCB. The connector won't be insertable into the mount point unless all the thru holes are present.
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790472825887.png](build/attachments/pasted_screenshot_1790472825887.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -4195,12 +3757,6 @@ pybullet build time: Oct 20 2025 08:05:00
 ✔ Done Visualizing...
 (cq)
 ```
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790473011710.png](build/attachments/pasted_screenshot_1790473011710.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -4249,12 +3805,6 @@ The proximity sensor region on the flex tail will have a low detection range, so
  ┃   ──────
 ```
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790478673311.png](build/attachments/pasted_screenshot_1790478673311.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Revised flex tail layout to perimeter proximity sensor loop enclosing touch sensing region with >=0.5mm clearance corridors for traces.
@@ -4274,12 +3824,6 @@ Revised flex tail layout to perimeter proximity sensor loop enclosing touch sens
 #### Description
 
 Attached screenshot. The SWD and USB connector markers appear reversed
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790474255304.png](build/attachments/pasted_screenshot_1790474255304.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -4357,12 +3901,6 @@ The flying probes test for flex tail shows the flex tail PCB overlaying the carr
 
 1. $ python src/view.py  carrier_board/flex_tail:view/simulate
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790480948261.png](build/attachments/pasted_screenshot_1790480948261.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Cleared prior simulation world entities on target initialization and isolated flex tail subassembly from carrier copper regions.
@@ -4417,12 +3955,6 @@ In rerun, when viewing the textured carrier board during the flying probes test,
 #### Reproduction Steps
 
 1. $ python src/view.py  carrier_board/carrier_board:view/simulate
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790481436497.png](build/attachments/pasted_screenshot_1790481436497.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -4486,12 +4018,6 @@ Calling `python src/view.py test_board/flex_tail:pcb` fails with RuntimeError be
 RuntimeError: A* router could not find collision-free path for net 'GND' from (0.00, 0.00) [F.Cu] to (-5.50, -8.00) [F.Cu]
 ```
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [flex_fail_overlap.png](build/flex_fail_overlap.png) | Visual artifact of routing collision |
-
 #### Resolution Notes
 
 Removed on-the-fly auto_router.route_all_nets() from PCBExporter. Pre-computed flex routes in config_route and persisted to routing_flex.yaml. Scoped board footprint filtering in router to isolate subassemblies.
@@ -4522,12 +4048,6 @@ USB-C 16-pin receptacle was oriented at rotation 0, pointing the connector mouth
 
 - **Expected**: USB-C connector mouth must face board edge outward (-X) with receptacle pins facing board interior (+X).
 - **Actual**: Connector mouth faced -Y with shield pins facing board edge.
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [j_usb_must_face_board_edge.png](build/j_usb_must_face_board_edge.png) | Incorrect J_USB orientation review screenshot |
 
 #### Resolution Notes
 
@@ -4560,13 +4080,6 @@ Test point labels rendered horizontally across pads and discrete component label
 - **Expected**: Silkscreen text must be placed with collision avoidance keepouts clear of component pads and adjacent text.
 - **Actual**: Text rendered overlapping pads ('TP_GNDTP_TX0_N') and discrete component labels collided ('C3 R_BOO5').
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [test_points_silkscreen_overlap.png](build/test_points_silkscreen_overlap.png) | Overlapping test point silkscreen |
-| `screenshot` | [multiple_discrete_antenna.png](build/multiple_discrete_antenna.png) | Discrete component labels colliding |
-
 #### Resolution Notes
 
 Rotated test point labels 90 degrees with dedicated clearance boxes. Added placed_component_label_boxes in exporter.py. Relocated passives with >2mm spacing in wiring.yaml.
@@ -4598,12 +4111,6 @@ C1 0402 capacitor was placed in empty space at [18.0, -21.0] without stitching v
 - **Expected**: C1 must decouple U2 power pin with stitching vias to 3V3 and GND planes.
 - **Actual**: C1 had isolated pads with no traces or vias connecting to copper planes.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [c1_dangling.png](build/c1_dangling.png) | Dangling C1 decoupling capacitor |
-
 #### Resolution Notes
 
 Relocated C1 to [20.0, -15.0, 0.8] opposite U2 on F.Cu. Automated plane net stitching via generation in router connected both pads to 3V3 and GND planes.
@@ -4634,12 +4141,6 @@ SPK1 was specified with a rectangular 1x2 pin header footprint rather than a rou
 
 - **Expected**: Piezo speaker must have circular silkscreen boundary and be located near mounting hole MH2.
 - **Actual**: Rectangular pin header footprint rendered at [-22.0, 26.0].
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [fix_spk2_placement.png](build/fix_spk2_placement.png) | Review screenshot requesting round piezo silkscreen |
 
 #### Resolution Notes
 
@@ -4766,12 +4267,6 @@ Long comment docstrings in side-by-side split view pushed table cell boundaries,
 - **Expected**: Table cells should enforce max-width: 0 and overflow-x: auto to wrap cleanly without breaking container layout.
 - **Actual**: Text expanded uncontrollably beyond viewport width.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [overlapping_text.png](build/overlapping_text.png) | Overlapping text in split view screenshot |
-
 #### Resolution Notes
 
 Added max-width: 0; overflow-x: auto; to .sbs-row td in code_review.html.j2.
@@ -4800,12 +4295,6 @@ The flex tail cutout doesn't align with the physical flex tail when placed in th
 
 - **Expected**: _Not specified_
 - **Actual**: Flex tail should not intersect with the bottom or top of enclosure
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790004918049.png](build/attachments/pasted_screenshot_1790004918049.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -4897,12 +4386,6 @@ In the cat fountain project, the motor base is not secured in place. When the mo
 -For the motor hole in the motor room in the cat fountain bowl, just want to confirm the design is revised with added clearance to allow the motor to spin freely. I am having to sand down the cylindrical cut in the motor hole to allow it to move around freely around. 
 Please stage this on its own commit.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790535919844.png](build/attachments/pasted_screenshot_1790535919844.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Updated cat_fountain measurements and provider to support BetaFPV/LAVA 1102 3x M1.4 mounting bolt circle (Dia 6.6mm), triangular anti-rotation base recess, central shaft clearance, wire relief channel, and increased bowl motor pocket radius to 8.1mm for 15.2mm motor clearance.
@@ -4944,12 +4427,6 @@ Configured Git LFS tracking for build/attachments/ and feedback/attachments/ in 
 
 See attached. Bug 166 lost its resolution state when I added and saved a bug from the bug report tool. We need to add a file watch on the feedback directory and continuously update bug state in the bug report tool whenever files are modified in that directory.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [image.png](build/attachments/image.png) | Uploaded screenshot image.png |
-
 #### Resolution Notes
 
 Added continuous file watch on feedback/ directory in BugReportServer and request handlers (do_GET and do_POST) to sync bug state before writes, added client-side polling, and supported both Resolution and Resolution Notes headings.
@@ -4988,12 +4465,6 @@ Port the diff viewer from the SSD project (smartlog):
 - Update docs (CONTRIBUTING.md) about diff viewer integration
 - Track and support merge conflict resolution
 Please commit this in its own change.
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790568918278.png](build/attachments/pasted_screenshot_1790568918278.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -5072,12 +4543,6 @@ Sheet 9
 
 1. $ python src/build.py "carrier_board/*"
 2. $ open build/schematics/carrier_board/carrier_board_schematic.pdf
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790552121064.png](build/attachments/pasted_screenshot_1790552121064.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -5183,12 +4648,6 @@ The JST connector footprints J6-J10 silkscreens bordersoverlap with each other. 
 
 1. $ python src/view.py carrier_board/carrier_board:pcb
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790564470388.png](build/attachments/pasted_screenshot_1790564470388.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Re-spaced JST peripheral connectors J6-J10 along the right PCB edge with uniform 1.5mm body gap and >= 0.7mm silkscreen clearance (J6 at Y=33.0, J7 at Y=17.5, J8 at Y=2.0, J9 at Y=-14.5, J10 at Y=-32.0). Adjusted B.Cu/F.Cu signal routing (DCD_N, DTR_N, CAP_RX1/2) and via placements to ensure 0 DRC errors.
@@ -5291,13 +4750,6 @@ Updated obstacle envelopes in `pcb.yaml`, silkscreen bus identifiers in `provide
 #### Description
 
 The carrier board and flex tail have a bunch of DRC violations. Either resolve these violations, or suppress them if they are benign/transient violations
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `reference` | [carrier_board-drc.rpt](build/attachments/carrier_board-drc.rpt) | Updated clean carrier_board-drc.rpt (0 violations) |
-| `reference` | [flex_tail-drc.rpt](build/attachments/flex_tail-drc.rpt) | Updated clean flex_tail-drc.rpt (0 violations) |
 
 #### Resolution Notes
 
@@ -5611,12 +5063,6 @@ When the dashboard is opened the first time, the dashboard should sync SQLite da
 
 On the enclosure top, the GPIO pin labels overlap ('1..8' overlaps 'GPIO') and there is a rendering error for power and ground symbols. Can you fix the overlaps, then change the power and ground symbols to be text, place all symbols next to their respective GPIOs, and rotate the pin '1', '3V3', and 'GND' symbol 90 degrees
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790625153073.png](attachments/pasted_screenshot_1790625153073.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 1. Replaced missing unicode power and ground glyphs with standard text labels "3V3" and "GND".
@@ -5875,12 +5321,6 @@ Added Jump to CR icon with open vs resolved counter badge and dynamic color stat
 
 Multiple scrollbars are visible in the VCS diff view, when Split mode is selected. Screenshot attached. Please revise this UI to have a horizontal single scrollbar element at the bottom and enforce a maximum line length for files.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790634671150.png](attachments/pasted_screenshot_1790634671150.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 1. Removed per-line `overflow-x: auto` from `.diff-code-cell` in `src/provider/templates/diff_component.html.j2` which was generating independent horizontal scrollbars for every overflowing table row.
@@ -5903,12 +5343,6 @@ Multiple scrollbars are visible in the VCS diff view, when Split mode is selecte
 
 Multiple DIff Viewer tabs are open after a few minutes of filing bugs. There should only ever be one Diff Viewer tab open per session.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790634771653.png](attachments/pasted_screenshot_1790634771653.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 1. Replaced anonymous `_blank` window opening in `diff_view.html.j2` with named window targets (`hardware_bug_tracker`, `hardware_code_review`), ensuring browsers reuse existing tabs rather than spawning new tabs on every navigation or bug filing action.
@@ -5930,12 +5364,6 @@ Multiple DIff Viewer tabs are open after a few minutes of filing bugs. There sho
 #### Description
 
 Screenshot attached. I see no vertical scrollbar visible for the smartlog or file view in the VCS dashboard. Scrollbars should be clearly visible.
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790634905359.png](attachments/pasted_screenshot_1790634905359.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -6031,14 +5459,6 @@ Feedback on the latest change to route off sheet connectors for power and ground
 - The LED_AUD_K and LED_PERIPH_K text on sheet 17 is outside of the sheet border.
 - On sheet 17, R7-R12 symbols are huge! please make them smaller and fix whatever is causing huge discrete components symbols to be created.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790636178362.png](attachments/pasted_screenshot_1790636178362.png) | Pasted screenshot |
-| `screenshot` | [pasted_screenshot_1790636255586.png](attachments/pasted_screenshot_1790636255586.png) | Pasted screenshot |
-| `screenshot` | [pasted_screenshot_1790636366486.png](attachments/pasted_screenshot_1790636366486.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 - **Obstacle Avoidance**: Constructed `obstacle_boxes` in `src/provider/schematic_diagram.py` combining component bounding boxes, title block (`202.0, 12.0, 83.0, 32.0`), decoupling card, and truth tables. Vertical GND and power trunks dynamically query obstacles and stop short with safe margins instead of cutting through tables or title blocks.
@@ -6095,12 +5515,6 @@ Sheet 17 components are totally missing from the carrier board. Please add them 
 -Cirled in RED on attached screenshot - the battery cover elides "BATTERY" and "GPIO" text
 -Circled in GREEN, the 3V3 and GND markers for the GPIO header seem to end midway down the cutout, instead of at the cutout edge.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790644520721.png](attachments/pasted_screenshot_1790644520721.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Repositioned BATTERY label south of cover perimeter, aligned GPIO label above J14 cutout, and added pin 10 delimiter.
@@ -6131,14 +5545,6 @@ Repositioned BATTERY label south of cover perimeter, aligned GPIO label above J1
 2. $ python src/build.py "carrier_board:pcb"
 3. View board texture:
 4. $ python src/view.py  carrier_board/carrier_board:view/simulate
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790644800591.png](attachments/pasted_screenshot_1790644800591.png) | Pasted screenshot |
-| `screenshot` | [pasted_screenshot_1790645062449.png](attachments/pasted_screenshot_1790645062449.png) | Pasted screenshot |
-| `preview` | [carrier_board_top_bug209_fixed.png](recordings/previews/carrier_board_top_bug209_fixed.png) | High-resolution fixed board texture |
 
 #### Resolution Notes
 
@@ -6275,12 +5681,6 @@ Removed PCIe J1 connector and enclosure cutouts; integrated u-blox NINA-B302 U11
 
 -Text in the main dashboard under "Changed Files" in VCS window appears corrupted with a very large font and unrendered icons
 -There is a "Commit Changes" pane under the main VCS view with bare textboxes which appears to be coming from an HTML syntax error.
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790651818964.png](attachments/pasted_screenshot_1790651818964.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -6426,12 +5826,6 @@ Flying probes test- there's a bunch of isolation test results that are included 
 
 The main branch, and release branches v1..v5 are missing from the branch view. screenshot attach
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790659781121.png](attachments/pasted_screenshot_1790659781121.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 1. Updated `GitEngine.get_branches` in `src/provider/vcs/git_engine.py` to query both `refs/heads/` and `refs/remotes/`, and strip `refs/heads/` prefix directly from the full reference name rather than using ambiguous `%(refname:short)`, ensuring `refs/heads/main` resolves cleanly to `main` even when a colliding tag named `main` exists.
@@ -6560,13 +5954,6 @@ Enhanced merged commit detection across all tracking candidates in git_engine.py
 #### Description
 
 Can we globally disable the text wrap on toolbar buttons and add horizontal scrollers if they fall off the sheet instead. Pasted two example screenshots of ugly scroller wrap below
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790710739020.png](attachments/pasted_screenshot_1790710739020.png) | Pasted screenshot |
-| `screenshot` | [pasted_screenshot_1790710768949.png](attachments/pasted_screenshot_1790710768949.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -6750,14 +6137,6 @@ Preserved logs, expected_behavior, and actual_behavior in _handle_save_bug in Da
 
 According to the data sheet our BLE module NINA-B302-00B comes unflashed, we should use the flashed NINA-B312 variant, and include an SWD header as a recovery step. I have also noted that the PCB footprint does not match the board footprint and the NINA module will intersect with the side of the carrier enclosure, so we may need to move this component to the other side of the board and relate test points TP2-TP8 to place it correctly within the PCB's confines.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790711704163.png](attachments/pasted_screenshot_1790711704163.png) | Pasted screenshot |
-| `screenshot` | [pasted_screenshot_1790711777076.png](attachments/pasted_screenshot_1790711777076.png) | Pasted screenshot |
-| `document` | [u-blox_NINA-B30_datasheet.pdf](attachments/u-blox_NINA-B30_datasheet.pdf) | Uploaded document u-blox_NINA-B30_datasheet.pdf |
-
 #### Resolution Notes
 
 Replaced U11 with pre-flashed NINA-B312-02B, added SWD recovery header J15 at (-14.5, -41.0), updated footprint to LGA-72 Table 27, and eliminated all DRC violations.
@@ -6779,12 +6158,6 @@ Replaced U11 with pre-flashed NINA-B312-02B, added SWD recovery header J15 at (-
 
 Open copy/open in VS code icons with links next to the file name in the VCS UI and code review UI
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790725427077.png](attachments/pasted_screenshot_1790725427077.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Added Copy file path and Open in VS Code (vscode://file) action buttons next to file title in both VCS diff view and Code Review workstations.
@@ -6805,12 +6178,6 @@ Added Copy file path and Open in VS Code (vscode://file) action buttons next to 
 #### Description
 
 Attached screenshot. All horizontal, vertical scrollbars appear invisible (black on black) in the UI theme.
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790725528764.png](attachments/pasted_screenshot_1790725528764.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -6889,12 +6256,6 @@ Adding extra CR feedback for a commit didn't update the CR count; CR count staye
 - **Expected**: CR count should have increased to 1/4
 - **Actual**: CR count stayed at 1/1
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790727075474.png](attachments/pasted_screenshot_1790727075474.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Fixed SQLite comment pruning and added file watch on feedback directory
@@ -6919,12 +6280,6 @@ I kept moving the gripper in the VCS side-by-side view to the left; split pane k
 
 - **Expected**: When I click and hold on the gripper, the X position of the gripper should follow the mouse
 - **Actual**: It seemed to go in the opposite direction of the mouse
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790727267913.png](attachments/pasted_screenshot_1790727267913.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -7061,12 +6416,6 @@ Trimmed GEMINI.md and modularized domain-specific mandates into docs/
 #### Description
 
 If both commit and file panes are open in the Code Review page, the horizontal scroller shows. Ideally, there should be no scrolling required for any toolbar elements. Can we move the commit and file panes under the main toolbar in the grid, and ensure it formats cleanly on standard resolution displays without requiring scrolling?
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790739590554.png](attachments/pasted_screenshot_1790739590554.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -7287,12 +6636,6 @@ Marked J15 as DNP and no-connect, excluded from BOM export and schematic unconne
 #### Description
 
 I see what might be some corrupted text in the diff view when I select Unified mode. Attached screenshot
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790818791618.png](attachments/pasted_screenshot_1790818791618.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -7616,12 +6959,6 @@ Reconciled UUID and ID mapping during comment upsert in SQLite store and server 
 
 Suggest increasing the width of text to 0.8mm or more.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790825414866.png](attachments/pasted_screenshot_1790825414866.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Increased BATTERY text font size to 4.2mm bold with 0.15mm stroke offset to guarantee >= 0.80mm stroke width (DFM compliance)
@@ -7643,12 +6980,6 @@ Increased BATTERY text font size to 4.2mm bold with 0.15mm stroke offset to guar
 
 sheet 8- R1 and R2 are bridged with an off sheet 3V3 connector, but the sheet side of R1 and R2 off sheet
   connectors are unlabeled. the red wires on sheet side of r1 and r2 should have a 3V3 designator, and the bridge between the two resistors should be removed
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790829835444.png](attachments/pasted_screenshot_1790829835444.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -7704,12 +7035,6 @@ flex_tail | FLEX | 6-Layer Stackup | Rev: 1.0
  CBUS6 (2 pins)  CBUS7 (2 pins)  OSCI (2 pins)  GPIO0 (2 pins)
  GPIO1 (2 pins)  GPIO2 (2 pins)  GPIO3 (2 pins)
 ```
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790829938024.png](attachments/pasted_screenshot_1790829938024.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -7827,12 +7152,6 @@ Resolved floating pins on U10 (BYP) and U1 (D1) by removing unused pins from She
 #### Description
 
 The sheet names fall off the edge of the page-see screenshot below. We may simply abbreviate/truncate the sheet names on the index to prevent this issue from occuring
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790903212489.png](attachments/pasted_screenshot_1790903212489.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -8949,12 +8268,6 @@ Route individual file compilation logs to build/daemon.log via Logger.log struct
 
 Component designators for LEDs and jumpers are on the opposite of where the components are placed. This has no functional purpose-we can remove all these designators
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790907607655.png](attachments/pasted_screenshot_1790907607655.png) | Pasted screenshot |
-
 #### Resolution Notes
 
 Remove opposite-side component designators D2..D7, R7..R12, JP1..JP4, and SW1 from bottom silkscreen (B.SilkS) in CarrierBoardProvider.silkscreen().
@@ -8975,12 +8288,6 @@ Remove opposite-side component designators D2..D7, R7..R12, JP1..JP4, and SW1 fr
 #### Description
 
 Can we move C18 and C19 further away from U11 and stack them vertically? Right now, C18 is inside the silkscreen border of U11
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790907669247.png](attachments/pasted_screenshot_1790907669247.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -9007,12 +8314,6 @@ This seems like a general build issue, but it repress easily for the carrier_boa
 
 - **Expected**: $ python src/view.py carrier_board/carrier_board:pcb
 - **Actual**: $ python src/build.py "carrier_board/*"
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `document` | [daemon.log](attachments/daemon.log) | Uploaded document daemon.log |
 
 #### Resolution Notes
 
@@ -9170,12 +8471,6 @@ to me
 Hi
 It has two sets of files inside and it seems no FPC area in design, is it 6-layer rigid board? If so, could you please add new order under normal FR4 board?
  2026-10-02
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [pasted_screenshot_1790952643338.png](attachments/BUG-271/pasted_screenshot_1790952643338.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -26998,12 +26293,6 @@ Hi
 1. For board with assembly order, suggest panel in 1*2, make it 64*64mm, accept x-out board in panel, is it okay?
 2. It has no drill file inside, could you please add then upload the whole rev file in shopping cart for our double check?
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [W908185ASE69.png](attachments/BUG-275/W908185ASE69.png) | Uploaded screenshot W908185ASE69.png |
-
 #### Resolution Notes
 
 Confirmed and approved 1*2 panel in 64*64mm with x-out accepted. Clarified SMT-only flex design with 0 drill holes / 0 vias across project summary forms, order remarks, and Dwgs.User fabrication layer. Added multi-format drill deliverables (.drl, -PTH.drl, -NPTH.drl, .txt, -drl_map.gbr, -drill.rpt) into flex_tail/gerbers.zip.
@@ -27027,12 +26316,6 @@ Hi
 When checking the BOM, we find out some question. Please kindly check and reply the attached bom.
 Your early response would be highly appreciated. 
  2026-10-07
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `reference` | [T-E70W908185A-2units-bom_templates(2026-10-07) question.xlsx](attachments/BUG-276/T-E70W908185A-2units-bom_templates(2026-10-07) question.xlsx) | Uploaded reference T-E70W908185A-2units-bom_templates(2026-10-07) question.xlsx |
 
 #### Resolution Notes
 
@@ -27059,12 +26342,6 @@ Hi
 Could you please re-organize the bom as our template?
 https://www.pcbway.com/img/images/pcbway/Sample_BOM_PCBWay.xlsx
 Your early response would be highly appreciated.
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `reference` | [Sample_BOM_PCBWay.xlsx](attachments/BUG-277/Sample_BOM_PCBWay.xlsx) | Uploaded reference Sample_BOM_PCBWay.xlsx |
 
 #### Resolution Notes
 
@@ -27264,13 +26541,6 @@ The motor clip interferes with the 1102 motor base; it is not possible to rotate
 
 — Reopened this one. Can you please add some extra support where I indicated in the newly attached screenshot?
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [image.png](attachments/BUG-TRANSLUCENT-LARVA-792/image.png) | Uploaded screenshot image.png |
-| `screenshot` | [Untitled 4.png](attachments/BUG-TRANSLUCENT-LARVA-792/Untitled 4.png) | Uploaded screenshot Untitled 4.png |
-
 #### Resolution Notes
 
 Added curved support web connecting the 10mm guide stub to the continuous right arm along the indicated radius curve (radius 15mm, rising 6mm from Y=-16 to Y=-10), providing solid mechanical bracing while keeping the side connector cutout open for motor base installation.
@@ -27291,13 +26561,6 @@ Added curved support web connecting the 10mm guide stub to the continuous right 
 #### Description
 
 There is a pinout discrepency on the TMC6300 part I’m using from Sparkfun. The wiring diagram has different signal names for the input and output lines than the actual board. Since we are bridging high and low signals; can you create a key mapping the input bridges to UL, UH, VL, VH, and WL WH on the board and place it in the top right of the wiring diagram, and rename the output signals to U, V, and H. See screenshots below for comparison.w
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [image.png](attachments/BUG-DEEP-BURROWER-108/image.png) | Uploaded screenshot image.png |
-| `screenshot` | [Untitled.png](attachments/BUG-DEEP-BURROWER-108/Untitled.png) | Uploaded screenshot Untitled.png |
 
 #### Resolution Notes
 
@@ -27320,12 +26583,6 @@ Renamed TMC6300 motor_driver output pins and wire endpoints from OUT1, OUT2, OUT
 
 The RP2040 pinout on the wiring diagram is total unreadable garbage (see attached) I propose the following solution: name all the pins on the board according to their GPIO PIN numbers, then keep VSYS, 3V3, and GND intact. Create a separate key in one of the diagram corners mapping the RP2040 GPIOs to net names; keeping the same orientation and color coding of nets on the key as on the wiring diagram.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [image.png](attachments/BUG-FOSSORIAL-BRISTLE-291/image.png) | Uploaded screenshot image.png |
-
 #### Resolution Notes
 
 Simplified RP2040 pin labels on the board to just GPIO numbers (GPx) while keeping power/GND pins intact, and added a dedicated RP2040 GPIO pinout key in the bottom-left corner of the wiring diagram preserving left/right column orientation and net color coding.
@@ -27346,14 +26603,6 @@ Simplified RP2040 pin labels on the board to just GPIO numbers (GPx) while keepi
 #### Description
 
 Can you please resolve the remaining wiring diagram overlaps? Attached
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [Untitled 3.png](attachments/BUG-PROBOSCID-NIGHTCRAWLER-523/Untitled 3.png) | Uploaded screenshot Untitled 3.png |
-| `screenshot` | [Untitled 1.png](attachments/BUG-PROBOSCID-NIGHTCRAWLER-523/Untitled 1.png) | Uploaded screenshot Untitled 1.png |
-| `screenshot` | [Untitled 2.png](attachments/BUG-PROBOSCID-NIGHTCRAWLER-523/Untitled 2.png) | Uploaded screenshot Untitled 2.png |
 
 #### Resolution Notes
 
@@ -27464,12 +26713,6 @@ Defined missing copyText and improved fallbackCopy with secure context checks an
 
 Can you please take a look at this XLS doc and provide an update? I believe we’ll need to source some of the IC’s; MCU and cap touch, to them ourselves. Can you help me come up with an order form and shipping instructions?
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `reference` | [T-E68W908185A-2units-bom_templates(2026-10-11) questions.xls](attachments/BUG-SEGMENTED-PALOLO-739/T-E68W908185A-2units-bom_templates(2026-10-11) questions.xls) | Uploaded reference T-E68W908185A-2units-bom_templates(2026-10-11) questions.xls |
-
 #### Resolution Notes
 
 Answered all 7 PCBWay BOM questions in replied .xlsx and .xls attachments; updated Y1 crystal MPN from ECS-240-8-30B-CKM to ECS-240-8-32B-CKM to match 3225-4P footprint across wiring.yaml and downselection reports; generated carrier_board consignment parts sourcing list and PCBWay shipping/customs guide; rebuilt carrier board PCB packages.
@@ -27513,15 +26756,6 @@ Please note that the minimum buy-in on DigiKey for the IQS7222A is 8,000 units, 
 
 Greetings
 Could you please send us rev bom in xls/xlsx format?
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `reference` | [T-E68W908185A-2units-bom_templates(2026-10-12)_rev1.xlsx](attachments/BUG-GLOWING-OLIGOCHAETE-544/T-E68W908185A-2units-bom_templates(2026-10-12)_rev1.xlsx) | Revised quotation BOM spreadsheet with U1/U2 consignment notes, IQS7222C101QNR substitution, and 3225-4P crystal |
-| `reference` | [T-E68W908185A-2units-bom_templates(2026-10-12)_rev1.xls](attachments/BUG-GLOWING-OLIGOCHAETE-544/T-E68W908185A-2units-bom_templates(2026-10-12)_rev1.xls) | Legacy Excel 97-2004 format of revised quotation BOM |
-| `reference` | [carrier_board_bom_rev1.xlsx](attachments/BUG-GLOWING-OLIGOCHAETE-544/carrier_board_bom_rev1.xlsx) | Clean EDA export BOM generated directly from updated carrier board model matching PCBWay schema |
-| `reference` | [carrier_board_bom_rev1.csv](attachments/BUG-GLOWING-OLIGOCHAETE-544/carrier_board_bom_rev1.csv) | CSV export of clean EDA BOM |
 
 #### Resolution Notes
 
@@ -27569,9 +26803,6 @@ Pls see attached, we should plan to consign all remaining components to them exc
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
-| `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx) | Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16 |
-| `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls) | Legacy Excel 97-2004 format of replied quotation BOM |
-| `reference` | [digikey_order_2026-10-14.xlsx](attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx) | Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2) |
 | `reference` | [carrier_board_bom_rev3.xlsx](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx) | Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM) |
 | `reference` | [carrier_board_bom_rev2.xlsx](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx) | Clean EDA export BOM generated directly from updated carrier board model |
 | `reference` | [carrier_board_bom_rev2.csv](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv) | CSV export of clean EDA BOM |
@@ -27744,13 +26975,6 @@ Replaced interim shipping guide with supplier-required assembly documents: Docum
 #### Description
 
 See attachments below. Both nightly license compliance and CI jobs are failing
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `document` | [clipboard_text_1792279938306.txt](attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279938306.txt) | Pasted text document |
-| `document` | [clipboard_text_1792279899940.txt](attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279899940.txt) | Pasted text document |
 
 #### Resolution Notes
 
@@ -27942,12 +27166,6 @@ Replaced motor_clip and integrated enclosed well beneath the impeller with dedic
 - **Resolved**: `2026-11-05 15:45:39 UTC`
 - **Accepted**: `2026-11-06 00:18:47 UTC`
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1792806350220_dct9c.png](attachments/BUG-BARBED-MIDGE-630/screenshot_paste_1792806350220_dct9c.png) | Pasted screenshot screenshot_paste_1792806350220_dct9c.png |
-
 #### Attached Commits
 
 - `bf875947`
@@ -28101,12 +27319,6 @@ Added clip-on mounting boss for Treedix JTAG/SWD Breakout Board Adapter (19.1x13
 
 The sensor shield on the inner bowl wall is too complicated. The shape should be an extruded, hollow rectangle. Right now, there is an inner lip on the inside ofthe bowl wall, as well as two tails. See screenshot below. The red lines mark defects in the shape, while the green line marks the desired shape.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1793890121106_n89dw.png](attachments/BUG-SPECKLED-ROVEBEETLE-352/screenshot_paste_1793890121106_n89dw.png) | Pasted screenshot screenshot_paste_1793890121106_n89dw.png |
-
 #### Attached Commits
 
 - `5821d84e`
@@ -28135,12 +27347,6 @@ Simplify proximity sensor shield on inner bowl wall to an extruded hollow rectan
 #### Description
 
 Giving the TMC6300 mounting system as an example below, there are micro-gaps between the mounting rales, inner shells, and the rail system will not work if a current sensor is already installed. Can we simplify this design, and switch to a snap ring system (assuming the sides of the PCB function as the inner ring) similar to the bowl to lid and bowl to bottom connections? The defects are marked with red.
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1793890436150_8301p.png](attachments/BUG-STINGING-LACEWING-799/screenshot_paste_1793890436150_8301p.png) | Pasted screenshot screenshot_paste_1793890436150_8301p.png |
 
 #### Attached Commits
 
@@ -28182,8 +27388,6 @@ Defects circled in red.
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1793890876309_0c9ae.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png) | Pasted screenshot screenshot_paste_1793890876309_0c9ae.png |
-| `screenshot` | [screenshot_paste_1793924149979_7f535.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png) | Pasted screenshot screenshot_paste_1793924149979_7f535.png |
 | `screenshot` | [screenshot_paste_1793890911006_wvg54.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png) | Pasted screenshot screenshot_paste_1793890911006_wvg54.png |
 
 #### Attached Commits
@@ -28216,13 +27420,6 @@ Simplified motor base to circle unioned with hall sensor rectangular tongue; eli
 #### Description
 
 As indicated on the mechanical drawing for the 1102 18000kv motor, there are 3 struts on the top of the motor frame which connect to the drive shaft. Can we add a triangular groove pattern with central hole to the bottom of the drive hub so that the struts can be fit into the drive hub bottom to prevent torque slippage without gluing. Additionally, can we revise the design of the drive hub to be a convex hull with minimum 1.5mm wall thickness around all magnets, grooves, and mounting holes. Desired shape outlined in green on the existing drive hub in one of the attached screenshots.
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1793891547400_gyg0h.png](attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891547400_gyg0h.png) | Pasted screenshot screenshot_paste_1793891547400_gyg0h.png |
-| `screenshot` | [screenshot_paste_1793891379527_mc2d2.png](attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891379527_mc2d2.png) | Pasted screenshot screenshot_paste_1793891379527_mc2d2.png |
 
 #### Attached Commits
 
@@ -28334,7 +27531,6 @@ Additionally, we should add holes on each wall to allow a small tool such as an 
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1793947358948_g28nw.png](attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793947358948_g28nw.png) | Pasted screenshot screenshot_paste_1793947358948_g28nw.png |
 | `screenshot` | [screenshot_paste_1793948449522_d1ck8.png](attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793948449522_d1ck8.png) | Pasted screenshot screenshot_paste_1793948449522_d1ck8.png |
 
 #### Attached Commits
