@@ -9521,7 +9521,7 @@
       "logs": "",
       "attachments": [
         {
-          "id": "att-2",
+          "id": "att-1",
           "filename": "screenshot_paste_1793948449522_d1ck8.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793948449522_d1ck8.png",
@@ -9530,7 +9530,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-2",
           "filename": "screenshot_paste_1793947358948_g28nw.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793947358948_g28nw.png",
@@ -9560,7 +9560,7 @@
         }
       ],
       "created_at": "2026-11-06 06:40:24 UTC",
-      "updated_at": "2026-11-06 23:53:05 UTC",
+      "updated_at": "",
       "resolved_at": "2026-11-06 23:53:05 UTC",
       "resolution_notes": "Added 6x2mm tool removal apertures on each wall beneath PCB for easy board extraction with an Allen wrench",
       "rejection_notes": "Configured pcb_snap_socket_cutout_margin to 0.4mm for positive snap ring overlap holding SWD and TMC6300 boards\n\nRejected— the side openings for inserting a board removal tool into the mount are missing from the design.",
@@ -9687,20 +9687,20 @@
       "severity": "MEDIUM",
       "category": "INFRASTRUCTURE",
       "component": "dashboard",
-      "description": "Opening a commit in the bug report station doesn’t go to the code review window directly, instead it opens up a website to the toplevel VCS UI with only the working tree selected. Additionally, there is no way to go back to the bug report station when finished reviewing (there is no back button in the toolbar). ",
+      "description": "Opening a commit in the bug report station doesn’t go to the code review window directly, instead it opens up a website to the toplevel VCS UI with only the working tree selected. Additionally, there is no way to go back to the bug report station when finished reviewing (there is no back button in the toolbar).",
       "reproduction_steps": [],
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
       "attachments": [
         {
-          "id": "bb594939",
+          "id": "att-1",
           "filename": "screenshot_paste_1793985363740_q9986.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-DIURNAL-ANT-667/screenshot_paste_1793985363740_q9986.png",
-          "size_bytes": 132268,
+          "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793985363740_q9986.png",
-          "created_at": "2026-11-06 17:16:03 UTC"
+          "created_at": ""
         }
       ],
       "commit_ids": [
@@ -9716,13 +9716,13 @@
         }
       ],
       "created_at": "2026-11-06 17:15:23 UTC",
-      "updated_at": "2026-11-06 23:51:51 UTC",
+      "updated_at": "",
       "resolved_at": "2026-11-06 23:51:48 UTC",
       "resolution_notes": "Attached commits in Bug Report now navigate directly to Code Review for that commit, and Code Review provides toolbar and header buttons to return to the Bug Report workstation",
-      "rejection_notes": null,
+      "rejection_notes": "",
       "accepted_at": "2026-11-06 23:51:51 UTC",
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 23:53:08 UTC"
+  "updated_at": "2026-11-06 23:53:25 UTC"
 }
