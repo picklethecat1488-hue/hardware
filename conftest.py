@@ -64,5 +64,6 @@ def pytest_xdist_auto_num_workers(config):
     if is_slow_marker_selected(markexpr):
         # Force 0 workers (sequential execution) for slow tests to prevent GPU/UDS deadlocks
         return 0
-    # Let xdist decide automatically for other tests
-    return None
+    # Cap auto workers to prevent thread and cgroup pid exhaustion on large cloud instances (e.g. 128-core hosts)
+    cpu_count = os.cpu_count() or 4
+    return min(cpu_count, 8)
