@@ -190,6 +190,16 @@ def initialize_jax_environment(
     warnings.filterwarnings("ignore", category=UserWarning, message=".*jax-mps was built for jaxlib.*")
     warnings.filterwarnings("ignore", category=UserWarning, message=".*Platform 'mps' is experimental.*")
 
+    # Cap CPU core affinity to at most 8 on high-core Linux systems to prevent excessive
+    # Eigen/OpenBLAS thread pool allocations that exhaust container thread limits.
+    if hasattr(os, "sched_getaffinity") and hasattr(os, "sched_setaffinity"):
+        try:
+            current_affinity = sorted(os.sched_getaffinity(0))
+            if len(current_affinity) > 8:
+                os.sched_setaffinity(0, set(current_affinity[:8]))
+        except OSError:
+            pass
+
     # Allow dynamic CUDA device selection if device_id is provided and CUDA_VISIBLE_DEVICES is not set
     if device_id is not None and "CUDA_VISIBLE_DEVICES" not in os.environ:
         os.environ["CUDA_VISIBLE_DEVICES"] = str(device_id)
@@ -199,7 +209,7 @@ def initialize_jax_environment(
     os.environ.setdefault("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.20")
 
     # Configure deterministic single-threaded XLA CPU execution to prevent native Eigen threadpool futex deadlocks
-    os.environ.setdefault("XLA_FLAGS", "--xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1")
+    os.environ.setdefault("XLA_FLAGS", "--xla_cpu_multi_thread_eigen=false")
 
     # Unset experimental async dispatch on MPS backend to prevent deadlocks
     if os.environ.get("JAX_MPS_ASYNC_DISPATCH") == "1":
@@ -231,8 +241,14 @@ def initialize_jax_environment(
 
     # Enable JAX compilation caching globally to prevent JIT compile latency
     if cache_dir is None:
-        cache_dir = Path(__file__).resolve().parents[1] / "build" / "jax_cache"
-    jax.config.update("jax_compilation_cache_dir", str(cache_dir))
+        cache_path = Path(__file__).resolve().parents[1] / "build" / "jax_cache"
+        worker_id = os.environ.get("PYTEST_XDIST_WORKER")
+        if worker_id:
+            cache_path = cache_path / worker_id
+    else:
+        cache_path = Path(cache_dir)
+    cache_path.mkdir(parents=True, exist_ok=True)
+    jax.config.update("jax_compilation_cache_dir", str(cache_path))
 
     if os.environ.get("JAX_LOG_COMPILES") == "1":
         jax.config.update("jax_log_compiles", True)

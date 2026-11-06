@@ -87,7 +87,7 @@ elif [ "${REPO_NAME}" = "ssd" ] || [ "${REPO_NAME}" = "SSD" ] || [ "${REPO_NAME}
 fi
 
 REMOTE_CONDA="source \$(if [ -f /workspace/miniforge3/etc/profile.d/conda.sh ]; then echo /workspace/miniforge3/etc/profile.d/conda.sh; elif [ -f /home/ubuntu/miniforge3/etc/profile.d/conda.sh ]; then echo /home/ubuntu/miniforge3/etc/profile.d/conda.sh; else echo \$HOME/miniforge3/etc/profile.d/conda.sh; fi 2>/dev/null) 2>/dev/null && ENV_NAME=\$(conda env list 2>/dev/null | grep -E '^${DEFAULT_REMOTE_ENV} ' | awk '{print \$1}' | head -n 1 || (conda env list 2>/dev/null | grep -E '^firmware-env |^cq |^predict-env |^stalking-env ' | awk '{print \$1}' | head -n 1) || echo 'base') && conda run -n \$ENV_NAME --no-capture-output"
-REMOTE_CARGO_PATH="export PATH=\"/workspace/miniforge3/bin:\$HOME/.cargo/bin:/root/.cargo/bin:/home/ubuntu/.cargo/bin:\$PATH\""
+REMOTE_CARGO_PATH="export PATH=\"/workspace/miniforge3/bin:\$HOME/.cargo/bin:/root/.cargo/bin:/home/ubuntu/.cargo/bin:\$PATH\" && export OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 OMP_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 PYTEST_XDIST_AUTO_NUM_WORKERS=8 XLA_FLAGS=\"--xla_cpu_multi_thread_eigen=false\""
 
 # 5. Helper Functions
 run_vast_manager() {
@@ -150,8 +150,6 @@ sync_code() {
         --exclude '*.mov' \
         --exclude '.anvil.env*' \
         --exclude '.anvil.lock*' \
-        --exclude 'attachments' \
-        --exclude 'feedback/attachments' \
         "${REPO_DIR}/" "${SSH_TARGET}:${REMOTE_DIR}/"
     if [ -f "${REPO_DIR}/target/host_session.json" ]; then
         ssh ${SSH_OPTS} "${SSH_TARGET}" "mkdir -p ${REMOTE_DIR}/target" 2>/dev/null || true
@@ -205,7 +203,7 @@ auto_download_simulate() {
 
 kill_remote_pytest() {
     echo "🛑 Terminating preceding pytest runs on ${SSH_TARGET}..."
-    ssh ${SSH_OPTS} "${SSH_TARGET}" "pkill -9 -f 'pytest' 2>/dev/null || true" 2>/dev/null || true
+    ssh ${SSH_OPTS} "${SSH_TARGET}" "pkill -9 -f 'pytest|execnet|readline' 2>/dev/null || true" 2>/dev/null || true
 }
 
 kill_remote_verify() {
@@ -265,6 +263,10 @@ case "$1" in
     release|destroy)
         shift
         run_vast_manager release "$@"
+        ;;
+    reboot|restart)
+        shift
+        run_vast_manager reboot "$@"
         ;;
     auto-release|cob)
         shift
@@ -348,7 +350,7 @@ print(f'✅ Successfully merged {len(inputs)} recording(s) into {out}')
         if [[ "$*" != *"-n "* ]] && [[ "$*" != *"--numprocesses"* ]]; then
             worker_opt=" -n 8"
         fi
-        ssh ${SSH_OPTS} "${SSH_TARGET}" "cd ${REMOTE_DIR} && ${REMOTE_CARGO_PATH} && OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 OMP_NUM_THREADS=1 ${REMOTE_CONDA} pytest${worker_opt}${cmd_args}"
+        ssh ${SSH_OPTS} "${SSH_TARGET}" "cd ${REMOTE_DIR} && ${REMOTE_CARGO_PATH} && ${REMOTE_CONDA} taskset -c 0-7 pytest${worker_opt}${cmd_args}"
         ;;
     verify)
         shift
@@ -357,7 +359,7 @@ print(f'✅ Successfully merged {len(inputs)} recording(s) into {out}')
         kill_remote_verify
         sync_code
         echo "🔍 Running pre-commit verification on ${SSH_TARGET}..."
-        ssh ${SSH_OPTS} "${SSH_TARGET}" "cd ${REMOTE_DIR} && ${REMOTE_CARGO_PATH} && ./tools/verify.sh $*"
+        ssh ${SSH_OPTS} "${SSH_TARGET}" "cd ${REMOTE_DIR} && ${REMOTE_CARGO_PATH} && taskset -c 0-7 ./tools/verify.sh $*"
         ;;
     cargo)
         shift

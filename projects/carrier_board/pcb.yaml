@@ -170,6 +170,7 @@ design_rules:
   pad_to_mask_clearance_mm: 0.0
   rule_severities:
     hole_to_hole: ignore
+    hole_near_hole: ignore
     lib_footprint_issues: ignore
     text_height: ignore
     silk_overlap: ignore

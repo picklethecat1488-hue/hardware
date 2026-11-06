@@ -674,6 +674,35 @@ def release_instance(
     return True
 
 
+def reboot_instance(
+    instance_id: Optional[int] = None,
+    env_file: Path = DEFAULT_GLOBAL_ENV_FILE,
+) -> bool:
+    """Reboot running instance on Vast.ai to clear process leaks or zombie states."""
+    env = load_env_file(env_file)
+    target_id = instance_id or env.get("VAST_INSTANCE_ID")
+    if not target_id:
+        print(f"⚠️ No active Vast.ai instance ID found in {env_file}.", file=sys.stderr)
+        return False
+
+    print(f"🔄 Rebooting Vast.ai instance #{target_id}...")
+    api_res = api_request(f"instances/reboot/{target_id}/", method="PUT")
+    if "error" in api_res:
+        print(f"❌ Failed to reboot instance: {api_res['error']}", file=sys.stderr)
+        return False
+
+    print(f"✅ Reboot command issued for instance #{target_id}. Waiting for instance to resume running...")
+    for _ in range(30):
+        time.sleep(2)
+        info = get_instance_info(int(target_id))
+        state = info.get("actual_status", "")
+        if state == "running":
+            print(f"✅ Instance #{target_id} is back online and running!")
+            return True
+    print(f"⚠️ Instance #{target_id} has not returned to 'running' state yet.", file=sys.stderr)
+    return True
+
+
 def record_lock(
     command_str: str,
     repo_name: str,
@@ -920,6 +949,15 @@ if [ ! -f /usr/local/bin/blender ] || [ "$(/usr/local/bin/blender --version 2>/d
     ln -sf /opt/blender-4.2.3-linux-x64/blender /usr/local/bin/blender
 fi
 
+# Install KiCad 8 for declarative PCB exports (gerber/drill CAM generation)
+if ! command -v kicad-cli &>/dev/null; then
+    echo "📐 Installing KiCad 8..."
+    apt-get install -y --no-install-recommends software-properties-common
+    add-apt-repository --yes ppa:kicad/kicad-8.0-releases
+    apt-get update -qq
+    apt-get install -y --no-install-recommends kicad
+fi
+
 # 2. Rust & Cargo
 echo "🦀 [2/5] Configuring Rust & Cargo..."
 if ! command -v cargo &>/dev/null && [ ! -f "$HOME/.cargo/bin/cargo" ]; then
@@ -952,6 +990,19 @@ fi
 
 source "${CONDA_DIR}/etc/profile.d/conda.sh"
 echo "source ${CONDA_DIR}/etc/profile.d/conda.sh" >> "$HOME/.bashrc"
+
+# Configure global threading limits and JAX settings to prevent container PID exhaustion
+cat << 'EOF' > /etc/profile.d/anvil_threading.sh
+export OPENBLAS_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export OMP_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+export VECLIB_MAXIMUM_THREADS=1
+export PYTEST_XDIST_AUTO_NUM_WORKERS=8
+export XLA_FLAGS="--xla_cpu_multi_thread_eigen=false"
+EOF
+chmod +x /etc/profile.d/anvil_threading.sh 2>/dev/null || true
+cat /etc/profile.d/anvil_threading.sh >> "$HOME/.bashrc"
 
 # 4. NVIDIA GPU verification
 echo "⚡ [4/5] Checking GPU acceleration..."
@@ -997,7 +1048,7 @@ if [ "$TARGET" = "all" ] || [ "$TARGET" = "hardware" ] || [ "$TARGET" = "cq" ]; 
             ruff pytest pytest-xdist pytest-mock pytest-timeout \
             pydantic pydantic-settings pydantic-changedetect cbor2 rerun-sdk \
             opencv-python pybullet trimesh jinja2 jax jaxlib jax-md pyvista halo \
-            openpyxl eel pywebview matplotlib pyyaml requests ocp-vscode "pluggy<1.7.0" \
+            openpyxl xlrd eel pywebview matplotlib pyyaml requests ocp-vscode "pluggy<1.7.0" \
             scancode-toolkit typecode-libmagic
     else
         echo "cq environment already exists, ensuring required packages..."
@@ -1005,7 +1056,7 @@ if [ "$TARGET" = "all" ] || [ "$TARGET" = "hardware" ] || [ "$TARGET" = "cq" ]; 
             ruff pytest pytest-xdist pytest-mock pytest-timeout \
             pydantic pydantic-settings pydantic-changedetect cbor2 rerun-sdk \
             opencv-python pybullet trimesh jinja2 jax jaxlib jax-md pyvista halo \
-            openpyxl eel pywebview matplotlib pyyaml requests ocp-vscode "pluggy<1.7.0" \
+            openpyxl xlrd eel pywebview matplotlib pyyaml requests ocp-vscode "pluggy<1.7.0" \
             scancode-toolkit typecode-libmagic || true
     fi
 fi
@@ -1062,6 +1113,11 @@ def main() -> int:
     rel_p.add_argument("instance_id", nargs="?", type=int, default=None, help="Instance ID to destroy")
     rel_p.add_argument("--env-file", type=Path, default=DEFAULT_GLOBAL_ENV_FILE, help="Path to config")
 
+    # reboot
+    reb_p = subparsers.add_parser("reboot", help="Reboot running Vast.ai instance")
+    reb_p.add_argument("instance_id", nargs="?", type=int, default=None, help="Instance ID to reboot")
+    reb_p.add_argument("--env-file", type=Path, default=DEFAULT_GLOBAL_ENV_FILE, help="Path to config")
+
     # auto-release
     auto_p = subparsers.add_parser("auto-release", help="Check lock file and release if idle or past COB")
     auto_p.add_argument("--force", action="store_true", help="Force release if no active locks")
@@ -1105,6 +1161,10 @@ def main() -> int:
 
     elif args.subcommand == "release":
         success = release_instance(instance_id=args.instance_id, env_file=args.env_file)
+        return 0 if success else 1
+
+    elif args.subcommand == "reboot":
+        success = reboot_instance(instance_id=args.instance_id, env_file=args.env_file)
         return 0 if success else 1
 
     elif args.subcommand == "auto-release":
