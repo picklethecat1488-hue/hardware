@@ -13,6 +13,10 @@
 
 Right now, the pump cover may move freely up and down the shaft. We should use the same clip ring system used by the bowl to cover and lid to bottom cover connections to ensure the pump cover remains connected tightly to the bowl once in place.
 
+#### Attached Commits
+
+- `d0ab5f6a`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:a6119fc8 --> Inspect assembled cat fountain pump cover snap fit on volute casing | `python tools/view.py cat_fountain/product:view`
