@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 17:13:23 UTC` |
-| **Total Issues** | `319` |
-| **Open Issues** | `0` |
-| **Resolved / Closed** | `319 (100%)` |
+| **Report Date** | `2026-11-06 17:15:25 UTC` |
+| **Total Issues** | `320` |
+| **Open Issues** | `1` |
+| **Resolved / Closed** | `319 (99%)` |
 
 ## Issues by Severity
 
@@ -17,14 +17,14 @@
 | :--- | :---: | :--- |
 | **`[CRITICAL]`** | 20 | System crashes, build failures, blockages, or electrical shorts. |
 | **`[HIGH]`** | 31 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
-| **`[MEDIUM]`** | 239 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
+| **`[MEDIUM]`** | 240 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
 | **`[LOW]`** | 29 | Minor aesthetic imperfections or documentation notes. |
 
 ## Issues by Category
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 170 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`PCB`** | 171 | Schematics, routing, footprints, nets, DRC, silkscreen. |
 | **`CAD`** | 39 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 11 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
 | **`INFRASTRUCTURE`** | 85 | Build tooling, compilers, test runners, headless tools. |
@@ -351,6 +351,7 @@
 - [x] **`[MEDIUM]`** [#BUG-SHINING-SILVERFISH-89](#bug-shining-silverfish-89): Attachments show up in the diff view `[dashboard]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-BRISTLY-CENTIPEDE-327](#bug-bristly-centipede-327): Add modal progress UIs for repo and bug actions `[dashboard]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-LUSTROUS-HORSEFLY-593](#bug-lustrous-horsefly-593): Rename GEMINI.md to AGENTS.md (`CLOSED`)
+- [ ] **`[MEDIUM]`** [#BUG-DIURNAL-ANT-667](#bug-diurnal-ant-667): New Bug Report (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -28439,5 +28440,15 @@ Ensure the default rules file for bots is named AGENTS.md across all repos.
 #### Resolution Notes
 
 Renamed GEMINI.md to AGENTS.md and updated all documentation and test references across hardware and firmware.
+
+---
+
+### <a id="bug-diurnal-ant-667"></a> 🔴 `[BUG-DIURNAL-ANT-667]` New Bug Report
+
+- **UUID**: `11c9c5fd-5d11-49fd-98dd-55d1692ee65d`
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-11-06 17:15:23 UTC`
 
 ---
