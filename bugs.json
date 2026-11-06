@@ -9378,8 +9378,8 @@
         }
       ],
       "created_at": "2026-11-05 14:54:50 UTC",
-      "updated_at": "",
-      "resolved_at": "2026-11-06 00:24:42 UTC",
+      "updated_at": "2026-11-06 00:29:39 UTC",
+      "resolved_at": "2026-11-06 00:29:39 UTC",
       "resolution_notes": "Simplified motor base to circle unioned with hall sensor rectangular tongue; eliminated thin sliver walls under hall sensor cutout by extending socket keyway cut from inner bore.",
       "rejection_notes": "",
       "accepted_at": null,
@@ -9439,5 +9439,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 00:28:30 UTC"
+  "updated_at": "2026-11-06 00:29:39 UTC"
 }
