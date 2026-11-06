@@ -6,9 +6,9 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 04:29:56 UTC` |
-| **Total Issues** | `314` |
-| **Open Issues** | `1` |
+| **Report Date** | `2026-11-06 04:30:56 UTC` |
+| **Total Issues** | `315` |
+| **Open Issues** | `2` |
 | **Resolved / Closed** | `313 (99%)` |
 
 ## Issues by Severity
@@ -17,14 +17,14 @@
 | :--- | :---: | :--- |
 | **`[CRITICAL]`** | 20 | System crashes, build failures, blockages, or electrical shorts. |
 | **`[HIGH]`** | 31 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
-| **`[MEDIUM]`** | 235 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
+| **`[MEDIUM]`** | 236 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
 | **`[LOW]`** | 28 | Minor aesthetic imperfections or documentation notes. |
 
 ## Issues by Category
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 170 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`PCB`** | 171 | Schematics, routing, footprints, nets, DRC, silkscreen. |
 | **`CAD`** | 38 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 11 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
 | **`INFRASTRUCTURE`** | 83 | Build tooling, compilers, test runners, headless tools. |
@@ -346,6 +346,7 @@
 - [x] **`[HIGH]`** [#BUG-LUSTROUS-COCOON-669](#bug-lustrous-cocoon-669): Motor base design is way too complicated `[cat_fountain]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-THORACIC-HARVESTMAN-529](#bug-thoracic-harvestman-529): Add grooves for triangular motor struts to drive hub `[cat_fountain]` (`CLOSED`)
 - [ ] **`[MEDIUM]`** [#BUG-SPECKLED-ROACH-49](#bug-speckled-roach-49): Pump cover should snap into place `[cat_fountain]` (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-GLOWING-WASP-133](#bug-glowing-wasp-133): New Bug Report (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -28245,5 +28246,15 @@ Add triangular motor strut grooves to drive hub bottom and refactor drive hub bo
 #### Description
 
 Right now, the pump cover may move freely up and down the shaft. We should use the same clip ring system used by the bowl to cover and lid to bottom cover connections to ensure the pump cover remains connected tightly to the bowl once in place.
+
+---
+
+### <a id="bug-glowing-wasp-133"></a> 🔴 `[BUG-GLOWING-WASP-133]` New Bug Report
+
+- **UUID**: `3b92ccaf-1e89-42b4-b7fb-384d898c6e9e`
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-11-06 04:30:54 UTC`
 
 ---
