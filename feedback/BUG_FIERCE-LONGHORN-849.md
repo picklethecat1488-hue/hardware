@@ -1,12 +1,13 @@
-# 🔴 `[BUG-FIERCE-LONGHORN-849]` SWD and TMC6300 mounts- unsufficient snap ring overlap
+# 🟢 `[BUG-FIERCE-LONGHORN-849]` SWD and TMC6300 mounts- unsufficient snap ring overlap
 
 - **UUID**: `04ef79bc-f57b-442f-8969-9dba1c94909f`
 - **ID**: `BUG-FIERCE-LONGHORN-849`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-06 06:40:24 UTC`
+- **Resolved**: `2026-11-06 20:35:10 UTC`
 - **Rejected**: `2026-11-06 17:19:39 UTC`
 
 #### Description
@@ -19,8 +20,8 @@ Additionally, we should add holes on each wall to allow a small tool such as an 
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1793948449522_d1ck8.png](attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793948449522_d1ck8.png) | Pasted screenshot screenshot_paste_1793948449522_d1ck8.png |
 | `screenshot` | [screenshot_paste_1793947358948_g28nw.png](attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793947358948_g28nw.png) | Pasted screenshot screenshot_paste_1793947358948_g28nw.png |
+| `screenshot` | [screenshot_paste_1793948449522_d1ck8.png](attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793948449522_d1ck8.png) | Pasted screenshot screenshot_paste_1793948449522_d1ck8.png |
 
 #### Attached Commits
 
@@ -32,9 +33,7 @@ Additionally, we should add holes on each wall to allow a small tool such as an 
 
 #### Resolution Notes
 
-Configured pcb_snap_socket_cutout_margin to 0.4mm for positive snap ring overlap holding SWD and TMC6300 boards
-
-Rejected— the side openings for inserting a board removal tool into the mount are missing from the design.
+Added 6x2mm tool removal apertures on each wall beneath PCB for easy board extraction with an Allen wrench
 
 #### Rejection Feedback
 
