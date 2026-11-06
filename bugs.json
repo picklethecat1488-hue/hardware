@@ -9683,7 +9683,7 @@
       "id": "BUG-DIURNAL-ANT-667",
       "uuid": "11c9c5fd-5d11-49fd-98dd-55d1692ee65d",
       "title": "Opening commits in bug report workstation-broken",
-      "status": "RESOLVED",
+      "status": "CLOSED",
       "severity": "MEDIUM",
       "category": "INFRASTRUCTURE",
       "component": "dashboard",
@@ -9716,13 +9716,13 @@
         }
       ],
       "created_at": "2026-11-06 17:15:23 UTC",
-      "updated_at": "2026-11-06 23:51:48 UTC",
+      "updated_at": "2026-11-06 23:51:51 UTC",
       "resolved_at": "2026-11-06 23:51:48 UTC",
       "resolution_notes": "Attached commits in Bug Report now navigate directly to Code Review for that commit, and Code Review provides toolbar and header buttons to return to the Bug Report workstation",
       "rejection_notes": null,
-      "accepted_at": null,
+      "accepted_at": "2026-11-06 23:51:51 UTC",
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 23:51:48 UTC"
+  "updated_at": "2026-11-06 23:51:51 UTC"
 }

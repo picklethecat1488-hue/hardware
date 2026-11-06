@@ -2,12 +2,13 @@
 
 - **UUID**: `11c9c5fd-5d11-49fd-98dd-55d1692ee65d`
 - **ID**: `BUG-DIURNAL-ANT-667`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-11-06 17:15:23 UTC`
 - **Resolved**: `2026-11-06 23:51:48 UTC`
+- **Accepted**: `2026-11-06 23:51:51 UTC`
 
 #### Description
 

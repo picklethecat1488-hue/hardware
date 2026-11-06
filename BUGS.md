@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 23:51:50 UTC` |
+| **Report Date** | `2026-11-06 23:51:52 UTC` |
 | **Total Issues** | `320` |
 | **Open Issues** | `0` |
 | **Resolved / Closed** | `320 (100%)` |
@@ -351,7 +351,7 @@
 - [x] **`[MEDIUM]`** [#BUG-SHINING-SILVERFISH-89](#bug-shining-silverfish-89): Attachments show up in the diff view `[dashboard]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-BRISTLY-CENTIPEDE-327](#bug-bristly-centipede-327): Add modal progress UIs for repo and bug actions `[dashboard]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-LUSTROUS-HORSEFLY-593](#bug-lustrous-horsefly-593): Rename GEMINI.md to AGENTS.md (`CLOSED`)
-- [x] **`[MEDIUM]`** [#BUG-DIURNAL-ANT-667](#bug-diurnal-ant-667): Opening commits in bug report workstation-broken `[dashboard]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-DIURNAL-ANT-667](#bug-diurnal-ant-667): Opening commits in bug report workstation-broken `[dashboard]` (`CLOSED`)
 
 ## Detailed Issue Log
 
@@ -28456,12 +28456,13 @@ Renamed GEMINI.md to AGENTS.md and updated all documentation and test references
 ### <a id="bug-diurnal-ant-667"></a> 🟢 `[BUG-DIURNAL-ANT-667]` Opening commits in bug report workstation-broken
 
 - **UUID**: `11c9c5fd-5d11-49fd-98dd-55d1692ee65d`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-11-06 17:15:23 UTC`
 - **Resolved**: `2026-11-06 23:51:48 UTC`
+- **Accepted**: `2026-11-06 23:51:51 UTC`
 
 #### Description
 
