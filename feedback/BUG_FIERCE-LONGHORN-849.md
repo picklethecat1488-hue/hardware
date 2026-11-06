@@ -7,7 +7,7 @@
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-06 06:40:24 UTC`
-- **Resolved**: `2026-11-06 07:10:28 UTC`
+- **Resolved**: `2026-11-06 17:19:36 UTC`
 
 #### Description
 
@@ -33,3 +33,5 @@ Additionally, we should add holes on each wall to allow a small tool such as an 
 #### Resolution Notes
 
 Configured pcb_snap_socket_cutout_margin to 0.4mm for positive snap ring overlap holding SWD and TMC6300 boards
+
+Rejected— the side openings for inserting a board removal tool into the mount are missing from the design.

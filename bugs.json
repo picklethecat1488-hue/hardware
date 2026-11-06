@@ -9552,9 +9552,9 @@
         }
       ],
       "created_at": "2026-11-06 06:40:24 UTC",
-      "updated_at": "",
-      "resolved_at": "2026-11-06 07:10:28 UTC",
-      "resolution_notes": "Configured pcb_snap_socket_cutout_margin to 0.4mm for positive snap ring overlap holding SWD and TMC6300 boards",
+      "updated_at": "2026-11-06 17:19:36 UTC",
+      "resolved_at": "2026-11-06 17:19:36 UTC",
+      "resolution_notes": "Configured pcb_snap_socket_cutout_margin to 0.4mm for positive snap ring overlap holding SWD and TMC6300 boards\n\nRejected— the side openings for inserting a board removal tool into the mount are missing from the design.",
       "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
@@ -9706,5 +9706,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 17:17:38 UTC"
+  "updated_at": "2026-11-06 17:19:36 UTC"
 }
