@@ -3486,3 +3486,31 @@ def test_regression_bug_barbed_midge_630_iframe_border_prevention() -> None:
     assert 'target="hardware_vcs_diff_viewer"' in bug_text
     assert "window.top.location.href = " in cr_text
     assert "window.top.location.href = " in bug_text
+
+
+def test_regression_bug_diurnal_ant_667_commit_review_navigation() -> None:
+    """Verify BUG-DIURNAL-ANT-667: Opening attached commits in bug report navigates to Code Review with back navigation."""
+    tpl_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    bug_text = (tpl_dir / "bug_report.html.j2").read_text(encoding="utf-8")
+    cr_text = (tpl_dir / "code_review.html.j2").read_text(encoding="utf-8")
+    diff_text = (tpl_dir / "diff_view.html.j2").read_text(encoding="utf-8")
+
+    # 1. Bug Report attached commit chip must target Code Review, not VCS toplevel diff view
+    assert "const crUrl = `/review?revisions=${encodeURIComponent(cid)}&from=bugs" in bug_text
+    assert "openCommitInCodeReview(event, '${cid}')" in bug_text
+    assert '<a href="/?commit=' not in bug_text
+    assert "async function openCommitInCodeReview(event, commitHash)" in bug_text
+
+    # 2. Code Review must provide toolbar/header back button to return to Bug Report
+    assert 'id="btnBackToBugsHeader"' in cr_text
+    assert 'id="btnBackToBugsToolbar"' in cr_text
+    assert 'id="btnBugTracker"' in cr_text
+    assert "function returnToBugReport()" in cr_text
+    assert "function initBugNavigation()" in cr_text
+    assert "initBugNavigation();" in cr_text
+    assert 'urlParams.get("from") === "bugs"' in cr_text
+    assert "returnToBugReport();" in cr_text
+
+    # 3. Diff View must handle ?commit= or ?goto= in URL parameters
+    assert 'urlParams.get("commit") || urlParams.get("goto")' in diff_text
+    assert "selectCommit(urlCommit);" in diff_text

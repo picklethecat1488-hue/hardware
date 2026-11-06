@@ -1526,12 +1526,39 @@
       commitIds.forEach(cid => {
         const chip = document.createElement("div");
         chip.style.cssText = "display:inline-flex; align-items:center; gap:6px; background:#1b120c; border:1px solid var(--quake-gold); border-radius:3px; padding:4px 8px; font-family:var(--font-mono); font-size:10px;";
+        const bugParam = activeBugId ? `&bug_id=${encodeURIComponent(activeBugId)}` : "";
+        const crUrl = `/review?revisions=${encodeURIComponent(cid)}&from=bugs${bugParam}`;
         chip.innerHTML = `
-          <a href="/?commit=${encodeURIComponent(cid)}" target="_blank" style="color:var(--quake-gold); text-decoration:none; font-weight:700;">🔍 ${cid.slice(0, 10)}</a>
+          <a href="${crUrl}" onclick="openCommitInCodeReview(event, '${cid}')" style="color:var(--quake-gold); text-decoration:none; font-weight:700; cursor:pointer;" title="Review commit ${cid.slice(0, 10)} in Code Review">🔍 ${cid.slice(0, 10)}</a>
           <button class="copy-icon-btn copy-badge-btn" onclick="copyText('${cid}')" title="Copy commit SHA">📋</button>
         `;
         container.appendChild(chip);
       });
+    }
+
+    async function openCommitInCodeReview(event, commitHash) {
+      if (event) {
+        if (event.metaKey || event.ctrlKey || event.shiftKey) return;
+        event.preventDefault();
+      }
+      if (!commitHash) return;
+      const bugParam = activeBugId ? `&bug_id=${encodeURIComponent(activeBugId)}` : "";
+      const targetUrl = `/review?revisions=${encodeURIComponent(commitHash)}&from=bugs${bugParam}`;
+      const targetName = "hardware_code_review";
+
+      try {
+        await fetch("/api/open_code_review", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ commits: [commitHash] })
+        });
+      } catch (err) {}
+
+      if (window.parent && window.parent !== window && typeof window.parent.openWorkstationModal === "function") {
+        window.parent.openWorkstationModal(targetUrl, targetName);
+      } else {
+        window.location.href = targetUrl;
+      }
     }
 
     async function addTaskToActiveBug() {

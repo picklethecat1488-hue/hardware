@@ -3706,6 +3706,12 @@
 
       loadFilesForActiveCommit();
       startAutoSync();
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlCommit = urlParams.get("commit") || urlParams.get("goto");
+      if (urlCommit && urlCommit !== state.activeCommit) {
+        selectCommit(urlCommit);
+      }
     }
 
     if (document.readyState === "loading") {
