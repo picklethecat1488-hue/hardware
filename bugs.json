@@ -9231,7 +9231,7 @@
       "id": "BUG-SPECKLED-ROVEBEETLE-352",
       "uuid": "e4f40739-f0ba-495c-9426-ad99f73a67d0",
       "title": "Sensor shield design on inner bowl wall is too complicated",
-      "status": "RESOLVED",
+      "status": "CLOSED",
       "severity": "MEDIUM",
       "category": "CAD",
       "component": "cat_fountain",
@@ -9264,11 +9264,11 @@
         }
       ],
       "created_at": "2026-11-05 14:44:07 UTC",
-      "updated_at": "",
+      "updated_at": "2026-11-06 00:18:37 UTC",
       "resolved_at": "2026-11-05 16:25:54 UTC",
       "resolution_notes": "Simplify proximity sensor shield on inner bowl wall to an extruded hollow rectangle centered on pocket opening, eliminating inner lip and protruding tails.",
       "rejection_notes": "",
-      "accepted_at": null,
+      "accepted_at": "2026-11-06 00:18:37 UTC",
       "rejected_at": null
     },
     {
@@ -9431,5 +9431,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 00:18:19 UTC"
+  "updated_at": "2026-11-06 00:18:37 UTC"
 }

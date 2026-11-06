@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 00:18:20 UTC` |
+| **Report Date** | `2026-11-06 00:18:38 UTC` |
 | **Total Issues** | `313` |
 | **Open Issues** | `1` |
 | **Resolved / Closed** | `312 (99%)` |
@@ -341,7 +341,7 @@
 - [x] **`[HIGH]`** [#BUG-POLLEN-BACKSWIMMER-846](#bug-pollen-backswimmer-846): TMC6300-clip on mounts are too big `[cat_fountain]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-SWARMING-CICADA-917](#bug-swarming-cicada-917): Replace motor room mount halls with clip mounts `[cat_fountain]` (`CLOSED`)
 - [x] **`[LOW]`** [#BUG-PINCERED-CADDISFLY-769](#bug-pincered-caddisfly-769): Add clip on mount for SWD header `[cat_fountain]` (`CLOSED`)
-- [x] **`[MEDIUM]`** [#BUG-SPECKLED-ROVEBEETLE-352](#bug-speckled-rovebeetle-352): Sensor shield design on inner bowl wall is too complicated `[cat_fountain]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-SPECKLED-ROVEBEETLE-352](#bug-speckled-rovebeetle-352): Sensor shield design on inner bowl wall is too complicated `[cat_fountain]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-STINGING-LACEWING-799](#bug-stinging-lacewing-799): Mounting system for hole-less PCBs is too complicated `[cat_fountain]` (`CLOSED`)
 - [ ] **`[HIGH]`** [#BUG-LUSTROUS-COCOON-669](#bug-lustrous-cocoon-669): Motor base design is way too complicated `[cat_fountain]` (`OPEN`)
 - [x] **`[MEDIUM]`** [#BUG-THORACIC-HARVESTMAN-529](#bug-thoracic-harvestman-529): Add grooves for triangular motor struts to drive hub `[cat_fountain]` (`CLOSED`)
@@ -28081,12 +28081,13 @@ Added clip-on mounting boss for Treedix JTAG/SWD Breakout Board Adapter (19.1x13
 ### <a id="bug-speckled-rovebeetle-352"></a> 🟢 `[BUG-SPECKLED-ROVEBEETLE-352]` Sensor shield design on inner bowl wall is too complicated
 
 - **UUID**: `e4f40739-f0ba-495c-9426-ad99f73a67d0`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-05 14:44:07 UTC`
 - **Resolved**: `2026-11-05 16:25:54 UTC`
+- **Accepted**: `2026-11-06 00:18:37 UTC`
 
 #### Description
 
