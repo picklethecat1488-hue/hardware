@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 06:28:28 UTC` |
+| **Report Date** | `2026-11-06 06:28:30 UTC` |
 | **Total Issues** | `315` |
 | **Open Issues** | `0` |
 | **Resolved / Closed** | `315 (100%)` |
@@ -345,7 +345,7 @@
 - [x] **`[MEDIUM]`** [#BUG-STINGING-LACEWING-799](#bug-stinging-lacewing-799): Mounting system for hole-less PCBs is too complicated `[cat_fountain]` (`CLOSED`)
 - [x] **`[HIGH]`** [#BUG-LUSTROUS-COCOON-669](#bug-lustrous-cocoon-669): Motor base design is way too complicated `[cat_fountain]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-THORACIC-HARVESTMAN-529](#bug-thoracic-harvestman-529): Add grooves for triangular motor struts to drive hub `[cat_fountain]` (`CLOSED`)
-- [x] **`[MEDIUM]`** [#BUG-SPECKLED-ROACH-49](#bug-speckled-roach-49): Pump cover should snap into place `[cat_fountain]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-SPECKLED-ROACH-49](#bug-speckled-roach-49): Pump cover should snap into place `[cat_fountain]` (`CLOSED`)
 - [x] **`[LOW]`** [#BUG-GLOWING-WASP-133](#bug-glowing-wasp-133): Cat fountain-refactor and simplify code `[cat_fountain]` (`CLOSED`)
 
 ## Detailed Issue Log
@@ -28237,12 +28237,13 @@ Add triangular motor strut grooves to drive hub bottom and refactor drive hub bo
 ### <a id="bug-speckled-roach-49"></a> 🟢 `[BUG-SPECKLED-ROACH-49]` Pump cover should snap into place
 
 - **UUID**: `5f81d6b7-6ce8-4fd3-a1c5-54e9ee014af2`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-06 04:28:00 UTC`
-- **Resolved**: `2026-11-06 06:28:24 UTC`
+- **Resolved**: `2026-11-06 06:28:28 UTC`
+- **Accepted**: `2026-11-06 06:28:28 UTC`
 
 #### Description
 
