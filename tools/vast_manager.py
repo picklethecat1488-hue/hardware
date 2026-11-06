@@ -913,7 +913,7 @@ git lfs install || true
 git config --global --add safe.directory '*' || true
 
 # Install Blender 4.2 LTS for modern GPU OptiX raytracing & geometry nodes
-if [ ! -f /usr/local/bin/blender ] || [ "$(/usr/local/bin/blender --version 2>/dev/null | head -n1 | grep -o '4\.[0-9]')" = "" ]; then
+if [ ! -f /usr/local/bin/blender ] || [ "$(/usr/local/bin/blender --version 2>/dev/null | head -n1 | grep -o '4\\.[0-9]')" = "" ]; then
     echo "🎨 Installing Blender 4.2 LTS..."
     mkdir -p /opt
     curl -sSL https://download.blender.org/release/Blender4.2/blender-4.2.3-linux-x64.tar.xz | tar -xJ -C /opt

@@ -181,7 +181,7 @@ class CatFountainProvider(Provider):
 
     @method_cache
     def _build_bowl_impl(self, target: str) -> BuildPart:
-        """Internal cached implementation of bowl CAD geometry."""
+        """Build cached implementation of bowl CAD geometry."""
         r = self.settings.bowl_radius
         h = self.settings.bowl_height
         t = self.settings.bowl_thickness
@@ -861,7 +861,7 @@ class CatFountainProvider(Provider):
 
     @method_cache
     def _build_impeller_impl(self, target: str) -> BuildPart:
-        """Internal cached implementation of impeller CAD geometry."""
+        """Build cached implementation of impeller CAD geometry."""
         hub_r = self.settings.impeller_radius + self.settings.magnet_radius + 1.0
         hub_h = self.settings.impeller_base_height
         impeller_r = hub_r + 4.0
@@ -970,7 +970,7 @@ class CatFountainProvider(Provider):
 
     @method_cache
     def _build_bottom_cover_impl(self, target: str) -> BuildPart:
-        """Internal cached implementation of bottom cover CAD geometry."""
+        """Build cached implementation of bottom cover CAD geometry."""
         r = self.settings.bowl_radius
         t = self.settings.bowl_thickness
         clearance = self.settings.bottom_cover_clearance
@@ -1054,7 +1054,7 @@ class CatFountainProvider(Provider):
 
     @method_cache
     def _build_lid_impl(self, target: str) -> BuildPart:
-        """Internal cached implementation of lid CAD geometry."""
+        """Build cached implementation of lid CAD geometry."""
         r = self.settings.bowl_radius
         h = self.settings.bowl_height
         t = self.settings.bowl_thickness
@@ -1243,7 +1243,7 @@ class CatFountainProvider(Provider):
 
     @method_cache
     def _build_led_cover_impl(self, target: str) -> BuildPart:
-        """Internal cached implementation of LED cover CAD geometry."""
+        """Build cached implementation of LED cover CAD geometry."""
         flange_w = self.settings.led_flange_width
         flange_t = self.settings.led_flange_thickness
         plug_w = self.settings.led_plug_width
@@ -1277,7 +1277,7 @@ class CatFountainProvider(Provider):
 
     @method_cache
     def _build_drive_hub_impl(self, target: str) -> BuildPart:
-        """Internal cached implementation of drive hub CAD geometry."""
+        """Build cached implementation of drive hub CAD geometry."""
         hub_h = self.settings.magnet_thickness + self.settings.magnet_clearance + 0.8
         standoff_h = self.settings.drive_hub_standoff_height
         mr = self.settings.magnet_radius + self.settings.magnet_clearance
@@ -1369,7 +1369,7 @@ class CatFountainProvider(Provider):
 
     @method_cache
     def _build_pump_cover_impl(self, target: str) -> BuildPart:
-        """Internal cached implementation of pump cover CAD geometry."""
+        """Build cached implementation of pump cover CAD geometry."""
         tube_x = 0.0
         tube_y = 28.0
         tube_r = self.settings.tube_radius
@@ -1738,7 +1738,7 @@ class CatFountainProvider(Provider):
 
     @method_cache
     def _build_motor_hub_impl(self, target: str) -> BuildPart:
-        """Internal cached implementation of motor hub CAD geometry."""
+        """Build cached implementation of motor hub CAD geometry."""
         clip_h = self.settings.motor_hub_thickness
         r_bcd = self.settings.motor_mount_bolt_circle_radius
         hole_r = self.settings.motor_mount_hole_radius

@@ -1441,6 +1441,33 @@
     </div>
   </div>
 
+  <!-- ACTION PROGRESS MODAL (BUG-327) -->
+  <div id="actionProgressModalOverlay" class="quake-modal-overlay" style="display: none; z-index: 2000;">
+    <div class="quake-modal" style="width: 480px; max-width: 90vw; padding: 20px 24px; text-align: left;">
+      <div class="quake-modal-header" style="padding: 0 0 12px 0; margin-bottom: 12px; border-bottom: 1px solid var(--quake-border-mid); background: transparent;">
+        <div style="font-size: 11px; font-weight: bold; color: var(--quake-gold); letter-spacing: 1px; display: flex; align-items: center; gap: 8px;">
+          <span id="actionProgressIcon">⚡</span>
+          <span id="actionProgressTitle">PROCESSING ACTION</span>
+        </div>
+      </div>
+
+      <div style="font-size: 9px; color: var(--quake-text-muted); margin-bottom: 12px; line-height: 1.4;" id="actionProgressDescription">
+        Executing requested operation...
+      </div>
+
+      <!-- Progress bar -->
+      <div style="background: var(--quake-bg-dark); border: 1px solid var(--quake-border-light); border-radius: 3px; height: 16px; position: relative; overflow: hidden; margin-bottom: 12px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.6);">
+        <div id="actionProgressBar" style="width: 15%; height: 100%; background: linear-gradient(90deg, #ffaa00, #ff8800); transition: width 0.3s ease; box-shadow: 0 0 10px rgba(255,170,0,0.5);"></div>
+        <div id="actionProgressPercent" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #fff; text-shadow: 0 1px 2px #000;">15%</div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9px; color: var(--quake-copper); font-family: var(--font-mono); font-weight: bold;">
+        <span id="actionProgressStatus">Working...</span>
+        <span id="actionProgressElapsed" style="color: var(--quake-text-dim);">0.0s</span>
+      </div>
+    </div>
+  </div>
+
   <!-- COMMIT / AMEND MODAL (BUG-185) -->
   <div id="commitModalOverlay" class="quake-modal-overlay" onclick="if(event.target===this) closeCommitModal()">
     <div class="quake-modal">
@@ -2735,6 +2762,81 @@
       }
     }
 
+    // Action Progress Modal Management (BUG-327)
+    let actionProgressTimer = null;
+    let actionProgressInterval = null;
+
+    async function runWithActionModal(options, asyncFn) {
+      const thresholdMs = (options && options.delayMs !== undefined) ? options.delayMs : 1000;
+      const overlay = document.getElementById("actionProgressModalOverlay");
+      const titleEl = document.getElementById("actionProgressTitle");
+      const descEl = document.getElementById("actionProgressDescription");
+      const statusEl = document.getElementById("actionProgressStatus");
+      const elapsedEl = document.getElementById("actionProgressElapsed");
+      const barEl = document.getElementById("actionProgressBar");
+      const percentEl = document.getElementById("actionProgressPercent");
+      const iconEl = document.getElementById("actionProgressIcon");
+
+      let isModalVisible = false;
+      const startTime = Date.now();
+      let progress = 15;
+
+      if (actionProgressTimer) {
+        clearTimeout(actionProgressTimer);
+        actionProgressTimer = null;
+      }
+      if (actionProgressInterval) {
+        clearInterval(actionProgressInterval);
+        actionProgressInterval = null;
+      }
+
+      actionProgressTimer = setTimeout(() => {
+        if (!overlay) return;
+        isModalVisible = true;
+        if (titleEl) titleEl.textContent = (options && options.title) || "PROCESSING ACTION";
+        if (descEl) descEl.textContent = (options && options.description) || "Please wait while the operation completes...";
+        if (statusEl) statusEl.textContent = (options && options.stepText) || "Working...";
+        if (iconEl && options && options.icon) iconEl.textContent = options.icon;
+        if (barEl) barEl.style.width = "20%";
+        if (percentEl) percentEl.textContent = "20%";
+        if (elapsedEl) elapsedEl.textContent = ((Date.now() - startTime) / 1000).toFixed(1) + "s";
+        overlay.style.display = "flex";
+
+        actionProgressInterval = setInterval(() => {
+          const elapsedSec = ((Date.now() - startTime) / 1000).toFixed(1);
+          if (elapsedEl) elapsedEl.textContent = `${elapsedSec}s`;
+          if (progress < 90) {
+            progress += Math.floor(Math.random() * 6) + 2;
+            if (progress > 90) progress = 90;
+            if (barEl) barEl.style.width = `${progress}%`;
+            if (percentEl) percentEl.textContent = `${progress}%`;
+          }
+        }, 200);
+      }, thresholdMs);
+
+      try {
+        const result = await asyncFn();
+        return result;
+      } finally {
+        if (actionProgressTimer) {
+          clearTimeout(actionProgressTimer);
+          actionProgressTimer = null;
+        }
+        if (actionProgressInterval) {
+          clearInterval(actionProgressInterval);
+          actionProgressInterval = null;
+        }
+        if (isModalVisible && overlay) {
+          if (barEl) barEl.style.width = "100%";
+          if (percentEl) percentEl.textContent = "100%";
+          if (statusEl) statusEl.textContent = "Complete!";
+          setTimeout(() => {
+            overlay.style.display = "none";
+          }, 250);
+        }
+      }
+    }
+
     async function submitCommitModal() {
       const msg = document.getElementById("modalCommitMessage").value.trim();
       if (!msg) {
@@ -2748,22 +2850,29 @@
       }
 
       const endpoint = state.isAmendMode ? "/api/amend" : "/api/commit";
-      try {
-        const resp = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: msg, files: selectedFiles })
-        });
-        const res = await resp.json();
-        if (res.error) showToast("Commit failed: " + res.error);
-        else {
-          showToast((state.isAmendMode ? "Amended " : "Committed ") + res.commit_hash.slice(0, 7));
-          closeCommitModal();
-          setTimeout(() => location.reload(), 500);
+      await runWithActionModal({
+        title: state.isAmendMode ? "AMENDING COMMIT" : "CREATING COMMIT",
+        description: state.isAmendMode ? "Amending current HEAD commit with selected changes..." : "Creating new commit with selected staged changes...",
+        stepText: state.isAmendMode ? "Amending commit..." : "Writing commit tree...",
+        icon: "📦"
+      }, async () => {
+        try {
+          const resp = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: msg, files: selectedFiles })
+          });
+          const res = await resp.json();
+          if (res.error) showToast("Commit failed: " + res.error);
+          else {
+            showToast((state.isAmendMode ? "Amended " : "Committed ") + res.commit_hash.slice(0, 7));
+            closeCommitModal();
+            setTimeout(() => location.reload(), 500);
+          }
+        } catch (err) {
+          showToast("Commit failed: " + err);
         }
-      } catch (err) {
-        showToast("Commit failed: " + err);
-      }
+      });
     }
 
     // Merge Conflicts
@@ -2788,19 +2897,26 @@
     // HUD Actions: Sync, Branch, Goto
     async function onSyncClicked() {
       const spinner = document.getElementById("syncSpinner");
-      spinner.style.display = "inline";
+      if (spinner) spinner.style.display = "inline";
       showToast("Syncing repository from remote...");
 
-      try {
-        const resp = await fetch("/api/sync", { method: "POST" });
-        const res = await resp.json();
-        spinner.style.display = "none";
-        showToast(res.message || "Sync completed.");
-        setTimeout(() => location.reload(), 1000);
-      } catch (err) {
-        spinner.style.display = "none";
-        showToast("Sync failed: " + err);
-      }
+      await runWithActionModal({
+        title: "SYNCHRONIZING REPOSITORY",
+        description: "Pulling latest changes from remote and synchronizing review branches...",
+        stepText: "Connecting to remote...",
+        icon: "🔄"
+      }, async () => {
+        try {
+          const resp = await fetch("/api/sync", { method: "POST" });
+          const res = await resp.json();
+          if (spinner) spinner.style.display = "none";
+          showToast(res.message || "Sync completed.");
+          setTimeout(() => location.reload(), 1000);
+        } catch (err) {
+          if (spinner) spinner.style.display = "none";
+          showToast("Sync failed: " + err);
+        }
+      });
     }
 
     async function onRebaseClicked() {
@@ -2808,9 +2924,32 @@
       if (spinner) spinner.style.display = "inline";
       showToast("Rebasing onto ancestor branch...");
 
-      try {
-        const resp = await fetch("/api/rebase", {
-          method: "POST",
+      await runWithActionModal({
+        title: "REBASING COMMITS",
+        description: "Rebasing local commits onto target ancestor branch...",
+        stepText: "Rebasing branch...",
+        icon: "⎇"
+      }, async () => {
+        try {
+          const resp = await fetch("/api/rebase", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({})
+          });
+          const res = await resp.json();
+          if (spinner) spinner.style.display = "none";
+          if (res.status === "ok") {
+            showToast(res.message || "Rebase completed.");
+            setTimeout(() => location.reload(), 1000);
+          } else {
+            showToast("Rebase failed: " + (res.message || "Unknown error"), 5000);
+          }
+        } catch (err) {
+          if (spinner) spinner.style.display = "none";
+          showToast("Rebase failed: " + err, 5000);
+        }
+      });
+    }
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({})
         });

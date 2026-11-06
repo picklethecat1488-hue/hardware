@@ -279,16 +279,32 @@ class DetachedBranchBugStore:
                             continue
 
             # 5. Include attachments from attachments/ and feedback/attachments/
-            for att_dir_name in ("attachments", "feedback/attachments"):
-                att_dir = self.repo_root / att_dir_name
-                if att_dir.exists() and att_dir.is_dir():
-                    for att_file in att_dir.rglob("*"):
-                        if att_file.is_file():
-                            rel_p = att_file.relative_to(self.repo_root).as_posix()
-                            try:
-                                target_files[rel_p] = att_file.read_bytes()
-                            except OSError:
-                                continue
+            if dirty_bug_ids is not None:
+                for b_id in dirty_bug_ids:
+                    clean_b_id = (
+                        b_id.removeprefix("BUG-").removeprefix("BUG_").removeprefix("WORM-").removeprefix("WORM_")
+                    )
+                    for base in ("attachments", "feedback/attachments"):
+                        for cand in (self.repo_root / base / b_id, self.repo_root / base / clean_b_id):
+                            if cand.exists() and cand.is_dir():
+                                for att_file in cand.rglob("*"):
+                                    if att_file.is_file():
+                                        rel_p = att_file.relative_to(self.repo_root).as_posix()
+                                        try:
+                                            target_files[rel_p] = att_file.read_bytes()
+                                        except OSError:
+                                            continue
+            else:
+                for att_dir_name in ("attachments", "feedback/attachments"):
+                    att_dir = self.repo_root / att_dir_name
+                    if att_dir.exists() and att_dir.is_dir():
+                        for att_file in att_dir.rglob("*"):
+                            if att_file.is_file():
+                                rel_p = att_file.relative_to(self.repo_root).as_posix()
+                                try:
+                                    target_files[rel_p] = att_file.read_bytes()
+                                except OSError:
+                                    continue
 
             # Batch update index
             index_updates: List[str] = []

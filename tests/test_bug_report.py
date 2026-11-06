@@ -4,6 +4,7 @@ import base64
 import json
 from pathlib import Path
 import re
+import subprocess
 import threading
 import urllib.request
 import pytest
@@ -17,6 +18,7 @@ from model.bug_report import (
     BugStatus,
 )
 from provider.bug_report.markdown_exporter import MarkdownBugExporter
+from provider.bug_report.detached_branch import DetachedBranchBugStore
 from provider.bug_report.server import BugReportRequestHandler, BugReportServer
 from provider.bug_report.sqlite_store import SQLiteBugStore
 
@@ -1257,9 +1259,7 @@ def test_regression_bug_shining_silverfish_89_attachments_in_detached_branch_and
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     subprocess.run(["git", "init", "-b", "main"], cwd=str(repo_root), check=True, capture_output=True)
-    subprocess.run(
-        ["git", "config", "user.name", "Test User"], cwd=str(repo_root), check=True, capture_output=True
-    )
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=str(repo_root), check=True, capture_output=True)
     subprocess.run(
         ["git", "config", "user.email", "test@workspace"], cwd=str(repo_root), check=True, capture_output=True
     )
@@ -1324,3 +1324,110 @@ def test_regression_bug_shining_silverfish_89_attachments_in_detached_branch_and
     for f in changed:
         assert not f["path"].startswith("attachments/")
         assert not f["path"].startswith('"attachments/')
+
+
+def test_regression_bug_bristly_centipede_327_action_progress_modals_and_incremental_indexing(tmp_path: Path) -> None:
+    """Verify BUG-BRISTLY-CENTIPEDE-327: Action progress modals in diff and bug views & incremental attachment indexing."""
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+
+    # 1. Verify diff_view.html.j2 modal UI and helper
+    diff_view = (templates_dir / "diff_view.html.j2").read_text(encoding="utf-8")
+    assert 'id="actionProgressModalOverlay"' in diff_view
+    assert "runWithActionModal" in diff_view
+    assert 'title: "SYNCHRONIZING REPOSITORY"' in diff_view
+    assert "await runWithActionModal" in diff_view
+
+    # 2. Verify bug_report.html.j2 modal UI and helper
+    bug_report = (templates_dir / "bug_report.html.j2").read_text(encoding="utf-8")
+    assert 'id="actionProgressModalOverlay"' in bug_report
+    assert "runWithActionModal" in bug_report
+    assert 'title: "SAVING BUG REPORT"' in bug_report
+    assert 'title: "ACCEPTING BUG REPORT"' in bug_report
+    assert 'title: "REJECTING BUG REPORT"' in bug_report
+    assert 'title: "DELETING BUG REPORT"' in bug_report
+    assert 'title: "MERGING AGENT FEEDBACK"' in bug_report
+
+    # 3. Verify incremental attachment scanning in DetachedBranchBugStore
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    subprocess.run(["git", "init", "-b", "main"], cwd=str(repo_root), check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "User"], cwd=str(repo_root), check=True)
+    subprocess.run(["git", "config", "user.email", "user@workspace"], cwd=str(repo_root), check=True)
+
+    dummy_file = repo_root / "README.md"
+    dummy_file.write_text("# Test Repo\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=str(repo_root), check=True)
+    subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=str(repo_root), check=True, capture_output=True)
+
+    att1_dir = repo_root / "attachments" / "BUG-CENTIPEDE-1"
+    att1_dir.mkdir(parents=True)
+    att1_file = att1_dir / "att1.txt"
+    att1_file.write_text("Attachment 1 content", encoding="utf-8")
+
+    att2_dir = repo_root / "attachments" / "BUG-CENTIPEDE-2"
+    att2_dir.mkdir(parents=True)
+    att2_file = att2_dir / "att2.txt"
+    att2_file.write_text("Attachment 2 content", encoding="utf-8")
+
+    bug1 = BugReportModel(
+        id="BUG-CENTIPEDE-1",
+        title="Bug 1",
+        status=BugStatus.OPEN,
+        severity=BugSeverity.LOW,
+        category=BugCategory.INFRASTRUCTURE,
+        attachments=[
+            BugAttachmentModel(
+                id="att-1",
+                filename="att1.txt",
+                file_type="document",
+                file_path="attachments/BUG-CENTIPEDE-1/att1.txt",
+            )
+        ],
+    )
+    bug2 = BugReportModel(
+        id="BUG-CENTIPEDE-2",
+        title="Bug 2",
+        status=BugStatus.OPEN,
+        severity=BugSeverity.MEDIUM,
+        category=BugCategory.INFRASTRUCTURE,
+        attachments=[
+            BugAttachmentModel(
+                id="att-2",
+                filename="att2.txt",
+                file_type="document",
+                file_path="attachments/BUG-CENTIPEDE-2/att2.txt",
+            )
+        ],
+    )
+    db = BugDatabaseModel(bugs=[bug1, bug2])
+    store = DetachedBranchBugStore(repo_root=repo_root, branch_name="bugs")
+
+    # Initial commit (indexes both)
+    commit1 = store.commit_database(db, commit_message="Initial bugs commit")
+    assert commit1 is not None
+
+    tree1 = subprocess.run(
+        ["git", "ls-tree", "-r", "--name-only", "refs/heads/bugs"],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.splitlines()
+    assert "attachments/BUG-CENTIPEDE-1/att1.txt" in tree1
+    assert "attachments/BUG-CENTIPEDE-2/att2.txt" in tree1
+
+    # Incremental commit: modify bug 2, specify dirty_bug_ids=["BUG-CENTIPEDE-2"]
+    bug2.title = "Bug 2 Updated"
+    att2_file.write_text("Attachment 2 updated content", encoding="utf-8")
+    commit2 = store.commit_database(db, commit_message="Update bug 2", dirty_bug_ids=["BUG-CENTIPEDE-2"])
+    assert commit2 is not None
+
+    tree2 = subprocess.run(
+        ["git", "ls-tree", "-r", "--name-only", "refs/heads/bugs"],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.splitlines()
+    assert "attachments/BUG-CENTIPEDE-1/att1.txt" in tree2
+    assert "attachments/BUG-CENTIPEDE-2/att2.txt" in tree2
