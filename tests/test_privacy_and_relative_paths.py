@@ -139,13 +139,13 @@ Legacy: D:\\Documents and Settings\\{test_user}\\Desktop\\notes.txt
 
 def test_documentation_uses_relative_paths() -> None:
     """Verify documentation files do not contain absolute file:///Users/ links or unredacted names."""
-    gemini_file = WORKSPACE_ROOT / "GEMINI.md"
-    assert gemini_file.exists(), "GEMINI.md must exist"
-    gemini_text = gemini_file.read_text(encoding="utf-8")
-    assert "file:///Users/" not in gemini_text
+    agents_file = WORKSPACE_ROOT / "AGENTS.md"
+    assert agents_file.exists(), "AGENTS.md must exist"
+    agents_text = agents_file.read_text(encoding="utf-8")
+    assert "file:///Users/" not in agents_text
     for term in get_author_blacklist():
         if len(term) >= 4:
-            assert term.lower() not in gemini_text.lower(), f"Found personal identifier '{term}' in GEMINI.md"
+            assert term.lower() not in agents_text.lower(), f"Found personal identifier '{term}' in AGENTS.md"
 
 
 def test_bug_exporter_automatically_elides_personal_info(tmp_path: Path) -> None:
