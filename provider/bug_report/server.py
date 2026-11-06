@@ -6,6 +6,7 @@ and automated Markdown persistence (build/BUGS.md).
 """
 
 import base64
+from collections.abc import Collection
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -151,6 +152,8 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
                 self._handle_run_command(data)
             case "/api/bugs/delete":
                 self._handle_delete_bug(data)
+            case "/api/bugs/migrate_legacy":
+                self._handle_migrate_legacy(data)
             case "/api/upload":
                 self._handle_file_upload(data)
             case "/api/export":
@@ -300,7 +303,7 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
         )
 
         self.server.database.add_or_update(bug)
-        self.server.save_and_sync()
+        self.server.save_and_sync(dirty_bug_ids=[bug.id])
         self._send_json(bug.model_dump(mode="json"))
 
     def _handle_update_status(self, data: Dict[str, Any]) -> None:
@@ -326,7 +329,7 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
             bug.resolution_notes = notes
 
         bug.updated_at = now_str
-        self.server.save_and_sync()
+        self.server.save_and_sync(dirty_bug_ids=[bug.id])
         self._send_json(bug.model_dump(mode="json"))
 
     def _handle_accept_bug(self, data: Dict[str, Any]) -> None:
@@ -347,7 +350,7 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
             else:
                 bug.resolution_notes = f"**Acceptance Note**: {notes}"
         bug.updated_at = now_str
-        self.server.save_and_sync()
+        self.server.save_and_sync(dirty_bug_ids=[bug.id])
         self._send_json({"status": "ok", "bug": bug.model_dump(mode="json")})
 
     def _handle_reject_bug(self, data: Dict[str, Any]) -> None:
@@ -365,8 +368,58 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
         bug.rejected_at = now_str
         bug.rejection_notes = notes
         bug.updated_at = now_str
-        self.server.save_and_sync()
+        self.server.save_and_sync(dirty_bug_ids=[bug.id])
         self._send_json({"status": "ok", "bug": bug.model_dump(mode="json")})
+
+    def _handle_migrate_legacy(self, data: Dict[str, Any]) -> None:
+        """Handle migrating legacy resolved bugs to CLOSED status."""
+        before_ts = data.get("before", "2026-11-05 14:00:00 UTC")
+        migrate_all = bool(data.get("all", False))
+        exclude_raw = data.get("exclude", [])
+        exclude_ids = set(exclude_raw if isinstance(exclude_raw, list) else str(exclude_raw).split(","))
+        dry_run = bool(data.get("dry_run", False))
+
+        candidates = []
+        for b in self.server.database.bugs:
+            if b.status == BugStatus.RESOLVED and not b.accepted_at:
+                if b.id.upper() in {x.upper().strip() for x in exclude_ids if x.strip()}:
+                    continue
+                if not migrate_all and before_ts:
+                    check_ts = b.resolved_at or b.updated_at or b.created_at
+                    if check_ts and check_ts > before_ts:
+                        continue
+                candidates.append(b)
+
+        if dry_run:
+            self._send_json(
+                {
+                    "status": "ok",
+                    "dry_run": True,
+                    "count": len(candidates),
+                    "migrated_ids": [b.id for b in candidates],
+                }
+            )
+            return
+
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        migrated_ids = []
+        for b in candidates:
+            b.status = BugStatus.CLOSED
+            b.accepted_at = b.resolved_at or b.updated_at or b.created_at or now_str
+            b.updated_at = now_str
+            migrated_ids.append(b.id)
+
+        if migrated_ids:
+            self.server.save_and_sync(dirty_bug_ids=migrated_ids)
+
+        self._send_json(
+            {
+                "status": "ok",
+                "dry_run": False,
+                "count": len(migrated_ids),
+                "migrated_ids": migrated_ids,
+            }
+        )
 
     def _handle_attach_commit(self, data: Dict[str, Any]) -> None:
         """Attach a commit hash to a bug report."""
@@ -384,7 +437,7 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
             bug.commit_ids.append(commit_id)
 
         bug.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-        self.server.save_and_sync()
+        self.server.save_and_sync(dirty_bug_ids=[bug.id])
         self._send_json({"status": "ok", "bug": bug.model_dump(mode="json")})
 
     def _handle_add_task(self, data: Dict[str, Any]) -> None:
@@ -403,7 +456,7 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
         task = ReviewTaskModel(title=title, command=cmd)
         bug.review_tasks.append(task)
         bug.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-        self.server.save_and_sync()
+        self.server.save_and_sync(dirty_bug_ids=[bug.id])
         self._send_json({"status": "ok", "task": task.model_dump(mode="json"), "bug": bug.model_dump(mode="json")})
 
     def _handle_update_task(self, data: Dict[str, Any]) -> None:
@@ -436,7 +489,7 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
             target_task.notes = str(notes)
 
         bug.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-        self.server.save_and_sync()
+        self.server.save_and_sync(dirty_bug_ids=[bug.id])
         self._send_json(
             {"status": "ok", "task": target_task.model_dump(mode="json"), "bug": bug.model_dump(mode="json")}
         )
@@ -859,7 +912,7 @@ class BugReportServer(ThreadingHTTPServer):
             self.save_and_sync()
             return stats
 
-    def save_and_sync(self) -> Path:
+    def save_and_sync(self, dirty_bug_ids: Optional[Collection[str]] = None) -> Path:
         """Persist bug database to SQLite, JSON, BUGS.md, and individual BUG_<id>.md files."""
         with self._lock:
             if not self._is_internal_saving and self.feedback_dir.exists():
@@ -870,13 +923,26 @@ class BugReportServer(ThreadingHTTPServer):
             self._is_internal_saving = True
             try:
                 self.database.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-                self.sqlite_store.save_database(self.database)
+                if dirty_bug_ids is not None:
+                    dirty_set = set(dirty_bug_ids)
+                    for bug in self.database.bugs:
+                        if bug.id in dirty_set:
+                            self.sqlite_store.save_bug(bug)
+                    with self.sqlite_store._get_connection() as conn:
+                        conn.execute(
+                            "INSERT INTO metadata (key, value) VALUES ('updated_at', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                            (self.database.updated_at,),
+                        )
+                else:
+                    self.sqlite_store.save_database(self.database)
+
                 self.exporter.export_state_json(self.database, self.state_file)
                 out = self.exporter.export_markdown(
                     self.database,
                     self.markdown_output,
                     store=self.sqlite_store,
                     feedback_dir=self.feedback_dir,
+                    dirty_bug_ids=dirty_bug_ids,
                 )
                 if self.markdown_output.exists():
                     self.markdown_mtime = self.markdown_output.stat().st_mtime
@@ -889,6 +955,7 @@ class BugReportServer(ThreadingHTTPServer):
                         self.database,
                         commit_message=f"Update bug database (v{self.db_version})",
                         sync_local_disk=False,
+                        dirty_bug_ids=dirty_bug_ids,
                     )
                 except Exception:
                     pass

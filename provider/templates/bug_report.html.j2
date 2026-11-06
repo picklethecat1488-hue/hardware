@@ -16,6 +16,14 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
   <link rel="shortcut icon" href="/static/favicon.ico">
   <link rel="stylesheet" href="/static/common.css">
+  <script>
+    if (window.self !== window.top) {
+      document.documentElement.classList.add("in-iframe");
+      window.addEventListener("DOMContentLoaded", () => {
+        if (document.body) document.body.classList.add("in-iframe");
+      });
+    }
+  </script>
   <style>
     html { font-size: 80%; }
     /* =========================================================
@@ -68,6 +76,18 @@
       overflow: hidden;
       border: 2px solid var(--quake-border-mid);
       box-shadow: inset 0 0 0 1px rgba(255, 184, 0, 0.2), 0 0 10px rgba(200, 122, 50, 0.1);
+    }
+
+    html.in-iframe,
+    html.in-iframe body,
+    body.in-iframe {
+      border: none !important;
+      box-shadow: none !important;
+    }
+    html.in-iframe .window-resize-gripper,
+    body.in-iframe .window-resize-gripper,
+    .in-iframe .window-resize-gripper {
+      display: none !important;
     }
 
     /* Window Resize Gripper (WORM-027) */
@@ -721,6 +741,16 @@
         </div>
         <div id="rejection-feedback-text" style="color:#fff; font-size:11px; white-space:pre-wrap; line-height:1.5;"></div>
       </div>
+
+      <!-- Accepted Fix Card -->
+      <div id="accepted-feedback-card" class="form-section quake-card accepted-banner" style="display:none; border:2px solid var(--quake-green); background:rgba(34,197,94,0.12); margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <div class="section-title" style="color:var(--quake-green); margin-bottom:0;">
+            <span>✔ FIX FUNCTIONALLY REVIEWED &amp; ACCEPTED</span>
+          </div>
+          <span id="accepted-timestamp-display" style="font-size:9.5px; background:var(--quake-green); color:#000; padding:2px 6px; border-radius:2px; font-weight:800;">CLOSED</span>
+        </div>
+      </div>
       <!-- Bug Identity Section -->
       <div class="form-section quake-card">
         <div class="section-title">
@@ -1190,6 +1220,20 @@
         }
       }
 
+      // Accepted Feedback Alert
+      const accCard = document.getElementById("accepted-feedback-card");
+      const accTime = document.getElementById("accepted-timestamp-display");
+      if (accCard) {
+        if (bug.status === "CLOSED") {
+          accCard.style.display = "block";
+          if (accTime) {
+            accTime.textContent = bug.accepted_at ? `ACCEPTED ${bug.accepted_at}` : "CLOSED";
+          }
+        } else {
+          accCard.style.display = "none";
+        }
+      }
+
       document.getElementById("bug-title").value = bug.title || "";
       document.getElementById("bug-severity").value = bug.severity || "MEDIUM";
       document.getElementById("bug-status").value = bug.status || "OPEN";
@@ -1210,13 +1254,12 @@
 
     async function acceptActiveBug() {
       if (!activeBugId) return;
-      const notes = prompt("Optional acceptance notes (leave blank if none):", "");
-      if (notes === null) return;
       try {
+        await saveActiveBug();
         const res = await fetch("/api/bugs/accept", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: activeBugId, notes: notes.trim() })
+          body: JSON.stringify({ id: activeBugId, notes: "" })
         });
         const data = await res.json();
         if (data.status === "ok") {
@@ -1240,16 +1283,13 @@
 
     async function rejectActiveBug() {
       if (!activeBugId) return;
-      const notes = prompt("Enter rejection feedback (explain why the fix failed validation):", "");
-      if (!notes || !notes.trim()) {
-        alert("Rejection feedback is required to reject a fix.");
-        return;
-      }
       try {
+        const currentNotes = document.getElementById("bug-resolution") ? document.getElementById("bug-resolution").value.trim() : "";
+        await saveActiveBug();
         const res = await fetch("/api/bugs/reject", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: activeBugId, notes: notes.trim() })
+          body: JSON.stringify({ id: activeBugId, notes: currentNotes })
         });
         const data = await res.json();
         if (data.status === "ok") {
@@ -1597,7 +1637,11 @@
         window.opener.focus();
         window.close();
       } else {
-        window.location.href = "/";
+        if (window.top && window.top !== window) {
+          window.top.location.href = "/";
+        } else {
+          window.location.href = "/";
+        }
       }
       try {
         window.parent.postMessage({ action: "close_workstation", type: "close_modal" }, "*");

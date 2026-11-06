@@ -314,25 +314,16 @@ class CatFountainProvider(Provider):
                     mode=Mode.SUBTRACT,
                 )
 
-            # Keyway slot at North (+Y) in socket wall allowing Hall sensor platform to pass through
+            # Keyway slot at North (+Y) in socket wall allowing Hall sensor platform and cabling to pass through (BUG-LUSTROUS-COCOON-669)
+            # Fits hall sensor mount to prevent rotation during spinning without cutting into the bowl floor above ceiling_z.
+            # Cut from Y = 0 (well inside hollow bore radius 18mm) outwards past the socket wall to eliminate thin sliver walls at the curved corners
             keyway_w = self.settings.hall_sensor_spacing_x + 6.0
-            with Locations((0, socket_out_r / 2.0, mount_seat_z - 1.0)):
+            with Locations((0, 0, floor_z - t)):
                 Box(
                     keyway_w,
-                    socket_out_r + 2.0,
-                    socket_h + 4.0,
-                    align=(Align.CENTER, Align.MIN, Align.MIN),
-                    mode=Mode.SUBTRACT,
-                )
-
-            # Clearance opening at South (-Y) in socket wall for motor mount plate and wiring
-            south_slot_w = self.settings.motor_hub_width + 1.0
-            with Locations((0, -socket_out_r / 2.0, mount_seat_z - 1.0)):
-                Box(
-                    south_slot_w,
-                    socket_out_r + 2.0,
-                    socket_h + 4.0,
-                    align=(Align.CENTER, Align.MAX, Align.MIN),
+                    socket_out_r + 5.0,
+                    socket_h + 1.0,
+                    align=(Align.CENTER, Align.MIN, Align.MAX),
                     mode=Mode.SUBTRACT,
                 )
 
@@ -358,50 +349,70 @@ class CatFountainProvider(Provider):
                                 mode=Mode.SUBTRACT,
                             )
 
-            # Helper function to generate a 3D-printed two-sided slide-in card guide
+            # Helper function to generate a 3D-printed snap-fit socket for hole-less PCBs (BUG-STINGING-LACEWING-799)
             def add_pcb_clip(
                 center_x: float,
                 center_y: float,
-                board_span: float,  # Board width across the guide rails (along X)
-                board_slide: float,  # Board length along slide direction (along Y)
+                board_span: float,  # Board width along X
+                board_slide: float,  # Board length along Y
                 standoff_h: float,
                 label: str,
             ):
-                stop_wall = self.settings.pcb_clip_stop_wall
-                detent_lip = self.settings.pcb_clip_detent_lip
-                track_w = board_slide + stop_wall
-                track_l = 3.0
-                track_h = standoff_h + 3.2
+                wall_t = 2.0
+                pcb_t = 1.6
+                clearance = 0.2
+                snap_depth = 0.35
+                snap_h = 1.8
+                total_h = standoff_h + pcb_t + 1.0
 
-                half_span = board_span / 2.0
-                track_center_x = half_span + 0.5
-                slot_center_x = half_span - 0.25
+                outer_x = board_span + 2.0 * wall_t
+                outer_y = board_slide + 2.0 * wall_t
+                inner_x = board_span + clearance
+                inner_y = board_slide + clearance
 
                 with Locations((center_x, center_y, floor_z - t)):
-                    # 1. Base plate connecting the two guide tracks (recessed to save material and provide airflow)
-                    Box(board_span - 2.5, board_slide - 2.0, standoff_h, align=(Align.CENTER, Align.CENTER, Align.MAX))
+                    # 1. Solid outer socket frame extending from ceiling
+                    Box(outer_x, outer_y, total_h, align=(Align.CENTER, Align.CENTER, Align.MAX))
 
-                    # 2. Left and Right guide tracks (extended at +Y for positive stop wall)
-                    with Locations((-track_center_x, stop_wall / 2.0, 0), (track_center_x, stop_wall / 2.0, 0)):
-                        Box(track_l, track_w, track_h, align=(Align.CENTER, Align.CENTER, Align.MAX))
+                    # 2. Central cavity for components and airflow (through the standoff region)
+                    Box(
+                        board_span - 3.0,
+                        board_slide - 3.0,
+                        total_h + 0.1,
+                        align=(Align.CENTER, Align.CENTER, Align.MAX),
+                        mode=Mode.SUBTRACT,
+                    )
 
-                    # 3. Guide slots inside left/right tracks (open at entrance -Y, closed at +Y)
-                    slot_len = board_slide + 1.0
-                    slot_y_center = -0.5
-                    with Locations((0, slot_y_center, -standoff_h)):
-                        with Locations((-slot_center_x, 0, 0), (slot_center_x, 0, 0)):
-                            Box(
-                                1.5,
-                                slot_len,
-                                1.85,
-                                align=(Align.CENTER, Align.CENTER, Align.MAX),
-                                mode=Mode.SUBTRACT,
-                            )
+                    # 3. PCB seating pocket (from -standoff_h down through bottom)
+                    with Locations((0, 0, -standoff_h)):
+                        Box(
+                            inner_x,
+                            inner_y,
+                            total_h - standoff_h + 0.1,
+                            align=(Align.CENTER, Align.CENTER, Align.MAX),
+                            mode=Mode.SUBTRACT,
+                        )
 
-                    # 4. Inward snap detent lips at entrance (-Y) to lock PCB in place
-                    with Locations((0, -board_slide / 2.0 + 0.5, -standoff_h)):
-                        with Locations((-half_span + detent_lip / 2.0, 0, 0), (half_span - detent_lip / 2.0, 0, 0)):
-                            Box(detent_lip, 1.2, 1.6, align=(Align.CENTER, Align.CENTER, Align.MAX))
+                    # 4. Internal snap-fit groove in socket walls (matching lid and bottom cover snap groove style)
+                    # Located at the PCB seating position so PCB perimeter edges act as the inner snap ring
+                    with Locations((0, 0, -standoff_h)):
+                        Box(
+                            inner_x + snap_depth * 2.0,
+                            inner_y + snap_depth * 2.0,
+                            snap_h,
+                            align=(Align.CENTER, Align.CENTER, Align.MAX),
+                            mode=Mode.SUBTRACT,
+                        )
+
+                    # 5. Lead-in entry chamfer at bottom opening for smooth snap-in insertion
+                    with Locations((0, 0, -total_h + 0.4)):
+                        Box(
+                            inner_x + 0.8,
+                            inner_y + 0.8,
+                            0.8,
+                            align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                            mode=Mode.SUBTRACT,
+                        )
 
                 # Add engraved label (move to opposite side of board to avoid proximity to CURRENT)
                 label_y_offset = board_slide / 2.0 + 5.0
@@ -613,35 +624,26 @@ class CatFountainProvider(Provider):
                                 mode=Mode.SUBTRACT,
                             )
 
-                        # Extend inner wall to enclose each side of ToF sensor against ambient light noise (Finding 1)
-                        if ext_h > 0.0:
-                            with Locations(Location((-4.0, 0, 5.0 - ext_h / 2.0))):
-                                # Top inner wall interface
+                        # Sensor shield on the inner bowl wall: extruded hollow rectangle (BUG-SPECKLED-ROVEBEETLE-352)
+                        side_wall_t = 2.0
+                        pocket_w = self.settings.proximity_sensor_pocket_width
+                        pocket_h = self.settings.proximity_sensor_pocket_height
+                        with Locations(Location((-4.0, 0, -2.0))):
+                            with BuildPart(mode=Mode.PRIVATE) as shield_part:
                                 Box(
                                     4.0,
-                                    self.settings.proximity_sensor_pocket_width,
-                                    ext_h,
+                                    pocket_w + side_wall_t * 2.0,
+                                    pocket_h + side_wall_t * 2.0,
                                     align=(Align.CENTER, Align.CENTER, Align.CENTER),
                                 )
-                            # Side enclosing walls on left (+Y) and right (-Y) to shield optical sensor from ambient LED light
-                            side_wall_t = 2.0
-                            y_offset = (self.settings.proximity_sensor_pocket_width + side_wall_t) / 2.0
-                            with Locations(Location((-4.0, y_offset, 0)), Location((-4.0, -y_offset, 0))):
                                 Box(
-                                    4.0,
-                                    side_wall_t,
-                                    self.settings.proximity_sensor_pocket_height + ext_h,
+                                    4.0 + 0.1,
+                                    pocket_w,
+                                    pocket_h,
                                     align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                                    mode=Mode.SUBTRACT,
                                 )
-                            # Bottom enclosing wall (-Z)
-                            z_bottom_offset = -(self.settings.proximity_sensor_pocket_height + ext_h) / 2.0
-                            with Locations(Location((-4.0, 0, z_bottom_offset))):
-                                Box(
-                                    4.0,
-                                    self.settings.proximity_sensor_pocket_width + side_wall_t * 2.0,
-                                    side_wall_t,
-                                    align=(Align.CENTER, Align.CENTER, Align.CENTER),
-                                )
+                            add(shield_part)
 
                         # Press-fit mounting standoffs on the INSIDE of the bowl wall (Finding 5)
                         post_r = self.settings.pcb_mounting_post_diameter / 2.0
@@ -706,6 +708,15 @@ class CatFountainProvider(Provider):
                                 merged_shape = bowl.part + trimmed_standoffs
                                 # Ensure final returned shape is a Part object, wrapping the internal Solid
                                 bowl.part = Part(children=merged_shape.solids(), label=target)
+
+            # Ensure dry compartment clearance for bottom cover (Z <= 4.0)
+            with Locations((0, 0, 0)):
+                Cylinder(
+                    radius=r - t + 0.5,
+                    height=4.0,
+                    align=(Align.CENTER, Align.CENTER, Align.MIN),
+                    mode=Mode.SUBTRACT,
+                )
 
             with URDFMetadata(
                 label=target,
@@ -1200,7 +1211,6 @@ class CatFountainProvider(Provider):
         self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
         """Build the dry-side magnet drive hub mounted on the motor D-shaft."""
-        hub_r = self.settings.impeller_radius + self.settings.magnet_radius + 1.6
         hub_h = self.settings.magnet_thickness + self.settings.magnet_clearance + 0.8
         standoff_h = self.settings.drive_hub_standoff_height
         mr = self.settings.magnet_radius + self.settings.magnet_clearance
@@ -1209,8 +1219,26 @@ class CatFountainProvider(Provider):
         thrust_r = self.settings.drive_hub_thrust_collar_radius
         shaft_r = self.settings.drive_hub_shaft_radius
 
+        min_wall = self.settings.drive_hub_min_wall
+        lobe_r = mr + min_wall
+        center_r = 4.5
+        groove_w = self.settings.drive_hub_strut_groove_width
+        groove_d = self.settings.drive_hub_strut_groove_depth
+        groove_l = self.settings.drive_hub_strut_groove_length
+
         with BuildPart() as hub:
-            Cylinder(radius=hub_r, height=hub_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+            # 1. 3-lobed convex hull body with minimum 1.5mm wall thickness around magnets, grooves, and center hole (BUG-THORACIC-HARVESTMAN-529)
+            with BuildSketch() as sketch:
+                for i in range(self.settings.magnet_count):
+                    angle = i * (360.0 / self.settings.magnet_count)
+                    rad = math.radians(angle)
+                    with BuildSketch() as arm:
+                        Circle(radius=center_r)
+                        with Locations((ring_r * math.cos(rad), ring_r * math.sin(rad))):
+                            Circle(radius=lobe_r)
+                        make_hull()
+                    add(arm.sketch)
+            extrude(sketch.sketch, amount=hub_h)
 
             # Central PTFE/POM thrust collar directly around 1.5mm motor shaft collar at R <= 1.5mm
             # Dropping contact radius from R = 15.6mm down to R <= 1.5mm reduces friction torque by over 90%
@@ -1218,12 +1246,14 @@ class CatFountainProvider(Provider):
                 with Locations((0, 0, hub_h)):
                     Cylinder(radius=thrust_r, height=standoff_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
-            # Motor shaft hole with generous print-shrinkage clearance for smooth hand press-fit
+            # Motor shaft through-hole
             total_h = hub_h + standoff_h
-            with BuildSketch() as hole_sketch:
-                Circle(radius=shaft_r)
-            ext_hole = extrude(hole_sketch.sketch, amount=total_h + 2.0, mode=Mode.PRIVATE)
-            hub.part -= Location((0, 0, -1.0)) * ext_hole
+            Cylinder(
+                radius=shaft_r,
+                height=total_h + 2.0,
+                align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                mode=Mode.SUBTRACT,
+            )
 
             # Magnet pockets on the top face (Z = hub_h)
             for i in range(self.settings.magnet_count):
@@ -1233,6 +1263,19 @@ class CatFountainProvider(Provider):
                         # Pockets cut downward into the cylinder
                         Cylinder(
                             radius=mr, height=mt, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT
+                        )
+
+            # Triangular motor strut grooves on the bottom face (Z = 0) to prevent torque slippage (BUG-THORACIC-HARVESTMAN-529)
+            for i in range(self.settings.magnet_count):
+                angle = i * (360.0 / self.settings.magnet_count)
+                with Locations(Location((0, 0, 0)) * Rot(0, 0, angle)):
+                    with Locations((groove_l / 2.0, 0, 0)):
+                        Box(
+                            groove_l,
+                            groove_w,
+                            groove_d,
+                            align=(Align.CENTER, Align.CENTER, Align.MIN),
+                            mode=Mode.SUBTRACT,
                         )
 
             URDFMetadata(
@@ -1561,40 +1604,39 @@ class CatFountainProvider(Provider):
         }
 
     @method_cache
+    @method_cache
     def build_motor_hub(
         self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
-        """Build the dedicated motor drive hub assembly bracket mounting the motor and Hall sensor (BUG-VIBRANT-WOODBORER-940)."""
-        clip_w = self.settings.motor_hub_width
-        clip_l = self.settings.motor_hub_length
+        """Build the dedicated motor drive hub assembly bracket mounting the motor and Hall sensor (BUG-LUSTROUS-COCOON-669)."""
         clip_h = self.settings.motor_hub_thickness
-        flange_w = self.settings.motor_hub_flange_width
         r_bcd = self.settings.motor_mount_bolt_circle_radius
         hole_r = self.settings.motor_mount_hole_radius
         shaft_r = self.settings.motor_shaft_clearance_radius
         recess_d = self.settings.motor_base_recess_depth
         lobe_r = self.settings.motor_base_lobe_radius
-        wire_w = self.settings.motor_wire_relief_width
 
-        stub_l = self.settings.motor_hub_arm_stub_length
-        relief_r = self.settings.motor_hub_side_relief_radius
-        relief_fillet = self.settings.motor_hub_side_relief_fillet
-        support_rise = self.settings.motor_hub_support_rise
-        support_r = self.settings.motor_hub_support_radius
+        collar_r = self.settings.motor_hub_socket_radius - self.settings.motor_hub_collar_clearance
+        collar_h = 5.0
+        groove_offset = self.settings.motor_hub_snap_groove_radius_offset
 
         angles_deg = [90.0, 210.0, 330.0]
         mount_pts = [(r_bcd * math.cos(math.radians(a)), r_bcd * math.sin(math.radians(a))) for a in angles_deg]
 
+        hall_front_y = self.settings.speed_sensor_pocket_y
+        hall_sp_x = self.settings.hall_sensor_spacing_x
+        hall_sh = self.settings.hall_sensor_standoff_height
+        hall_dx = hall_sp_x / 2.0
+        rect_w = hall_sp_x + 6.0
+        rect_len = hall_front_y + 5.0
+
         with BuildPart() as hub_bracket:
-            # 1. Main motor mount plate extending South from center (0, 0)
-            with Locations((0, -clip_l, 0)):
-                Box(clip_w, clip_l + 5.0, clip_h, align=(Align.CENTER, Align.MIN, Align.MIN))
+            # 1. Base plate: circle unioned with rectangle to mount the hall sensor (BUG-LUSTROUS-COCOON-669)
+            Cylinder(radius=collar_r, height=clip_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+            with Locations((0, rect_len / 2.0, 0)):
+                Box(rect_w, rect_len, clip_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
-            # 2. Circular cylindrical snap-fit collar with annular ridge (groove-style mount matching lid and bowl bottom)
-            collar_r = self.settings.motor_hub_socket_radius - self.settings.motor_hub_collar_clearance
-            collar_h = 5.0
-            groove_offset = self.settings.motor_hub_snap_groove_radius_offset
-
+            # 2. Circular cylindrical snap-fit collar with annular ridge
             with Locations((0, 0, clip_h)):
                 Cylinder(radius=collar_r, height=collar_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
                 Cylinder(
@@ -1632,20 +1674,7 @@ class CatFountainProvider(Provider):
                         mode=Mode.SUBTRACT,
                     )
 
-            # 3. Dedicated Hall sensor PCB module mount directly on motor hub (FORIOT A3144 module)
-            # Front tongue only needs 2 mounting points for holes on the front of the board
-            hall_front_y = self.settings.speed_sensor_pocket_y
-            hall_sp_x = self.settings.hall_sensor_spacing_x
-            hall_sh = self.settings.hall_sensor_standoff_height
-            hall_dx = hall_sp_x / 2.0
-
-            # Mounting platform base supporting the 2 front mounting points
-            tongue_len = hall_front_y - 5.0 + 5.0
-            tongue_center_y = 5.0 + tongue_len / 2.0
-            with Locations((0, tongue_center_y, 0)):
-                Box(hall_sp_x + 6.0, tongue_len, clip_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
-
-            # 2 press-fit mounting points for holes on front of the Hall sensor board
+            # 3. Dedicated Hall sensor PCB module mount on the rectangular tongue (FORIOT A3144 module)
             post_r = self.settings.pcb_mounting_post_diameter / 2.0
             flare_r = self.settings.pcb_mounting_post_flare_diameter / 2.0
             tip_r = self.settings.pcb_mounting_post_tip_diameter / 2.0
@@ -1679,11 +1708,7 @@ class CatFountainProvider(Provider):
             ext_label = extrude(hall_label_sketch.sketch, amount=0.5, mode=Mode.PRIVATE)
             hub_bracket.part -= Location((0, hall_front_y - 4.5, clip_h)) * ext_label
 
-            # 4. Pull handle at the back (South end, Y = -clip_l) for toolless removal
-            with Locations((0, -clip_l, 0)):
-                Box(clip_w + 4.0, 3.0, clip_h + 3.0, align=(Align.CENTER, Align.MAX, Align.MIN))
-
-            # 5. Central shaft and bearing collar clearance through-hole
+            # 4. Central shaft and bearing collar clearance through-hole
             Cylinder(
                 radius=shaft_r,
                 height=clip_h + 10.0,
@@ -1691,7 +1716,7 @@ class CatFountainProvider(Provider):
                 mode=Mode.SUBTRACT,
             )
 
-            # 6. 3x M1.4 mounting screw through-holes on Phi 6.6mm BCD
+            # 5. Exactly 3x M1.4 mounting screw through-holes on Phi 6.6mm BCD on the bottom
             with Locations(*mount_pts):
                 Cylinder(
                     radius=hole_r,
@@ -1700,49 +1725,13 @@ class CatFountainProvider(Provider):
                     mode=Mode.SUBTRACT,
                 )
 
-            # 7. Triangular anti-rotation recess for motor base (on top surface Z = clip_h)
+            # 6. Triangular anti-rotation recess for motor base (on top surface Z = clip_h)
             with Locations((0, 0, clip_h)):
                 with BuildSketch(mode=Mode.PRIVATE) as base_sketch:
                     with Locations(*mount_pts):
                         Circle(radius=lobe_r)
                     make_hull()
                 extrude(base_sketch.sketch, amount=-recess_d, mode=Mode.SUBTRACT)
-
-            # 8. Side wiring connector relief cutout and wire channel with support web (BUG-TRANSLUCENT-LARVA-792)
-            y_stub = -clip_l + stub_l
-            p_stub_outer = (-clip_w / 2.0 - 2.0, y_stub)
-            p_stub_inner = (-wire_w / 2.0, y_stub)
-            p_support_end = (wire_w / 2.0, y_stub + support_rise)
-            p_slot_top_right = (wire_w / 2.0, -1.5)
-            p_slot_top_left = (-wire_w / 2.0, -1.5)
-            p_lobe_notch = (mount_pts[1][0] - 1.2, mount_pts[1][1])
-            p_front_edge = (-clip_w / 2.0 + 1.8, 5.0)
-            p_front_outer = (-clip_w / 2.0 - 2.0, 5.0 + 1.0)
-
-            with BuildSketch(Plane.XY) as cut_sketch:
-                with BuildLine() as cut_line:
-                    Line(p_stub_outer, p_stub_inner)
-                    RadiusArc(p_stub_inner, p_support_end, radius=-support_r)
-                    Line(p_support_end, p_slot_top_right)
-                    Line(p_slot_top_right, p_slot_top_left)
-                    Line(p_slot_top_left, p_lobe_notch)
-                    RadiusArc(p_lobe_notch, p_front_edge, radius=relief_r)
-                    Line(p_front_edge, (p_front_edge[0], 5.0 + 1.0))
-                    Line((p_front_edge[0], 5.0 + 1.0), p_front_outer)
-                    Line(p_front_outer, p_stub_outer)
-                make_face()
-            extrude(cut_sketch.sketch, amount=clip_h + 5.0, mode=Mode.SUBTRACT)
-
-            # Stress-relief fillet on re-entrant corner of remaining arm stub
-            reentrant_edges = [
-                e
-                for e in hub_bracket.part.edges()
-                if abs(e.center().X - (-wire_w / 2.0)) < 0.5
-                and abs(e.center().Y - y_stub) < 0.5
-                and abs(e.length - clip_h) < 0.2
-            ]
-            if reentrant_edges:
-                fillet(reentrant_edges, radius=relief_fillet)
 
             URDFMetadata(
                 label=target,

@@ -40,6 +40,8 @@ REMOTE_PORT="${REMOTE_PORT:-}"
 REMOTE_USER="${REMOTE_USER:-root}"
 REMOTE_KEY="${REMOTE_KEY:-}"
 REMOTE_DIR="${REMOTE_DIR:-}"
+MIN_TOPS="${MIN_TOPS:-${ANVIL_MIN_TOPS:-50.0}}"
+MAX_COST="${MAX_COST:-${ANVIL_MAX_COST:-${MAX_DPH:-${ANVIL_MAX_DPH:-1.50}}}}"
 
 # SSH & Rsync Options
 SSH_BASE_OPTS="-o ServerAliveInterval=30 -o ServerAliveCountMax=120 -o TCPKeepAlive=yes -o StrictHostKeyChecking=accept-new"
@@ -381,7 +383,7 @@ print(f'✅ Successfully merged {len(inputs)} recording(s) into {out}')
 Usage: bin/anvil <command> [args...]
 
 Instance Lifecycle Subcommands:
-  provision [--image ubuntu:22.04] [--disk 40]   Provision new Vast.ai instance and write ~/.anvil.env
+  provision [--image ubuntu:22.04] [--disk 40] [--min-tops 50] [--max-cost 1.50]  Provision new Vast.ai instance and write ~/.anvil.env
   bootstrap [all|firmware|hardware|ssd]          Install compilers, Rust, Miniforge, and Conda on remote VM
   release [id]                                   Destroy rented instance and clear ~/.anvil.env
   auto-release [--force]                         Check ~/.anvil.lock and release if idle or past COB

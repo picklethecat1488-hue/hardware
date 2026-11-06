@@ -5,6 +5,7 @@ from pathlib import Path
 import sqlite3
 import subprocess
 import threading
+import time
 import urllib.request
 import pytest
 
@@ -21,6 +22,7 @@ from provider.bug_report.detached_branch import DetachedBranchBugStore
 from provider.bug_report.markdown_exporter import MarkdownBugExporter
 from provider.bug_report.server import BugReportServer
 from provider.bug_report.sqlite_store import SQLiteBugStore
+from provider.dashboard.server import DashboardServer
 from tools.dashboard import main as dashboard_main
 
 
@@ -514,3 +516,419 @@ def test_cli_functional_review_subcommands(
     dashboard_main(["--db-file", str(db_file), "list-bugs", "--open"])
     captured = capsys.readouterr()
     assert "BUG-CLI-001" not in captured.out
+
+
+def test_migrate_resolved_bugs_cli(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+    """Verify migrate-resolved-bugs CLI handles dry-run, timestamp filtering, exclude, and --all."""
+    db_file = tmp_path / "test_bugs.sqlite"
+    store = SQLiteBugStore(db_path=db_file)
+
+    b_old = BugReportModel(
+        id="BUG-LEGACY-001",
+        title="Legacy resolved bug",
+        status=BugStatus.RESOLVED,
+        severity=BugSeverity.MEDIUM,
+        category=BugCategory.PCB,
+        created_at="2026-09-01 10:00:00 UTC",
+        resolved_at="2026-09-01 12:00:00 UTC",
+        accepted_at=None,
+    )
+    b_recent = BugReportModel(
+        id="BUG-RECENT-002",
+        title="Recently resolved bug awaiting review",
+        status=BugStatus.RESOLVED,
+        severity=BugSeverity.HIGH,
+        category=BugCategory.CAD,
+        created_at="2026-11-05 14:15:00 UTC",
+        resolved_at="2026-11-05 14:20:00 UTC",
+        accepted_at=None,
+    )
+    b_open = BugReportModel(
+        id="BUG-OPEN-003",
+        title="Open defect",
+        status=BugStatus.OPEN,
+        severity=BugSeverity.LOW,
+        category=BugCategory.UI,
+    )
+
+    store.save_bug(b_old)
+    store.save_bug(b_recent)
+    store.save_bug(b_open)
+
+    # 1. Dry run
+    capsys.readouterr()
+    dashboard_main(["--db-file", str(db_file), "migrate-resolved-bugs", "--dry-run"])
+    captured = capsys.readouterr()
+    assert "[DRY-RUN]" in captured.out
+    assert "BUG-LEGACY-001" in captured.out
+    assert "BUG-RECENT-002" not in captured.out
+
+    # Status must not change after dry-run
+    assert store.get_bug("BUG-LEGACY-001").status == BugStatus.RESOLVED
+
+    # 2. Exclude flag
+    capsys.readouterr()
+    dashboard_main(
+        [
+            "--db-file",
+            str(db_file),
+            "migrate-resolved-bugs",
+            "--all",
+            "--exclude",
+            "BUG-RECENT-002",
+            "--dry-run",
+        ]
+    )
+    captured = capsys.readouterr()
+    assert "BUG-LEGACY-001" in captured.out
+    assert "BUG-RECENT-002" not in captured.out
+
+    # 3. Default migration (migrates bugs resolved <= 2026-11-05 14:00:00 UTC)
+    dashboard_main(["--db-file", str(db_file), "migrate-resolved-bugs"])
+    updated_old = store.get_bug("BUG-LEGACY-001")
+    updated_recent = store.get_bug("BUG-RECENT-002")
+    updated_open = store.get_bug("BUG-OPEN-003")
+
+    assert updated_old.status == BugStatus.CLOSED
+    assert updated_old.accepted_at == "2026-09-01 12:00:00 UTC"
+    assert updated_recent.status == BugStatus.RESOLVED
+    assert updated_recent.accepted_at is None
+    assert updated_open.status == BugStatus.OPEN
+
+    # 4. Migrate remaining with --all
+    dashboard_main(["--db-file", str(db_file), "migrate-resolved-bugs", "--all"])
+    updated_recent_all = store.get_bug("BUG-RECENT-002")
+    assert updated_recent_all.status == BugStatus.CLOSED
+    assert updated_recent_all.accepted_at is not None
+
+
+def test_sqlite_store_auto_migration_and_markdown_protection(tmp_path: Path) -> None:
+    """Verify SQLiteBugStore schema migration of legacy resolved bugs and markdown merge protection."""
+    db_file = tmp_path / "legacy_test.sqlite"
+
+    # Seed legacy bugs directly into SQLite without metadata flag
+    conn = sqlite3.connect(str(db_file))
+    conn.execute(
+        """
+        CREATE TABLE bugs (
+            id TEXT PRIMARY KEY, uuid TEXT, title TEXT NOT NULL, status TEXT NOT NULL,
+            severity TEXT NOT NULL, category TEXT NOT NULL, component TEXT DEFAULT '',
+            description TEXT DEFAULT '', reproduction_steps TEXT DEFAULT '[]',
+            expected_behavior TEXT DEFAULT '', actual_behavior TEXT DEFAULT '',
+            logs TEXT DEFAULT '', commit_ids TEXT DEFAULT '[]', review_tasks TEXT DEFAULT '[]',
+            created_at TEXT DEFAULT '', updated_at TEXT DEFAULT '', resolved_at TEXT,
+            resolution_notes TEXT DEFAULT '', rejection_notes TEXT DEFAULT '',
+            accepted_at TEXT, rejected_at TEXT
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE metadata (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO bugs (id, uuid, title, status, severity, category, resolved_at)
+        VALUES ('BUG-SEED-001', 'u-seed-1', 'Legacy seed bug', 'RESOLVED', 'MEDIUM', 'PCB', '2026-09-10 12:00:00 UTC')
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    # Initializing SQLiteBugStore runs _ensure_schema and auto-migrates
+    store = SQLiteBugStore(db_path=db_file)
+    bug = store.get_bug("BUG-SEED-001")
+    assert bug is not None
+    assert bug.status == BugStatus.CLOSED
+    assert bug.accepted_at == "2026-09-10 12:00:00 UTC"
+
+    # Verify metadata flag is recorded
+    with store._get_connection() as c:
+        row = c.execute("SELECT value FROM metadata WHERE key = 'legacy_resolved_migrated'").fetchone()
+        assert row is not None and row["value"] == "1"
+
+    # Test Markdown merge protection: stale markdown with RESOLVED must not regress CLOSED bug
+    exporter = MarkdownBugExporter(repo_root=tmp_path)
+    base_db = BugDatabaseModel(bugs=[bug])
+    stale_md_db = BugDatabaseModel(
+        bugs=[
+            BugReportModel(
+                id="BUG-SEED-001",
+                uuid="u-seed-1",
+                title="Legacy seed bug",
+                status=BugStatus.RESOLVED,
+                severity=BugSeverity.MEDIUM,
+                category=BugCategory.PCB,
+                resolved_at="2026-09-10 12:00:00 UTC",
+                accepted_at=None,
+            )
+        ]
+    )
+    merged = exporter.merge_databases(base_db, stale_md_db)
+    merged_bug = merged.get_bug("BUG-SEED-001")
+    assert merged_bug.status == BugStatus.CLOSED
+    assert merged_bug.accepted_at == "2026-09-10 12:00:00 UTC"
+
+
+def test_api_migrate_legacy_bugs(tmp_path: Path) -> None:
+    """Verify REST API endpoint POST /api/bugs/migrate_legacy."""
+    db_file = tmp_path / "api_test.sqlite"
+    server = BugReportServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=tmp_path,
+        sqlite_file=db_file,
+        bind_and_activate=True,
+    )
+
+    t = threading.Thread(target=server.serve_forever, daemon=True)
+    t.start()
+
+    try:
+        url = server.get_url()
+
+        # Add a legacy resolved bug directly to server database
+        server.database.bugs.append(
+            BugReportModel(
+                id="BUG-API-001",
+                title="API legacy bug",
+                status=BugStatus.RESOLVED,
+                severity=BugSeverity.LOW,
+                category=BugCategory.PCB,
+                resolved_at="2026-09-15 10:00:00 UTC",
+                accepted_at=None,
+            )
+        )
+        server.sqlite_store.save_database(server.database)
+
+        # POST /api/bugs/migrate_legacy
+        req = urllib.request.Request(
+            f"{url}/api/bugs/migrate_legacy",
+            data=json.dumps({"all": True}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "ok"
+            assert data["count"] >= 1
+            assert "BUG-API-001" in data["migrated_ids"]
+
+        migrated_bug = server.database.get_bug("BUG-API-001")
+        assert migrated_bug.status == BugStatus.CLOSED
+        assert migrated_bug.accepted_at == "2026-09-15 10:00:00 UTC"
+    finally:
+        server.server_close()
+        server.shutdown()
+        t.join(timeout=2.0)
+
+
+def test_bug_server_fast_incremental_save_regression(tmp_path: Path) -> None:
+    """Verify incremental dirty bug save and detached branch commits execute in sub-second time.
+
+    Guards against regression BUG-FEATHERED-CENTIPEDE-381 where saving took >10s due to
+    per-bug subprocess spawning across all historical bugs.
+    """
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init", "-b", "main"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "User"], cwd=repo_dir, check=True)
+    subprocess.run(["git", "config", "user.email", "user@workspace"], cwd=repo_dir, check=True)
+    (repo_dir / "README.md").write_text("# Test Repo\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=repo_dir, check=True)
+    subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=repo_dir, check=True, capture_output=True)
+
+    feedback_dir = repo_dir / "feedback"
+    feedback_dir.mkdir(parents=True, exist_ok=True)
+    db_file = repo_dir / "bugs.sqlite"
+
+    # Populate 50 test bugs
+    bugs = [
+        BugReportModel(
+            id=f"BUG-FAST-{i:03d}",
+            title=f"Fast Bug {i}",
+            status=BugStatus.OPEN,
+            severity=BugSeverity.LOW,
+            category=BugCategory.INFRASTRUCTURE,
+        )
+        for i in range(50)
+    ]
+    db = BugDatabaseModel(title="Bench DB", bugs=bugs)
+    store = SQLiteBugStore(db_path=db_file)
+    store.save_database(db)
+
+    server = BugReportServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        feedback_dir=feedback_dir,
+        sqlite_file=db_file,
+    )
+    # Initial full save
+    server.save_and_sync()
+
+    # Now modify one bug and test incremental dirty save performance
+    target_bug = server.database.get_bug("BUG-FAST-010")
+    target_bug.status = BugStatus.RESOLVED
+    target_bug.resolution_notes = "Fixed performance regression"
+
+    t0 = time.perf_counter()
+    server.save_and_sync(dirty_bug_ids=[target_bug.id])
+    elapsed = time.perf_counter() - t0
+
+    assert elapsed < 3.0, f"Incremental save took {elapsed:.2f}s, expected < 3.0s"
+
+    # Verify updated bug is saved in SQLite, markdown, and detached branch
+    reloaded_bug = server.sqlite_store.get_bug("BUG-FAST-010")
+    assert reloaded_bug is not None
+    assert reloaded_bug.status == BugStatus.RESOLVED
+    assert reloaded_bug.resolution_notes == "Fixed performance regression"
+
+    detached_store = DetachedBranchBugStore(repo_dir)
+    loaded_detached = detached_store.load_database()
+    assert loaded_detached is not None
+    detached_target = loaded_detached.get_bug("BUG-FAST-010")
+    assert detached_target is not None
+    assert detached_target.status == BugStatus.RESOLVED
+
+
+def test_dashboard_server_bug_lifecycle_api(tmp_path: Path) -> None:
+    """Verify DashboardServer REST endpoints for bug lifecycle: attach_commit, add_task, update_task, run_command, reject, accept."""
+    repo_dir = create_test_git_repo(tmp_path)
+    feedback_dir = repo_dir / "feedback"
+    feedback_dir.mkdir(parents=True, exist_ok=True)
+    db_file = repo_dir / "build" / "bugs.sqlite"
+    db_file.parent.mkdir(parents=True, exist_ok=True)
+
+    store = SQLiteBugStore(db_path=db_file)
+    test_bug = BugReportModel(
+        id="BUG-DASH-001",
+        title="Dashboard API Bug",
+        status=BugStatus.RESOLVED,
+        severity=BugSeverity.MEDIUM,
+        category=BugCategory.PCB,
+    )
+    store.save_bug(test_bug)
+
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    # Ensure bug_server loads from our sqlite db
+    server.bug_server.sqlite_file = db_file
+    server.bug_server.sqlite_store = store
+    server.bug_server.database.bugs = [test_bug]
+
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base_url = server.get_url()
+
+    try:
+        # 1. Attach commit
+        req = urllib.request.Request(
+            f"{base_url}/api/bugs/attach_commit",
+            data=json.dumps({"id": "BUG-DASH-001", "commit_id": "def5678"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "ok"
+            assert "def5678" in data["bug"]["commit_ids"]
+
+        # 2. Add review task
+        req = urllib.request.Request(
+            f"{base_url}/api/bugs/add_task",
+            data=json.dumps(
+                {
+                    "id": "BUG-DASH-001",
+                    "title": "Run echo test",
+                    "command": "echo 'Hello from dashboard task'",
+                }
+            ).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "ok"
+            tasks = data["bug"]["review_tasks"]
+            assert len(tasks) == 1
+            task_id = tasks[0]["id"]
+            assert tasks[0]["title"] == "Run echo test"
+
+        # 3. Update task status
+        req = urllib.request.Request(
+            f"{base_url}/api/bugs/update_task",
+            data=json.dumps(
+                {
+                    "id": "BUG-DASH-001",
+                    "task_id": task_id,
+                    "status": "COMPLETED",
+                }
+            ).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "ok"
+            assert data["bug"]["review_tasks"][0]["status"] == "COMPLETED"
+
+        # 4. Run task command
+        req = urllib.request.Request(
+            f"{base_url}/api/bugs/run_command",
+            data=json.dumps(
+                {
+                    "id": "BUG-DASH-001",
+                    "command": "echo 'Dashboard command demo output'",
+                }
+            ).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "ok"
+            assert "Dashboard command demo output" in data["stdout"]
+            assert data["exit_code"] == 0
+
+        # 5. Reject bug -> transitions RESOLVED to OPEN immediately (notes can be empty)
+        req = urllib.request.Request(
+            f"{base_url}/api/bugs/reject",
+            data=json.dumps({"id": "BUG-DASH-001", "notes": ""}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "ok"
+            assert data["bug"]["status"] == "OPEN"
+            assert data["bug"]["rejected_at"] is not None
+
+        # Re-resolve bug to test accept
+        bug_obj = server.bug_server.database.get_bug("BUG-DASH-001")
+        bug_obj.status = BugStatus.RESOLVED
+        server.bug_server.save_and_sync()
+
+        # 6. Accept bug -> transitions RESOLVED to CLOSED immediately without prompt notes
+        req = urllib.request.Request(
+            f"{base_url}/api/bugs/accept",
+            data=json.dumps({"id": "BUG-DASH-001", "notes": ""}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "ok"
+            assert data["bug"]["status"] == "CLOSED"
+            assert data["bug"]["accepted_at"] is not None
+
+    finally:
+        server.server_close()

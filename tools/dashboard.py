@@ -71,6 +71,7 @@ def parse_arguments(args: Optional[List[str]] = None) -> argparse.Namespace:
         "attach-commit",
         "add-task",
         "resolve-task",
+        "migrate-resolved-bugs",
         "add-comment",
         "resolve-comment",
         "set-verdict",
@@ -413,6 +414,23 @@ def parse_arguments(args: Optional[List[str]] = None) -> argparse.Namespace:
     )
     p_res_t.add_argument("--failed", action="store_true", help="Mark task as FAILED instead of COMPLETED.")
     p_res_t.add_argument("--notes", default="", help="Optional task execution notes.")
+
+    # migrate-resolved-bugs
+    p_mig = subparsers.add_parser(
+        "migrate-resolved-bugs",
+        help="Migrate legacy resolved bugs to CLOSED status.",
+    )
+    p_mig.add_argument("--dry-run", action="store_true", help="Preview bugs to be migrated without modifying database.")
+    p_mig.add_argument(
+        "--all", action="store_true", default=False, help="Migrate all RESOLVED bugs to CLOSED regardless of timestamp."
+    )
+    p_mig.add_argument(
+        "--before",
+        type=str,
+        default="2026-11-05 14:00:00 UTC",
+        help="Only migrate bugs resolved on or before this UTC timestamp.",
+    )
+    p_mig.add_argument("--exclude", type=str, default="", help="Comma-separated bug IDs to exclude from migration.")
 
     # add-comment
     p_add_c = subparsers.add_parser("add-comment", help="Quickly add a review comment.")
@@ -910,6 +928,7 @@ def main(cli_args: Optional[List[str]] = None) -> None:
             "attach-commit",
             "add-task",
             "resolve-task",
+            "migrate-resolved-bugs",
         )
         or getattr(args, "bugs", False)
         or getattr(args, "planned", False)
@@ -1060,7 +1079,7 @@ def main(cli_args: Optional[List[str]] = None) -> None:
                 description=args.description,
             )
             server.bug_server.database.add_or_update(bug)
-            server.bug_server.save_and_sync()
+            server.bug_server.save_and_sync(dirty_bug_ids=[bug.id])
             print(f"Registered bug [{bug.id}]: {bug.title} ({bug.severity.value})")
             return
         case "resolve-bug":
@@ -1076,7 +1095,7 @@ def main(cli_args: Optional[List[str]] = None) -> None:
             bug.resolved_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
             if getattr(args, "notes", ""):
                 bug.resolution_notes = args.notes
-            server.bug_server.save_and_sync()
+            server.bug_server.save_and_sync(dirty_bug_ids=[bug.id])
             print(f"Resolved bug [{bug.id}]: {bug.title}")
             return
         case "accept-bug":
@@ -1098,7 +1117,7 @@ def main(cli_args: Optional[List[str]] = None) -> None:
                 else:
                     bug.resolution_notes = f"**Acceptance Note**: {notes}"
             bug.updated_at = now_str
-            server.bug_server.save_and_sync()
+            server.bug_server.save_and_sync(dirty_bug_ids=[bug.id])
             print(f"Accepted and closed bug [{bug.id}]: {bug.title}")
             return
         case "reject-bug":
@@ -1120,7 +1139,7 @@ def main(cli_args: Optional[List[str]] = None) -> None:
             bug.rejected_at = now_str
             bug.rejection_notes = notes
             bug.updated_at = now_str
-            server.bug_server.save_and_sync()
+            server.bug_server.save_and_sync(dirty_bug_ids=[bug.id])
             print(f"Rejected bug [{bug.id}], returned to OPEN: {bug.title}")
             return
         case "attach-commit":
@@ -1139,7 +1158,7 @@ def main(cli_args: Optional[List[str]] = None) -> None:
             if cid not in bug.commit_ids:
                 bug.commit_ids.append(cid)
             bug.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-            server.bug_server.save_and_sync()
+            server.bug_server.save_and_sync(dirty_bug_ids=[bug.id])
             print(f"Attached commit {cid} to [{bug.id}]. Total attached: {len(bug.commit_ids)}")
             return
         case "add-task":
@@ -1159,7 +1178,7 @@ def main(cli_args: Optional[List[str]] = None) -> None:
             task = ReviewTaskModel(title=title, command=cmd)
             bug.review_tasks.append(task)
             bug.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-            server.bug_server.save_and_sync()
+            server.bug_server.save_and_sync(dirty_bug_ids=[bug.id])
             print(f"Added review task [{task.id}] to [{bug.id}]: {task.title}")
             return
         case "resolve-task":
@@ -1194,8 +1213,46 @@ def main(cli_args: Optional[List[str]] = None) -> None:
             if notes:
                 target_task.notes = notes
             bug.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-            server.bug_server.save_and_sync()
+            server.bug_server.save_and_sync(dirty_bug_ids=[bug.id])
             print(f"Updated task [{target_task.id}] on [{bug.id}] -> {target_task.status}")
+            return
+        case "migrate-resolved-bugs":
+            dry_run = getattr(args, "dry_run", False)
+            migrate_all = getattr(args, "all", False)
+            before_str = getattr(args, "before", None)
+            exclude_raw = getattr(args, "exclude", "")
+            exclude_ids = {x.strip().upper() for x in exclude_raw.split(",") if x.strip()}
+
+            candidates = []
+            for b in server.bug_server.database.bugs:
+                if b.status == BugStatus.RESOLVED and not b.accepted_at:
+                    if b.id.upper() in exclude_ids:
+                        continue
+                    if not migrate_all and before_str:
+                        check_ts = b.resolved_at or b.updated_at or b.created_at
+                        if check_ts and check_ts > before_str:
+                            continue
+                    candidates.append(b)
+
+            if dry_run:
+                print(f"\n[DRY-RUN] Found {len(candidates)} legacy resolved bug(s) to migrate to CLOSED:")
+                for b in candidates:
+                    print(f"  - [{b.id}] {b.title} (resolved: {b.resolved_at or b.created_at})")
+                print()
+                return
+
+            now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            migrated_count = 0
+            for b in candidates:
+                b.status = BugStatus.CLOSED
+                b.accepted_at = b.resolved_at or b.updated_at or b.created_at or now_str
+                b.updated_at = now_str
+                migrated_count += 1
+
+            if migrated_count > 0:
+                server.bug_server.save_and_sync(dirty_bug_ids=[b.id for b in candidates])
+
+            print(f"\nSuccessfully migrated {migrated_count} legacy resolved bug(s) to CLOSED status.\n")
             return
         case "add-comment":
             body = getattr(args, "comment_body", "") or getattr(args, "body", "")

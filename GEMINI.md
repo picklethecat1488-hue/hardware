@@ -118,7 +118,8 @@ Host anvil
   3. **Targeted Fix**: Implement the minimal necessary change strictly scoped to the defect.
   4. **Dedicated Regression Test**: Codify the reproduction into an active unit test asserting the correct invariant.
   5. **Verification**: Run pre-commit checks (`compileall`, `ruff`, and `pytest`) to verify 100% pass rate.
-  6. **Resolution & Commit**: Mark the bug resolved in `tools/dashboard.py` and commit the fix atomically before picking up the next task.
+  6. **Review Tasks & Functional Checklist**: When changing status to `RESOLVED`, populate the bug's review tasks and functional checklist (`review_tasks`) with concise, actionable verification steps and executable demonstration commands that verify the change from a user-experience perspective (such as a host CLI command e.g. `python tools/host.py cli ...`, interactive 3D visualizer e.g. `python tools/view.py ...`, or UI inspection). Do NOT use `pytest` commands as review verification tasks, as automated test suites are already run during pre-commit checks and CI; verification commands should demonstrate the actual behavioral outcome or visual fix in the user experience.
+  7. **Resolution, Linkage & Commit**: Mark the bug resolved (`python tools/dashboard.py resolve-bug --id <ID> --notes "<Summary>"`), attach the fix commit hash (`python tools/dashboard.py attach-commit --id <ID> --commit <hash>`), and commit atomically before picking up the next task.
 
 ### 5. User-Managed Code Review & Autonomous PR Prohibition
 * The assistant is strictly PROHIBITED from autonomously creating pull requests (`gh pr create`) or merging pull requests (`gh pr merge`). All pull request creation, peer code reviews, and PR merges MUST be performed manually by the user.

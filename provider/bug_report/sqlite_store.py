@@ -4,6 +4,7 @@ Provides robust, concurrent, atomic persistence for bug reports,
 reproduction steps, attachments, and tracker metadata using SQLite.
 """
 
+from collections.abc import Collection
 import contextlib
 import json
 from pathlib import Path
@@ -159,6 +160,77 @@ class SQLiteBugStore:
             conn.execute("UPDATE bugs SET uuid = ? WHERE id = ?", (str(uuid_pkg.uuid4()), r["id"]))
 
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_bugs_uuid ON bugs(uuid)")
+
+        # Check if legacy resolved bugs have been migrated to CLOSED
+        cursor = conn.execute("SELECT value FROM metadata WHERE key = 'legacy_resolved_migrated'")
+        migrated_row = cursor.fetchone()
+        if not migrated_row or migrated_row["value"] != "1":
+            conn.execute(
+                """
+                UPDATE bugs
+                SET status = 'CLOSED',
+                    accepted_at = COALESCE(NULLIF(resolved_at, ''), NULLIF(updated_at, ''), NULLIF(created_at, ''), CURRENT_TIMESTAMP)
+                WHERE status = 'RESOLVED'
+                  AND (accepted_at IS NULL OR accepted_at = '')
+                  AND (resolved_at IS NULL OR resolved_at = '' OR resolved_at < '2026-11-05 14:00:00 UTC')
+                """
+            )
+            conn.execute(
+                "INSERT INTO metadata (key, value) VALUES ('legacy_resolved_migrated', '1') "
+                "ON CONFLICT(key) DO UPDATE SET value = '1'"
+            )
+
+    def migrate_legacy_resolved(
+        self,
+        before_timestamp: Optional[str] = "2026-11-05 14:00:00 UTC",
+        migrate_all: bool = False,
+        exclude_ids: Optional[Collection[str]] = None,
+        dry_run: bool = False,
+    ) -> List[str]:
+        """Migrate legacy resolved bugs to CLOSED status with accepted_at populated.
+
+        Args:
+            before_timestamp: Cutoff timestamp (inclusive). Bugs resolved before this are migrated.
+                              Ignored if migrate_all is True.
+            migrate_all: If True, migrate all unaccepted RESOLVED bugs regardless of timestamp.
+            exclude_ids: Optional collection of bug IDs to skip.
+            dry_run: If True, return candidate IDs without modifying SQLite.
+
+        Returns:
+            List of migrated bug IDs.
+        """
+        exclude_set = {x.upper().strip() for x in (exclude_ids or []) if x.strip()}
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "SELECT id, resolved_at, updated_at, created_at FROM bugs "
+                "WHERE status = 'RESOLVED' AND (accepted_at IS NULL OR accepted_at = '')"
+            )
+            candidates = []
+            for row in cursor.fetchall():
+                b_id = row["id"]
+                if b_id.upper() in exclude_set:
+                    continue
+                res_at = row["resolved_at"]
+                if not migrate_all and before_timestamp:
+                    check_ts = res_at or row["updated_at"] or row["created_at"]
+                    if check_ts and check_ts > before_timestamp:
+                        continue
+                candidates.append((b_id, res_at or row["updated_at"] or row["created_at"]))
+
+            if dry_run or not candidates:
+                return [c[0] for c in candidates]
+
+            for b_id, acc_at in candidates:
+                conn.execute(
+                    "UPDATE bugs SET status = 'CLOSED', accepted_at = COALESCE(?, CURRENT_TIMESTAMP), "
+                    "updated_at = COALESCE(updated_at, CURRENT_TIMESTAMP) WHERE id = ?",
+                    (acc_at, b_id),
+                )
+            conn.execute(
+                "INSERT INTO metadata (key, value) VALUES ('legacy_resolved_migrated', '1') "
+                "ON CONFLICT(key) DO UPDATE SET value = '1'"
+            )
+            return [c[0] for c in candidates]
 
     def load_database(self) -> BugDatabaseModel:
         """Load full bug database model from SQLite.

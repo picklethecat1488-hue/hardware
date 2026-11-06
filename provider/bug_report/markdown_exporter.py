@@ -5,6 +5,7 @@ into a clean GitHub-flavored Markdown document (build/BUGS.md) with overview met
 action checklists, and embedded references.
 """
 
+from collections.abc import Collection
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -53,6 +54,7 @@ class MarkdownBugExporter:
         output_path: Path,
         store: Optional[Any] = None,
         feedback_dir: Optional[Path] = None,
+        dirty_bug_ids: Optional[Collection[str]] = None,
     ) -> Path:
         """Generate and save BUGS.md markdown document and individual BUG_<id>.md files.
 
@@ -61,6 +63,8 @@ class MarkdownBugExporter:
             output_path: Destination path for BUGS.md file.
             store: Optional SQLiteBugStore to synchronize duplicate ID updates.
             feedback_dir: Optional destination directory for individual BUG_<id>.md files.
+            dirty_bug_ids: Optional collection of bug IDs that were modified. If provided,
+                only individual files for these bugs are updated.
 
         Returns:
             Resolved Path where markdown was saved.
@@ -96,7 +100,13 @@ class MarkdownBugExporter:
         target_feedback_dir = feedback_dir or (
             output_path.parent if output_path.parent.name != "build" else (self.repo_root / "feedback")
         )
-        self.export_all_individual_bugs(database, target_feedback_dir)
+        if dirty_bug_ids is not None:
+            dirty_set = set(dirty_bug_ids)
+            for bug in database.bugs:
+                if bug.id in dirty_set:
+                    self.export_individual_bug(bug, target_feedback_dir)
+        else:
+            self.export_all_individual_bugs(database, target_feedback_dir)
 
         return output_path
 
@@ -641,6 +651,9 @@ class MarkdownBugExporter:
                     and not (md_bug.rejection_notes and md_bug.rejection_notes.strip())
                     and not md_bug.resolution_notes.strip()
                 ):
+                    pass
+                elif existing.status == BugStatus.CLOSED and md_bug.status == BugStatus.RESOLVED:
+                    # Bug was already accepted/closed in database; protect from stale markdown without acceptance
                     pass
                 elif md_bug.status != existing.status:
                     existing.status = md_bug.status
@@ -1204,6 +1217,9 @@ class MarkdownBugExporter:
                     and not (md_bug.rejection_notes and md_bug.rejection_notes.strip())
                     and not md_bug.resolution_notes.strip()
                 ):
+                    pass
+                elif existing_by_uuid.status == BugStatus.CLOSED and md_bug.status == BugStatus.RESOLVED:
+                    # Bug was already accepted/closed in database; do not regress to RESOLVED from stale markdown
                     pass
                 else:
                     database.add_or_update(md_bug)
