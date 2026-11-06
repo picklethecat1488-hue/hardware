@@ -8713,29 +8713,29 @@
       "attachments": [
         {
           "id": "att-4",
-          "filename": "carrier_board_bom_rev3.csv",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
           "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
           "size_bytes": 0,
-          "description": "CSV export of clean EDA BOM Rev 3",
+          "description": "Legacy Excel 97-2004 format of replied quotation BOM",
           "created_at": ""
         },
         {
           "id": "att-5",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
+          "filename": "digikey_order_2026-10-14.xlsx",
           "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx",
           "size_bytes": 0,
-          "description": "Uploaded reference questions spreadsheet from PCBWay",
+          "description": "Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2)",
           "created_at": ""
         },
         {
           "id": "att-6",
-          "filename": "carrier_board_bom_rev3.xlsx",
+          "filename": "carrier_board_bom_rev2.csv",
           "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv",
           "size_bytes": 0,
-          "description": "Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM)",
+          "description": "CSV export of clean EDA BOM",
           "created_at": ""
         },
         {
@@ -8757,30 +8757,30 @@
           "created_at": ""
         },
         {
+          "id": "att-1",
+          "filename": "carrier_board_bom_rev3.csv",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv",
+          "size_bytes": 0,
+          "description": "CSV export of clean EDA BOM Rev 3",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
+          "size_bytes": 0,
+          "description": "Uploaded reference questions spreadsheet from PCBWay",
+          "created_at": ""
+        },
+        {
           "id": "att-3",
-          "filename": "carrier_board_bom_rev2.csv",
+          "filename": "carrier_board_bom_rev3.xlsx",
           "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
           "size_bytes": 0,
-          "description": "CSV export of clean EDA BOM",
-          "created_at": ""
-        },
-        {
-          "id": "att-4",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
-          "size_bytes": 0,
-          "description": "Legacy Excel 97-2004 format of replied quotation BOM",
-          "created_at": ""
-        },
-        {
-          "id": "att-5",
-          "filename": "digikey_order_2026-10-14.xlsx",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx",
-          "size_bytes": 0,
-          "description": "Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2)",
+          "description": "Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM)",
           "created_at": ""
         }
       ],
@@ -9331,6 +9331,15 @@
       "attachments": [
         {
           "id": "att-3",
+          "filename": "screenshot_paste_1793924149979_7f535.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1793924149979_7f535.png",
+          "created_at": ""
+        },
+        {
+          "id": "att-1",
           "filename": "screenshot_paste_1793890911006_wvg54.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png",
@@ -9339,21 +9348,12 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-2",
           "filename": "screenshot_paste_1793890876309_0c9ae.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png",
           "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793890876309_0c9ae.png",
-          "created_at": ""
-        },
-        {
-          "id": "att-2",
-          "filename": "screenshot_paste_1793924149979_7f535.png",
-          "file_type": "screenshot",
-          "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png",
-          "size_bytes": 0,
-          "description": "Pasted screenshot screenshot_paste_1793924149979_7f535.png",
           "created_at": ""
         }
       ],
@@ -9522,20 +9522,20 @@
       "attachments": [
         {
           "id": "att-2",
-          "filename": "screenshot_paste_1793947358948_g28nw.png",
-          "file_type": "screenshot",
-          "file_path": "attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793947358948_g28nw.png",
-          "size_bytes": 0,
-          "description": "Pasted screenshot screenshot_paste_1793947358948_g28nw.png",
-          "created_at": ""
-        },
-        {
-          "id": "att-1",
           "filename": "screenshot_paste_1793948449522_d1ck8.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793948449522_d1ck8.png",
           "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793948449522_d1ck8.png",
+          "created_at": ""
+        },
+        {
+          "id": "att-1",
+          "filename": "screenshot_paste_1793947358948_g28nw.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793947358948_g28nw.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1793947358948_g28nw.png",
           "created_at": ""
         }
       ],
@@ -9630,7 +9630,7 @@
         }
       ],
       "created_at": "2026-11-06 06:45:37 UTC",
-      "updated_at": "2026-11-06 14:12:20 UTC",
+      "updated_at": "",
       "resolved_at": "2026-11-06 14:12:02 UTC",
       "resolution_notes": "Added delayed (>1s) action progress modal with live elapsed timer to dashboard and bug workstation, and optimized incremental attachment indexing.",
       "rejection_notes": "",
@@ -9652,9 +9652,17 @@
       "logs": "",
       "attachments": [],
       "commit_ids": [],
-      "review_tasks": [],
+      "review_tasks": [
+        {
+          "id": "bc4c6346",
+          "title": "Verify AGENTS.md exists at repository root",
+          "command": "ls -la AGENTS.md",
+          "status": "PENDING",
+          "notes": ""
+        }
+      ],
       "created_at": "2026-11-06 06:54:27 UTC",
-      "updated_at": "",
+      "updated_at": "2026-11-06 14:14:36 UTC",
       "resolved_at": null,
       "resolution_notes": "",
       "rejection_notes": "",
@@ -9662,5 +9670,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 14:12:20 UTC"
+  "updated_at": "2026-11-06 14:14:36 UTC"
 }

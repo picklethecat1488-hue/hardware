@@ -10,3 +10,7 @@
 #### Description
 
 Ensure the default rules file for bots is named AGENTS.md across all repos.
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:bc4c6346 --> Verify AGENTS.md exists at repository root | `ls -la AGENTS.md`
