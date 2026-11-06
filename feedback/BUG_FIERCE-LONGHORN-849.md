@@ -2,12 +2,13 @@
 
 - **UUID**: `04ef79bc-f57b-442f-8969-9dba1c94909f`
 - **ID**: `BUG-FIERCE-LONGHORN-849`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-06 06:40:24 UTC`
 - **Resolved**: `2026-11-06 23:53:00 UTC`
+- **Accepted**: `2026-11-06 23:53:02 UTC`
 - **Rejected**: `2026-11-06 17:19:39 UTC`
 
 #### Description
