@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 06:54:21 UTC` |
-| **Total Issues** | `318` |
-| **Open Issues** | `3` |
-| **Resolved / Closed** | `315 (99%)` |
+| **Report Date** | `2026-11-06 06:54:29 UTC` |
+| **Total Issues** | `319` |
+| **Open Issues** | `4` |
+| **Resolved / Closed** | `315 (98%)` |
 
 ## Issues by Severity
 
@@ -17,14 +17,14 @@
 | :--- | :---: | :--- |
 | **`[CRITICAL]`** | 20 | System crashes, build failures, blockages, or electrical shorts. |
 | **`[HIGH]`** | 31 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
-| **`[MEDIUM]`** | 238 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
+| **`[MEDIUM]`** | 239 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
 | **`[LOW]`** | 29 | Minor aesthetic imperfections or documentation notes. |
 
 ## Issues by Category
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 170 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`PCB`** | 171 | Schematics, routing, footprints, nets, DRC, silkscreen. |
 | **`CAD`** | 39 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 11 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
 | **`INFRASTRUCTURE`** | 85 | Build tooling, compilers, test runners, headless tools. |
@@ -350,6 +350,7 @@
 - [ ] **`[MEDIUM]`** [#BUG-FIERCE-LONGHORN-849](#bug-fierce-longhorn-849): SWD and TMC6300 mounts- unsufficient snap ring overlap `[cat_fountain]` (`OPEN`)
 - [ ] **`[MEDIUM]`** [#BUG-SHINING-SILVERFISH-89](#bug-shining-silverfish-89): Attachments show up in the diff view `[dashboard]` (`OPEN`)
 - [ ] **`[MEDIUM]`** [#BUG-BRISTLY-CENTIPEDE-327](#bug-bristly-centipede-327): Add modal progress UIs for repo and bug actions `[dashboard]` (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-LUSTROUS-HORSEFLY-593](#bug-lustrous-horsefly-593): New Bug Report (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -28367,5 +28368,15 @@ Attachment LFS changes show up in the diff view. Can we ensure that attachments 
 #### Description
 
 Repo actions like sync, and bug actions like saving, approving or rejecting, and creating bugs now take sufficiently long that I think we need a modal UI to show action status, similar to the UI used for creating PRs. Can we do some profiling of repo and bug actions, optimize if needed, and add modal progress UIs for actions that take sufficiently long (>1s)? The UIs should be hidden automatically after the action completes, and only show if the action is taking a long time. We can also make this change to the sync action to make all actions behave uniformly.
+
+---
+
+### <a id="bug-lustrous-horsefly-593"></a> 🔴 `[BUG-LUSTROUS-HORSEFLY-593]` New Bug Report
+
+- **UUID**: `3df722a8-04f9-4547-a81c-1da2e14017ef`
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-11-06 06:54:27 UTC`
 
 ---
