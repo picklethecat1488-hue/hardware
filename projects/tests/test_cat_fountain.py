@@ -1890,12 +1890,15 @@ class TestCatFountainProvider:
             f"Expected motor_driver_spacing_y to be 15.24mm (0.60 in width), got {provider.settings.motor_driver_spacing_y}"
         )
 
-        # 2. Check wiring.yaml footprint dimensions and absence of screw mounting holes
+        # 2. Check wiring.yaml footprint dimensions, rotation, and absence of screw mounting holes
         yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
         wiring = Wiring(yaml_path)
         driver = next(f for f in wiring.footprints if f.name == "motor_driver")
         assert tuple(driver.dimensions) == (20.32, 15.24, 1.6), (
             f"Expected TMC6300 board dimensions [20.32, 15.24, 1.6], got {driver.dimensions}"
+        )
+        assert tuple(driver.rotation) == (0.0, 0.0, 90.0), (
+            f"Expected TMC6300 rotation [0.0, 0.0, 90.0] for clip socket alignment, got {driver.rotation}"
         )
         assert driver.mounting_holes is None, (
             "SparkFun TMC6300 breakout has no screw mounting holes per official dimensions PDF"
@@ -2050,6 +2053,9 @@ class TestCatFountainProvider:
         swd_fp = next((f for f in wiring.footprints if f.name == "swd_adapter"), None)
         assert swd_fp is not None, "swd_adapter footprint must exist in wiring.yaml"
         assert tuple(swd_fp.dimensions) == (19.1, 13.7, 1.6)
+        assert tuple(swd_fp.rotation) == (0.0, 0.0, 90.0), (
+            f"Expected SWD adapter rotation [0.0, 0.0, 90.0] for clip socket alignment, got {swd_fp.rotation}"
+        )
 
         # 3. Bowl CAD model contains clip guide for SWD board
         bowl = provider.build_bowl("bowl")
