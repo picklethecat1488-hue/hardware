@@ -2422,12 +2422,12 @@ class TestCatFountainProvider:
             "PCB groove must be open for board length"
         )
 
-        # At the ceiling stop shelf (Z = base_z - 1.0): positive overlap of (margin/2 = 0.2mm)
-        # Point just inside board edge (swd_span/2 - 0.1) should be inside solid stop shelf
-        assert solid.is_inside((cx + swd_span / 2.0 - 0.1, cy, base_z - 1.0)), (
+        # At the ceiling stop shelf (Z = base_z - 1.0 outside tool opening): positive overlap of (margin/2 = 0.2mm)
+        # Point just inside board edge (swd_span/2 - 0.1) outside tool hole should be inside solid stop shelf
+        assert solid.is_inside((cx + swd_span / 2.0 - 0.1, cy + 5.0, base_z - 1.0)), (
             "Top stop shelf must overlap SWD PCB edge"
         )
-        assert solid.is_inside((cx, cy + swd_slide / 2.0 - 0.1, base_z - 1.0)), (
+        assert solid.is_inside((cx + 4.0, cy + swd_slide / 2.0 - 0.1, base_z - 1.0)), (
             "Top stop shelf must overlap SWD PCB edge"
         )
 
@@ -2458,11 +2458,11 @@ class TestCatFountainProvider:
             "PCB groove must be open for TMC6300 length"
         )
 
-        # At the ceiling stop shelf (Z = base_z - 2.0): positive overlap
-        assert solid.is_inside((mcx + tmc_span / 2.0 - 0.1, mcy, base_z - 2.0)), (
+        # At the ceiling stop shelf (Z = base_z - 2.0 outside tool opening): positive overlap
+        assert solid.is_inside((mcx + tmc_span / 2.0 - 0.1, mcy + 5.0, base_z - 2.0)), (
             "Top stop shelf must overlap TMC6300 PCB edge"
         )
-        assert solid.is_inside((mcx, mcy + tmc_slide / 2.0 - 0.1, base_z - 2.0)), (
+        assert solid.is_inside((mcx + 4.0, mcy + tmc_slide / 2.0 - 0.1, base_z - 2.0)), (
             "Top stop shelf must overlap TMC6300 PCB edge"
         )
 
@@ -2472,4 +2472,49 @@ class TestCatFountainProvider:
         )
         assert solid.is_inside((mcx, mcy + tmc_slide / 2.0 - 0.1, base_z - 5.8)), (
             "Bottom retaining lip must overlap TMC6300 PCB edge"
+        )
+
+        # 3. Tool removal openings on each wall beneath the PCB (BUG-FIERCE-LONGHORN-849)
+        # Apertures must penetrate through the walls into the standoff space beneath the board
+        assert provider.settings.pcb_snap_socket_tool_hole_width >= 4.0
+        assert provider.settings.pcb_snap_socket_tool_hole_height >= 1.5
+
+        tool_h = provider.settings.pcb_snap_socket_tool_hole_height
+        wall_t = 2.0
+        opening_z = base_z - tool_h / 2.0
+
+        # Check through-openings on all 4 walls of TMC6300 socket
+        assert not solid.is_inside((mcx + tmc_span / 2.0 + wall_t / 2.0, mcy, opening_z)), (
+            "+X wall tool hole must penetrate outer wall"
+        )
+        assert not solid.is_inside((mcx - tmc_span / 2.0 - wall_t / 2.0, mcy, opening_z)), (
+            "-X wall tool hole must penetrate outer wall"
+        )
+        assert not solid.is_inside((mcx, mcy + tmc_slide / 2.0 + wall_t / 2.0, opening_z)), (
+            "+Y wall tool hole must penetrate outer wall"
+        )
+        assert not solid.is_inside((mcx, mcy - tmc_slide / 2.0 - wall_t / 2.0, opening_z)), (
+            "-Y wall tool hole must penetrate outer wall"
+        )
+
+        # Check through-openings on all 4 walls of SWD socket
+        assert not solid.is_inside((cx + swd_span / 2.0 + wall_t / 2.0, cy, opening_z)), (
+            "+X wall tool hole on SWD must penetrate outer wall"
+        )
+        assert not solid.is_inside((cx - swd_span / 2.0 - wall_t / 2.0, cy, opening_z)), (
+            "-X wall tool hole on SWD must penetrate outer wall"
+        )
+        assert not solid.is_inside((cx, cy + swd_slide / 2.0 + wall_t / 2.0, opening_z)), (
+            "+Y wall tool hole on SWD must penetrate outer wall"
+        )
+        assert not solid.is_inside((cx, cy - swd_slide / 2.0 - wall_t / 2.0, opening_z)), (
+            "-Y wall tool hole on SWD must penetrate outer wall"
+        )
+
+        # Verify corner posts remain solid for structural rigidity
+        assert solid.is_inside(
+            (mcx + tmc_span / 2.0 + wall_t / 2.0, mcy + tmc_slide / 2.0 + wall_t / 2.0, opening_z)
+        ), "TMC6300 corner post must remain solid"
+        assert solid.is_inside((cx + swd_span / 2.0 + wall_t / 2.0, cy + swd_slide / 2.0 + wall_t / 2.0, opening_z)), (
+            "SWD corner post must remain solid"
         )

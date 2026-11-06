@@ -733,6 +733,16 @@ class CatFountainConfig(BaseModel):
         """Return the margin reduction for hole-less PCB snap sockets (0.1mm - 0.5mm)."""
         return float(self._raw_data.get("pcb_snap_socket_cutout_margin", 0.4))
 
+    @cached_property
+    def pcb_snap_socket_tool_hole_width(self) -> float:
+        """Return the width of tool insertion openings on snap socket walls for board removal."""
+        return float(self._raw_data.get("pcb_snap_socket_tool_hole_width", 6.0))
+
+    @cached_property
+    def pcb_snap_socket_tool_hole_height(self) -> float:
+        """Return the height of tool insertion openings on snap socket walls for board removal."""
+        return float(self._raw_data.get("pcb_snap_socket_tool_hole_height", 2.0))
+
     # Drain Shroud & Trimmer
     @cached_property
     def drain_shroud_radius(self) -> float:

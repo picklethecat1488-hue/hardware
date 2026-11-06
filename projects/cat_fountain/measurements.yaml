@@ -182,6 +182,8 @@ swd_board_standoff_height: 2.0
 
 # Snap-Fit PCB Sockets
 pcb_snap_socket_cutout_margin: 0.4
+pcb_snap_socket_tool_hole_width: 6.0
+pcb_snap_socket_tool_hole_height: 2.0
 
 # ==========================================
 # 10. Magnetic Centrifugal Pump Redesign

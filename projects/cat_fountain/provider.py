@@ -444,6 +444,26 @@ class CatFountainProvider(Provider):
                             mode=Mode.SUBTRACT,
                         )
 
+                    # 5. Tool removal openings on each wall beneath the PCB (BUG-FIERCE-LONGHORN-849)
+                    # Allows inserting a tool (e.g. Allen wrench) under the board from any of the 4 sides to pop it out
+                    tool_hole_w = self.settings.pcb_snap_socket_tool_hole_width
+                    tool_hole_h = self.settings.pcb_snap_socket_tool_hole_height
+                    with Locations((0, 0, -tool_hole_h / 2.0)):
+                        Box(
+                            outer_x + 2.0,
+                            tool_hole_w,
+                            tool_hole_h,
+                            align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                            mode=Mode.SUBTRACT,
+                        )
+                        Box(
+                            tool_hole_w,
+                            outer_y + 2.0,
+                            tool_hole_h,
+                            align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                            mode=Mode.SUBTRACT,
+                        )
+
                 # Add engraved label (move to opposite side of board to avoid proximity to CURRENT)
                 label_y_offset = board_slide / 2.0 + 5.0
                 if center_y + label_y_offset > r - t - 10.0:
