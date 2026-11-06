@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 04:58:15 UTC` |
+| **Report Date** | `2026-11-06 04:58:16 UTC` |
 | **Total Issues** | `3` |
 | **Open Issues** | `1` |
 | **Resolved / Closed** | `2 (66%)` |
@@ -34,7 +34,7 @@
 
 - [ ] **`[LOW]`** [#BUG-OPEN-003](#bug-open-003): Open defect (`OPEN`)
 - [x] **`[MEDIUM]`** [#BUG-LEGACY-001](#bug-legacy-001): Legacy resolved bug (`CLOSED`)
-- [x] **`[HIGH]`** [#BUG-RECENT-002](#bug-recent-002): Recently resolved bug awaiting review (`RESOLVED`)
+- [x] **`[HIGH]`** [#BUG-RECENT-002](#bug-recent-002): Recently resolved bug awaiting review (`CLOSED`)
 
 ## Detailed Issue Log
 
@@ -62,10 +62,11 @@
 ### <a id="bug-recent-002"></a> 🟢 `[BUG-RECENT-002]` Recently resolved bug awaiting review
 
 - **UUID**: `54dae19b-5fe1-49d4-8860-7e52a2eaca62`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `CAD`
 - **Created**: `2026-11-05 14:15:00 UTC`
 - **Resolved**: `2026-11-05 14:20:00 UTC`
+- **Accepted**: `2026-11-05 14:20:00 UTC`
 
 ---
