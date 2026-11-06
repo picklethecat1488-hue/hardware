@@ -2950,22 +2950,6 @@
         }
       });
     }
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({})
-        });
-        const res = await resp.json();
-        if (spinner) spinner.style.display = "none";
-        if (res.status === "ok") {
-          showToast(res.message || "Rebase completed.");
-          setTimeout(() => location.reload(), 1000);
-        } else {
-          showToast("Rebase failed: " + (res.message || "Unknown error"), 5000);
-        }
-      } catch (err) {
-        if (spinner) spinner.style.display = "none";
-        showToast("Rebase failed: " + err, 5000);
-      }
-    }
 
     // Branch Selection & Formatting (BUG-197, BUG-221)
     const branchData = [
