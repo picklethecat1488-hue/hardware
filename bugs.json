@@ -8713,42 +8713,6 @@
       "attachments": [
         {
           "id": "att-4",
-          "filename": "digikey_order_2026-10-14.xlsx",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx",
-          "size_bytes": 0,
-          "description": "Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2)",
-          "created_at": ""
-        },
-        {
-          "id": "att-5",
-          "filename": "carrier_board_bom_rev3.csv",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv",
-          "size_bytes": 0,
-          "description": "CSV export of clean EDA BOM Rev 3",
-          "created_at": ""
-        },
-        {
-          "id": "att-6",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
-          "size_bytes": 0,
-          "description": "Uploaded reference questions spreadsheet from PCBWay",
-          "created_at": ""
-        },
-        {
-          "id": "att-7",
-          "filename": "carrier_board_bom_rev3.xlsx",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
-          "size_bytes": 0,
-          "description": "Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM)",
-          "created_at": ""
-        },
-        {
-          "id": "att-8",
           "filename": "carrier_board_bom_rev2.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
@@ -8757,16 +8721,7 @@
           "created_at": ""
         },
         {
-          "id": "att-3",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
-          "size_bytes": 0,
-          "description": "Legacy Excel 97-2004 format of replied quotation BOM",
-          "created_at": ""
-        },
-        {
-          "id": "att-4",
+          "id": "att-5",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
@@ -8775,12 +8730,57 @@
           "created_at": ""
         },
         {
-          "id": "att-5",
+          "id": "att-6",
           "filename": "carrier_board_bom_rev2.csv",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv",
           "size_bytes": 0,
           "description": "CSV export of clean EDA BOM",
+          "created_at": ""
+        },
+        {
+          "id": "att-7",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
+          "size_bytes": 0,
+          "description": "Uploaded reference questions spreadsheet from PCBWay",
+          "created_at": ""
+        },
+        {
+          "id": "att-8",
+          "filename": "carrier_board_bom_rev3.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
+          "size_bytes": 0,
+          "description": "Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM)",
+          "created_at": ""
+        },
+        {
+          "id": "att-1",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
+          "size_bytes": 0,
+          "description": "Legacy Excel 97-2004 format of replied quotation BOM",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "digikey_order_2026-10-14.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx",
+          "size_bytes": 0,
+          "description": "Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2)",
+          "created_at": ""
+        },
+        {
+          "id": "att-3",
+          "filename": "carrier_board_bom_rev3.csv",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv",
+          "size_bytes": 0,
+          "description": "CSV export of clean EDA BOM Rev 3",
           "created_at": ""
         }
       ],
@@ -9331,15 +9331,6 @@
       "attachments": [
         {
           "id": "att-3",
-          "filename": "screenshot_paste_1793924149979_7f535.png",
-          "file_type": "screenshot",
-          "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png",
-          "size_bytes": 0,
-          "description": "Pasted screenshot screenshot_paste_1793924149979_7f535.png",
-          "created_at": ""
-        },
-        {
-          "id": "att-1",
           "filename": "screenshot_paste_1793890911006_wvg54.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png",
@@ -9348,12 +9339,21 @@
           "created_at": ""
         },
         {
-          "id": "att-2",
+          "id": "att-1",
           "filename": "screenshot_paste_1793890876309_0c9ae.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png",
           "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793890876309_0c9ae.png",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "screenshot_paste_1793924149979_7f535.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1793924149979_7f535.png",
           "created_at": ""
         }
       ],
@@ -9522,20 +9522,20 @@
       "attachments": [
         {
           "id": "att-2",
-          "filename": "screenshot_paste_1793947358948_g28nw.png",
-          "file_type": "screenshot",
-          "file_path": "attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793947358948_g28nw.png",
-          "size_bytes": 0,
-          "description": "Pasted screenshot screenshot_paste_1793947358948_g28nw.png",
-          "created_at": ""
-        },
-        {
-          "id": "att-1",
           "filename": "screenshot_paste_1793948449522_d1ck8.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793948449522_d1ck8.png",
           "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793948449522_d1ck8.png",
+          "created_at": ""
+        },
+        {
+          "id": "att-1",
+          "filename": "screenshot_paste_1793947358948_g28nw.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793947358948_g28nw.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1793947358948_g28nw.png",
           "created_at": ""
         }
       ],
@@ -9560,7 +9560,7 @@
         }
       ],
       "created_at": "2026-11-06 06:40:24 UTC",
-      "updated_at": "",
+      "updated_at": "2026-11-06 17:19:39 UTC",
       "resolved_at": "2026-11-06 20:35:10 UTC",
       "resolution_notes": "Added 6x2mm tool removal apertures on each wall beneath PCB for easy board extraction with an Allen wrench",
       "rejection_notes": "Configured pcb_snap_socket_cutout_margin to 0.4mm for positive snap ring overlap holding SWD and TMC6300 boards\n\nRejected— the side openings for inserting a board removal tool into the mount are missing from the design.",
@@ -9604,7 +9604,7 @@
         }
       ],
       "created_at": "2026-11-06 06:44:04 UTC",
-      "updated_at": "",
+      "updated_at": "2026-11-06 17:17:38 UTC",
       "resolved_at": "2026-11-06 17:17:35 UTC",
       "resolution_notes": "Decoupled attachments to dedicated refs/heads/bugs detached branch, added attachments to .gitignore, hid attachments from git_engine diff view, and added checkout_attachments restoration.",
       "rejection_notes": "",
@@ -9638,7 +9638,7 @@
         }
       ],
       "created_at": "2026-11-06 06:45:37 UTC",
-      "updated_at": "",
+      "updated_at": "2026-11-06 17:13:22 UTC",
       "resolved_at": "2026-11-06 17:13:20 UTC",
       "resolution_notes": "Added delayed (>1s) action progress modal with live elapsed timer to dashboard and bug workstation, and optimized incremental attachment indexing.",
       "rejection_notes": "",
@@ -9672,7 +9672,7 @@
         }
       ],
       "created_at": "2026-11-06 06:54:27 UTC",
-      "updated_at": "",
+      "updated_at": "2026-11-06 17:13:15 UTC",
       "resolved_at": "2026-11-06 17:13:12 UTC",
       "resolution_notes": "Renamed GEMINI.md to AGENTS.md and updated all documentation and test references across hardware and firmware.",
       "rejection_notes": "",
@@ -9687,20 +9687,20 @@
       "severity": "MEDIUM",
       "category": "INFRASTRUCTURE",
       "component": "dashboard",
-      "description": "Opening a commit in the bug report station doesn’t go to the code review window directly, instead it opens up a website to the toplevel VCS UI with only the working tree selected. Additionally, there is no way to go back to the bug report station when finished reviewing (there is no back button in the toolbar).",
+      "description": "Opening a commit in the bug report station doesn’t go to the code review window directly, instead it opens up a website to the toplevel VCS UI with only the working tree selected. Additionally, there is no way to go back to the bug report station when finished reviewing (there is no back button in the toolbar). ",
       "reproduction_steps": [],
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
       "attachments": [
         {
-          "id": "att-1",
+          "id": "bb594939",
           "filename": "screenshot_paste_1793985363740_q9986.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-DIURNAL-ANT-667/screenshot_paste_1793985363740_q9986.png",
-          "size_bytes": 0,
+          "size_bytes": 132268,
           "description": "Pasted screenshot screenshot_paste_1793985363740_q9986.png",
-          "created_at": ""
+          "created_at": "2026-11-06 17:16:03 UTC"
         }
       ],
       "commit_ids": [
@@ -9716,13 +9716,13 @@
         }
       ],
       "created_at": "2026-11-06 17:15:23 UTC",
-      "updated_at": "2026-11-06 20:42:29 UTC",
+      "updated_at": "2026-11-06 17:17:11 UTC",
       "resolved_at": "2026-11-06 20:42:14 UTC",
       "resolution_notes": "Attached commits in Bug Report now navigate directly to Code Review for that commit, and Code Review provides toolbar and header buttons to return to the Bug Report workstation",
-      "rejection_notes": "",
+      "rejection_notes": null,
       "accepted_at": null,
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 20:42:29 UTC"
+  "updated_at": "2026-11-06 23:50:36 UTC"
 }
