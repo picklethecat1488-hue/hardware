@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 14:14:37 UTC` |
+| **Report Date** | `2026-11-06 14:14:48 UTC` |
 | **Total Issues** | `319` |
-| **Open Issues** | `1` |
-| **Resolved / Closed** | `318 (99%)` |
+| **Open Issues** | `0` |
+| **Resolved / Closed** | `319 (100%)` |
 
 ## Issues by Severity
 
@@ -350,7 +350,7 @@
 - [x] **`[MEDIUM]`** [#BUG-FIERCE-LONGHORN-849](#bug-fierce-longhorn-849): SWD and TMC6300 mounts- unsufficient snap ring overlap `[cat_fountain]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-SHINING-SILVERFISH-89](#bug-shining-silverfish-89): Attachments show up in the diff view `[dashboard]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-BRISTLY-CENTIPEDE-327](#bug-bristly-centipede-327): Add modal progress UIs for repo and bug actions `[dashboard]` (`RESOLVED`)
-- [ ] **`[MEDIUM]`** [#BUG-LUSTROUS-HORSEFLY-593](#bug-lustrous-horsefly-593): Rename GEMINI.md to AGENTS.md (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-LUSTROUS-HORSEFLY-593](#bug-lustrous-horsefly-593): Rename GEMINI.md to AGENTS.md (`RESOLVED`)
 
 ## Detailed Issue Log
 
@@ -28413,13 +28413,14 @@ Added delayed (>1s) action progress modal with live elapsed timer to dashboard a
 
 ---
 
-### <a id="bug-lustrous-horsefly-593"></a> 🔴 `[BUG-LUSTROUS-HORSEFLY-593]` Rename GEMINI.md to AGENTS.md
+### <a id="bug-lustrous-horsefly-593"></a> 🟢 `[BUG-LUSTROUS-HORSEFLY-593]` Rename GEMINI.md to AGENTS.md
 
 - **UUID**: `3df722a8-04f9-4547-a81c-1da2e14017ef`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `GENERAL`
 - **Created**: `2026-11-06 06:54:27 UTC`
+- **Resolved**: `2026-11-06 14:14:47 UTC`
 
 #### Description
 
@@ -28428,5 +28429,9 @@ Ensure the default rules file for bots is named AGENTS.md across all repos.
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:bc4c6346 --> Verify AGENTS.md exists at repository root | `ls -la AGENTS.md`
+
+#### Resolution Notes
+
+Renamed GEMINI.md to AGENTS.md and updated all documentation and test references across hardware and firmware.
 
 ---
