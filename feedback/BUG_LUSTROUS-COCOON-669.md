@@ -38,3 +38,5 @@ Defects circled in red.
 #### Resolution Notes
 
 Simplify motor base to a circle unioned with a hall sensor mounting rectangle fitting into socket wall keyway gap; ensure 3 mounting holes on bottom; remove latent south slide cut and extra box above hall sensor in bowl.
+
+—There are thin walls under the cutout for the hall sensor. Can you fix?

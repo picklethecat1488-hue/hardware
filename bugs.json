@@ -9370,9 +9370,9 @@
         }
       ],
       "created_at": "2026-11-05 14:54:50 UTC",
-      "updated_at": "2026-11-06 00:17:04 UTC",
+      "updated_at": "2026-11-06 00:17:30 UTC",
       "resolved_at": null,
-      "resolution_notes": "Simplify motor base to a circle unioned with a hall sensor mounting rectangle fitting into socket wall keyway gap; ensure 3 mounting holes on bottom; remove latent south slide cut and extra box above hall sensor in bowl.",
+      "resolution_notes": "Simplify motor base to a circle unioned with a hall sensor mounting rectangle fitting into socket wall keyway gap; ensure 3 mounting holes on bottom; remove latent south slide cut and extra box above hall sensor in bowl.\n\n—There are thin walls under the cutout for the hall sensor. Can you fix?",
       "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": "2026-11-06 00:16:51 UTC"
@@ -9431,5 +9431,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 00:17:04 UTC"
+  "updated_at": "2026-11-06 00:17:30 UTC"
 }
