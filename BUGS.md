@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 00:14:57 UTC` |
+| **Report Date** | `2026-11-06 00:15:09 UTC` |
 | **Total Issues** | `313` |
 | **Open Issues** | `0` |
 | **Resolved / Closed** | `313 (100%)` |
@@ -344,7 +344,7 @@
 - [x] **`[MEDIUM]`** [#BUG-SPECKLED-ROVEBEETLE-352](#bug-speckled-rovebeetle-352): Sensor shield design on inner bowl wall is too complicated `[cat_fountain]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-STINGING-LACEWING-799](#bug-stinging-lacewing-799): Mounting system for hole-less PCBs is too complicated `[cat_fountain]` (`RESOLVED`)
 - [x] **`[HIGH]`** [#BUG-LUSTROUS-COCOON-669](#bug-lustrous-cocoon-669): Motor base design is way too complicated `[cat_fountain]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-THORACIC-HARVESTMAN-529](#bug-thoracic-harvestman-529): Add grooves for triangular motor struts to drive hub `[cat_fountain]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-THORACIC-HARVESTMAN-529](#bug-thoracic-harvestman-529): Add grooves for triangular motor struts to drive hub `[cat_fountain]` (`CLOSED`)
 
 ## Detailed Issue Log
 
@@ -28190,12 +28190,13 @@ Simplify motor base to a circle unioned with a hall sensor mounting rectangle fi
 ### <a id="bug-thoracic-harvestman-529"></a> 🟢 `[BUG-THORACIC-HARVESTMAN-529]` Add grooves for triangular motor struts to drive hub
 
 - **UUID**: `cdda94d6-e538-437c-9940-01516226d9ab`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-05 15:06:09 UTC`
 - **Resolved**: `2026-11-05 17:14:12 UTC`
+- **Accepted**: `2026-11-06 00:15:08 UTC`
 
 #### Description
 

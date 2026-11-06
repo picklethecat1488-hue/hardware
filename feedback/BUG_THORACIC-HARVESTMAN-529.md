@@ -2,12 +2,13 @@
 
 - **UUID**: `cdda94d6-e538-437c-9940-01516226d9ab`
 - **ID**: `BUG-THORACIC-HARVESTMAN-529`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-05 15:06:09 UTC`
 - **Resolved**: `2026-11-05 17:14:12 UTC`
+- **Accepted**: `2026-11-06 00:15:08 UTC`
 
 #### Description
 

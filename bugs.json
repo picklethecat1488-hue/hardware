@@ -9372,7 +9372,7 @@
       "id": "BUG-THORACIC-HARVESTMAN-529",
       "uuid": "cdda94d6-e538-437c-9940-01516226d9ab",
       "title": "Add grooves for triangular motor struts to drive hub",
-      "status": "RESOLVED",
+      "status": "CLOSED",
       "severity": "MEDIUM",
       "category": "CAD",
       "component": "cat_fountain",
@@ -9414,13 +9414,13 @@
         }
       ],
       "created_at": "2026-11-05 15:06:09 UTC",
-      "updated_at": "",
+      "updated_at": "2026-11-06 00:15:08 UTC",
       "resolved_at": "2026-11-05 17:14:12 UTC",
       "resolution_notes": "Add triangular motor strut grooves to drive hub bottom and refactor drive hub body to a 3-lobed convex hull with >=1.5mm wall thickness around all magnets, grooves, and shaft hole.",
       "rejection_notes": "",
-      "accepted_at": null,
+      "accepted_at": "2026-11-06 00:15:08 UTC",
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 00:14:55 UTC"
+  "updated_at": "2026-11-06 00:15:08 UTC"
 }
