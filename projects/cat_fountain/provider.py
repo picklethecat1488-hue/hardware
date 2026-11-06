@@ -44,6 +44,37 @@ from . import layouts
 from typing import cast, Callable, Sequence, Any, Optional
 
 
+def make_snap_ring(
+    outer_radius: float,
+    inner_radius: float,
+    height: float,
+    fillet_radius: float = 0.35,
+    align_z: Align = Align.MIN,
+) -> Part:
+    """Build an annular snap-fit ring with filleted circular edges."""
+    with BuildPart() as snap_ring:
+        Cylinder(radius=outer_radius, height=height, align=(Align.CENTER, Align.CENTER, align_z))
+        Cylinder(
+            radius=inner_radius,
+            height=height + 2.0,
+            align=(Align.CENTER, Align.CENTER, Align.CENTER),
+            mode=Mode.SUBTRACT,
+        )
+        if fillet_radius > 0.0:
+            fillet(snap_ring.edges().filter_by(GeomType.CIRCLE), radius=fillet_radius)
+    return cast(Part, snap_ring.part)
+
+
+def make_filleted_pocket_tool(radius: float, height: float, fillet_radius: float = 1.5) -> Part:
+    """Build a cylindrical pocket subtractive tool with a filleted bottom circular edge."""
+    with BuildPart() as tool:
+        Cylinder(radius=radius, height=height, align=(Align.CENTER, Align.CENTER, Align.MIN))
+        bottom_edge = tool.edges().filter_by(GeomType.CIRCLE).sort_by(Axis.Z)[0]
+        if fillet_radius > 0.0:
+            fillet(bottom_edge, radius=fillet_radius)
+    return cast(Part, tool.part)
+
+
 @discover_provider
 class CatFountainProvider(Provider):
     """Provider for cat fountain geometry."""
@@ -933,21 +964,21 @@ class CatFountainProvider(Provider):
             Cylinder(radius=cover_r, height=4.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
             # Add a 0.5mm snap-fit annular ring around the perimeter
-            with BuildPart(mode=Mode.PRIVATE) as snap_ring_part:
-                Cylinder(radius=cover_r + 0.5, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
-                Cylinder(
-                    radius=cover_r - 2.0, height=2.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
-                )
-                fillet(snap_ring_part.edges().filter_by(GeomType.CIRCLE), radius=0.4)
-
+            snap_ring_part = make_snap_ring(
+                outer_radius=cover_r + 0.5,
+                inner_radius=cover_r - 2.0,
+                height=1.0,
+                fillet_radius=0.4,
+                align_z=Align.MIN,
+            )
             with Locations((0, 0, 1.2)):
-                add(snap_ring_part.part)
+                add(snap_ring_part)
 
             # Funnel-shaped top surface to drain water towards the central drain hole
             with Locations((0, 0, 1.5)):
                 Cone(
                     bottom_radius=0.0,
-                    top_radius=80.0,
+                    top_radius=self.settings.lid_pocket_radius,
                     height=2.5,
                     align=(Align.CENTER, Align.CENTER, Align.MIN),
                     mode=Mode.SUBTRACT,
@@ -1027,11 +1058,12 @@ class CatFountainProvider(Provider):
                     minor_radius=self.settings.snap_ridge_minor,
                 )
 
-            with BuildPart() as pocket_tool:
-                Cylinder(radius=80.0, height=6.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
-                bottom_edge = pocket_tool.edges().filter_by(GeomType.CIRCLE).sort_by(Axis.Z)[0]
-                fillet(bottom_edge, radius=1.5)
-            with Locations((0.0, 0.0, 3.0)):
+            pocket_tool = make_filleted_pocket_tool(
+                radius=self.settings.lid_pocket_radius,
+                height=6.0,
+                fillet_radius=1.5,
+            )
+            with Locations((0.0, 0.0, self.settings.lid_pocket_z_offset)):
                 add(pocket_tool, mode=Mode.SUBTRACT)
 
             # Subtract the large circular cutout, but preserve the circular platform at Y = 28.0
@@ -1710,21 +1742,15 @@ class CatFountainProvider(Provider):
                 )
 
             # Annular snap ridge matching the internal groove in the bowl mounting socket
-            with BuildPart(mode=Mode.PRIVATE) as snap_ring_part:
-                Cylinder(
-                    radius=collar_r + groove_offset - 0.1,
-                    height=1.0,
-                    align=(Align.CENTER, Align.CENTER, Align.CENTER),
-                )
-                Cylinder(
-                    radius=collar_r - 1.0,
-                    height=2.0,
-                    align=(Align.CENTER, Align.CENTER, Align.CENTER),
-                    mode=Mode.SUBTRACT,
-                )
-                fillet(snap_ring_part.edges().filter_by(GeomType.CIRCLE), radius=0.35)
+            snap_ring_part = make_snap_ring(
+                outer_radius=collar_r + groove_offset - 0.1,
+                inner_radius=collar_r - 1.0,
+                height=1.0,
+                fillet_radius=0.35,
+                align_z=Align.CENTER,
+            )
             with Locations((0, 0, clip_h + 2.0)):
-                add(snap_ring_part.part)
+                add(snap_ring_part)
 
             # Vertical expansion slits to provide radial snap compliance during insertion/removal
             with Locations(Rot(0, 0, 45)), Locations(Rot(0, 0, 135)):
