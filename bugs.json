@@ -8731,33 +8731,6 @@
         },
         {
           "id": "att-6",
-          "filename": "carrier_board_bom_rev2.csv",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv",
-          "size_bytes": 0,
-          "description": "CSV export of clean EDA BOM",
-          "created_at": ""
-        },
-        {
-          "id": "att-7",
-          "filename": "carrier_board_bom_rev2.xlsx",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
-          "size_bytes": 0,
-          "description": "Clean EDA export BOM generated directly from updated carrier board model",
-          "created_at": ""
-        },
-        {
-          "id": "att-8",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
-          "size_bytes": 0,
-          "description": "Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16",
-          "created_at": ""
-        },
-        {
-          "id": "att-6",
           "filename": "carrier_board_bom_rev3.csv",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv",
@@ -8781,6 +8754,33 @@
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
           "size_bytes": 0,
           "description": "Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM)",
+          "created_at": ""
+        },
+        {
+          "id": "att-3",
+          "filename": "carrier_board_bom_rev2.csv",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv",
+          "size_bytes": 0,
+          "description": "CSV export of clean EDA BOM",
+          "created_at": ""
+        },
+        {
+          "id": "att-4",
+          "filename": "carrier_board_bom_rev2.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
+          "size_bytes": 0,
+          "description": "Clean EDA export BOM generated directly from updated carrier board model",
+          "created_at": ""
+        },
+        {
+          "id": "att-5",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
+          "size_bytes": 0,
+          "description": "Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16",
           "created_at": ""
         }
       ],
@@ -9331,6 +9331,15 @@
       "attachments": [
         {
           "id": "att-3",
+          "filename": "screenshot_paste_1793890876309_0c9ae.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1793890876309_0c9ae.png",
+          "created_at": ""
+        },
+        {
+          "id": "att-1",
           "filename": "screenshot_paste_1793924149979_7f535.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png",
@@ -9345,15 +9354,6 @@
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png",
           "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793890911006_wvg54.png",
-          "created_at": ""
-        },
-        {
-          "id": "att-3",
-          "filename": "screenshot_paste_1793890876309_0c9ae.png",
-          "file_type": "screenshot",
-          "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png",
-          "size_bytes": 0,
-          "description": "Pasted screenshot screenshot_paste_1793890876309_0c9ae.png",
           "created_at": ""
         }
       ],
@@ -9522,20 +9522,20 @@
       "attachments": [
         {
           "id": "att-2",
-          "filename": "screenshot_paste_1793948449522_d1ck8.png",
-          "file_type": "screenshot",
-          "file_path": "attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793948449522_d1ck8.png",
-          "size_bytes": 0,
-          "description": "Pasted screenshot screenshot_paste_1793948449522_d1ck8.png",
-          "created_at": ""
-        },
-        {
-          "id": "att-2",
           "filename": "screenshot_paste_1793947358948_g28nw.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793947358948_g28nw.png",
           "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793947358948_g28nw.png",
+          "created_at": ""
+        },
+        {
+          "id": "att-1",
+          "filename": "screenshot_paste_1793948449522_d1ck8.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793948449522_d1ck8.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1793948449522_d1ck8.png",
           "created_at": ""
         }
       ],
@@ -9651,7 +9651,9 @@
       "actual_behavior": "",
       "logs": "",
       "attachments": [],
-      "commit_ids": [],
+      "commit_ids": [
+        "584c667a"
+      ],
       "review_tasks": [
         {
           "id": "bc4c6346",
@@ -9662,7 +9664,7 @@
         }
       ],
       "created_at": "2026-11-06 06:54:27 UTC",
-      "updated_at": "",
+      "updated_at": "2026-11-06 14:14:59 UTC",
       "resolved_at": "2026-11-06 14:14:47 UTC",
       "resolution_notes": "Renamed GEMINI.md to AGENTS.md and updated all documentation and test references across hardware and firmware.",
       "rejection_notes": "",
@@ -9670,5 +9672,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 14:14:47 UTC"
+  "updated_at": "2026-11-06 14:14:59 UTC"
 }
