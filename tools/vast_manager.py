@@ -17,12 +17,13 @@ import shutil
 import subprocess
 import sys
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 import urllib.error
 import urllib.parse
 import urllib.request
 
 VAST_API_BASE = "https://cloud.vast.ai/api/v0"
+VAST_API_V1_BASE = "https://cloud.vast.ai/api/v1"
 HOME_DIR = Path.home()
 DEFAULT_GLOBAL_ENV_FILE = HOME_DIR / ".anvil.env"
 DEFAULT_LOCK_FILE = HOME_DIR / ".anvil.lock"
@@ -33,6 +34,9 @@ DEFAULT_COB_HOUR = 18  # 18:00 (6:00 PM)
 DEFAULT_IDLE_TIMEOUT_SEC = 1800  # 30 minutes
 DEFAULT_MIN_TOPS = 50.0  # Minimum compute throughput in TOPS / TFLOPS
 DEFAULT_MAX_COST = 1.50  # Maximum hourly rental cost in USD/hr
+DEFAULT_MAX_PROVISION_ATTEMPTS = 3
+DEFAULT_SSH_KEY_PUB = HOME_DIR / ".ssh" / "id_rsa.pub"
+ED25519_SSH_KEY_PUB = HOME_DIR / ".ssh" / "id_ed25519.pub"
 
 
 def get_api_key() -> Optional[str]:
@@ -83,7 +87,7 @@ def write_env_file(env_path: Path, updates: Dict[str, Optional[str]]) -> None:
 
     lines = [
         "# ==============================================================================",
-        "# Vast.ai Shared Instance Configuration (Managed by bin/anvil)",
+        "# Vast.ai Shared Instance Configuration (Managed by tools/anvil)",
         f"# Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         "# ==============================================================================",
     ]
@@ -111,7 +115,16 @@ def api_request(
             "error": "VAST_API_KEY is not configured. Set VAST_API_KEY environment variable or write to ~/.vast_api_key"
         }
 
-    url = f"{VAST_API_BASE}/{endpoint.lstrip('/')}"
+    if endpoint.startswith("http://") or endpoint.startswith("https://"):
+        url = endpoint
+    else:
+        clean_endpoint = endpoint.lstrip("/").split("?")[0].rstrip("/")
+        if clean_endpoint == "instances":
+            # Vast.ai requires /api/v1/instances/ for instance listing (v0 returns HTTP 410)
+            url = f"{VAST_API_V1_BASE}/{endpoint.lstrip('/')}"
+        else:
+            url = f"{VAST_API_BASE}/{endpoint.lstrip('/')}"
+
     headers = {
         "Accept": "application/json",
         "Authorization": f"Bearer {key}",
@@ -148,6 +161,8 @@ def search_offers(
     max_dph: Optional[float] = None,
     min_tops: Optional[float] = None,
     max_cost: Optional[float] = None,
+    exclude_machine_ids: Optional[Set[int]] = None,
+    exclude_offer_ids: Optional[Set[int]] = None,
 ) -> List[Dict[str, Any]]:
     """Search available rentable machines on Vast.ai with hardware constraints (min TOPS, max cost)."""
     effective_max_cost = max_cost if max_cost is not None else max_dph
@@ -175,6 +190,12 @@ def search_offers(
     # Client-side verification to strictly guarantee min_tops and max_cost
     filtered_offers: List[Dict[str, Any]] = []
     for o in raw_offers:
+        machine_id = o.get("machine_id")
+        if exclude_machine_ids and machine_id is not None and machine_id in exclude_machine_ids:
+            continue
+        offer_id = o.get("id") or o.get("ask_id")
+        if exclude_offer_ids and offer_id is not None and offer_id in exclude_offer_ids:
+            continue
         dph = float(
             o.get("dph_total")
             if o.get("dph_total") is not None
@@ -198,17 +219,119 @@ def search_offers(
 
 def get_instance_info(instance_id: int) -> Dict[str, Any]:
     """Retrieve status and connection parameters for a specific instance."""
-    res = api_request(f"instances/{instance_id}/")
-    if "instances" in res and isinstance(res["instances"], list) and res["instances"]:
-        return res["instances"][0]
-    if "error" not in res and "id" in res:
-        return res
+    # 1. Query all active instances via v1 (fast and comprehensive)
     res_all = api_request("instances/")
     if "instances" in res_all and isinstance(res_all["instances"], list):
         for inst in res_all["instances"]:
             if str(inst.get("id")) == str(instance_id):
                 return inst
+
+    # 2. Fallback to direct single-instance query via v0
+    res = api_request(f"instances/{instance_id}/")
+    if "instances" in res and isinstance(res["instances"], list) and res["instances"]:
+        return res["instances"][0]
+    if "error" not in res and "id" in res:
+        return res
     return res
+
+
+def check_instance_failure(info: Dict[str, Any]) -> Optional[str]:
+    """Check if an instance has encountered an unrecoverable host, daemon, or image pull error."""
+    status_msg = str(info.get("status_msg") or "").strip()
+    actual_status = str(info.get("actual_status") or "").strip().lower()
+    cur_state = str(info.get("cur_state") or "").strip().lower()
+
+    if status_msg:
+        status_msg_lower = status_msg.lower()
+        error_indicators = [
+            "error response from daemon",
+            "client.timeout exceeded",
+            "request canceled while waiting for connection",
+            "failed to pull image",
+            "failed to register layer",
+            "context deadline exceeded",
+            "no space left on device",
+            "manifest for",
+            "oci runtime create failed",
+            "failed to create shim",
+        ]
+        for indicator in error_indicators:
+            if indicator in status_msg_lower:
+                return status_msg
+
+    if actual_status in ("offline", "error", "failed"):
+        return f"Host entered fatal status '{actual_status}': {status_msg or 'no details'}"
+
+    if cur_state in ("stopped", "exited") and actual_status not in ("running", "loaded"):
+        if status_msg and "error" in status_msg.lower():
+            return f"Container stopped unexpectedly: {status_msg}"
+
+    return None
+
+
+def get_public_ssh_key() -> Optional[str]:
+    """Retrieve local public SSH key for injection and account registration on Vast.ai."""
+    candidates = [
+        DEFAULT_SSH_KEY_PUB,
+        ED25519_SSH_KEY_PUB,
+    ]
+    for c in candidates:
+        if c.exists():
+            key_text = c.read_text(encoding="utf-8").strip()
+            if key_text and (key_text.startswith("ssh-rsa") or key_text.startswith("ssh-ed25519")):
+                return key_text
+
+    ssh_dir = HOME_DIR / ".ssh"
+    if ssh_dir.exists():
+        for p in ssh_dir.glob("*.pub"):
+            key_text = p.read_text(encoding="utf-8").strip()
+            if key_text and (key_text.startswith("ssh-rsa") or key_text.startswith("ssh-ed25519")):
+                return key_text
+    return None
+
+
+def ensure_ssh_key_registered() -> bool:
+    """Ensure the local SSH public key is registered with the Vast.ai account."""
+    pub_key = get_public_ssh_key()
+    if not pub_key:
+        print("⚠️ Warning: No local SSH public key found (~/.ssh/id_rsa.pub or id_ed25519.pub).", file=sys.stderr)
+        return False
+
+    user_info = api_request("users/current/")
+    existing_key = user_info.get("ssh_key")
+    if existing_key and pub_key in existing_key:
+        return True
+
+    print("🔑 Registering local SSH public key with Vast.ai account...")
+    res = api_request("ssh", method="POST", data={"ssh_key": pub_key})
+    if res.get("success") or "key" in res:
+        print("✅ Registered SSH key with Vast.ai.")
+        return True
+    else:
+        print(f"⚠️ Warning: Failed to register SSH key: {res.get('error', res)}", file=sys.stderr)
+        return False
+
+
+def probe_ssh_connection(host: str, port: int, timeout_sec: int = 5) -> bool:
+    """Verify that SSH connection and public key authentication succeed."""
+    cmd = [
+        "ssh",
+        "-o",
+        f"ConnectTimeout={timeout_sec}",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "StrictHostKeyChecking=accept-new",
+        "-p",
+        str(port),
+        f"root@{host}",
+        "echo READY",
+    ]
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_sec + 2)
+        return res.returncode == 0 and "READY" in res.stdout
+    except Exception:
+        return False
 
 
 def provision_instance(
@@ -227,6 +350,9 @@ def provision_instance(
         print("❌ Error: Vast.ai API key not found.", file=sys.stderr)
         print("Please export VAST_API_KEY='<key>' or save your key in ~/.vast_api_key", file=sys.stderr)
         return {"error": "Missing API key"}
+
+    ensure_ssh_key_registered()
+    pub_key = get_public_ssh_key()
 
     env_vars = load_env_file(env_file)
 
@@ -271,142 +397,215 @@ def provision_instance(
     if effective_max_cost is None:
         effective_max_cost = DEFAULT_MAX_COST
 
-    selected_offer = offer_id
-    if not selected_offer:
-        print(
-            f"🔍 Searching available Vast.ai offers (disk >= {disk_gb}GB, min TOPS >= {min_tops:.1f}, "
-            f"max cost <= ${effective_max_cost:.2f}/hr, image: {image})..."
-        )
-        offers = search_offers(gpu_name=gpu, min_disk_gb=disk_gb, max_cost=effective_max_cost, min_tops=min_tops)
-        if not offers:
-            print("⚠️ No verified offers found with strict criteria; retrying unverified instances...", file=sys.stderr)
-            q_param = urllib.parse.quote(
-                json.dumps(
-                    {
-                        "rentable": {"eq": True},
-                        "disk_space": {"gte": disk_gb},
-                        "total_flops": {"gte": min_tops},
-                        "dph_total": {"lte": effective_max_cost},
-                    }
-                )
+    max_attempts = 1 if offer_id is not None else DEFAULT_MAX_PROVISION_ATTEMPTS
+    failed_machine_ids: Set[int] = set()
+    failed_offer_ids: Set[int] = set()
+
+    for attempt in range(1, max_attempts + 1):
+        selected_offer = offer_id
+        chosen_machine_id = None
+        if not selected_offer:
+            print(
+                f"🔍 Searching available Vast.ai offers (disk >= {disk_gb}GB, min TOPS >= {min_tops:.1f}, "
+                f"max cost <= ${effective_max_cost:.2f}/hr, image: {image})"
+                + (f" [attempt {attempt}/{max_attempts}]..." if max_attempts > 1 else "...")
             )
-            res = api_request(f"bundles/?q={q_param}")
-            raw_offers = res.get("offers", []) if isinstance(res, dict) else (res if isinstance(res, list) else [])
-            # Strictly filter unverified offers to guarantee min_tops and max_cost
-            offers = [
-                o
-                for o in raw_offers
-                if float(
-                    o.get("total_flops")
-                    if o.get("total_flops") is not None
-                    else (o.get("flops") if o.get("flops") is not None else 0.0)
+            offers = search_offers(
+                gpu_name=gpu,
+                min_disk_gb=disk_gb,
+                max_cost=effective_max_cost,
+                min_tops=min_tops,
+                exclude_machine_ids=failed_machine_ids,
+                exclude_offer_ids=failed_offer_ids,
+            )
+            if not offers:
+                print(
+                    "⚠️ No verified offers found with strict criteria; retrying unverified instances...", file=sys.stderr
                 )
-                >= min_tops
-                and float(
+                q_param = urllib.parse.quote(
+                    json.dumps(
+                        {
+                            "rentable": {"eq": True},
+                            "disk_space": {"gte": disk_gb},
+                            "total_flops": {"gte": min_tops},
+                            "dph_total": {"lte": effective_max_cost},
+                        }
+                    )
+                )
+                res = api_request(f"bundles/?q={q_param}")
+                raw_offers = res.get("offers", []) if isinstance(res, dict) else (res if isinstance(res, list) else [])
+                # Strictly filter unverified offers to guarantee min_tops and max_cost
+                offers = [
+                    o
+                    for o in raw_offers
+                    if float(
+                        o.get("total_flops")
+                        if o.get("total_flops") is not None
+                        else (o.get("flops") if o.get("flops") is not None else 0.0)
+                    )
+                    >= min_tops
+                    and float(
+                        o.get("dph_total")
+                        if o.get("dph_total") is not None
+                        else (o.get("dph") if o.get("dph") is not None else 999.0)
+                    )
+                    <= effective_max_cost
+                    and (not failed_machine_ids or o.get("machine_id") not in failed_machine_ids)
+                    and (not failed_offer_ids or (o.get("id") or o.get("ask_id")) not in failed_offer_ids)
+                ]
+
+            if not offers:
+                print(
+                    f"❌ No rentable machines available matching criteria (min TOPS: {min_tops:.1f}, max cost: ${effective_max_cost:.2f}/hr).",
+                    file=sys.stderr,
+                )
+                return {
+                    "error": f"No offers available matching hardware constraints (min TOPS: {min_tops:.1f}, max cost: ${effective_max_cost:.2f}/hr)"
+                }
+
+            # Sort by total dollars-per-hour
+            offers.sort(
+                key=lambda o: float(
                     o.get("dph_total")
                     if o.get("dph_total") is not None
                     else (o.get("dph") if o.get("dph") is not None else 999.0)
                 )
-                <= effective_max_cost
-            ]
-
-        if not offers:
+            )
+            chosen = offers[0]
+            selected_offer = chosen.get("id") or chosen.get("ask_id")
+            chosen_machine_id = chosen.get("machine_id")
+            gpu_model = chosen.get("gpu_name", "GPU/CPU")
+            dph = float(
+                chosen.get("dph_total")
+                if chosen.get("dph_total") is not None
+                else (chosen.get("dph") if chosen.get("dph") is not None else 0.0)
+            )
+            flops = float(
+                chosen.get("total_flops")
+                if chosen.get("total_flops") is not None
+                else (chosen.get("flops") if chosen.get("flops") is not None else 0.0)
+            )
             print(
-                f"❌ No rentable machines available matching criteria (min TOPS: {min_tops:.1f}, max cost: ${effective_max_cost:.2f}/hr).",
-                file=sys.stderr,
+                f"🎯 Selected offer #{selected_offer}: {gpu_model} ({flops:.1f} TOPS) @ ${dph:.3f}/hr "
+                f"(Limits: >= {min_tops:.1f} TOPS, <= ${effective_max_cost:.2f}/hr)"
             )
-            return {
-                "error": f"No offers available matching hardware constraints (min TOPS: {min_tops:.1f}, max cost: ${effective_max_cost:.2f}/hr)"
-            }
 
-        # Sort by total dollars-per-hour
-        offers.sort(
-            key=lambda o: float(
-                o.get("dph_total")
-                if o.get("dph_total") is not None
-                else (o.get("dph") if o.get("dph") is not None else 999.0)
-            )
-        )
-        chosen = offers[0]
-        selected_offer = chosen.get("id") or chosen.get("ask_id")
-        gpu_model = chosen.get("gpu_name", "GPU/CPU")
-        dph = float(
-            chosen.get("dph_total")
-            if chosen.get("dph_total") is not None
-            else (chosen.get("dph") if chosen.get("dph") is not None else 0.0)
-        )
-        flops = float(
-            chosen.get("total_flops")
-            if chosen.get("total_flops") is not None
-            else (chosen.get("flops") if chosen.get("flops") is not None else 0.0)
-        )
-        print(
-            f"🎯 Selected offer #{selected_offer}: {gpu_model} ({flops:.1f} TOPS) @ ${dph:.3f}/hr "
-            f"(Limits: >= {min_tops:.1f} TOPS, <= ${effective_max_cost:.2f}/hr)"
-        )
+        print(f"🚀 Creating Vast.ai instance from offer #{selected_offer}...")
+        payload: Dict[str, Any] = {
+            "image": image,
+            "disk": disk_gb,
+            "runtype": "ssh",
+        }
+        if pub_key:
+            payload["ssh_key"] = pub_key
+        create_res = api_request(f"asks/{selected_offer}/", method="PUT", data=payload)
+        if "error" in create_res:
+            print(f"❌ Failed to create instance from offer #{selected_offer}: {create_res['error']}", file=sys.stderr)
+            if selected_offer is not None:
+                failed_offer_ids.add(selected_offer)
+            if chosen_machine_id is not None:
+                failed_machine_ids.add(chosen_machine_id)
+            if attempt < max_attempts:
+                print(f"🔄 Retrying with alternate offer (attempt {attempt + 1}/{max_attempts})...\n")
+                continue
+            return create_res
 
-    print(f"🚀 Creating Vast.ai instance from offer #{selected_offer}...")
-    payload = {
-        "image": image,
-        "disk": disk_gb,
-        "runtype": "ssh",
-    }
-    create_res = api_request(f"asks/{selected_offer}/", method="PUT", data=payload)
-    if "error" in create_res:
-        print(f"❌ Failed to create instance: {create_res['error']}", file=sys.stderr)
-        return create_res
+        instance_id = create_res.get("new_contract") or create_res.get("instance_id")
+        if not instance_id:
+            # Check if list of instances has our new rental
+            inst_list = api_request("instances/").get("instances", [])
+            if inst_list:
+                instance_id = inst_list[-1].get("id")
 
-    instance_id = create_res.get("new_contract") or create_res.get("instance_id")
-    if not instance_id:
-        # Check if list of instances has our new rental
-        inst_list = api_request("instances/").get("instances", [])
-        if inst_list:
-            instance_id = inst_list[-1].get("id")
+        if not instance_id:
+            print("❌ Vast.ai returned success but no instance ID was provided.", file=sys.stderr)
+            if attempt < max_attempts:
+                continue
+            return {"error": "Failed to determine provisioned instance ID"}
 
-    print(f"⏳ Waiting for instance #{instance_id} to enter 'running' state and establish SSH...")
-    ssh_host = None
-    ssh_port = None
-    start_time = time.time()
-    while time.time() - start_time < 300:  # 5 min timeout
-        time.sleep(6)
-        info = get_instance_info(instance_id)
-        status = info.get("actual_status") or info.get("status_msg") or "unknown"
-        cur_host = info.get("ssh_host")
-        cur_port = info.get("ssh_port")
-        print(f"   Status: {status} | SSH: {cur_host}:{cur_port}")
-        if cur_host and cur_port and (status == "running" or status == "loaded"):
-            ssh_host = cur_host
-            ssh_port = str(cur_port)
-            break
+        print(f"⏳ Waiting for instance #{instance_id} to enter 'running' state and establish SSH...")
+        ssh_host = None
+        ssh_port = None
+        start_time = time.time()
+        fatal_error: Optional[str] = None
+        mid = chosen_machine_id
 
-    if not ssh_host or not ssh_port:
-        print("⚠️ Instance provisioned but SSH port mapping not ready yet.", file=sys.stderr)
-        print(f"Instance ID: {instance_id}. Check status via 'bin/anvil status'.", file=sys.stderr)
-    else:
+        while time.time() - start_time < 300:  # 5 min timeout
+            time.sleep(6)
+            info = get_instance_info(instance_id)
+            status = info.get("actual_status") or info.get("status_msg") or "unknown"
+            cur_host = info.get("ssh_host")
+            cur_port = info.get("ssh_port")
+            if info.get("machine_id"):
+                mid = info.get("machine_id")
+            print(f"   Status: {status} | SSH: {cur_host}:{cur_port}")
+
+            # Check for fatal container/daemon/registry errors
+            failure_reason = check_instance_failure(info)
+            if failure_reason:
+                fatal_error = failure_reason
+                print(f"❌ Fatal host error on Vast.ai machine #{mid} (Instance #{instance_id}):", file=sys.stderr)
+                print(f"   {fatal_error}", file=sys.stderr)
+                break
+
+            if cur_host and cur_port and (status == "running" or status == "loaded"):
+                print(f"   Status: {status} | Probing SSH connection on {cur_host}:{cur_port}...")
+                if probe_ssh_connection(cur_host, int(cur_port), timeout_sec=5):
+                    ssh_host = cur_host
+                    ssh_port = str(cur_port)
+                    print(f"   ✅ SSH connection verified and authenticated! (root@{cur_host}:{cur_port})")
+                    break
+                else:
+                    print(f"   Status: {status} | SSH port mapping active; waiting for sshd to accept connections...")
+            else:
+                print(f"   Status: {status} | SSH: {cur_host}:{cur_port}")
+
+        if fatal_error or not ssh_host or not ssh_port:
+            # Immediately destroy the defective/unready instance to prevent charges
+            print(f"🛑 Releasing unusable Vast.ai instance #{instance_id} to prevent charges...", file=sys.stderr)
+            api_request(f"instances/{instance_id}/", method="DELETE")
+            if mid is not None:
+                failed_machine_ids.add(mid)
+            if selected_offer is not None:
+                failed_offer_ids.add(selected_offer)
+
+            if attempt < max_attempts:
+                reason = fatal_error or "SSH port mapping timed out."
+                print(
+                    f"🔄 Retrying provisioning with alternate host machine (attempt {attempt + 1}/{max_attempts})...\n"
+                )
+                continue
+            else:
+                reason = fatal_error or "Instance provisioned but SSH port mapping timed out after 300s."
+                print(f"❌ Provisioning failed after {max_attempts} attempts: {reason}", file=sys.stderr)
+                return {"error": reason}
+
         print(f"✅ Instance is running! SSH connection: ssh -p {ssh_port} root@{ssh_host}")
 
-    # Write connection details and hardware constraints to ~/.anvil.env
-    env_updates: Dict[str, Optional[str]] = {
-        "VAST_INSTANCE_ID": str(instance_id) if instance_id else None,
-        "REMOTE_HOST": ssh_host or "ssh.vast.ai",
-        "REMOTE_PORT": ssh_port or "22",
-        "REMOTE_USER": "root",
-        "REMOTE_IMAGE": image,
-        "MIN_TOPS": f"{min_tops:.1f}",
-        "MAX_COST": f"{effective_max_cost:.2f}",
-    }
-    write_env_file(env_file, env_updates)
-    print(f"📝 Updated shared configuration: {env_file}")
+        # Write connection details and hardware constraints to ~/.anvil.env
+        env_updates: Dict[str, Optional[str]] = {
+            "VAST_INSTANCE_ID": str(instance_id) if instance_id else None,
+            "REMOTE_HOST": ssh_host or "ssh.vast.ai",
+            "REMOTE_PORT": ssh_port or "22",
+            "REMOTE_USER": "root",
+            "REMOTE_IMAGE": image,
+            "MIN_TOPS": f"{min_tops:.1f}",
+            "MAX_COST": f"{effective_max_cost:.2f}",
+        }
+        write_env_file(env_file, env_updates)
+        print(f"📝 Updated shared configuration: {env_file}")
 
-    return {
-        "instance_id": instance_id,
-        "ssh_host": ssh_host,
-        "ssh_port": ssh_port,
-        "image": image,
-        "min_tops": min_tops,
-        "max_cost": effective_max_cost,
-        "env_file": str(env_file),
-    }
+        return {
+            "instance_id": instance_id,
+            "ssh_host": ssh_host,
+            "ssh_port": ssh_port,
+            "image": image,
+            "min_tops": min_tops,
+            "max_cost": effective_max_cost,
+            "env_file": str(env_file),
+        }
+
+    return {"error": "Exhausted all provisioning attempts"}
 
 
 def release_instance(
@@ -418,7 +617,34 @@ def release_instance(
     env = load_env_file(env_file)
     target_id = instance_id or env.get("VAST_INSTANCE_ID")
     if not target_id:
-        print("⚠️ No active Vast.ai instance ID found in configuration.", file=sys.stderr)
+        # Check if there are unreferenced active instances on the Vast.ai account
+        inst_list = api_request("instances/").get("instances", [])
+        if inst_list:
+            print(
+                f"⚠️ No active instance ID in {env_file}, but found {len(inst_list)} active instance(s) on Vast.ai account.",
+                file=sys.stderr,
+            )
+            for inst in inst_list:
+                iid = inst.get("id")
+                if iid:
+                    print(f"🛑 Destroying unreferenced Vast.ai instance #{iid}...")
+                    api_request(f"instances/{iid}/", method="DELETE")
+            write_env_file(
+                env_file,
+                {
+                    "VAST_INSTANCE_ID": None,
+                    "REMOTE_HOST": None,
+                    "REMOTE_PORT": None,
+                    "REMOTE_USER": None,
+                },
+            )
+            if lock_file.exists():
+                try:
+                    lock_file.unlink()
+                except Exception:
+                    pass
+            return True
+        print("⚠️ No active Vast.ai instance ID found in configuration or account.", file=sys.stderr)
         return False
 
     print(f"🛑 Destroying Vast.ai instance #{target_id}...")
@@ -431,7 +657,7 @@ def release_instance(
         env_file,
         {
             "VAST_INSTANCE_ID": None,
-            "REMOTE_HOST": "anvil",
+            "REMOTE_HOST": None,
             "REMOTE_PORT": None,
             "REMOTE_USER": None,
         },
@@ -659,19 +885,30 @@ export DEBIAN_FRONTEND=noninteractive
 
 echo "🔧 [1/5] Updating apt repositories and installing core compiler toolchains..."
 apt-get update -qq
+apt-get install -y --no-install-recommends ca-certificates curl gnupg
+if ! command -v node &>/dev/null || [ "$(node -v 2>/dev/null | cut -d'.' -f1 | tr -d 'v')" -lt 18 ] 2>/dev/null; then
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - 2>/dev/null || true
+fi
 apt-get install -y --no-install-recommends \
     build-essential \
     pkg-config \
     libssl-dev \
+    libudev-dev \
     cmake \
     clang \
     git \
-    curl \
     wget \
     rsync \
     jq \
     htop \
-    ca-certificates
+    ffmpeg \
+    libgl1 \
+    libglib2.0-0 \
+    nodejs \
+    git-lfs
+
+git lfs install || true
+git config --global --add safe.directory '*' || true
 
 # 2. Rust & Cargo
 echo "🦀 [2/5] Configuring Rust & Cargo..."
@@ -680,6 +917,8 @@ if ! command -v cargo &>/dev/null && [ ! -f "$HOME/.cargo/bin/cargo" ]; then
 fi
 export PATH="$HOME/.cargo/bin:$PATH"
 if command -v cargo &>/dev/null; then
+    rustup component add rustfmt clippy 2>/dev/null || true
+    rustup target add thumbv6m-none-eabi 2>/dev/null || true
     if ! command -v cargo-nextest &>/dev/null; then
         echo "Installing cargo-nextest..."
         cargo install cargo-nextest --locked 2>/dev/null || true
@@ -727,9 +966,15 @@ if [ "$TARGET" = "all" ] || [ "$TARGET" = "firmware" ]; then
         echo "Creating firmware-env..."
         conda create -y -n firmware-env python=3.11
         conda run -n firmware-env pip install --no-cache-dir \
-            pytest pytest-mock pydantic jinja2 requests
+            pytest pytest-mock pytest-xdist pydantic jinja2 requests \
+            ruff tree-sitter tree-sitter-rust halo colorama pyyaml \
+            eel pillow beautifulsoup4 pyserial numpy psutil pywebview
     else
-        echo "firmware-env already exists, skipping."
+        echo "firmware-env already exists, ensuring required packages..."
+        conda run -n firmware-env pip install --no-cache-dir \
+            pytest pytest-mock pytest-xdist pydantic jinja2 requests \
+            ruff tree-sitter tree-sitter-rust halo colorama pyyaml \
+            eel pillow beautifulsoup4 pyserial numpy psutil pywebview || true
     fi
 fi
 
@@ -737,11 +982,21 @@ fi
 if [ "$TARGET" = "all" ] || [ "$TARGET" = "hardware" ] || [ "$TARGET" = "cq" ]; then
     if ! conda env list | grep -q "^cq "; then
         echo "Creating cq environment..."
-        conda create -y -n cq python=3.11 -c conda-forge
+        conda create -y -n cq python=3.11 cadquery build123d -c conda-forge
         conda run -n cq pip install --no-cache-dir \
-            cadquery pytest pytest-xdist rerun-sdk opencv-python pybullet
+            ruff pytest pytest-xdist pytest-mock pytest-timeout \
+            pydantic pydantic-settings pydantic-changedetect cbor2 rerun-sdk \
+            opencv-python pybullet trimesh jinja2 jax jaxlib jax-md pyvista halo \
+            openpyxl eel pywebview matplotlib pyyaml requests ocp-vscode "pluggy<1.7.0" \
+            scancode-toolkit typecode-libmagic
     else
-        echo "cq environment already exists, skipping."
+        echo "cq environment already exists, ensuring required packages..."
+        conda run -n cq pip install --no-cache-dir \
+            ruff pytest pytest-xdist pytest-mock pytest-timeout \
+            pydantic pydantic-settings pydantic-changedetect cbor2 rerun-sdk \
+            opencv-python pybullet trimesh jinja2 jax jaxlib jax-md pyvista halo \
+            openpyxl eel pywebview matplotlib pyyaml requests ocp-vscode "pluggy<1.7.0" \
+            scancode-toolkit typecode-libmagic || true
     fi
 fi
 

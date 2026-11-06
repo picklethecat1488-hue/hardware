@@ -539,16 +539,11 @@ def test_pcb_revision_metadata_and_templates(tmp_path: Path, advanced_pcb_stacku
 
     diag = SchematicDiagram(wiring, pcb_config=cfg)
     pdf_file = diag.render_pdf(tmp_path / "rev_schematic.pdf")
-    pdf_bytes = pdf_file.read_bytes()
 
-    import re
-    import zlib
+    from pdfminer.high_level import extract_text
 
-    streams = re.findall(rb"stream[\r\n]+(.*?)[\r\n]+endstream", pdf_bytes, re.DOTALL)
-    decomp = b"".join(
-        [zlib.decompress(s) if s.startswith((b"\x78\x9c", b"\x78\x01", b"\x78\xda")) else s for s in streams]
-    )
-    assert b"2.4.1" in decomp
+    pdf_text = extract_text(pdf_file)
+    assert "2.4.1" in pdf_text
 
 
 def test_schematic_compact_symbology_and_channel_routing(tmp_path: Path, advanced_pcb_stackup: StackupModel):
@@ -607,17 +602,14 @@ def test_schematic_compact_symbology_and_channel_routing(tmp_path: Path, advance
 
     assert res.exists()
     assert res.stat().st_size > 0
-    pdf_bytes = res.read_bytes()
-    streams = re.findall(rb"stream[\r\n]+(.*?)[\r\n]+endstream", pdf_bytes, re.DOTALL)
-    decomp = b"".join(
-        [zlib.decompress(s) if s.startswith((b"\x78\x9c", b"\x78\x01", b"\x78\xda")) else s for s in streams]
-    )
-    clean_text = re.sub(rb"[\(\)\[\]0-9\.\s]+", b"", decomp)
+    from pdfminer.high_level import extract_text
+
+    pdf_text = extract_text(res)
     # Ensure net labels, revision, and part number (MPN) are properly rendered
-    assert b"FACING_NET" in clean_text
-    assert b"NON_FACING_NET" in clean_text
-    assert b"STM-PARTNUM-" in clean_text or b"PARTNUM" in clean_text
-    assert b"1.1" in decomp
+    assert "FACING_NET" in pdf_text
+    assert "NON_FACING_NET" in pdf_text
+    assert "STM32-PARTNUM-" in pdf_text or "PARTNUM" in pdf_text
+    assert "1.1" in pdf_text
 
 
 def test_schematic_multi_page_breakout_and_toc(tmp_path: Path, advanced_pcb_stackup: StackupModel):
@@ -721,13 +713,11 @@ def test_schematic_multi_page_breakout_and_toc(tmp_path: Path, advanced_pcb_stac
     page_matches = re.findall(rb"/Type\s*/Page\b", pdf_bytes)
     assert len(page_matches) == 4  # Title + TOC + Sheet 1 + Sheet 2
 
-    streams = re.findall(rb"stream[\r\n]+(.*?)[\r\n]+endstream", pdf_bytes, re.DOTALL)
-    decomp = b"".join(
-        [zlib.decompress(s) if s.startswith((b"\x78\x9c", b"\x78\x01", b"\x78\xda")) else s for s in streams]
-    )
-    clean_text = re.sub(rb"[\(\)\[\]0-9\.\s\-_]+", b"", decomp)
-    assert b"PowerDistribution" in clean_text or b"Distribution" in clean_text
-    assert b"CommunicationBus" in clean_text or b"Communication" in clean_text
+    from pdfminer.high_level import extract_text
+
+    pdf_text = extract_text(res)
+    assert "PowerDistribution" in pdf_text or "Distribution" in pdf_text
+    assert "CommunicationBus" in pdf_text or "Communication" in pdf_text
 
 
 def test_pcb_exporter_mounting_holes(tmp_path: Path, advanced_pcb_stackup: StackupModel):
