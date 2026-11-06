@@ -2,6 +2,13 @@
 
 import os
 
+# Limit BLAS, OpenMP, and XLA threading per worker to avoid pthread limit exhaustion in containers
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+os.environ.setdefault("XLA_FLAGS", "--xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1")
+
 # Force JAX to run exclusively in CPU mode during unit tests to avoid MPS (Apple Silicon GPU)
 # compilation deadlocks, resource constraints, and multi-process GPU conflicts.
 os.environ["JAX_PLATFORMS"] = "cpu"

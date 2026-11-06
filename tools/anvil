@@ -25,6 +25,12 @@ REPO_NAME="$(basename "${REPO_DIR}")"
 GLOBAL_ENV_FILE="${HOME}/.anvil.env"
 LOCAL_ENV_FILE="${REPO_DIR}/.anvil.env"
 
+# Preserve environment variables explicitly passed by caller
+CALLER_REMOTE_HOST="${REMOTE_HOST:-}"
+CALLER_REMOTE_PORT="${REMOTE_PORT:-}"
+CALLER_REMOTE_USER="${REMOTE_USER:-}"
+CALLER_REMOTE_DIR="${REMOTE_DIR:-}"
+
 if [ -f "${GLOBAL_ENV_FILE}" ]; then
     # shellcheck disable=SC1090
     source "${GLOBAL_ENV_FILE}"
@@ -33,6 +39,12 @@ if [ -f "${LOCAL_ENV_FILE}" ]; then
     # shellcheck disable=SC1090
     source "${LOCAL_ENV_FILE}"
 fi
+
+# Restore caller overrides if explicitly supplied
+[ -n "${CALLER_REMOTE_HOST}" ] && REMOTE_HOST="${CALLER_REMOTE_HOST}"
+[ -n "${CALLER_REMOTE_PORT}" ] && REMOTE_PORT="${CALLER_REMOTE_PORT}"
+[ -n "${CALLER_REMOTE_USER}" ] && REMOTE_USER="${CALLER_REMOTE_USER}"
+[ -n "${CALLER_REMOTE_DIR}" ] && REMOTE_DIR="${CALLER_REMOTE_DIR}"
 
 # 3. Connection Parameters
 REMOTE_HOST="${REMOTE_HOST:-anvil}"
@@ -65,7 +77,16 @@ SSH_OPTS="${SSH_BASE_OPTS} ${SSH_PORT_OPT} ${SSH_KEY_OPT}"
 RSYNC_SSH="ssh ${SSH_OPTS}"
 
 # 4. Remote Execution Paths
-REMOTE_CONDA="source \$(if [ -f /workspace/miniforge3/etc/profile.d/conda.sh ]; then echo /workspace/miniforge3/etc/profile.d/conda.sh; elif [ -f /home/ubuntu/miniforge3/etc/profile.d/conda.sh ]; then echo /home/ubuntu/miniforge3/etc/profile.d/conda.sh; else echo \$HOME/miniforge3/etc/profile.d/conda.sh; fi 2>/dev/null) 2>/dev/null && ENV_NAME=\$(conda env list 2>/dev/null | grep -E -q '^firmware-env |^cq |^predict-env |^stalking-env ' && conda env list 2>/dev/null | grep -E '^firmware-env |^cq |^predict-env |^stalking-env ' | awk '{print \$1}' | head -n 1 || echo 'base') && conda run -n \"\$ENV_NAME\" --no-capture-output"
+DEFAULT_REMOTE_ENV="base"
+if [ "${REPO_NAME}" = "firmware" ]; then
+    DEFAULT_REMOTE_ENV="firmware-env"
+elif [ "${REPO_NAME}" = "hardware" ]; then
+    DEFAULT_REMOTE_ENV="cq"
+elif [ "${REPO_NAME}" = "ssd" ] || [ "${REPO_NAME}" = "SSD" ] || [ "${REPO_NAME}" = "predict" ] || [ "${REPO_NAME}" = "stalking" ]; then
+    DEFAULT_REMOTE_ENV="predict-env"
+fi
+
+REMOTE_CONDA="source \$(if [ -f /workspace/miniforge3/etc/profile.d/conda.sh ]; then echo /workspace/miniforge3/etc/profile.d/conda.sh; elif [ -f /home/ubuntu/miniforge3/etc/profile.d/conda.sh ]; then echo /home/ubuntu/miniforge3/etc/profile.d/conda.sh; else echo \$HOME/miniforge3/etc/profile.d/conda.sh; fi 2>/dev/null) 2>/dev/null && ENV_NAME=\$(conda env list 2>/dev/null | grep -E '^${DEFAULT_REMOTE_ENV} ' | awk '{print \$1}' | head -n 1 || (conda env list 2>/dev/null | grep -E '^firmware-env |^cq |^predict-env |^stalking-env ' | awk '{print \$1}' | head -n 1) || echo 'base') && conda run -n \$ENV_NAME --no-capture-output"
 REMOTE_CARGO_PATH="export PATH=\"/workspace/miniforge3/bin:\$HOME/.cargo/bin:/root/.cargo/bin:/home/ubuntu/.cargo/bin:\$PATH\""
 
 # 5. Helper Functions
@@ -111,15 +132,16 @@ sync_code() {
     ssh ${SSH_OPTS} "${SSH_TARGET}" "mkdir -p ${REMOTE_DIR}"
     rsync -az --delete -e "${RSYNC_SSH}" \
         --exclude '.git' \
-        --exclude 'target' \
-        --exclude 'build' \
-        --exclude 'build_temp' \
-        --exclude 'build_test_tmp' \
-        --exclude 'tmp' \
+        --exclude '/target' \
+        --exclude '/build' \
+        --exclude '/build_temp' \
+        --exclude '/build_test_tmp' \
+        --exclude '/tmp' \
         --exclude '__pycache__' \
         --exclude '*.pyc' \
         --exclude '.pytest_cache' \
         --exclude '.ruff_cache' \
+        --exclude '.mypy_cache' \
         --exclude '.venv' \
         --exclude 'venv' \
         --exclude '*.rrd' \
@@ -131,6 +153,10 @@ sync_code() {
         --exclude 'attachments' \
         --exclude 'feedback/attachments' \
         "${REPO_DIR}/" "${SSH_TARGET}:${REMOTE_DIR}/"
+    if [ -f "${REPO_DIR}/target/host_session.json" ]; then
+        ssh ${SSH_OPTS} "${SSH_TARGET}" "mkdir -p ${REMOTE_DIR}/target" 2>/dev/null || true
+        rsync -az -e "${RSYNC_SSH}" "${REPO_DIR}/target/host_session.json" "${SSH_TARGET}:${REMOTE_DIR}/target/host_session.json" 2>/dev/null || true
+    fi
 }
 
 pull_file() {
@@ -184,7 +210,7 @@ kill_remote_pytest() {
 
 kill_remote_verify() {
     echo "🛑 Terminating preceding verification runs on ${SSH_TARGET}..."
-    ssh ${SSH_OPTS} "${SSH_TARGET}" "pkill -9 -f 'verify.sh|validate_all.py|cargo-nextest|cargo test' 2>/dev/null || true" 2>/dev/null || true
+    ssh ${SSH_OPTS} "${SSH_TARGET}" "pkill -9 -f 'verify.sh|validate_all.py|cargo-nextest|cargo test|pytest' 2>/dev/null || true" 2>/dev/null || true
 }
 
 kill_remote_daemon() {
@@ -195,8 +221,21 @@ kill_remote_daemon() {
 bootstrap_remote() {
     local target="${1:-${REPO_NAME}}"
     echo "🚀 Bootstrapping remote environment on ${SSH_TARGET} (Target: ${target})..."
-    run_vast_manager bootstrap-script --target "${target}" | ssh ${SSH_OPTS} "${SSH_TARGET}" "bash -s"
-    echo "✅ Bootstrap complete on ${SSH_TARGET}."
+    local max_attempts=5
+    local attempt=1
+    while [ "${attempt}" -le "${max_attempts}" ]; do
+        if run_vast_manager bootstrap-script --target "${target}" | ssh ${SSH_OPTS} "${SSH_TARGET}" "bash -s"; then
+            echo "✅ Bootstrap complete on ${SSH_TARGET}."
+            return 0
+        fi
+        if [ "${attempt}" -lt "${max_attempts}" ]; then
+            echo "⚠️ SSH connection to ${SSH_TARGET} not ready yet (attempt ${attempt}/${max_attempts}); retrying in 3s..."
+            sleep 3
+        fi
+        attempt=$((attempt + 1))
+    done
+    echo "❌ Failed to bootstrap remote environment on ${SSH_TARGET} after ${max_attempts} attempts." >&2
+    return 1
 }
 
 # 6. CLI Subcommand Dispatch
@@ -244,7 +283,7 @@ case "$1" in
     pull|fetch|get|download)
         shift
         if [ $# -eq 0 ]; then
-            echo "Usage: bin/anvil pull <remote_path> [local_dest]"
+            echo "Usage: tools/anvil pull <remote_path> [local_dest]"
             exit 1
         fi
         pull_file "$1" "$2"
@@ -305,7 +344,11 @@ print(f'✅ Successfully merged {len(inputs)} recording(s) into {out}')
         else
             cmd_args=""
         fi
-        ssh ${SSH_OPTS} "${SSH_TARGET}" "cd ${REMOTE_DIR} && ${REMOTE_CARGO_PATH} && ${REMOTE_CONDA} pytest${cmd_args}"
+        worker_opt=""
+        if [[ "$*" != *"-n "* ]] && [[ "$*" != *"--numprocesses"* ]]; then
+            worker_opt=" -n 8"
+        fi
+        ssh ${SSH_OPTS} "${SSH_TARGET}" "cd ${REMOTE_DIR} && ${REMOTE_CARGO_PATH} && OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 OMP_NUM_THREADS=1 ${REMOTE_CONDA} pytest${worker_opt}${cmd_args}"
         ;;
     verify)
         shift
@@ -327,7 +370,7 @@ print(f'✅ Successfully merged {len(inputs)} recording(s) into {out}')
     cli)
         shift
         if [ $# -eq 0 ]; then
-            echo "Usage: bin/anvil cli <command...>"
+            echo "Usage: tools/anvil cli <command...>"
             exit 1
         fi
         acquire_lock "cli $*"
@@ -340,7 +383,7 @@ print(f'✅ Successfully merged {len(inputs)} recording(s) into {out}')
     host)
         shift
         if [ $# -eq 0 ]; then
-            echo "Usage: bin/anvil host <subcommand...> [args...]"
+            echo "Usage: tools/anvil host <subcommand...> [args...]"
             exit 1
         fi
         acquire_lock "host $*"
@@ -380,7 +423,7 @@ print(f'✅ Successfully merged {len(inputs)} recording(s) into {out}')
     *)
         if [ $# -eq 0 ]; then
             cat <<EOF
-Usage: bin/anvil <command> [args...]
+Usage: tools/anvil <command> [args...]
 
 Instance Lifecycle Subcommands:
   provision [--image ubuntu:22.04] [--disk 40] [--min-tops 50] [--max-cost 1.50]  Provision new Vast.ai instance and write ~/.anvil.env

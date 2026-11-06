@@ -27,7 +27,7 @@ Guidelines for Quake VCS dashboard, Jinja2 templating, code review persistence, 
 ## 5. Bidirectional Dashboard & Script Cross-Patching Mandate
 * **Automatic Cross-Repository Synchronization**: Any bug fix, feature enhancement, styling update, or refactoring applied to developer scripts, tooling, or dashboard components in one repository (`firmware` or `hardware`) that is applicable to the other repository MUST be automatically cross-patched and mirrored into that repository, and vice versa.
 * **Synchronized Subsystems**: This includes, but is not limited to:
-  - Remote cloud runner and lifecycle orchestration (`bin/anvil`, `tools/vast_manager.py`, `~/.anvil.env`, `~/.anvil.lock`).
+  - Remote cloud runner and lifecycle orchestration (`tools/anvil`, `tools/vast_manager.py`, `~/.anvil.env`, `~/.anvil.lock`).
   - VCS web workstation and dashboard backends (`tools/dashboard.py`, `provider/vcs/git_engine.py`, `provider/worm_report/`, `provider/bug_report/`).
   - Shared workstation templates (`diff_view.html.j2`, `diff_component.html.j2`, `code_review.html.j2`, `worm_report.html.j2`, `bug_report.html.j2`).
   - Smartlog DAG tree rendering, commit selection, node highlighting, and author identity sanitization.

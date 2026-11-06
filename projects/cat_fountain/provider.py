@@ -44,6 +44,37 @@ from . import layouts
 from typing import cast, Callable, Sequence, Any, Optional
 
 
+def make_snap_ring(
+    outer_radius: float,
+    inner_radius: float,
+    height: float,
+    fillet_radius: float = 0.35,
+    align_z: Align = Align.MIN,
+) -> Part:
+    """Build an annular snap-fit ring with filleted circular edges."""
+    with BuildPart() as snap_ring:
+        Cylinder(radius=outer_radius, height=height, align=(Align.CENTER, Align.CENTER, align_z))
+        Cylinder(
+            radius=inner_radius,
+            height=height + 2.0,
+            align=(Align.CENTER, Align.CENTER, Align.CENTER),
+            mode=Mode.SUBTRACT,
+        )
+        if fillet_radius > 0.0:
+            fillet(snap_ring.edges().filter_by(GeomType.CIRCLE), radius=fillet_radius)
+    return cast(Part, snap_ring.part)
+
+
+def make_filleted_pocket_tool(radius: float, height: float, fillet_radius: float = 1.5) -> Part:
+    """Build a cylindrical pocket subtractive tool with a filleted bottom circular edge."""
+    with BuildPart() as tool:
+        Cylinder(radius=radius, height=height, align=(Align.CENTER, Align.CENTER, Align.MIN))
+        bottom_edge = tool.edges().filter_by(GeomType.CIRCLE).sort_by(Axis.Z)[0]
+        if fillet_radius > 0.0:
+            fillet(bottom_edge, radius=fillet_radius)
+    return cast(Part, tool.part)
+
+
 @discover_provider
 class CatFountainProvider(Provider):
     """Provider for cat fountain geometry."""
@@ -246,6 +277,13 @@ class CatFountainProvider(Provider):
                 with Locations((0, 0, 8.5)):
                     Cylinder(
                         radius=snap_r, height=1.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
+                    )
+                # Internal annular snap-fit groove in casing recess wall (BUG-SPECKLED-ROACH-49)
+                with Locations((0, 0, 10.0 - self.settings.pump_cover_snap_z_offset)):
+                    Torus(
+                        major_radius=snap_r,
+                        minor_radius=self.settings.pump_cover_snap_groove_minor,
+                        mode=Mode.SUBTRACT,
                     )
             with Locations((tube_x, tube_y, floor_z + 2.0)):
                 # Tube inner cavity (starting 2mm above floor to create a bottom pocket)
@@ -926,21 +964,21 @@ class CatFountainProvider(Provider):
             Cylinder(radius=cover_r, height=4.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
             # Add a 0.5mm snap-fit annular ring around the perimeter
-            with BuildPart(mode=Mode.PRIVATE) as snap_ring_part:
-                Cylinder(radius=cover_r + 0.5, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
-                Cylinder(
-                    radius=cover_r - 2.0, height=2.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
-                )
-                fillet(snap_ring_part.edges().filter_by(GeomType.CIRCLE), radius=0.4)
-
+            snap_ring_part = make_snap_ring(
+                outer_radius=cover_r + 0.5,
+                inner_radius=cover_r - 2.0,
+                height=1.0,
+                fillet_radius=0.4,
+                align_z=Align.MIN,
+            )
             with Locations((0, 0, 1.2)):
-                add(snap_ring_part.part)
+                add(snap_ring_part)
 
             # Funnel-shaped top surface to drain water towards the central drain hole
             with Locations((0, 0, 1.5)):
                 Cone(
                     bottom_radius=0.0,
-                    top_radius=80.0,
+                    top_radius=self.settings.lid_pocket_radius,
                     height=2.5,
                     align=(Align.CENTER, Align.CENTER, Align.MIN),
                     mode=Mode.SUBTRACT,
@@ -1020,11 +1058,12 @@ class CatFountainProvider(Provider):
                     minor_radius=self.settings.snap_ridge_minor,
                 )
 
-            with BuildPart() as pocket_tool:
-                Cylinder(radius=80.0, height=6.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
-                bottom_edge = pocket_tool.edges().filter_by(GeomType.CIRCLE).sort_by(Axis.Z)[0]
-                fillet(bottom_edge, radius=1.5)
-            with Locations((0.0, 0.0, 3.0)):
+            pocket_tool = make_filleted_pocket_tool(
+                radius=self.settings.lid_pocket_radius,
+                height=6.0,
+                fillet_radius=1.5,
+            )
+            with Locations((0.0, 0.0, self.settings.lid_pocket_z_offset)):
                 add(pocket_tool, mode=Mode.SUBTRACT)
 
             # Subtract the large circular cutout, but preserve the circular platform at Y = 28.0
@@ -1332,6 +1371,12 @@ class CatFountainProvider(Provider):
                         height=1.5,
                         align=(Align.CENTER, Align.CENTER, Align.MIN),
                     )
+                # Annular snap-fit ridge on downward lip to lock tightly into casing recess (BUG-SPECKLED-ROACH-49)
+                with Locations((0, 0, -self.settings.pump_cover_snap_z_offset)):
+                    Torus(
+                        major_radius=snap_r + self.settings.pump_cover_snap_ridge_offset,
+                        minor_radius=self.settings.pump_cover_snap_ridge_minor,
+                    )
 
             # 2. Tube sleeve sliding down the vertical delivery tube
             with Locations((tube_x, tube_y, 0)):
@@ -1586,6 +1631,56 @@ class CatFountainProvider(Provider):
         ]:
             rgba = self.get_color(name)
             room.add(name, part, color=rgba[:3], alpha=rgba[3])
+
+        # 4. Build and add dummy PCBs / footprints for visual inspection and fitment checks (non-printable)
+        if mode != ProviderMode.SIMULATE:
+
+            def make_pcb(w: float, l: float, h: float = 2.0) -> Part:
+                with BuildPart() as pcb:
+                    Box(w, l, h, align=(Align.CENTER, Align.CENTER, Align.CENTER))
+                    r = min(1.5, min(w, l) * 0.4)
+                    if r > 0.1:
+                        fillet(pcb.edges().filter_by(Axis.Z), radius=r)
+                return cast(Part, pcb.part)
+
+            def make_sensor_pcb() -> Part:
+                with BuildPart() as pcb:
+                    Box(2.0, 25.0, 17.0, align=(Align.CENTER, Align.CENTER, Align.CENTER))
+                    fillet(pcb.edges().filter_by(Axis.X), radius=1.5)
+                return cast(Part, pcb.part)
+
+            def make_motor(dia: float = 13.8, h: float = 9.3) -> Part:
+                with BuildPart() as motor:
+                    Cylinder(radius=dia / 2.0, height=h, align=(Align.CENTER, Align.CENTER, Align.CENTER))
+                    with Locations((0, 0, h / 2.0)):
+                        Cylinder(radius=0.75, height=7.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                return cast(Part, motor.part)
+
+            yaml_path = Path(__file__).parent / "wiring.yaml"
+            wiring = Wiring(yaml_path, bowl_part)
+            pcb_footprints = wiring.footprints
+
+            for fp in pcb_footprints:
+                if fp.name == "led":
+                    continue
+                w, l, thickness = fp.dimensions
+                if fp.package == "tof_sensor":
+                    joint_name = fp.name.replace("sensor_", "sensor_port_")
+                    joint_loc = bowl_part.joints[joint_name].location
+                    s_pcb = make_sensor_pcb()
+                    s_pcb.location = joint_loc * Location((-18.3, 0, 0))
+                    room.add(f"sensor_pcb_{fp.name[7:]}", s_pcb, color="green", alpha=0.6)
+                elif fp.package == "motor":
+                    m_part = make_motor(w, thickness)
+                    m_part.location = Location(fp.position, fp.rotation)
+                    room.add(f"{fp.name}_pcb", m_part, color="grey", alpha=0.85)
+                else:
+                    pcb = make_pcb(w, l, thickness)
+                    pcb.location = Location(fp.position, fp.rotation)
+                    color = "blue" if fp.package == "battery" else "green"
+                    alpha = 0.8 if fp.package == "battery" else 0.6
+                    room.add(f"{fp.name}_pcb", pcb, color=color, alpha=alpha)
+
         self.room = room
 
     def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
@@ -1647,21 +1742,15 @@ class CatFountainProvider(Provider):
                 )
 
             # Annular snap ridge matching the internal groove in the bowl mounting socket
-            with BuildPart(mode=Mode.PRIVATE) as snap_ring_part:
-                Cylinder(
-                    radius=collar_r + groove_offset - 0.1,
-                    height=1.0,
-                    align=(Align.CENTER, Align.CENTER, Align.CENTER),
-                )
-                Cylinder(
-                    radius=collar_r - 1.0,
-                    height=2.0,
-                    align=(Align.CENTER, Align.CENTER, Align.CENTER),
-                    mode=Mode.SUBTRACT,
-                )
-                fillet(snap_ring_part.edges().filter_by(GeomType.CIRCLE), radius=0.35)
+            snap_ring_part = make_snap_ring(
+                outer_radius=collar_r + groove_offset - 0.1,
+                inner_radius=collar_r - 1.0,
+                height=1.0,
+                fillet_radius=0.35,
+                align_z=Align.CENTER,
+            )
             with Locations((0, 0, clip_h + 2.0)):
-                add(snap_ring_part.part)
+                add(snap_ring_part)
 
             # Vertical expansion slits to provide radial snap compliance during insertion/removal
             with Locations(Rot(0, 0, 45)), Locations(Rot(0, 0, 135)):

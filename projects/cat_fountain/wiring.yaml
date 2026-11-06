@@ -232,7 +232,7 @@ components:
   - name: motor_driver
     package: board
     position: [50.0, 15.0, 23.0]
-    rotation: [0.0, 0.0, 0.0]
+    rotation: [0.0, 0.0, 90.0]
     dimensions: [20.32, 15.24, 1.6]
     label:
       text: "TMC6300"
@@ -433,7 +433,7 @@ components:
   - name: swd_adapter
     package: board
     position: [-50.0, -45.0, 23.0]
-    rotation: [0.0, 0.0, 0.0]
+    rotation: [0.0, 0.0, 90.0]
     dimensions: [19.1, 13.7, 1.6]
     label:
       text: "SWD"

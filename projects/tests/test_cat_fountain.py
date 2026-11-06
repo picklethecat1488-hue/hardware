@@ -252,6 +252,30 @@ class TestCatFountainProvider:
         assert "bottom_cover" in room
         assert "lid" in room
 
+        # Verify footprints/PCBs are placed in DEFAULT mode for visual inspection
+        expected_footprints = [
+            "battery_pcb",
+            "charger_pcb",
+            "pico_pcb",
+            "fuel_gauge_pcb",
+            "current_monitor_pcb",
+            "motor_driver_pcb",
+            "motor_pcb",
+            "sensor_pcb_east",
+            "sensor_pcb_north",
+            "sensor_pcb_west",
+            "speed_sensor_pcb",
+            "swd_adapter_pcb",
+        ]
+        for fp_name in expected_footprints:
+            assert fp_name in room, f"Expected footprint '{fp_name}' in room for visual inspection"
+
+        # Verify dummy footprints are omitted in SIMULATE mode
+        sim_room = Room()
+        provider.build_product(sim_room, Mode.SIMULATE)
+        for fp_name in expected_footprints:
+            assert fp_name not in sim_room, f"Footprint '{fp_name}' must not be present in SIMULATE mode"
+
         # Verify attributes on bowl
         bowl_shape = room["bowl"][0]
         assert bowl_shape.urdf_label == "bowl"
@@ -1605,6 +1629,83 @@ class TestCatFountainProvider:
         south_y = tube_y - tube_r - 1.0
         assert solid.is_inside((0.0, south_y, z_mid)), f"Pump cover South cradle wall is broken at Y = {south_y}!"
 
+    @pytest.mark.slow
+    def test_regression_bug_speckled_roach_49_pump_cover_snap_fit(self, provider):
+        """Verify that pump cover downward lip features an annular snap ridge and casing recess has a matching groove.
+
+        BUG-SPECKLED-ROACH-49: Ensures pump cover snaps securely into the casing recess on the bowl and cannot move
+        freely up and down the tube/shaft.
+        """
+        from build123d import Location
+
+        bowl = provider.build_bowl("bowl")
+        cover = provider.build_pump_cover("pump_cover")
+        bowl_part = bowl.part
+        cover_part = cover.part
+        assert bowl_part is not None and cover_part is not None
+
+        floor_z = provider.settings.floor_z
+        hub_r = provider.settings.impeller_radius + provider.settings.magnet_radius + 1.0
+        impeller_r = hub_r + 4.0
+        chamber_r = impeller_r + provider.settings.pump_casing_clearance
+        snap_r = chamber_r + 1.0
+        z_offset = provider.settings.pump_cover_snap_z_offset
+
+        # 1. Pump cover downward lip has an annular snap ridge protruding beyond snap_r
+        ridge_outer_r = (
+            snap_r + provider.settings.pump_cover_snap_ridge_offset + provider.settings.pump_cover_snap_ridge_minor
+        )
+        assert ridge_outer_r > snap_r, "Snap ridge must extend beyond casing recess radius to snap in"
+        test_ridge_pt = (ridge_outer_r - 0.05, 0.0, -z_offset)
+        assert cover_part.is_inside(test_ridge_pt), (
+            f"Pump cover downward lip is missing annular snap ridge at {test_ridge_pt}!"
+        )
+
+        # 2. Bowl casing recess has a matching snap groove at the same relative Z
+        groove_z = floor_z + 10.0 - z_offset
+        test_groove_pt = (snap_r + 0.2, 0.0, groove_z)
+        assert not bowl_part.is_inside(test_groove_pt), (
+            f"Bowl casing recess is missing annular snap groove at {test_groove_pt}!"
+        )
+
+        # 3. Assembled configuration must have zero CAD collision between ridge and groove
+        seat_loc = Location((0, 0, floor_z + 10.0))
+        cover_placed = cover_part.located(seat_loc)
+        intersection = bowl_part.intersect(cover_placed)
+        vol = sum(s.volume for s in intersection.solids()) if intersection else 0.0
+        assert vol < 0.2, f"Interference detected between bowl and snapped pump cover: {vol:.4f} mm3"
+
+    @pytest.mark.slow
+    def test_regression_bug_glowing_wasp_133_snap_ring_refactoring(self, provider):
+        """Verify that snap ring and pocket tool geometry routines are cleanly abstracted and parameterized.
+
+        BUG-GLOWING-WASP-133: Replaces repeated ad-hoc snap ring and pocket tool patterns with reusable helpers
+        and parameterized config settings.
+        """
+        from projects.cat_fountain.provider import make_filleted_pocket_tool, make_snap_ring
+
+        # 1. Test make_snap_ring
+        ring = make_snap_ring(outer_radius=20.0, inner_radius=18.0, height=1.0, fillet_radius=0.3)
+        assert ring is not None and ring.volume > 0.0
+        assert ring.is_inside((19.0, 0.0, 0.5))
+        assert not ring.is_inside((17.0, 0.0, 0.5))
+        assert not ring.is_inside((21.0, 0.0, 0.5))
+
+        # 2. Test make_filleted_pocket_tool
+        tool = make_filleted_pocket_tool(radius=80.0, height=6.0, fillet_radius=1.5)
+        assert tool is not None and tool.volume > 0.0
+        assert tool.is_inside((0.0, 0.0, 3.0))
+
+        # 3. Verify that bottom cover, lid, and motor hub build cleanly with refactored helpers
+        bottom_cover = provider.build_bottom_cover("bottom_cover")
+        assert bottom_cover.part is not None and bottom_cover.part.volume > 0.0
+
+        lid = provider.build_lid("lid")
+        assert lid.part is not None and lid.part.volume > 0.0
+
+        motor_hub = provider.build_motor_hub("motor_hub")
+        assert motor_hub.part is not None and motor_hub.part.volume > 0.0
+
     def test_compute_flow_metrics_upper_reservoir_retention(self, provider):
         """Verify that fluid particles filling the reservoir up to the lid shelf are counted in pool_volume.
 
@@ -1789,12 +1890,15 @@ class TestCatFountainProvider:
             f"Expected motor_driver_spacing_y to be 15.24mm (0.60 in width), got {provider.settings.motor_driver_spacing_y}"
         )
 
-        # 2. Check wiring.yaml footprint dimensions and absence of screw mounting holes
+        # 2. Check wiring.yaml footprint dimensions, rotation, and absence of screw mounting holes
         yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
         wiring = Wiring(yaml_path)
         driver = next(f for f in wiring.footprints if f.name == "motor_driver")
         assert tuple(driver.dimensions) == (20.32, 15.24, 1.6), (
             f"Expected TMC6300 board dimensions [20.32, 15.24, 1.6], got {driver.dimensions}"
+        )
+        assert tuple(driver.rotation) == (0.0, 0.0, 90.0), (
+            f"Expected TMC6300 rotation [0.0, 0.0, 90.0] for clip socket alignment, got {driver.rotation}"
         )
         assert driver.mounting_holes is None, (
             "SparkFun TMC6300 breakout has no screw mounting holes per official dimensions PDF"
@@ -1949,6 +2053,9 @@ class TestCatFountainProvider:
         swd_fp = next((f for f in wiring.footprints if f.name == "swd_adapter"), None)
         assert swd_fp is not None, "swd_adapter footprint must exist in wiring.yaml"
         assert tuple(swd_fp.dimensions) == (19.1, 13.7, 1.6)
+        assert tuple(swd_fp.rotation) == (0.0, 0.0, 90.0), (
+            f"Expected SWD adapter rotation [0.0, 0.0, 90.0] for clip socket alignment, got {swd_fp.rotation}"
+        )
 
         # 3. Bowl CAD model contains clip guide for SWD board
         bowl = provider.build_bowl("bowl")

@@ -835,6 +835,26 @@ class CatFountainConfig(BaseModel):
         return float(self._raw_data.get("pump_cover_clip_opening_width", 14.8))
 
     @cached_property
+    def pump_cover_snap_groove_minor(self) -> float:
+        """Return the minor radius of the annular snap groove for the pump cover in the volute casing."""
+        return float(self._raw_data.get("pump_cover_snap_groove_minor", 0.4))
+
+    @cached_property
+    def pump_cover_snap_ridge_minor(self) -> float:
+        """Return the minor radius of the annular snap ridge on the pump cover downward lip."""
+        return float(self._raw_data.get("pump_cover_snap_ridge_minor", 0.35))
+
+    @cached_property
+    def pump_cover_snap_ridge_offset(self) -> float:
+        """Return the major radius offset for the pump cover annular snap ridge."""
+        return float(self._raw_data.get("pump_cover_snap_ridge_offset", -0.15))
+
+    @cached_property
+    def pump_cover_snap_z_offset(self) -> float:
+        """Return the vertical Z offset from casing top for the pump cover snap fit ring."""
+        return float(self._raw_data.get("pump_cover_snap_z_offset", 0.75))
+
+    @cached_property
     def pump_outlet_radius(self) -> float:
         """Return the inner radius of the tangential water outlet nozzle."""
         return float(self._raw_data.get("pump_outlet_radius", 4.0))
