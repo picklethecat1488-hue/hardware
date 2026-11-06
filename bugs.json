@@ -8712,34 +8712,7 @@
       "logs": "",
       "attachments": [
         {
-          "id": "att-3",
-          "filename": "carrier_board_bom_rev2.csv",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv",
-          "size_bytes": 0,
-          "description": "CSV export of clean EDA BOM",
-          "created_at": ""
-        },
-        {
           "id": "att-4",
-          "filename": "carrier_board_bom_rev3.xlsx",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
-          "size_bytes": 0,
-          "description": "Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM)",
-          "created_at": ""
-        },
-        {
-          "id": "att-5",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
-          "size_bytes": 0,
-          "description": "Uploaded reference questions spreadsheet from PCBWay",
-          "created_at": ""
-        },
-        {
-          "id": "att-6",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
@@ -8748,7 +8721,7 @@
           "created_at": ""
         },
         {
-          "id": "att-7",
+          "id": "att-5",
           "filename": "carrier_board_bom_rev3.csv",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv",
@@ -8757,7 +8730,7 @@
           "created_at": ""
         },
         {
-          "id": "att-8",
+          "id": "att-6",
           "filename": "digikey_order_2026-10-14.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx",
@@ -8766,7 +8739,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-7",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
@@ -8775,12 +8748,39 @@
           "created_at": ""
         },
         {
-          "id": "att-2",
+          "id": "att-8",
           "filename": "carrier_board_bom_rev2.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
           "size_bytes": 0,
           "description": "Clean EDA export BOM generated directly from updated carrier board model",
+          "created_at": ""
+        },
+        {
+          "id": "att-1",
+          "filename": "carrier_board_bom_rev2.csv",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv",
+          "size_bytes": 0,
+          "description": "CSV export of clean EDA BOM",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "carrier_board_bom_rev3.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
+          "size_bytes": 0,
+          "description": "Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM)",
+          "created_at": ""
+        },
+        {
+          "id": "att-3",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
+          "size_bytes": 0,
+          "description": "Uploaded reference questions spreadsheet from PCBWay",
           "created_at": ""
         }
       ],
@@ -9090,7 +9090,7 @@
         }
       ],
       "created_at": "2026-10-23 23:00:18 UTC",
-      "updated_at": "2026-11-06 00:18:47 UTC",
+      "updated_at": "",
       "resolved_at": "2026-11-05 15:45:39 UTC",
       "resolution_notes": "Eliminate duplicate outer window borders and resize grippers by applying .in-iframe rules to common.css and workstation templates, and add frame-busting to diff_view.",
       "rejection_notes": "",
@@ -9148,7 +9148,7 @@
         }
       ],
       "created_at": "2026-10-23 23:04:38 UTC",
-      "updated_at": "2026-11-06 00:18:54 UTC",
+      "updated_at": "",
       "resolved_at": "2026-11-06 00:18:54 UTC",
       "resolution_notes": "Optimized bug persistence and detached branch commits: 1) Batch git index updates via 'git update-index --index-info' instead of per-bug subprocess calls; 2) In-memory SHA-1 computation and direct blob persistence; 3) Incremental dirty bug saving in SQLite and markdown exporter; reducing save times from >12s to sub-second.",
       "rejection_notes": "",
@@ -9264,7 +9264,7 @@
         }
       ],
       "created_at": "2026-11-05 14:44:07 UTC",
-      "updated_at": "2026-11-06 00:18:37 UTC",
+      "updated_at": "",
       "resolved_at": "2026-11-05 16:25:54 UTC",
       "resolution_notes": "Simplify proximity sensor shield on inner bowl wall to an extruded hollow rectangle centered on pocket opening, eliminating inner lip and protruding tails.",
       "rejection_notes": "",
@@ -9308,7 +9308,7 @@
         }
       ],
       "created_at": "2026-11-05 14:49:40 UTC",
-      "updated_at": "2026-11-06 00:18:19 UTC",
+      "updated_at": "",
       "resolved_at": "2026-11-05 17:04:16 UTC",
       "resolution_notes": "Replaced slide-in guide rail system for hole-less PCBs with axial snap-socket frame featuring an internal perimeter snap groove and entrance lead-in chamfer, eliminating micro-gaps and assembly collision with current sensor.",
       "rejection_notes": "",
@@ -9319,7 +9319,7 @@
       "id": "BUG-LUSTROUS-COCOON-669",
       "uuid": "13875eb9-23cd-4e48-8250-856f02d7bfa1",
       "title": "Motor base design is way too complicated",
-      "status": "OPEN",
+      "status": "RESOLVED",
       "severity": "HIGH",
       "category": "CAD",
       "component": "cat_fountain",
@@ -9329,6 +9329,15 @@
       "actual_behavior": "",
       "logs": "",
       "attachments": [
+        {
+          "id": "att-3",
+          "filename": "screenshot_paste_1793924149979_7f535.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1793924149979_7f535.png",
+          "created_at": ""
+        },
         {
           "id": "att-1",
           "filename": "screenshot_paste_1793890911006_wvg54.png",
@@ -9346,15 +9355,6 @@
           "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793890876309_0c9ae.png",
           "created_at": ""
-        },
-        {
-          "id": "5d7230b6",
-          "filename": "screenshot_paste_1793924149979_7f535.png",
-          "file_type": "screenshot",
-          "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png",
-          "size_bytes": 398279,
-          "description": "Pasted screenshot screenshot_paste_1793924149979_7f535.png",
-          "created_at": "2026-11-06 00:15:49 UTC"
         }
       ],
       "commit_ids": [
@@ -9370,9 +9370,9 @@
         }
       ],
       "created_at": "2026-11-05 14:54:50 UTC",
-      "updated_at": "2026-11-06 00:17:30 UTC",
-      "resolved_at": null,
-      "resolution_notes": "Simplify motor base to a circle unioned with a hall sensor mounting rectangle fitting into socket wall keyway gap; ensure 3 mounting holes on bottom; remove latent south slide cut and extra box above hall sensor in bowl.\n\n—There are thin walls under the cutout for the hall sensor. Can you fix?",
+      "updated_at": "",
+      "resolved_at": "2026-11-06 00:24:42 UTC",
+      "resolution_notes": "Simplified motor base to circle unioned with hall sensor rectangular tongue; eliminated thin sliver walls under hall sensor cutout by extending socket keyway cut from inner bore.",
       "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": "2026-11-06 00:16:51 UTC"
@@ -9423,7 +9423,7 @@
         }
       ],
       "created_at": "2026-11-05 15:06:09 UTC",
-      "updated_at": "2026-11-06 00:15:08 UTC",
+      "updated_at": "",
       "resolved_at": "2026-11-05 17:14:12 UTC",
       "resolution_notes": "Add triangular motor strut grooves to drive hub bottom and refactor drive hub body to a 3-lobed convex hull with >=1.5mm wall thickness around all magnets, grooves, and shaft hole.",
       "rejection_notes": "",
@@ -9431,5 +9431,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 00:18:56 UTC"
+  "updated_at": "2026-11-06 00:24:42 UTC"
 }
