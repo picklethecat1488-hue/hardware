@@ -9679,7 +9679,7 @@
       "severity": "MEDIUM",
       "category": "INFRASTRUCTURE",
       "component": "dashboard",
-      "description": "",
+      "description": "Opening a commit in the bug report station doesn’t go to the code review window directly, instead it opens up a website to the toplevel VCS UI with only the working tree selected. Additionally, there is no way to go back to the bug report station when finished reviewing (there is no back button in the toolbar). ",
       "reproduction_steps": [],
       "expected_behavior": "",
       "actual_behavior": "",
@@ -9698,7 +9698,7 @@
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-06 17:15:23 UTC",
-      "updated_at": "2026-11-06 17:16:03 UTC",
+      "updated_at": "2026-11-06 17:17:11 UTC",
       "resolved_at": null,
       "resolution_notes": "",
       "rejection_notes": null,
@@ -9706,5 +9706,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 17:16:03 UTC"
+  "updated_at": "2026-11-06 17:17:11 UTC"
 }
