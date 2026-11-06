@@ -9510,7 +9510,7 @@
       "id": "BUG-FIERCE-LONGHORN-849",
       "uuid": "04ef79bc-f57b-442f-8969-9dba1c94909f",
       "title": "SWD and TMC6300 mounts- unsufficient snap ring overlap",
-      "status": "RESOLVED",
+      "status": "OPEN",
       "severity": "MEDIUM",
       "category": "CAD",
       "component": "cat_fountain",
@@ -9552,12 +9552,12 @@
         }
       ],
       "created_at": "2026-11-06 06:40:24 UTC",
-      "updated_at": "2026-11-06 17:19:36 UTC",
-      "resolved_at": "2026-11-06 17:19:36 UTC",
+      "updated_at": "2026-11-06 17:19:39 UTC",
+      "resolved_at": null,
       "resolution_notes": "Configured pcb_snap_socket_cutout_margin to 0.4mm for positive snap ring overlap holding SWD and TMC6300 boards\n\nRejected— the side openings for inserting a board removal tool into the mount are missing from the design.",
-      "rejection_notes": "",
+      "rejection_notes": "Configured pcb_snap_socket_cutout_margin to 0.4mm for positive snap ring overlap holding SWD and TMC6300 boards\n\nRejected— the side openings for inserting a board removal tool into the mount are missing from the design.",
       "accepted_at": null,
-      "rejected_at": null
+      "rejected_at": "2026-11-06 17:19:39 UTC"
     },
     {
       "id": "BUG-SHINING-SILVERFISH-89",
@@ -9706,5 +9706,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 17:19:36 UTC"
+  "updated_at": "2026-11-06 17:19:39 UTC"
 }

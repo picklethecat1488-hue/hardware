@@ -1,13 +1,13 @@
-# 🟢 `[BUG-FIERCE-LONGHORN-849]` SWD and TMC6300 mounts- unsufficient snap ring overlap
+# 🔴 `[BUG-FIERCE-LONGHORN-849]` SWD and TMC6300 mounts- unsufficient snap ring overlap
 
 - **UUID**: `04ef79bc-f57b-442f-8969-9dba1c94909f`
 - **ID**: `BUG-FIERCE-LONGHORN-849`
-- **Status**: `RESOLVED`
+- **Status**: `OPEN`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-06 06:40:24 UTC`
-- **Resolved**: `2026-11-06 17:19:36 UTC`
+- **Rejected**: `2026-11-06 17:19:39 UTC`
 
 #### Description
 
@@ -31,6 +31,12 @@ Additionally, we should add holes on each wall to allow a small tool such as an 
 - [ ] <!-- task:142f51c1 --> Inspect SWD and TMC6300 snap sockets in 3D viewer | `python tools/view.py cat_fountain/product:view`
 
 #### Resolution Notes
+
+Configured pcb_snap_socket_cutout_margin to 0.4mm for positive snap ring overlap holding SWD and TMC6300 boards
+
+Rejected— the side openings for inserting a board removal tool into the mount are missing from the design.
+
+#### Rejection Feedback
 
 Configured pcb_snap_socket_cutout_margin to 0.4mm for positive snap ring overlap holding SWD and TMC6300 boards
 

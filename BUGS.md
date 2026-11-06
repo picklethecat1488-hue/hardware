@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 17:19:38 UTC` |
+| **Report Date** | `2026-11-06 17:19:40 UTC` |
 | **Total Issues** | `320` |
-| **Open Issues** | `1` |
-| **Resolved / Closed** | `319 (99%)` |
+| **Open Issues** | `2` |
+| **Resolved / Closed** | `318 (99%)` |
 
 ## Issues by Severity
 
@@ -347,7 +347,7 @@
 - [x] **`[MEDIUM]`** [#BUG-THORACIC-HARVESTMAN-529](#bug-thoracic-harvestman-529): Add grooves for triangular motor struts to drive hub `[cat_fountain]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-SPECKLED-ROACH-49](#bug-speckled-roach-49): Pump cover should snap into place `[cat_fountain]` (`CLOSED`)
 - [x] **`[LOW]`** [#BUG-GLOWING-WASP-133](#bug-glowing-wasp-133): Cat fountain-refactor and simplify code `[cat_fountain]` (`CLOSED`)
-- [x] **`[MEDIUM]`** [#BUG-FIERCE-LONGHORN-849](#bug-fierce-longhorn-849): SWD and TMC6300 mounts- unsufficient snap ring overlap `[cat_fountain]` (`RESOLVED`)
+- [ ] **`[MEDIUM]`** [#BUG-FIERCE-LONGHORN-849](#bug-fierce-longhorn-849): SWD and TMC6300 mounts- unsufficient snap ring overlap `[cat_fountain]` (`OPEN`)
 - [x] **`[MEDIUM]`** [#BUG-SHINING-SILVERFISH-89](#bug-shining-silverfish-89): Attachments show up in the diff view `[dashboard]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-BRISTLY-CENTIPEDE-327](#bug-bristly-centipede-327): Add modal progress UIs for repo and bug actions `[dashboard]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-LUSTROUS-HORSEFLY-593](#bug-lustrous-horsefly-593): Rename GEMINI.md to AGENTS.md (`CLOSED`)
@@ -28315,15 +28315,15 @@ Refactored repeated snap ring and pocket tool patterns into reusable helpers mak
 
 ---
 
-### <a id="bug-fierce-longhorn-849"></a> 🟢 `[BUG-FIERCE-LONGHORN-849]` SWD and TMC6300 mounts- unsufficient snap ring overlap
+### <a id="bug-fierce-longhorn-849"></a> 🔴 `[BUG-FIERCE-LONGHORN-849]` SWD and TMC6300 mounts- unsufficient snap ring overlap
 
 - **UUID**: `04ef79bc-f57b-442f-8969-9dba1c94909f`
-- **Status**: `RESOLVED`
+- **Status**: `OPEN`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-06 06:40:24 UTC`
-- **Resolved**: `2026-11-06 17:19:36 UTC`
+- **Rejected**: `2026-11-06 17:19:39 UTC`
 
 #### Description
 
@@ -28347,6 +28347,12 @@ Additionally, we should add holes on each wall to allow a small tool such as an 
 - [ ] <!-- task:142f51c1 --> Inspect SWD and TMC6300 snap sockets in 3D viewer | `python tools/view.py cat_fountain/product:view`
 
 #### Resolution Notes
+
+Configured pcb_snap_socket_cutout_margin to 0.4mm for positive snap ring overlap holding SWD and TMC6300 boards
+
+Rejected— the side openings for inserting a board removal tool into the mount are missing from the design.
+
+#### Rejection Feedback
 
 Configured pcb_snap_socket_cutout_margin to 0.4mm for positive snap ring overlap holding SWD and TMC6300 boards
 
