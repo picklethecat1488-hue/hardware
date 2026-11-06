@@ -2,11 +2,12 @@
 
 - **UUID**: `3df722a8-04f9-4547-a81c-1da2e14017ef`
 - **ID**: `BUG-LUSTROUS-HORSEFLY-593`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `GENERAL`
 - **Created**: `2026-11-06 06:54:27 UTC`
 - **Resolved**: `2026-11-06 17:13:12 UTC`
+- **Accepted**: `2026-11-06 17:13:15 UTC`
 
 #### Description
 

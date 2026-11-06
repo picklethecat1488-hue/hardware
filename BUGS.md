@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 17:13:14 UTC` |
+| **Report Date** | `2026-11-06 17:13:15 UTC` |
 | **Total Issues** | `319` |
 | **Open Issues** | `0` |
 | **Resolved / Closed** | `319 (100%)` |
@@ -350,7 +350,7 @@
 - [x] **`[MEDIUM]`** [#BUG-FIERCE-LONGHORN-849](#bug-fierce-longhorn-849): SWD and TMC6300 mounts- unsufficient snap ring overlap `[cat_fountain]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-SHINING-SILVERFISH-89](#bug-shining-silverfish-89): Attachments show up in the diff view `[dashboard]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-BRISTLY-CENTIPEDE-327](#bug-bristly-centipede-327): Add modal progress UIs for repo and bug actions `[dashboard]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-LUSTROUS-HORSEFLY-593](#bug-lustrous-horsefly-593): Rename GEMINI.md to AGENTS.md (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-LUSTROUS-HORSEFLY-593](#bug-lustrous-horsefly-593): Rename GEMINI.md to AGENTS.md (`CLOSED`)
 
 ## Detailed Issue Log
 
@@ -28416,11 +28416,12 @@ Added delayed (>1s) action progress modal with live elapsed timer to dashboard a
 ### <a id="bug-lustrous-horsefly-593"></a> 🟢 `[BUG-LUSTROUS-HORSEFLY-593]` Rename GEMINI.md to AGENTS.md
 
 - **UUID**: `3df722a8-04f9-4547-a81c-1da2e14017ef`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `GENERAL`
 - **Created**: `2026-11-06 06:54:27 UTC`
 - **Resolved**: `2026-11-06 17:13:12 UTC`
+- **Accepted**: `2026-11-06 17:13:15 UTC`
 
 #### Description
 
