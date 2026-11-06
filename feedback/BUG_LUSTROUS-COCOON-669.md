@@ -7,7 +7,7 @@
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-05 14:54:50 UTC`
-- **Resolved**: `2026-11-05 17:09:52 UTC`
+- **Resolved**: `2026-11-06 00:15:49 UTC`
 
 #### Description
 
@@ -25,6 +25,7 @@ Defects circled in red.
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1793890911006_wvg54.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png) | Pasted screenshot screenshot_paste_1793890911006_wvg54.png |
 | `screenshot` | [screenshot_paste_1793890876309_0c9ae.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png) | Pasted screenshot screenshot_paste_1793890876309_0c9ae.png |
+| `screenshot` | [screenshot_paste_1793924149979_7f535.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png) | Pasted screenshot screenshot_paste_1793924149979_7f535.png |
 
 #### Attached Commits
 

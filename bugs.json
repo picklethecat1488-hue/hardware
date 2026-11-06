@@ -9346,6 +9346,15 @@
           "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793890876309_0c9ae.png",
           "created_at": ""
+        },
+        {
+          "id": "5d7230b6",
+          "filename": "screenshot_paste_1793924149979_7f535.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png",
+          "size_bytes": 398279,
+          "description": "Pasted screenshot screenshot_paste_1793924149979_7f535.png",
+          "created_at": "2026-11-06 00:15:49 UTC"
         }
       ],
       "commit_ids": [
@@ -9361,8 +9370,8 @@
         }
       ],
       "created_at": "2026-11-05 14:54:50 UTC",
-      "updated_at": "",
-      "resolved_at": "2026-11-05 17:09:52 UTC",
+      "updated_at": "2026-11-06 00:15:49 UTC",
+      "resolved_at": "2026-11-06 00:15:49 UTC",
       "resolution_notes": "Simplify motor base to a circle unioned with a hall sensor mounting rectangle fitting into socket wall keyway gap; ensure 3 mounting holes on bottom; remove latent south slide cut and extra box above hall sensor in bowl.",
       "rejection_notes": "",
       "accepted_at": null,
@@ -9422,5 +9431,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 00:15:08 UTC"
+  "updated_at": "2026-11-06 00:15:49 UTC"
 }
