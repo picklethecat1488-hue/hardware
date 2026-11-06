@@ -26,11 +26,11 @@ def test_regression_bug_humic_centipede_711_clean_up_repo() -> None:
     assert canonical_urdf_template.exists(), "Canonical urdf_template.yaml must exist under provider/templates/"
 
 
-def test_gemini_functional_behavioral_testing_mandate() -> None:
-    """Verify GEMINI.md codifies the Functional Behavioral Testing Mandate (CR-824ffd23)."""
-    gemini_path = WORKSPACE_ROOT / "GEMINI.md"
-    assert gemini_path.exists(), "GEMINI.md must exist at workspace root"
-    content = gemini_path.read_text(encoding="utf-8")
+def test_agents_functional_behavioral_testing_mandate() -> None:
+    """Verify AGENTS.md codifies the Functional Behavioral Testing Mandate (CR-824ffd23)."""
+    agents_path = WORKSPACE_ROOT / "AGENTS.md"
+    assert agents_path.exists(), "AGENTS.md must exist at workspace root"
+    content = agents_path.read_text(encoding="utf-8")
     assert "Functional Behavioral Testing Mandate" in content, (
-        "GEMINI.md must codify the Functional Behavioral Testing Mandate"
+        "AGENTS.md must codify the Functional Behavioral Testing Mandate"
     )

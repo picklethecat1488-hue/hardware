@@ -134,6 +134,25 @@ class TestModel:
 
         assert service.call_count == 1
 
+    def test_method_cache_default_argument_normalization(self):
+        """Verify that calling a method with explicit defaults hits the cache of a call using implicit defaults."""
+
+        class Service:
+            def __init__(self):
+                self.calls = 0
+
+            @method_cache
+            def query(self, target: str, sub: str | None = None, mode: str = "default"):
+                self.calls += 1
+                return f"{target}:{sub}:{mode}"
+
+        s = Service()
+        res1 = s.query("item")
+        res2 = s.query("item", None, "default")
+        res3 = s.query("item", sub=None, mode="default")
+        assert s.calls == 1
+        assert res1 == res2 == res3 == "item:None:default"
+
     def test_load_measurements_from_file(self, tmp_path):
         """Verify basic measurement loading from a YAML file."""
         data = {"point_a": [10.0, 20.0, 30.0]}

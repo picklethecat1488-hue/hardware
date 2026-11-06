@@ -4,6 +4,7 @@ import base64
 import json
 from pathlib import Path
 import re
+import subprocess
 import threading
 import urllib.request
 import pytest
@@ -17,6 +18,7 @@ from model.bug_report import (
     BugStatus,
 )
 from provider.bug_report.markdown_exporter import MarkdownBugExporter
+from provider.bug_report.detached_branch import DetachedBranchBugStore
 from provider.bug_report.server import BugReportRequestHandler, BugReportServer
 from provider.bug_report.sqlite_store import SQLiteBugStore
 
@@ -476,12 +478,12 @@ def test_regression_bug_169_git_lfs_tracking_and_policy() -> None:
     assert "GitHub LFS" in contrib_text or "Git LFS" in contrib_text
     assert "non-confidential" in contrib_text
 
-    # Check GEMINI.md
-    gemini_file = repo_root / "GEMINI.md"
-    assert gemini_file.exists()
-    gemini_text = gemini_file.read_text(encoding="utf-8")
-    assert "GitHub LFS" in gemini_text or "Git LFS" in gemini_text
-    assert "non-confidential" in gemini_text
+    # Check AGENTS.md
+    agents_file = repo_root / "AGENTS.md"
+    assert agents_file.exists()
+    agents_text = agents_file.read_text(encoding="utf-8")
+    assert "GitHub LFS" in agents_text or "Git LFS" in agents_text
+    assert "non-confidential" in agents_text
 
     # Check bug_report template
     template_file = repo_root / "provider" / "templates" / "bug_report.html.j2"
@@ -1236,3 +1238,196 @@ def test_regression_worm_creeping_larva_820_worm_prefixed_bug_files(tmp_path: Pa
     server = BugReportServer(host="127.0.0.1", port=0, feedback_dir=feedback_dir, bind_and_activate=False)
     mtime = server._get_feedback_dir_mtime()
     assert mtime == exported_path.stat().st_mtime
+
+
+def test_regression_bug_shining_silverfish_89_attachments_in_detached_branch_and_hidden_from_diff(
+    tmp_path: Path,
+) -> None:
+    """Verify BUG-SHINING-SILVERFISH-89: Attachments are decoupled to detached branch and hidden from diff view."""
+    import subprocess
+    import shutil
+    from provider.bug_report.detached_branch import DetachedBranchBugStore
+    from provider.vcs.git_engine import GitEngine, is_file_ignored
+
+    # 1. Verify is_file_ignored ignores attachments across formats and quotation
+    assert is_file_ignored("attachments/test.png")
+    assert is_file_ignored('"attachments/with spaces/test.png"')
+    assert is_file_ignored("feedback/attachments/screenshot.jpg")
+    assert not is_file_ignored("provider/bug_report/server.py")
+
+    # 2. Setup isolated Git repository
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    subprocess.run(["git", "init", "-b", "main"], cwd=str(repo_root), check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=str(repo_root), check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@workspace"], cwd=str(repo_root), check=True, capture_output=True
+    )
+
+    # Initial commit on main
+    (repo_root / "README.md").write_text("# Test Repo\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=str(repo_root), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=str(repo_root), check=True, capture_output=True)
+
+    # 3. Add an attachment to workspace
+    att_dir = repo_root / "attachments" / "BUG-SILVERFISH-1"
+    att_dir.mkdir(parents=True, exist_ok=True)
+    att_file = att_dir / "evidence.png"
+    att_bytes = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDRtest_data"
+    att_file.write_bytes(att_bytes)
+
+    # 4. Create bug database and commit to detached branch
+    bug = BugReportModel(
+        id="BUG-SILVERFISH-1",
+        uuid="4f9fe270-0b4f-4ff7-acce-8b9e66188e1c",
+        title="Sample defect with attachment",
+        status=BugStatus.OPEN,
+        severity=BugSeverity.MEDIUM,
+        category=BugCategory.INFRASTRUCTURE,
+        description="Verify attachment decoupling.",
+        attachments=[
+            BugAttachmentModel(
+                id="att-1",
+                filename="evidence.png",
+                file_type="screenshot",
+                file_path="attachments/BUG-SILVERFISH-1/evidence.png",
+                description="Test preview",
+            )
+        ],
+    )
+    db = BugDatabaseModel(bugs=[bug])
+    store = DetachedBranchBugStore(repo_root=repo_root, branch_name="bugs")
+    commit_sha = store.commit_database(db, commit_message="Add bug with attachment")
+    assert commit_sha is not None
+
+    # 5. Verify the attachment was committed directly to refs/heads/bugs
+    tree_out = subprocess.run(
+        ["git", "ls-tree", "-r", "--name-only", "refs/heads/bugs"],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert "attachments/BUG-SILVERFISH-1/evidence.png" in tree_out.splitlines()
+
+    # 6. Verify checkout_attachments restores files from detached branch
+    shutil.rmtree(repo_root / "attachments")
+    assert not att_file.exists()
+    restored = store.checkout_attachments()
+    assert att_file.exists()
+    assert att_file.read_bytes() == att_bytes
+    assert any("evidence.png" in str(p) for p in restored)
+
+    # 7. Verify GitEngine diff view does not list attachments
+    engine = GitEngine(repo_root=repo_root)
+    changed = engine.get_changed_files("working")
+    for f in changed:
+        assert not f["path"].startswith("attachments/")
+        assert not f["path"].startswith('"attachments/')
+
+
+def test_regression_bug_bristly_centipede_327_action_progress_modals_and_incremental_indexing(tmp_path: Path) -> None:
+    """Verify BUG-BRISTLY-CENTIPEDE-327: Action progress modals in diff and bug views & incremental attachment indexing."""
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+
+    # 1. Verify diff_view.html.j2 modal UI and helper
+    diff_view = (templates_dir / "diff_view.html.j2").read_text(encoding="utf-8")
+    assert 'id="actionProgressModalOverlay"' in diff_view
+    assert "runWithActionModal" in diff_view
+    assert 'title: "SYNCHRONIZING REPOSITORY"' in diff_view
+    assert "await runWithActionModal" in diff_view
+
+    # 2. Verify bug_report.html.j2 modal UI and helper
+    bug_report = (templates_dir / "bug_report.html.j2").read_text(encoding="utf-8")
+    assert 'id="actionProgressModalOverlay"' in bug_report
+    assert "runWithActionModal" in bug_report
+    assert 'title: "SAVING BUG REPORT"' in bug_report
+    assert 'title: "ACCEPTING BUG REPORT"' in bug_report
+    assert 'title: "REJECTING BUG REPORT"' in bug_report
+    assert 'title: "DELETING BUG REPORT"' in bug_report
+    assert 'title: "MERGING AGENT FEEDBACK"' in bug_report
+
+    # 3. Verify incremental attachment scanning in DetachedBranchBugStore
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    subprocess.run(["git", "init", "-b", "main"], cwd=str(repo_root), check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "User"], cwd=str(repo_root), check=True)
+    subprocess.run(["git", "config", "user.email", "user@workspace"], cwd=str(repo_root), check=True)
+
+    dummy_file = repo_root / "README.md"
+    dummy_file.write_text("# Test Repo\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=str(repo_root), check=True)
+    subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=str(repo_root), check=True, capture_output=True)
+
+    att1_dir = repo_root / "attachments" / "BUG-CENTIPEDE-1"
+    att1_dir.mkdir(parents=True)
+    att1_file = att1_dir / "att1.txt"
+    att1_file.write_text("Attachment 1 content", encoding="utf-8")
+
+    att2_dir = repo_root / "attachments" / "BUG-CENTIPEDE-2"
+    att2_dir.mkdir(parents=True)
+    att2_file = att2_dir / "att2.txt"
+    att2_file.write_text("Attachment 2 content", encoding="utf-8")
+
+    bug1 = BugReportModel(
+        id="BUG-CENTIPEDE-1",
+        title="Bug 1",
+        status=BugStatus.OPEN,
+        severity=BugSeverity.LOW,
+        category=BugCategory.INFRASTRUCTURE,
+        attachments=[
+            BugAttachmentModel(
+                id="att-1",
+                filename="att1.txt",
+                file_type="document",
+                file_path="attachments/BUG-CENTIPEDE-1/att1.txt",
+            )
+        ],
+    )
+    bug2 = BugReportModel(
+        id="BUG-CENTIPEDE-2",
+        title="Bug 2",
+        status=BugStatus.OPEN,
+        severity=BugSeverity.MEDIUM,
+        category=BugCategory.INFRASTRUCTURE,
+        attachments=[
+            BugAttachmentModel(
+                id="att-2",
+                filename="att2.txt",
+                file_type="document",
+                file_path="attachments/BUG-CENTIPEDE-2/att2.txt",
+            )
+        ],
+    )
+    db = BugDatabaseModel(bugs=[bug1, bug2])
+    store = DetachedBranchBugStore(repo_root=repo_root, branch_name="bugs")
+
+    # Initial commit (indexes both)
+    commit1 = store.commit_database(db, commit_message="Initial bugs commit")
+    assert commit1 is not None
+
+    tree1 = subprocess.run(
+        ["git", "ls-tree", "-r", "--name-only", "refs/heads/bugs"],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.splitlines()
+    assert "attachments/BUG-CENTIPEDE-1/att1.txt" in tree1
+    assert "attachments/BUG-CENTIPEDE-2/att2.txt" in tree1
+
+    # Incremental commit: modify bug 2, specify dirty_bug_ids=["BUG-CENTIPEDE-2"]
+    bug2.title = "Bug 2 Updated"
+    att2_file.write_text("Attachment 2 updated content", encoding="utf-8")
+    commit2 = store.commit_database(db, commit_message="Update bug 2", dirty_bug_ids=["BUG-CENTIPEDE-2"])
+    assert commit2 is not None
+
+    tree2 = subprocess.run(
+        ["git", "ls-tree", "-r", "--name-only", "refs/heads/bugs"],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.splitlines()
+    assert "attachments/BUG-CENTIPEDE-1/att1.txt" in tree2
+    assert "attachments/BUG-CENTIPEDE-2/att2.txt" in tree2

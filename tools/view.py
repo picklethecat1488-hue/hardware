@@ -444,6 +444,7 @@ def get_args():
     parser.add_argument(
         "-s",
         "--sim-steps",
+        "--steps",
         type=int,
         default=None,
         required=False,

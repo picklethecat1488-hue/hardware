@@ -180,10 +180,8 @@ class CatFountainProvider(Provider):
         }
 
     @method_cache
-    def build_bowl(
-        self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
-    ) -> BuildPart:
-        """Build the cat fountain bowl with integrated 2L reservoir, integrated tube, motor compartment, and screw mounts."""
+    def _build_bowl_impl(self, target: str) -> BuildPart:
+        """Build cached implementation of bowl CAD geometry."""
         r = self.settings.bowl_radius
         h = self.settings.bowl_height
         t = self.settings.bowl_thickness
@@ -299,8 +297,8 @@ class CatFountainProvider(Provider):
 
             # Central solid boss and guide post for the isolated impeller
             with Locations((0, 0, floor_z)):
-                # Static guide post (radius 2.5mm, height 12.0mm)
-                Cylinder(radius=pin_r + 1.5, height=2.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                # Static guide post (radius pin_r, height 12.0mm on shoulder pin_r + 1.0mm)
+                Cylinder(radius=pin_r + 1.0, height=2.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
                 Cylinder(radius=pin_r, height=12.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
             # Groove-style cylindrical mounting socket for dedicated motor hub assembly (BUG-VIBRANT-WOODBORER-940)
@@ -403,36 +401,30 @@ class CatFountainProvider(Provider):
                 snap_h = 1.8
                 total_h = standoff_h + pcb_t + 1.0
 
+                cutout_margin = self.settings.pcb_snap_socket_cutout_margin
+
                 outer_x = board_span + 2.0 * wall_t
                 outer_y = board_slide + 2.0 * wall_t
                 inner_x = board_span + clearance
                 inner_y = board_slide + clearance
+                cutout_x = board_span - cutout_margin
+                cutout_y = board_slide - cutout_margin
 
                 with Locations((center_x, center_y, floor_z - t)):
                     # 1. Solid outer socket frame extending from ceiling
                     Box(outer_x, outer_y, total_h, align=(Align.CENTER, Align.CENTER, Align.MAX))
 
-                    # 2. Central cavity for components and airflow (through the standoff region)
+                    # 2. Central cutout surrounding the boards with small margin (0.1mm - 0.5mm) per BUG-FIERCE-LONGHORN-849
                     Box(
-                        board_span - 3.0,
-                        board_slide - 3.0,
+                        cutout_x,
+                        cutout_y,
                         total_h + 0.1,
                         align=(Align.CENTER, Align.CENTER, Align.MAX),
                         mode=Mode.SUBTRACT,
                     )
 
-                    # 3. PCB seating pocket (from -standoff_h down through bottom)
-                    with Locations((0, 0, -standoff_h)):
-                        Box(
-                            inner_x,
-                            inner_y,
-                            total_h - standoff_h + 0.1,
-                            align=(Align.CENTER, Align.CENTER, Align.MAX),
-                            mode=Mode.SUBTRACT,
-                        )
-
-                    # 4. Internal snap-fit groove in socket walls (matching lid and bottom cover snap groove style)
-                    # Located at the PCB seating position so PCB perimeter edges act as the inner snap ring
+                    # 3. PCB seating pocket (from -standoff_h down through PCB thickness)
+                    # Creates internal snap-fit groove with positive retaining lip below and ceiling shelf above
                     with Locations((0, 0, -standoff_h)):
                         Box(
                             inner_x + snap_depth * 2.0,
@@ -442,12 +434,32 @@ class CatFountainProvider(Provider):
                             mode=Mode.SUBTRACT,
                         )
 
-                    # 5. Lead-in entry chamfer at bottom opening for smooth snap-in insertion
-                    with Locations((0, 0, -total_h + 0.4)):
+                    # 4. Lead-in entry chamfer at bottom opening for smooth snap-in insertion
+                    with Locations((0, 0, -total_h)):
                         Box(
-                            inner_x + 0.8,
-                            inner_y + 0.8,
-                            0.8,
+                            cutout_x + 0.6,
+                            cutout_y + 0.6,
+                            0.3,
+                            align=(Align.CENTER, Align.CENTER, Align.MIN),
+                            mode=Mode.SUBTRACT,
+                        )
+
+                    # 5. Tool removal openings on each wall beneath the PCB (BUG-FIERCE-LONGHORN-849)
+                    # Allows inserting a tool (e.g. Allen wrench) under the board from any of the 4 sides to pop it out
+                    tool_hole_w = self.settings.pcb_snap_socket_tool_hole_width
+                    tool_hole_h = self.settings.pcb_snap_socket_tool_hole_height
+                    with Locations((0, 0, -tool_hole_h / 2.0)):
+                        Box(
+                            outer_x + 2.0,
+                            tool_hole_w,
+                            tool_hole_h,
+                            align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                            mode=Mode.SUBTRACT,
+                        )
+                        Box(
+                            tool_hole_w,
+                            outer_y + 2.0,
+                            tool_hole_h,
                             align=(Align.CENTER, Align.CENTER, Align.CENTER),
                             mode=Mode.SUBTRACT,
                         )
@@ -861,32 +873,55 @@ class CatFountainProvider(Provider):
 
         return bowl
 
-    @method_cache
-    def build_impeller(
-        self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
+    def build_bowl(
+        self, target: str, subassembly: Optional[str] = None, mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
-        """Build the lightweight centrifugal impeller (magnetic-drive)."""
+        """Build the cat fountain bowl with integrated 2L reservoir, integrated tube, motor compartment, and screw mounts."""
+        return self._build_bowl_impl(target.split("/")[-1])
+
+    @method_cache
+    def _build_impeller_impl(self, target: str) -> BuildPart:
+        """Build cached implementation of impeller CAD geometry."""
         hub_r = self.settings.impeller_radius + self.settings.magnet_radius + 1.0
         hub_h = self.settings.impeller_base_height
         impeller_r = hub_r + 4.0
         pin_r = self.settings.impeller_shaft_radius
         pin_clearance = self.settings.impeller_shaft_clearance
-        sleeve_r = 4.5
+        sleeve_r = self.settings.impeller_sleeve_radius
         mr = self.settings.magnet_radius + self.settings.magnet_clearance
         mt = self.settings.magnet_thickness + self.settings.magnet_clearance
         ring_r = self.settings.magnet_ring_radius
+        min_wall = 1.5
+        lobe_r = mr + min_wall
+        center_r = 4.0
+        num_blades = self.settings.impeller_blades
+        blade_h = 4.0
+        blade_len = (ring_r + lobe_r) - sleeve_r
 
         with BuildPart() as impeller:
-            # Impeller Hub base (carrying the magnets)
-            with Locations((0, 0, 0)):
-                Cylinder(radius=hub_r, height=hub_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+            # 1. 3-lobed convex hull base carrying the magnets (minimizes inertia and startup torque)
+            with BuildSketch() as sketch:
+                for i in range(self.settings.magnet_count):
+                    angle = i * (360.0 / self.settings.magnet_count)
+                    rad = math.radians(angle)
+                    with BuildSketch() as arm:
+                        Circle(radius=center_r)
+                        with Locations((ring_r * math.cos(rad), ring_r * math.sin(rad))):
+                            Circle(radius=lobe_r)
+                        make_hull()
+                    add(arm.sketch)
+            extrude(amount=hub_h)
 
-            # Central guide post sleeve (protrudes up to 10.0mm for stability on the post)
+            # 2. Central guide post sleeve (protrudes up for axial stability on the slim pin)
             with Locations((0, 0, 0)):
-                Cylinder(radius=sleeve_r, height=10.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                Cylinder(
+                    radius=sleeve_r,
+                    height=self.settings.impeller_sleeve_height,
+                    align=(Align.CENTER, Align.CENTER, Align.MIN),
+                )
 
-            # Subtract guide post central hole (with generous clearance for free rotation after resin coating)
-            # Rests directly on top of the bowl's 2.0mm post flange shoulder, elevating the base disk 2.0mm off the floor
+            # 3. Subtract guide post central hole (with generous clearance for free rotation after resin coating)
+            # Rests directly on top of the bowl's 2.0mm post flange shoulder, elevating the base 2.0mm off the floor
             Cylinder(
                 radius=pin_r + pin_clearance,
                 height=14.0,
@@ -894,7 +929,7 @@ class CatFountainProvider(Provider):
                 mode=Mode.SUBTRACT,
             )
 
-            # Subtract 4 magnet pockets on the bottom face of the base disk
+            # 4. Subtract magnet pockets on the bottom face of each lobe
             for i in range(self.settings.magnet_count):
                 angle = i * (360.0 / self.settings.magnet_count)
                 with Locations(Rot(0, 0, angle)):
@@ -903,11 +938,8 @@ class CatFountainProvider(Provider):
                             radius=mr, height=mt, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
                         )
 
-            # Add radial blades on the top face of the hub base (Z = hub_h)
-            # Starting directly at the central hub sleeve (sleeve_r) with zero empty space
-            blade_h = 4.0
-            blade_len = hub_r - sleeve_r
-            num_blades = self.settings.impeller_blades
+            # 5. Add 3 radial blades on the top face of the hub base (Z = hub_h)
+            # Situated directly atop the 3 lobes of the convex hull base starting at the central sleeve
             for i in range(num_blades):
                 angle = i * (360.0 / num_blades)
                 with Locations(Location((0, 0, hub_h)) * Rot(0, 0, angle)):
@@ -950,11 +982,15 @@ class CatFountainProvider(Provider):
 
         return impeller
 
-    @method_cache
-    def build_bottom_cover(
-        self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
+    def build_impeller(
+        self, target: str, subassembly: Optional[str] = None, mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
-        """Build the detachable bottom cover for the motor controller compartment."""
+        """Build the lightweight centrifugal impeller (magnetic-drive)."""
+        return self._build_impeller_impl(target.split("/")[-1])
+
+    @method_cache
+    def _build_bottom_cover_impl(self, target: str) -> BuildPart:
+        """Build cached implementation of bottom cover CAD geometry."""
         r = self.settings.bowl_radius
         t = self.settings.bowl_thickness
         clearance = self.settings.bottom_cover_clearance
@@ -1030,11 +1066,15 @@ class CatFountainProvider(Provider):
 
         return cover
 
-    @method_cache
-    def build_lid(
-        self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
+    def build_bottom_cover(
+        self, target: str, subassembly: Optional[str] = None, mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
-        """Build the top cover lid which acts as a drinking shelf and covers/stabilizes the vertical delivery tube."""
+        """Build the detachable bottom cover for the motor controller compartment."""
+        return self._build_bottom_cover_impl(target.split("/")[-1])
+
+    @method_cache
+    def _build_lid_impl(self, target: str) -> BuildPart:
+        """Build cached implementation of lid CAD geometry."""
         r = self.settings.bowl_radius
         h = self.settings.bowl_height
         t = self.settings.bowl_thickness
@@ -1215,11 +1255,15 @@ class CatFountainProvider(Provider):
 
         return lid
 
-    @method_cache
-    def build_led_cover(
-        self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
+    def build_lid(
+        self, target: str, subassembly: Optional[str] = None, mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
-        """Build a translucent push-fit cover/diffuser for the RGB status LED."""
+        """Build the top cover lid which acts as a drinking shelf and covers/stabilizes the vertical delivery tube."""
+        return self._build_lid_impl(target.split("/")[-1])
+
+    @method_cache
+    def _build_led_cover_impl(self, target: str) -> BuildPart:
+        """Build cached implementation of LED cover CAD geometry."""
         flange_w = self.settings.led_flange_width
         flange_t = self.settings.led_flange_thickness
         plug_w = self.settings.led_plug_width
@@ -1245,11 +1289,15 @@ class CatFountainProvider(Provider):
 
         return cover
 
-    @method_cache
-    def build_drive_hub(
-        self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
+    def build_led_cover(
+        self, target: str, subassembly: Optional[str] = None, mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
-        """Build the dry-side magnet drive hub mounted on the motor D-shaft."""
+        """Build a translucent push-fit cover/diffuser for the RGB status LED."""
+        return self._build_led_cover_impl(target.split("/")[-1])
+
+    @method_cache
+    def _build_drive_hub_impl(self, target: str) -> BuildPart:
+        """Build cached implementation of drive hub CAD geometry."""
         hub_h = self.settings.magnet_thickness + self.settings.magnet_clearance + 0.8
         standoff_h = self.settings.drive_hub_standoff_height
         mr = self.settings.magnet_radius + self.settings.magnet_clearance
@@ -1333,11 +1381,15 @@ class CatFountainProvider(Provider):
         RevoluteJoint(label="motor", to_part=hub.part, axis=Axis((0, 0, 0), (0, 0, 1)))
         return hub
 
-    @method_cache
-    def build_pump_cover(
-        self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
+    def build_drive_hub(
+        self, target: str, subassembly: Optional[str] = None, mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
-        """Build the revised wet-side pump cover that slides down the tube and mounts directly over the tube and casing."""
+        """Build the dry-side magnet drive hub mounted on the motor D-shaft."""
+        return self._build_drive_hub_impl(target.split("/")[-1])
+
+    @method_cache
+    def _build_pump_cover_impl(self, target: str) -> BuildPart:
+        """Build cached implementation of pump cover CAD geometry."""
         tube_x = 0.0
         tube_y = 28.0
         tube_r = self.settings.tube_radius
@@ -1464,6 +1516,12 @@ class CatFountainProvider(Provider):
         RigidJoint("mount", cover.part, Location((0, 0, 0)))
         return cover
 
+    def build_pump_cover(
+        self, target: str, subassembly: Optional[str] = None, mode: ProviderMode = ProviderMode.DEFAULT
+    ) -> BuildPart:
+        """Build the revised wet-side pump cover that slides down the tube and mounts directly over the tube and casing."""
+        return self._build_pump_cover_impl(target.split("/")[-1])
+
     def build_diagram(self, room: Room, targets: Sequence[str], mode: ProviderMode) -> None:
         """Build an exploded assembly diagram for the cat fountain."""
         bowl_part = self.build_bowl("bowl").part
@@ -1587,13 +1645,13 @@ class CatFountainProvider(Provider):
 
     def build_product(self, room: Room, mode: ProviderMode) -> None:
         """Place all parts of the cat fountain in the room for visualization/simulation."""
-        bowl_part = self.build_bowl("bowl", mode=mode).part
-        impeller_part = self.build_impeller("impeller", mode=mode).part
-        bottom_cover_part = self.build_bottom_cover("bottom_cover", mode=mode).part
-        lid_part = self.build_lid("lid", mode=mode).part
-        drive_hub_part = self.build_drive_hub("drive_hub", mode=mode).part
-        pump_cover_part = self.build_pump_cover("pump_cover", mode=mode).part
-        motor_hub_part = self.build_motor_hub("motor_hub", mode=mode).part
+        bowl_part = self.build_bowl("bowl").part
+        impeller_part = self.build_impeller("impeller").part
+        bottom_cover_part = self.build_bottom_cover("bottom_cover").part
+        lid_part = self.build_lid("lid").part
+        drive_hub_part = self.build_drive_hub("drive_hub").part
+        pump_cover_part = self.build_pump_cover("pump_cover").part
+        motor_hub_part = self.build_motor_hub("motor_hub").part
 
         assert (
             bowl_part is not None
@@ -1614,7 +1672,7 @@ class CatFountainProvider(Provider):
         bowl_part.joints["motor_hub_seat"].connect_to(motor_hub_part.joints["mount"])
 
         # Build and connect the LED cover using joints
-        led_cover = self.build_led_cover("led_cover", mode=mode).part
+        led_cover = self.build_led_cover("led_cover").part
         assert led_cover is not None
         bowl_part.joints["led_port"].connect_to(led_cover.joints["mount"])
 
@@ -1699,11 +1757,8 @@ class CatFountainProvider(Provider):
         }
 
     @method_cache
-    @method_cache
-    def build_motor_hub(
-        self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
-    ) -> BuildPart:
-        """Build the dedicated motor drive hub assembly bracket mounting the motor and Hall sensor (BUG-LUSTROUS-COCOON-669)."""
+    def _build_motor_hub_impl(self, target: str) -> BuildPart:
+        """Build cached implementation of motor hub CAD geometry."""
         clip_h = self.settings.motor_hub_thickness
         r_bcd = self.settings.motor_mount_bolt_circle_radius
         hole_r = self.settings.motor_mount_hole_radius
@@ -1836,6 +1891,12 @@ class CatFountainProvider(Provider):
         RigidJoint("motor_shaft", hub_bracket.part, Location((0, 0, clip_h + 9.3 + 0.5)))
         RigidJoint("hall_mount", hub_bracket.part, Location((0, hall_front_y, clip_h + hall_sh)))
         return hub_bracket
+
+    def build_motor_hub(
+        self, target: str, subassembly: Optional[str] = None, mode: ProviderMode = ProviderMode.DEFAULT
+    ) -> BuildPart:
+        """Build the dedicated motor drive hub assembly bracket mounting the motor and Hall sensor (BUG-LUSTROUS-COCOON-669)."""
+        return self._build_motor_hub_impl(target.split("/")[-1])
 
     def build_wiring_diagram(self, room: Room, targets: Sequence[str], mode: ProviderMode) -> None:
         """Build a 2D colored wiring diagram for the cat water fountain."""

@@ -7,7 +7,20 @@ os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
-os.environ.setdefault("XLA_FLAGS", "--xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1")
+os.environ.setdefault("XLA_FLAGS", "--xla_cpu_multi_thread_eigen=false")
+
+# Cap CPU core affinity to at most 8 on high-core Linux systems to prevent excessive
+# Eigen/OpenBLAS thread pool allocations that exhaust container thread limits.
+if hasattr(os, "sched_getaffinity") and hasattr(os, "sched_setaffinity"):
+    try:
+        current_affinity = sorted(os.sched_getaffinity(0))
+        if len(current_affinity) > 8:
+            os.sched_setaffinity(0, set(current_affinity[:8]))
+    except OSError:
+        pass
+
+# Limit parallel xdist workers to at most 8 to prevent thread and process exhaustion on high-core systems
+os.environ.setdefault("PYTEST_XDIST_AUTO_NUM_WORKERS", str(min(os.cpu_count() or 4, 8)))
 
 # Force JAX to run exclusively in CPU mode during unit tests to avoid MPS (Apple Silicon GPU)
 # compilation deadlocks, resource constraints, and multi-process GPU conflicts.
@@ -58,11 +71,16 @@ def pytest_cmdline_main(config):
             config.option.numprocesses = 0
 
 
+import pytest
+
+
+@pytest.hookimpl(tryfirst=True)
 def pytest_xdist_auto_num_workers(config):
     """Dynamically determine the number of xdist workers."""
     markexpr = getattr(config.option, "markexpr", "")
     if is_slow_marker_selected(markexpr):
         # Force 0 workers (sequential execution) for slow tests to prevent GPU/UDS deadlocks
         return 0
-    # Let xdist decide automatically for other tests
-    return None
+    # Cap auto workers to prevent thread and cgroup pid exhaustion on large cloud instances (e.g. 128-core hosts)
+    cpu_count = os.cpu_count() or 4
+    return min(cpu_count, 8)

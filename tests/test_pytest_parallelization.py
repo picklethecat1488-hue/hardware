@@ -34,7 +34,8 @@ def test_xdist_workers_not_disabled_for_fast_tests() -> None:
     config.option.numprocesses = "auto"
 
     workers = pytest_xdist_auto_num_workers(config)
-    assert workers is None, f"Expected None (letting xdist decide automatically), got {workers}"
+    assert workers is not None and workers > 0, f"Expected positive worker count, got {workers}"
+    assert workers <= 8, f"Expected workers capped at 8, got {workers}"
 
     pytest_cmdline_main(config)
     assert config.option.numprocesses == "auto", "Fast test runs must not zero out numprocesses"

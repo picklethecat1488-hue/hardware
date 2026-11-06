@@ -755,10 +755,10 @@ def test_regression_bug_194_lfs_tracked_files_grouping_and_styling(tmp_path: Pat
     assert "📦 LFS Tracked Files" in tpl_text
     assert 'class="file-status-badge status-lfs">LFS</span>' in tpl_text
 
-    # 2. Create LFS tracked file under attachments/ and a regular file
-    att_dir = repo_dir / "attachments"
-    att_dir.mkdir(parents=True, exist_ok=True)
-    lfs_file = att_dir / "diagram.png"
+    # 2. Create LFS tracked file under assets/ and a regular file
+    assets_dir = repo_dir / "assets"
+    assets_dir.mkdir(parents=True, exist_ok=True)
+    lfs_file = assets_dir / "diagram.png"
     lfs_file.write_bytes(b"\x89PNG\r\n\x1a\ntestdiagram")
 
     reg_file = repo_dir / "main.py"
@@ -766,20 +766,20 @@ def test_regression_bug_194_lfs_tracked_files_grouping_and_styling(tmp_path: Pat
 
     # Ensure .gitattributes has LFS pattern
     ga = repo_dir / ".gitattributes"
-    ga.write_text("attachments/* filter=lfs diff=lfs merge=lfs -text\n", encoding="utf-8")
+    ga.write_text("assets/* filter=lfs diff=lfs merge=lfs -text\n", encoding="utf-8")
 
     # 3. Check get_working_tree_files identifies is_lfs
     working = engine.get_working_tree_files()
     lfs_items = [w for w in working if w.is_lfs]
     reg_items = [w for w in working if not w.is_lfs and not w.is_feedback]
-    assert any(w.path == "attachments/diagram.png" for w in lfs_items)
+    assert any(w.path == "assets/diagram.png" for w in lfs_items)
     assert any(w.path == "main.py" for w in reg_items)
 
     # 4. Check get_changed_files identifies is_lfs
     changed = engine.get_changed_files("working", include_feedback=False)
     lfs_changed = [c for c in changed if c.get("is_lfs")]
     reg_changed = [c for c in changed if not c.get("is_lfs")]
-    assert any(c["path"] == "attachments/diagram.png" for c in lfs_changed)
+    assert any(c["path"] == "assets/diagram.png" for c in lfs_changed)
     assert any(c["path"] == "main.py" for c in reg_changed)
 
     # 5. Check API endpoint /api/working returns is_lfs: true
@@ -800,7 +800,7 @@ def test_regression_bug_194_lfs_tracked_files_grouping_and_styling(tmp_path: Pat
             data = json.loads(resp.read().decode("utf-8"))
             lfs_api = [f for f in data if f.get("is_lfs")]
             reg_api = [f for f in data if not f.get("is_lfs") and not f.get("is_feedback")]
-            assert any(f["path"] == "attachments/diagram.png" for f in lfs_api)
+            assert any(f["path"] == "assets/diagram.png" for f in lfs_api)
             assert any(f["path"] == "main.py" for f in reg_api)
     finally:
         server.shutdown()
@@ -3486,3 +3486,31 @@ def test_regression_bug_barbed_midge_630_iframe_border_prevention() -> None:
     assert 'target="hardware_vcs_diff_viewer"' in bug_text
     assert "window.top.location.href = " in cr_text
     assert "window.top.location.href = " in bug_text
+
+
+def test_regression_bug_diurnal_ant_667_commit_review_navigation() -> None:
+    """Verify BUG-DIURNAL-ANT-667: Opening attached commits in bug report navigates to Code Review with back navigation."""
+    tpl_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    bug_text = (tpl_dir / "bug_report.html.j2").read_text(encoding="utf-8")
+    cr_text = (tpl_dir / "code_review.html.j2").read_text(encoding="utf-8")
+    diff_text = (tpl_dir / "diff_view.html.j2").read_text(encoding="utf-8")
+
+    # 1. Bug Report attached commit chip must target Code Review, not VCS toplevel diff view
+    assert "const crUrl = `/review?revisions=${encodeURIComponent(cid)}&from=bugs" in bug_text
+    assert "openCommitInCodeReview(event, '${cid}')" in bug_text
+    assert '<a href="/?commit=' not in bug_text
+    assert "async function openCommitInCodeReview(event, commitHash)" in bug_text
+
+    # 2. Code Review must provide toolbar/header back button to return to Bug Report
+    assert 'id="btnBackToBugsHeader"' in cr_text
+    assert 'id="btnBackToBugsToolbar"' in cr_text
+    assert 'id="btnBugTracker"' in cr_text
+    assert "function returnToBugReport()" in cr_text
+    assert "function initBugNavigation()" in cr_text
+    assert "initBugNavigation();" in cr_text
+    assert 'urlParams.get("from") === "bugs"' in cr_text
+    assert "returnToBugReport();" in cr_text
+
+    # 3. Diff View must handle ?commit= or ?goto= in URL parameters
+    assert 'urlParams.get("commit") || urlParams.get("goto")' in diff_text
+    assert "selectCommit(urlCommit);" in diff_text

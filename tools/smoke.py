@@ -29,7 +29,7 @@ class TestSmoke:
         # Force CPU execution for JAX in smoke tests to bypass MPS compilation/deadlock lag on macOS
         if sys.platform == "darwin":
             env["JAX_PLATFORMS"] = "cpu"
-            env["XLA_FLAGS"] = "--xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1"
+            env["XLA_FLAGS"] = "--xla_cpu_multi_thread_eigen=false"
         if extra_env:
             env.update(extra_env)
 

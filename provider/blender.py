@@ -366,7 +366,7 @@ class BlenderRenderer:
     @classmethod
     def _build_blender_command(cls, blender_exec: str, script_path: str) -> list[str]:
         """Construct the CLI command for running headless Blender, wrapping with xvfb-run on Linux if headless."""
-        cmd = [blender_exec, "-b", "-P", script_path]
+        cmd = [blender_exec, "-b", "--python-exit-code", "1", "-P", script_path]
         if sys.platform.startswith("linux") and "DISPLAY" not in os.environ and shutil.which("xvfb-run"):
             return ["xvfb-run", "-a"] + cmd
         return cmd

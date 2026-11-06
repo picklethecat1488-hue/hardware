@@ -138,6 +138,46 @@
       border-radius: 4px;
     }
 
+    /* Quake Modal Dialog */
+    .quake-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(2px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+    }
+    .quake-modal {
+      background: var(--quake-panel);
+      border: 2px solid var(--quake-border-light);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.9), inset 1px 1px 0 var(--quake-border-light);
+      border-radius: 4px;
+      width: 620px;
+      max-width: 90vw;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .quake-modal-header {
+      background: var(--quake-header-bg);
+      border-bottom: 2px solid var(--quake-border-mid);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--quake-gold);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
     /* Quake Buttons */
     .quake-btn {
       font-family: var(--font-mono);
@@ -666,6 +706,33 @@
     </div>
   </div>
 
+  <!-- Action Progress Modal (BUG-327) -->
+  <div id="actionProgressModalOverlay" class="quake-modal-overlay" style="display: none; z-index: 99999;">
+    <div class="quake-modal" style="width: 480px; max-width: 90vw; padding: 20px 24px; text-align: left;">
+      <div class="quake-modal-header" style="padding: 0 0 12px 0; margin-bottom: 12px; border-bottom: 1px solid var(--quake-border-mid); display: flex; align-items: center; justify-content: space-between; background: transparent;">
+        <div style="font-size: 11px; font-weight: bold; color: var(--quake-gold); letter-spacing: 1px; display: flex; align-items: center; gap: 8px;">
+          <span id="actionProgressIcon">⚡</span>
+          <span id="actionProgressTitle">PROCESSING ACTION</span>
+        </div>
+      </div>
+
+      <div style="font-size: 9px; color: var(--quake-text-muted); margin-bottom: 12px; line-height: 1.4;" id="actionProgressDescription">
+        Executing requested operation...
+      </div>
+
+      <!-- Progress bar -->
+      <div style="background: var(--quake-bg-dark, #120c08); border: 1px solid var(--quake-border-light, #5a381e); border-radius: 3px; height: 16px; position: relative; overflow: hidden; margin-bottom: 12px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.6);">
+        <div id="actionProgressBar" style="width: 15%; height: 100%; background: linear-gradient(90deg, #ffaa00, #ff8800); transition: width 0.3s ease; box-shadow: 0 0 10px rgba(255,170,0,0.5);"></div>
+        <div id="actionProgressPercent" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #fff; text-shadow: 0 1px 2px #000;">15%</div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9px; color: var(--quake-copper, #c47c38); font-family: var(--font-mono, monospace); font-weight: bold;">
+        <span id="actionProgressStatus">Working...</span>
+        <span id="actionProgressElapsed" style="color: var(--quake-text-dim, #7a6a58);">0.0s</span>
+      </div>
+    </div>
+  </div>
+
   <!-- Main Container -->
   <div class="main-container">
     <!-- Sidebar -->
@@ -923,6 +990,93 @@
 
     const severityOrder = { "CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3 };
     const statusOrder = { "OPEN": 0, "IN_PROGRESS": 1, "PLANNED": 2, "RESOLVED": 3, "CLOSED": 4 };
+
+    // Action Progress Modal Management (BUG-327)
+    let actionProgressDepth = 0;
+    let actionProgressTimer = null;
+    let actionProgressInterval = null;
+
+    async function runWithActionModal(options, asyncFn) {
+      if (actionProgressDepth > 0) {
+        actionProgressDepth++;
+        try {
+          return await asyncFn();
+        } finally {
+          actionProgressDepth--;
+        }
+      }
+
+      actionProgressDepth = 1;
+      const thresholdMs = (options && options.delayMs !== undefined) ? options.delayMs : 1000;
+      const overlay = document.getElementById("actionProgressModalOverlay");
+      const titleEl = document.getElementById("actionProgressTitle");
+      const descEl = document.getElementById("actionProgressDescription");
+      const statusEl = document.getElementById("actionProgressStatus");
+      const elapsedEl = document.getElementById("actionProgressElapsed");
+      const barEl = document.getElementById("actionProgressBar");
+      const percentEl = document.getElementById("actionProgressPercent");
+      const iconEl = document.getElementById("actionProgressIcon");
+
+      let isModalVisible = false;
+      const startTime = Date.now();
+      let progress = 15;
+
+      if (actionProgressTimer) {
+        clearTimeout(actionProgressTimer);
+        actionProgressTimer = null;
+      }
+      if (actionProgressInterval) {
+        clearInterval(actionProgressInterval);
+        actionProgressInterval = null;
+      }
+
+      actionProgressTimer = setTimeout(() => {
+        if (!overlay) return;
+        isModalVisible = true;
+        if (titleEl) titleEl.textContent = (options && options.title) || "PROCESSING ACTION";
+        if (descEl) descEl.textContent = (options && options.description) || "Please wait while the operation completes...";
+        if (statusEl) statusEl.textContent = (options && options.stepText) || "Working...";
+        if (iconEl && options && options.icon) iconEl.textContent = options.icon;
+        if (barEl) barEl.style.width = "20%";
+        if (percentEl) percentEl.textContent = "20%";
+        if (elapsedEl) elapsedEl.textContent = ((Date.now() - startTime) / 1000).toFixed(1) + "s";
+        overlay.style.display = "flex";
+
+        actionProgressInterval = setInterval(() => {
+          const elapsedSec = ((Date.now() - startTime) / 1000).toFixed(1);
+          if (elapsedEl) elapsedEl.textContent = `${elapsedSec}s`;
+          if (progress < 90) {
+            progress += Math.floor(Math.random() * 6) + 2;
+            if (progress > 90) progress = 90;
+            if (barEl) barEl.style.width = `${progress}%`;
+            if (percentEl) percentEl.textContent = `${progress}%`;
+          }
+        }, 200);
+      }, thresholdMs);
+
+      try {
+        const result = await asyncFn();
+        return result;
+      } finally {
+        actionProgressDepth--;
+        if (actionProgressTimer) {
+          clearTimeout(actionProgressTimer);
+          actionProgressTimer = null;
+        }
+        if (actionProgressInterval) {
+          clearInterval(actionProgressInterval);
+          actionProgressInterval = null;
+        }
+        if (isModalVisible && overlay) {
+          if (barEl) barEl.style.width = "100%";
+          if (percentEl) percentEl.textContent = "100%";
+          if (statusEl) statusEl.textContent = "Complete!";
+          setTimeout(() => {
+            overlay.style.display = "none";
+          }, 250);
+        }
+      }
+    }
 
     function init() {
       initUiScale();
@@ -1254,61 +1408,75 @@
 
     async function acceptActiveBug() {
       if (!activeBugId) return;
-      try {
-        await saveActiveBug();
-        const res = await fetch("/api/bugs/accept", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: activeBugId, notes: "" })
-        });
-        const data = await res.json();
-        if (data.status === "ok") {
-          const bug = db.bugs.find(b => b.id === activeBugId);
-          if (bug) {
-            bug.status = "CLOSED";
-            bug.accepted_at = data.bug.accepted_at;
-            if (data.bug.resolution_notes) bug.resolution_notes = data.bug.resolution_notes;
+      return await runWithActionModal({
+        title: "ACCEPTING BUG REPORT",
+        description: `Marking bug ${activeBugId} as verified / closed...`,
+        stepText: `Accepting ${activeBugId}...`,
+        icon: "✓"
+      }, async () => {
+        try {
+          await saveActiveBug();
+          const res = await fetch("/api/bugs/accept", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: activeBugId, notes: "" })
+          });
+          const data = await res.json();
+          if (data.status === "ok") {
+            const bug = db.bugs.find(b => b.id === activeBugId);
+            if (bug) {
+              bug.status = "CLOSED";
+              bug.accepted_at = data.bug.accepted_at;
+              if (data.bug.resolution_notes) bug.resolution_notes = data.bug.resolution_notes;
+            }
+            loadActiveBug();
+            renderBugList();
+            updateMetrics();
+            showToast(`Bug [${activeBugId}] accepted and closed.`);
+          } else {
+            showToast(data.error || "Failed to accept bug");
           }
-          loadActiveBug();
-          renderBugList();
-          updateMetrics();
-          showToast(`Bug [${activeBugId}] accepted and closed.`);
-        } else {
-          showToast(data.error || "Failed to accept bug");
+        } catch (err) {
+          showToast("Error accepting bug: " + err);
         }
-      } catch (err) {
-        showToast("Error accepting bug: " + err);
-      }
+      });
     }
 
     async function rejectActiveBug() {
       if (!activeBugId) return;
-      try {
-        const currentNotes = document.getElementById("bug-resolution") ? document.getElementById("bug-resolution").value.trim() : "";
-        await saveActiveBug();
-        const res = await fetch("/api/bugs/reject", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: activeBugId, notes: currentNotes })
-        });
-        const data = await res.json();
-        if (data.status === "ok") {
-          const bug = db.bugs.find(b => b.id === activeBugId);
-          if (bug) {
-            bug.status = "OPEN";
-            bug.rejected_at = data.bug.rejected_at;
-            bug.rejection_notes = data.bug.rejection_notes;
+      return await runWithActionModal({
+        title: "REJECTING BUG REPORT",
+        description: `Reopening bug ${activeBugId} and saving review notes...`,
+        stepText: `Rejecting ${activeBugId}...`,
+        icon: "✕"
+      }, async () => {
+        try {
+          const currentNotes = document.getElementById("bug-resolution") ? document.getElementById("bug-resolution").value.trim() : "";
+          await saveActiveBug();
+          const res = await fetch("/api/bugs/reject", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: activeBugId, notes: currentNotes })
+          });
+          const data = await res.json();
+          if (data.status === "ok") {
+            const bug = db.bugs.find(b => b.id === activeBugId);
+            if (bug) {
+              bug.status = "OPEN";
+              bug.rejected_at = data.bug.rejected_at;
+              bug.rejection_notes = data.bug.rejection_notes;
+            }
+            loadActiveBug();
+            renderBugList();
+            updateMetrics();
+            showToast(`Bug [${activeBugId}] rejected and reopened.`);
+          } else {
+            showToast(data.error || "Failed to reject bug");
           }
-          loadActiveBug();
-          renderBugList();
-          updateMetrics();
-          showToast(`Bug [${activeBugId}] rejected and reopened.`);
-        } else {
-          showToast(data.error || "Failed to reject bug");
+        } catch (err) {
+          showToast("Error rejecting bug: " + err);
         }
-      } catch (err) {
-        showToast("Error rejecting bug: " + err);
-      }
+      });
     }
 
     async function attachCommitToActiveBug() {
@@ -1319,25 +1487,32 @@
         showToast("Please enter a commit SHA");
         return;
       }
-      try {
-        const res = await fetch("/api/bugs/attach_commit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: activeBugId, commit_id: commitSha })
-        });
-        const data = await res.json();
-        if (data.status === "ok") {
-          const bug = db.bugs.find(b => b.id === activeBugId);
-          if (bug) bug.commit_ids = data.bug.commit_ids || [];
-          input.value = "";
-          renderAttachedCommits(bug.commit_ids || []);
-          showToast(`Attached commit ${commitSha}`);
-        } else {
-          showToast(data.error || "Failed to attach commit");
+      return await runWithActionModal({
+        title: "ATTACHING COMMIT",
+        description: `Linking commit ${commitSha} to ${activeBugId}...`,
+        stepText: "Updating bug commit linkages...",
+        icon: "🔗"
+      }, async () => {
+        try {
+          const res = await fetch("/api/bugs/attach_commit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: activeBugId, commit_id: commitSha })
+          });
+          const data = await res.json();
+          if (data.status === "ok") {
+            const bug = db.bugs.find(b => b.id === activeBugId);
+            if (bug) bug.commit_ids = data.bug.commit_ids || [];
+            input.value = "";
+            renderAttachedCommits(bug.commit_ids || []);
+            showToast(`Attached commit ${commitSha}`);
+          } else {
+            showToast(data.error || "Failed to attach commit");
+          }
+        } catch (err) {
+          showToast("Error attaching commit: " + err);
         }
-      } catch (err) {
-        showToast("Error attaching commit: " + err);
-      }
+      });
     }
 
     function renderAttachedCommits(commitIds) {
@@ -1351,12 +1526,39 @@
       commitIds.forEach(cid => {
         const chip = document.createElement("div");
         chip.style.cssText = "display:inline-flex; align-items:center; gap:6px; background:#1b120c; border:1px solid var(--quake-gold); border-radius:3px; padding:4px 8px; font-family:var(--font-mono); font-size:10px;";
+        const bugParam = activeBugId ? `&bug_id=${encodeURIComponent(activeBugId)}` : "";
+        const crUrl = `/review?revisions=${encodeURIComponent(cid)}&from=bugs${bugParam}`;
         chip.innerHTML = `
-          <a href="/?commit=${encodeURIComponent(cid)}" target="_blank" style="color:var(--quake-gold); text-decoration:none; font-weight:700;">🔍 ${cid.slice(0, 10)}</a>
+          <a href="${crUrl}" onclick="openCommitInCodeReview(event, '${cid}')" style="color:var(--quake-gold); text-decoration:none; font-weight:700; cursor:pointer;" title="Review commit ${cid.slice(0, 10)} in Code Review">🔍 ${cid.slice(0, 10)}</a>
           <button class="copy-icon-btn copy-badge-btn" onclick="copyText('${cid}')" title="Copy commit SHA">📋</button>
         `;
         container.appendChild(chip);
       });
+    }
+
+    async function openCommitInCodeReview(event, commitHash) {
+      if (event) {
+        if (event.metaKey || event.ctrlKey || event.shiftKey) return;
+        event.preventDefault();
+      }
+      if (!commitHash) return;
+      const bugParam = activeBugId ? `&bug_id=${encodeURIComponent(activeBugId)}` : "";
+      const targetUrl = `/review?revisions=${encodeURIComponent(commitHash)}&from=bugs${bugParam}`;
+      const targetName = "hardware_code_review";
+
+      try {
+        await fetch("/api/open_code_review", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ commits: [commitHash] })
+        });
+      } catch (err) {}
+
+      if (window.parent && window.parent !== window && typeof window.parent.openWorkstationModal === "function") {
+        window.parent.openWorkstationModal(targetUrl, targetName);
+      } else {
+        window.location.href = targetUrl;
+      }
     }
 
     async function addTaskToActiveBug() {
@@ -1584,45 +1786,59 @@
       const bug = db.bugs.find(b => b.id === activeBugId);
       if (!bug) return;
 
-      bug.title = document.getElementById("bug-title").value;
-      bug.severity = document.getElementById("bug-severity").value;
-      bug.status = document.getElementById("bug-status").value;
-      bug.category = document.getElementById("bug-category").value;
-      bug.component = document.getElementById("bug-component").value;
-      bug.description = document.getElementById("bug-description").value;
-      bug.reproduction_steps = document.getElementById("bug-steps").value.split("\n").filter(s => s.trim());
-      bug.expected_behavior = document.getElementById("bug-expected").value;
-      bug.actual_behavior = document.getElementById("bug-actual").value;
-      bug.logs = document.getElementById("bug-logs").value;
-      bug.resolution_notes = document.getElementById("bug-resolution").value;
+      return await runWithActionModal({
+        title: "SAVING BUG REPORT",
+        description: `Persisting bug ${bug.id} changes and synchronizing markdown files...`,
+        stepText: `Saving ${bug.id}...`,
+        icon: "💾"
+      }, async () => {
+        bug.title = document.getElementById("bug-title").value;
+        bug.severity = document.getElementById("bug-severity").value;
+        bug.status = document.getElementById("bug-status").value;
+        bug.category = document.getElementById("bug-category").value;
+        bug.component = document.getElementById("bug-component").value;
+        bug.description = document.getElementById("bug-description").value;
+        bug.reproduction_steps = document.getElementById("bug-steps").value.split("\n").filter(s => s.trim());
+        bug.expected_behavior = document.getElementById("bug-expected").value;
+        bug.actual_behavior = document.getElementById("bug-actual").value;
+        bug.logs = document.getElementById("bug-logs").value;
+        bug.resolution_notes = document.getElementById("bug-resolution").value;
 
-      const res = await fetch("/api/bugs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(bug)
+        const res = await fetch("/api/bugs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(bug)
+        });
+        const saved = await res.json();
+        updateMetrics();
+        renderBugList();
+        updateComponentDatalist();
+        showToast("Saved bug " + saved.id + " & synced BUGS.md");
+        return saved;
       });
-      const saved = await res.json();
-      updateMetrics();
-      renderBugList();
-      updateComponentDatalist();
-      showToast("Saved bug " + saved.id + " & synced BUGS.md");
-      return saved;
     }
 
     async function deleteActiveBug() {
       if (!confirm("Are you sure you want to delete this bug report?")) return;
-      await fetch("/api/bugs/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: activeBugId })
+      return await runWithActionModal({
+        title: "DELETING BUG REPORT",
+        description: `Deleting ${activeBugId} and removing associated entries...`,
+        stepText: `Deleting ${activeBugId}...`,
+        icon: "🗑️"
+      }, async () => {
+        await fetch("/api/bugs/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: activeBugId })
+        });
+        db.bugs = db.bugs.filter(b => b.id !== activeBugId);
+        activeBugId = db.bugs.length > 0 ? db.bugs[0].id : null;
+        updateMetrics();
+        renderBugList();
+        updateComponentDatalist();
+        loadActiveBug();
+        showToast("Deleted bug & updated BUGS.md");
       });
-      db.bugs = db.bugs.filter(b => b.id !== activeBugId);
-      activeBugId = db.bugs.length > 0 ? db.bugs[0].id : null;
-      updateMetrics();
-      renderBugList();
-      updateComponentDatalist();
-      loadActiveBug();
-      showToast("Deleted bug & updated BUGS.md");
     }
 
     function returnToDashboard(e) {
@@ -1951,56 +2167,66 @@
       if (activeBugId && !payload.bug_id) {
         payload.bug_id = activeBugId;
       }
-      showToast("Uploading " + payload.filename + "...");
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+      return await runWithActionModal({
+        title: "UPLOADING ATTACHMENT",
+        description: `Uploading ${payload.filename || "file"} and saving to repository...`,
+        stepText: "Uploading file data...",
+        icon: "📎"
+      }, async () => {
+        showToast("Uploading " + payload.filename + "...");
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (res.status === 413) {
+          const errData = await res.json().catch(() => ({}));
+          showToast(errData.error || "Attachment exceeds maximum allowed size of 2 GB (GitHub LFS limit).", 5000);
+          return;
+        }
+        if (!res.ok) {
+          showToast("Failed to upload attachment: HTTP " + res.status);
+          return;
+        }
+        const att = await res.json();
+        const bug = db.bugs.find(b => b.id === activeBugId);
+        if (bug) {
+          if (!bug.attachments) bug.attachments = [];
+          bug.attachments.push(att);
+          renderAttachments(bug.attachments);
+          await saveActiveBug();
+          showToast("Attached " + att.filename);
+        }
       });
-      if (res.status === 413) {
-        const errData = await res.json().catch(() => ({}));
-        showToast(errData.error || "Attachment exceeds maximum allowed size of 2 GB (GitHub LFS limit).", 5000);
-        return;
-      }
-      if (!res.ok) {
-        showToast("Failed to upload attachment: HTTP " + res.status);
-        return;
-      }
-      const att = await res.json();
-      const bug = db.bugs.find(b => b.id === activeBugId);
-      if (bug) {
-        if (!bug.attachments) bug.attachments = [];
-        bug.attachments.push(att);
-        renderAttachments(bug.attachments);
-        saveActiveBug();
-        showToast("Attached " + att.filename);
-      }
     }
 
     async function syncFeedback() {
-      const modal = document.getElementById("feedback-loading-modal");
-      if (modal) modal.style.display = "flex";
-      try {
-        const res = await fetch("/api/sync_feedback", { method: "POST" });
-        const data = await res.json();
-        if (data.status === "ok") {
-          const stats = data.stats || {};
-          showToast(`Feedback synced: ${stats.imported || 0} imported, ${stats.renamed || 0} renamed, ${stats.total || 0} total bugs.`);
-          const dbRes = await fetch("/api/database");
-          if (dbRes.ok) {
-            db = await dbRes.json();
-            updateMetrics();
-            renderBugList();
-            loadActiveBug();
+      await runWithActionModal({
+        title: "MERGING AGENT FEEDBACK",
+        description: "Merging stored agent feedback from feedback/ directory into SQLite database...",
+        stepText: "Scanning feedback/ directory for BUG_*.md files...",
+        icon: "🔄"
+      }, async () => {
+        try {
+          const res = await fetch("/api/sync_feedback", { method: "POST" });
+          const data = await res.json();
+          if (data.status === "ok") {
+            const stats = data.stats || {};
+            showToast(`Feedback synced: ${stats.imported || 0} imported, ${stats.renamed || 0} renamed, ${stats.total || 0} total bugs.`);
+            const dbRes = await fetch("/api/database");
+            if (dbRes.ok) {
+              db = await dbRes.json();
+              updateMetrics();
+              renderBugList();
+              loadActiveBug();
+            }
+          } else {
+            showToast("Sync failed: " + (data.message || "Unknown error"));
           }
-        } else {
-          showToast("Sync failed: " + (data.message || "Unknown error"));
+        } catch (err) {
+          showToast("Error syncing feedback: " + err.message);
         }
-      } catch (err) {
-        showToast("Error syncing feedback: " + err.message);
-      } finally {
-        if (modal) modal.style.display = "none";
-      }
+      });
     }
 
     function toggleExpandPanel(btn) {

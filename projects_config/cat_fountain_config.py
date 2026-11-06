@@ -131,12 +131,17 @@ class CatFountainConfig(BaseModel):
     @cached_property
     def impeller_shaft_radius(self) -> float:
         """Return the impeller shaft hole radius."""
-        return float(self._raw_data.get("impeller_shaft_radius", 2.5))
+        return float(self._raw_data.get("impeller_shaft_radius", 1.0))
 
     @cached_property
     def impeller_shaft_clearance(self) -> float:
         """Return the radial clearance between the guide post and impeller sleeve bore."""
-        return float(self._raw_data.get("impeller_shaft_clearance", 0.30))
+        return float(self._raw_data.get("impeller_shaft_clearance", 0.25))
+
+    @cached_property
+    def impeller_sleeve_radius(self) -> float:
+        """Return the outer radius of the impeller central guide post sleeve."""
+        return float(self._raw_data.get("impeller_sleeve_radius", 2.75))
 
     @cached_property
     def impeller_base_height(self) -> float:
@@ -146,7 +151,7 @@ class CatFountainConfig(BaseModel):
     @cached_property
     def impeller_blades(self) -> int:
         """Return the number of impeller blades."""
-        return int(self._raw_data.get("impeller_blades", 6))
+        return int(self._raw_data.get("impeller_blades", 3))
 
     @cached_property
     def vane_twist(self) -> float:
@@ -699,7 +704,7 @@ class CatFountainConfig(BaseModel):
     @cached_property
     def impeller_sleeve_height(self) -> float:
         """Return the impeller sleeve height."""
-        return float(self._raw_data.get("impeller_sleeve_height", 4.0))
+        return float(self._raw_data.get("impeller_sleeve_height", 10.0))
 
     # Snap-fit Lid
     @cached_property
@@ -721,6 +726,22 @@ class CatFountainConfig(BaseModel):
     def snap_groove_minor(self) -> float:
         """Return the minor radius for the snap groove Torus."""
         return float(self._raw_data.get("snap_groove_minor", 0.6))
+
+    # Hole-less PCB Snap Socket
+    @cached_property
+    def pcb_snap_socket_cutout_margin(self) -> float:
+        """Return the margin reduction for hole-less PCB snap sockets (0.1mm - 0.5mm)."""
+        return float(self._raw_data.get("pcb_snap_socket_cutout_margin", 0.4))
+
+    @cached_property
+    def pcb_snap_socket_tool_hole_width(self) -> float:
+        """Return the width of tool insertion openings on snap socket walls for board removal."""
+        return float(self._raw_data.get("pcb_snap_socket_tool_hole_width", 6.0))
+
+    @cached_property
+    def pcb_snap_socket_tool_hole_height(self) -> float:
+        """Return the height of tool insertion openings on snap socket walls for board removal."""
+        return float(self._raw_data.get("pcb_snap_socket_tool_hole_height", 2.0))
 
     # Drain Shroud & Trimmer
     @cached_property

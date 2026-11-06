@@ -97,9 +97,11 @@ def is_file_ignored(file_path: str) -> bool:
     Returns:
         True if file is in IGNORED_REVIEW_FILES, in feedback/ directory, or matches ignored patterns.
     """
-    clean = file_path.replace("\\", "/").strip().lstrip("./")
+    clean = file_path.strip().strip('"').strip("'").replace("\\", "/").strip().lstrip("./")
     p = Path(clean)
     if "feedback" in p.parts:
+        return True
+    if "attachments" in p.parts:
         return True
     if p.name in IGNORED_REVIEW_FILES or clean in IGNORED_REVIEW_FILES:
         return True
@@ -1196,8 +1198,12 @@ class GitEngine:
             if " -> " in file_path:
                 file_path = file_path.split(" -> ")[1].strip()
 
-            clean_path = file_path.replace("\\", "/").strip().lstrip("./")
-            is_feedback = clean_path.startswith("feedback/") or clean_path in IGNORED_REVIEW_FILES
+            clean_path = file_path.strip().strip('"').strip("'").replace("\\", "/").strip().lstrip("./")
+            is_feedback = (
+                clean_path.startswith("feedback/")
+                or clean_path in IGNORED_REVIEW_FILES
+                or "attachments" in Path(clean_path).parts
+            )
             is_untracked = idx_status == "?" and work_status == "?"
             is_conflicted = (idx_status, work_status) in [
                 ("U", "U"),

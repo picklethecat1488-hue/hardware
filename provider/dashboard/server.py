@@ -161,7 +161,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             case "/eel.js":
                 self._handle_serve_eel_js()
             case "/" | "/index.html":
-                self._handle_serve_diff_ui()
+                self._handle_serve_diff_ui(query)
             case "/review" | "/review/":
                 self._handle_serve_review_ui(query)
             case "/bugs" | "/bugs/":
@@ -564,7 +564,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             case _:
                 self.send_error(404, "Endpoint not found")
 
-    def _handle_serve_diff_ui(self) -> None:
+    def _handle_serve_diff_ui(self, query: Optional[Dict[str, List[str]]] = None) -> None:
         """Render and return Jinja2 VCS diff view dashboard template."""
         templates_dir = Path(__file__).resolve().parent.parent / "templates"
         env = jinja2.Environment(
@@ -575,10 +575,14 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         )
         template = env.get_template("diff_view.html.j2")
         session = self.server.build_session()
+        commit_param = ""
+        if query:
+            commit_param = query.get("commit", [""])[0] or query.get("goto", [""])[0]
+        active_commit = commit_param or self.server.active_commit
         html_out = template.render(
             session=session,
             active_branch=self.server.active_branch,
-            active_commit=self.server.active_commit,
+            active_commit=active_commit,
         )
         self._send_html(html_out)
 

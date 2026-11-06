@@ -299,7 +299,8 @@ class TestCatFountainProvider:
         assert provider.settings.bowl_radius == 100.0
         assert provider.settings.tube_radius == 8.0
         assert provider.settings.impeller_radius == 9.0
-        assert provider.settings.impeller_blades == 6
+        assert provider.settings.impeller_blades == 3
+        assert provider.settings.impeller_shaft_radius == 1.0
         assert provider.settings.petg_boundary_friction == 0.20
         assert provider.settings.petg_contact_angle == 75.0
 
@@ -1068,31 +1069,40 @@ class TestCatFountainProvider:
 
     @pytest.mark.slow
     def test_impeller_geometry_and_elevation(self, provider):
-        """Verify that the impeller has the updated base height and continuous blade root geometry."""
+        """Verify that the impeller has the 3-bladed convex hull base, low-friction pin bore, and continuous blades."""
+        import math
+
         impeller = provider.build_impeller("impeller")
         solid = impeller.part
 
         base_h = provider.settings.impeller_base_height
         pin_r = provider.settings.impeller_shaft_radius
         pin_clearance = provider.settings.impeller_shaft_clearance
+        sleeve_r = provider.settings.impeller_sleeve_radius
         assert base_h >= 6.0, f"Expected impeller base height >= 6.0mm, got {base_h}"
+        assert pin_r == 1.0, f"Expected low-friction shaft radius 1.0mm, got {pin_r}"
+        assert provider.settings.impeller_blades == 3, "Expected 3-bladed impeller configuration"
 
-        # Point inside base disk at Z = base_h / 2.0 (outside magnet pockets) must be solid
-        test_r = (pin_r + 1.0 + 4.5) / 2.0
-        z_mid = base_h / 2.0
-        assert solid.is_inside((test_r, 0.0, z_mid)), "Impeller base disk is missing or hollow!"
+        # 1. Point inside magnet lobe at Z = 4.5 (above 3.2mm magnet pocket, along X-axis lobe) must be solid
+        assert solid.is_inside((6.0, 0.0, 4.5)), "Impeller magnet lobe body is missing or hollow!"
 
-        # Central pin hole must be open throughout
-        assert not solid.is_inside((0.0, 0.0, z_mid)), "Pin hole is blocked!"
-        assert not solid.is_inside((pin_r, 0.0, z_mid)), "Pin hole has insufficient clearance!"
+        # 2. Point in the valley between lobes (60 deg, R = 9.0mm) must be hollow/open (convex hull profile)
+        valley_x = 9.0 * math.cos(math.radians(60))
+        valley_y = 9.0 * math.sin(math.radians(60))
+        assert not solid.is_inside((valley_x, valley_y, 4.5)), (
+            "Impeller base should be a 3-lobed convex hull, not a full disk!"
+        )
 
-        # Blades start directly at the central hub sleeve (R = 4.5mm) with zero gap
-        sleeve_r = 4.5
+        # 3. Central pin hole must be open throughout
+        assert not solid.is_inside((0.0, 0.0, base_h / 2.0)), "Pin hole is blocked!"
+        assert not solid.is_inside((pin_r, 0.0, base_h / 2.0)), "Pin hole has insufficient clearance!"
+
+        # 4. Blades start directly at the central hub sleeve (sleeve_r = 2.75mm) with zero gap
         blade_mid_z = base_h + 2.0
         blade_root_point = (sleeve_r + 0.5, 0.0, blade_mid_z)
         assert solid.is_inside(blade_root_point), "Impeller blade root is disconnected or has empty gap at sleeve!"
 
-        # Ensure single contiguous solid
+        # 5. Ensure single contiguous solid
         assert len(solid.solids()) == 1, "Impeller is split into disconnected parts!"
 
     @pytest.mark.slow
@@ -2376,3 +2386,135 @@ class TestCatFountainProvider:
             assert solid.is_inside((wx, wy, groove_d * 0.5)), (
                 f"Lateral wall beside groove at {angle}° must be solid with >=1.5mm wall"
             )
+
+    def test_regression_bug_fierce_longhorn_849_pcb_snap_socket_overlap(self):
+        """Guard against regression for BUG-FIERCE-LONGHORN-849.
+
+        Verify positive snap ring overlap holding hole-less PCBs (SWD adapter and TMC6300)
+        in place on the cat fountain bowl base.
+        The cutout surrounding the boards must have width and height equal to
+        board dimensions minus a small margin (0.1mm - 0.5mm), creating positive retaining
+        lips below and ceiling stop shelves above the PCB seating groove.
+        """
+        provider = CatFountainProvider()
+        margin = provider.settings.pcb_snap_socket_cutout_margin
+        assert 0.1 <= margin <= 0.5, f"pcb_snap_socket_cutout_margin {margin} must be in [0.1, 0.5] mm"
+
+        bowl = provider.build_bowl("bowl")
+        solid = bowl.part
+        base_z = provider.settings.floor_z - provider.settings.bowl_thickness
+
+        # 1. SWD adapter at (-50.0, -45.0)
+        # Dimensions are rotated 90 deg: span (X) = swd_board_width (13.7), slide (Y) = swd_board_length (19.1)
+        # standoff_h = 2.0, pcb_t = 1.6
+        # Shelf is at Z = base_z - 1.0 (36.0)
+        # Groove is at Z = base_z - 2.8 (34.2)
+        # Retaining lip is at Z = base_z - 3.8 (33.2)
+        cx, cy = -50.0, -45.0
+        swd_span = provider.settings.swd_board_width
+        swd_slide = provider.settings.swd_board_length
+
+        # Inside the seating groove (Z = base_z - 2.8): the board slot is hollow
+        assert not solid.is_inside((cx + swd_span / 2.0 - 0.1, cy, base_z - 2.8)), (
+            "PCB groove must be open for board width"
+        )
+        assert not solid.is_inside((cx, cy + swd_slide / 2.0 - 0.1, base_z - 2.8)), (
+            "PCB groove must be open for board length"
+        )
+
+        # At the ceiling stop shelf (Z = base_z - 1.0 outside tool opening): positive overlap of (margin/2 = 0.2mm)
+        # Point just inside board edge (swd_span/2 - 0.1) outside tool hole should be inside solid stop shelf
+        assert solid.is_inside((cx + swd_span / 2.0 - 0.1, cy + 5.0, base_z - 1.0)), (
+            "Top stop shelf must overlap SWD PCB edge"
+        )
+        assert solid.is_inside((cx + 4.0, cy + swd_slide / 2.0 - 0.1, base_z - 1.0)), (
+            "Top stop shelf must overlap SWD PCB edge"
+        )
+
+        # At the bottom retaining lip (Z = base_z - 3.8): positive overlap of (margin/2 = 0.2mm)
+        # Point just inside board edge (swd_span/2 - 0.1) should be inside solid retaining lip
+        assert solid.is_inside((cx + swd_span / 2.0 - 0.1, cy, base_z - 3.8)), (
+            "Bottom retaining lip must overlap SWD PCB edge"
+        )
+        assert solid.is_inside((cx, cy + swd_slide / 2.0 - 0.1, base_z - 3.8)), (
+            "Bottom retaining lip must overlap SWD PCB edge"
+        )
+
+        # 2. TMC6300 motor driver at (50.0, 15.0)
+        # Rotated 90 deg: span (X) = spacing_y (15.24), slide (Y) = spacing_x (20.32)
+        # standoff_h = 4.0, pcb_t = 1.6
+        # Shelf is at Z = base_z - 2.0 (35.0)
+        # Groove is at Z = base_z - 4.8 (32.2)
+        # Retaining lip is at Z = base_z - 5.8 (31.2)
+        mcx, mcy = 50.0, 15.0
+        tmc_span = provider.settings.motor_driver_spacing_y
+        tmc_slide = provider.settings.motor_driver_spacing_x
+
+        # Inside the seating groove (Z = base_z - 4.8): open
+        assert not solid.is_inside((mcx + tmc_span / 2.0 - 0.1, mcy, base_z - 4.8)), (
+            "PCB groove must be open for TMC6300 width"
+        )
+        assert not solid.is_inside((mcx, mcy + tmc_slide / 2.0 - 0.1, base_z - 4.8)), (
+            "PCB groove must be open for TMC6300 length"
+        )
+
+        # At the ceiling stop shelf (Z = base_z - 2.0 outside tool opening): positive overlap
+        assert solid.is_inside((mcx + tmc_span / 2.0 - 0.1, mcy + 5.0, base_z - 2.0)), (
+            "Top stop shelf must overlap TMC6300 PCB edge"
+        )
+        assert solid.is_inside((mcx + 4.0, mcy + tmc_slide / 2.0 - 0.1, base_z - 2.0)), (
+            "Top stop shelf must overlap TMC6300 PCB edge"
+        )
+
+        # At the bottom retaining lip (Z = base_z - 5.8): positive overlap
+        assert solid.is_inside((mcx + tmc_span / 2.0 - 0.1, mcy, base_z - 5.8)), (
+            "Bottom retaining lip must overlap TMC6300 PCB edge"
+        )
+        assert solid.is_inside((mcx, mcy + tmc_slide / 2.0 - 0.1, base_z - 5.8)), (
+            "Bottom retaining lip must overlap TMC6300 PCB edge"
+        )
+
+        # 3. Tool removal openings on each wall beneath the PCB (BUG-FIERCE-LONGHORN-849)
+        # Apertures must penetrate through the walls into the standoff space beneath the board
+        assert provider.settings.pcb_snap_socket_tool_hole_width >= 4.0
+        assert provider.settings.pcb_snap_socket_tool_hole_height >= 1.5
+
+        tool_h = provider.settings.pcb_snap_socket_tool_hole_height
+        wall_t = 2.0
+        opening_z = base_z - tool_h / 2.0
+
+        # Check through-openings on all 4 walls of TMC6300 socket
+        assert not solid.is_inside((mcx + tmc_span / 2.0 + wall_t / 2.0, mcy, opening_z)), (
+            "+X wall tool hole must penetrate outer wall"
+        )
+        assert not solid.is_inside((mcx - tmc_span / 2.0 - wall_t / 2.0, mcy, opening_z)), (
+            "-X wall tool hole must penetrate outer wall"
+        )
+        assert not solid.is_inside((mcx, mcy + tmc_slide / 2.0 + wall_t / 2.0, opening_z)), (
+            "+Y wall tool hole must penetrate outer wall"
+        )
+        assert not solid.is_inside((mcx, mcy - tmc_slide / 2.0 - wall_t / 2.0, opening_z)), (
+            "-Y wall tool hole must penetrate outer wall"
+        )
+
+        # Check through-openings on all 4 walls of SWD socket
+        assert not solid.is_inside((cx + swd_span / 2.0 + wall_t / 2.0, cy, opening_z)), (
+            "+X wall tool hole on SWD must penetrate outer wall"
+        )
+        assert not solid.is_inside((cx - swd_span / 2.0 - wall_t / 2.0, cy, opening_z)), (
+            "-X wall tool hole on SWD must penetrate outer wall"
+        )
+        assert not solid.is_inside((cx, cy + swd_slide / 2.0 + wall_t / 2.0, opening_z)), (
+            "+Y wall tool hole on SWD must penetrate outer wall"
+        )
+        assert not solid.is_inside((cx, cy - swd_slide / 2.0 - wall_t / 2.0, opening_z)), (
+            "-Y wall tool hole on SWD must penetrate outer wall"
+        )
+
+        # Verify corner posts remain solid for structural rigidity
+        assert solid.is_inside(
+            (mcx + tmc_span / 2.0 + wall_t / 2.0, mcy + tmc_slide / 2.0 + wall_t / 2.0, opening_z)
+        ), "TMC6300 corner post must remain solid"
+        assert solid.is_inside((cx + swd_span / 2.0 + wall_t / 2.0, cy + swd_slide / 2.0 + wall_t / 2.0, opening_z)), (
+            "SWD corner post must remain solid"
+        )
