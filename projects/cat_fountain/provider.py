@@ -180,10 +180,8 @@ class CatFountainProvider(Provider):
         }
 
     @method_cache
-    def build_bowl(
-        self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
-    ) -> BuildPart:
-        """Build the cat fountain bowl with integrated 2L reservoir, integrated tube, motor compartment, and screw mounts."""
+    def _build_bowl_impl(self, target: str) -> BuildPart:
+        """Internal cached implementation of bowl CAD geometry."""
         r = self.settings.bowl_radius
         h = self.settings.bowl_height
         t = self.settings.bowl_thickness
@@ -855,11 +853,15 @@ class CatFountainProvider(Provider):
 
         return bowl
 
-    @method_cache
-    def build_impeller(
-        self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
+    def build_bowl(
+        self, target: str, subassembly: Optional[str] = None, mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
-        """Build the lightweight centrifugal impeller (magnetic-drive)."""
+        """Build the cat fountain bowl with integrated 2L reservoir, integrated tube, motor compartment, and screw mounts."""
+        return self._build_bowl_impl(target.split("/")[-1])
+
+    @method_cache
+    def _build_impeller_impl(self, target: str) -> BuildPart:
+        """Internal cached implementation of impeller CAD geometry."""
         hub_r = self.settings.impeller_radius + self.settings.magnet_radius + 1.0
         hub_h = self.settings.impeller_base_height
         impeller_r = hub_r + 4.0
@@ -960,11 +962,15 @@ class CatFountainProvider(Provider):
 
         return impeller
 
-    @method_cache
-    def build_bottom_cover(
-        self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
+    def build_impeller(
+        self, target: str, subassembly: Optional[str] = None, mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
-        """Build the detachable bottom cover for the motor controller compartment."""
+        """Build the lightweight centrifugal impeller (magnetic-drive)."""
+        return self._build_impeller_impl(target.split("/")[-1])
+
+    @method_cache
+    def _build_bottom_cover_impl(self, target: str) -> BuildPart:
+        """Internal cached implementation of bottom cover CAD geometry."""
         r = self.settings.bowl_radius
         t = self.settings.bowl_thickness
         clearance = self.settings.bottom_cover_clearance
@@ -1040,11 +1046,15 @@ class CatFountainProvider(Provider):
 
         return cover
 
-    @method_cache
-    def build_lid(
-        self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
+    def build_bottom_cover(
+        self, target: str, subassembly: Optional[str] = None, mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
-        """Build the top cover lid which acts as a drinking shelf and covers/stabilizes the vertical delivery tube."""
+        """Build the detachable bottom cover for the motor controller compartment."""
+        return self._build_bottom_cover_impl(target.split("/")[-1])
+
+    @method_cache
+    def _build_lid_impl(self, target: str) -> BuildPart:
+        """Internal cached implementation of lid CAD geometry."""
         r = self.settings.bowl_radius
         h = self.settings.bowl_height
         t = self.settings.bowl_thickness
@@ -1225,11 +1235,15 @@ class CatFountainProvider(Provider):
 
         return lid
 
-    @method_cache
-    def build_led_cover(
-        self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
+    def build_lid(
+        self, target: str, subassembly: Optional[str] = None, mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
-        """Build a translucent push-fit cover/diffuser for the RGB status LED."""
+        """Build the top cover lid which acts as a drinking shelf and covers/stabilizes the vertical delivery tube."""
+        return self._build_lid_impl(target.split("/")[-1])
+
+    @method_cache
+    def _build_led_cover_impl(self, target: str) -> BuildPart:
+        """Internal cached implementation of LED cover CAD geometry."""
         flange_w = self.settings.led_flange_width
         flange_t = self.settings.led_flange_thickness
         plug_w = self.settings.led_plug_width
@@ -1255,11 +1269,15 @@ class CatFountainProvider(Provider):
 
         return cover
 
-    @method_cache
-    def build_drive_hub(
-        self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
+    def build_led_cover(
+        self, target: str, subassembly: Optional[str] = None, mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
-        """Build the dry-side magnet drive hub mounted on the motor D-shaft."""
+        """Build a translucent push-fit cover/diffuser for the RGB status LED."""
+        return self._build_led_cover_impl(target.split("/")[-1])
+
+    @method_cache
+    def _build_drive_hub_impl(self, target: str) -> BuildPart:
+        """Internal cached implementation of drive hub CAD geometry."""
         hub_h = self.settings.magnet_thickness + self.settings.magnet_clearance + 0.8
         standoff_h = self.settings.drive_hub_standoff_height
         mr = self.settings.magnet_radius + self.settings.magnet_clearance
@@ -1343,11 +1361,15 @@ class CatFountainProvider(Provider):
         RevoluteJoint(label="motor", to_part=hub.part, axis=Axis((0, 0, 0), (0, 0, 1)))
         return hub
 
-    @method_cache
-    def build_pump_cover(
-        self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
+    def build_drive_hub(
+        self, target: str, subassembly: Optional[str] = None, mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
-        """Build the revised wet-side pump cover that slides down the tube and mounts directly over the tube and casing."""
+        """Build the dry-side magnet drive hub mounted on the motor D-shaft."""
+        return self._build_drive_hub_impl(target.split("/")[-1])
+
+    @method_cache
+    def _build_pump_cover_impl(self, target: str) -> BuildPart:
+        """Internal cached implementation of pump cover CAD geometry."""
         tube_x = 0.0
         tube_y = 28.0
         tube_r = self.settings.tube_radius
@@ -1474,6 +1496,12 @@ class CatFountainProvider(Provider):
         RigidJoint("mount", cover.part, Location((0, 0, 0)))
         return cover
 
+    def build_pump_cover(
+        self, target: str, subassembly: Optional[str] = None, mode: ProviderMode = ProviderMode.DEFAULT
+    ) -> BuildPart:
+        """Build the revised wet-side pump cover that slides down the tube and mounts directly over the tube and casing."""
+        return self._build_pump_cover_impl(target.split("/")[-1])
+
     def build_diagram(self, room: Room, targets: Sequence[str], mode: ProviderMode) -> None:
         """Build an exploded assembly diagram for the cat fountain."""
         bowl_part = self.build_bowl("bowl").part
@@ -1597,13 +1625,13 @@ class CatFountainProvider(Provider):
 
     def build_product(self, room: Room, mode: ProviderMode) -> None:
         """Place all parts of the cat fountain in the room for visualization/simulation."""
-        bowl_part = self.build_bowl("bowl", mode=mode).part
-        impeller_part = self.build_impeller("impeller", mode=mode).part
-        bottom_cover_part = self.build_bottom_cover("bottom_cover", mode=mode).part
-        lid_part = self.build_lid("lid", mode=mode).part
-        drive_hub_part = self.build_drive_hub("drive_hub", mode=mode).part
-        pump_cover_part = self.build_pump_cover("pump_cover", mode=mode).part
-        motor_hub_part = self.build_motor_hub("motor_hub", mode=mode).part
+        bowl_part = self.build_bowl("bowl").part
+        impeller_part = self.build_impeller("impeller").part
+        bottom_cover_part = self.build_bottom_cover("bottom_cover").part
+        lid_part = self.build_lid("lid").part
+        drive_hub_part = self.build_drive_hub("drive_hub").part
+        pump_cover_part = self.build_pump_cover("pump_cover").part
+        motor_hub_part = self.build_motor_hub("motor_hub").part
 
         assert (
             bowl_part is not None
@@ -1624,7 +1652,7 @@ class CatFountainProvider(Provider):
         bowl_part.joints["motor_hub_seat"].connect_to(motor_hub_part.joints["mount"])
 
         # Build and connect the LED cover using joints
-        led_cover = self.build_led_cover("led_cover", mode=mode).part
+        led_cover = self.build_led_cover("led_cover").part
         assert led_cover is not None
         bowl_part.joints["led_port"].connect_to(led_cover.joints["mount"])
 
@@ -1709,11 +1737,8 @@ class CatFountainProvider(Provider):
         }
 
     @method_cache
-    @method_cache
-    def build_motor_hub(
-        self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
-    ) -> BuildPart:
-        """Build the dedicated motor drive hub assembly bracket mounting the motor and Hall sensor (BUG-LUSTROUS-COCOON-669)."""
+    def _build_motor_hub_impl(self, target: str) -> BuildPart:
+        """Internal cached implementation of motor hub CAD geometry."""
         clip_h = self.settings.motor_hub_thickness
         r_bcd = self.settings.motor_mount_bolt_circle_radius
         hole_r = self.settings.motor_mount_hole_radius
@@ -1846,6 +1871,12 @@ class CatFountainProvider(Provider):
         RigidJoint("motor_shaft", hub_bracket.part, Location((0, 0, clip_h + 9.3 + 0.5)))
         RigidJoint("hall_mount", hub_bracket.part, Location((0, hall_front_y, clip_h + hall_sh)))
         return hub_bracket
+
+    def build_motor_hub(
+        self, target: str, subassembly: Optional[str] = None, mode: ProviderMode = ProviderMode.DEFAULT
+    ) -> BuildPart:
+        """Build the dedicated motor drive hub assembly bracket mounting the motor and Hall sensor (BUG-LUSTROUS-COCOON-669)."""
+        return self._build_motor_hub_impl(target.split("/")[-1])
 
     def build_wiring_diagram(self, room: Room, targets: Sequence[str], mode: ProviderMode) -> None:
         """Build a 2D colored wiring diagram for the cat water fountain."""

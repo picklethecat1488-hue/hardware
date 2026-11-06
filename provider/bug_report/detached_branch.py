@@ -278,6 +278,18 @@ class DetachedBranchBugStore:
                         except OSError:
                             continue
 
+            # 5. Include attachments from attachments/ and feedback/attachments/
+            for att_dir_name in ("attachments", "feedback/attachments"):
+                att_dir = self.repo_root / att_dir_name
+                if att_dir.exists() and att_dir.is_dir():
+                    for att_file in att_dir.rglob("*"):
+                        if att_file.is_file():
+                            rel_p = att_file.relative_to(self.repo_root).as_posix()
+                            try:
+                                target_files[rel_p] = att_file.read_bytes()
+                            except OSError:
+                                continue
+
             # Batch update index
             index_updates: List[str] = []
             for fn, data in target_files.items():
@@ -286,14 +298,17 @@ class DetachedBranchBugStore:
                     self._ensure_blob_written(data, sha, git_objects_dir)
                     index_updates.append(f"{FILE_MODE_STANDARD} {sha} 0\t{fn}\n")
 
-            if dirty_bug_ids is None and current_index:
+            if current_index:
                 valid_bug_paths = {
                     f"feedback/{prefix}_{b.id.removeprefix('BUG-').removeprefix('BUG_').removeprefix('WORM-').removeprefix('WORM_')}.md"
                     for b in database.bugs
                 }
                 for p in current_index:
-                    if p.startswith(f"feedback/{prefix}_") and p not in valid_bug_paths:
+                    if dirty_bug_ids is None and p.startswith(f"feedback/{prefix}_") and p not in valid_bug_paths:
                         index_updates.append(f"0 0000000000000000000000000000000000000000 0\t{p}\n")
+                    elif p.startswith("attachments/") or p.startswith("feedback/attachments/"):
+                        if not (self.repo_root / p).is_file():
+                            index_updates.append(f"0 0000000000000000000000000000000000000000 0\t{p}\n")
 
             if index_updates:
                 subprocess.run(
@@ -364,6 +379,59 @@ class DetachedBranchBugStore:
                     except OSError:
                         pass
 
+    def checkout_attachments(self) -> List[Path]:
+        """Extract attachments from the detached branch tree to the local workspace.
+
+        Returns:
+            List of paths to restored attachment files on disk.
+        """
+        if not self.ref_exists():
+            return []
+        try:
+            tree_proc = subprocess.run(
+                ["git", "ls-tree", "-r", "--name-only", self.ref_name],
+                cwd=str(self.repo_root),
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except (subprocess.CalledProcessError, RuntimeError):
+            return []
+
+        restored: List[Path] = []
+        for line in tree_proc.stdout.splitlines():
+            path_str = line.strip()
+            if not (path_str.startswith("attachments/") or path_str.startswith("feedback/attachments/")):
+                continue
+            dest_file = self.repo_root / path_str
+            if dest_file.exists():
+                continue
+            dest_file.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                raw_bytes = subprocess.run(
+                    ["git", "show", f"{self.ref_name}:{path_str}"],
+                    cwd=str(self.repo_root),
+                    capture_output=True,
+                    check=True,
+                ).stdout
+                if raw_bytes.startswith(b"version https://git-lfs"):
+                    try:
+                        smudged = subprocess.run(
+                            ["git", "lfs", "smudge"],
+                            input=raw_bytes,
+                            cwd=str(self.repo_root),
+                            capture_output=True,
+                            check=True,
+                        ).stdout
+                        raw_bytes = smudged
+                    except Exception:
+                        pass
+                dest_file.write_bytes(raw_bytes)
+                restored.append(dest_file)
+            except (subprocess.CalledProcessError, OSError):
+                pass
+        return restored
+
     def seed_from_workspace(
         self,
         sqlite_store: Optional[SQLiteBugStore] = None,
@@ -379,6 +447,7 @@ class DetachedBranchBugStore:
             Commit SHA string if seeded, or existing commit SHA if already present.
         """
         if self.ref_exists() and not force:
+            self.checkout_attachments()
             return self.get_ref_commit()
 
         db: Optional[BugDatabaseModel] = None
@@ -394,11 +463,13 @@ class DetachedBranchBugStore:
             self.exporter.scan_and_sync_feedback_dir(feedback_dir, db, sqlite_store)
 
         if db and db.bugs:
-            return self.commit_database(
+            commit_sha = self.commit_database(
                 db,
                 commit_message="Initialize detached bug tracking database",
                 extra_feedback_dir=feedback_dir,
             )
+            self.checkout_attachments()
+            return commit_sha
         return None
 
     def sync_branch(self) -> Dict[str, Any]:
@@ -496,6 +567,9 @@ class DetachedBranchBugStore:
                 check=False,
             )
             pushed = push_proc.returncode == 0
+
+        if local_commit:
+            self.checkout_attachments()
 
         return {
             "status": "ok",

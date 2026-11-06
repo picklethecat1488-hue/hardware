@@ -1236,3 +1236,91 @@ def test_regression_worm_creeping_larva_820_worm_prefixed_bug_files(tmp_path: Pa
     server = BugReportServer(host="127.0.0.1", port=0, feedback_dir=feedback_dir, bind_and_activate=False)
     mtime = server._get_feedback_dir_mtime()
     assert mtime == exported_path.stat().st_mtime
+
+
+def test_regression_bug_shining_silverfish_89_attachments_in_detached_branch_and_hidden_from_diff(
+    tmp_path: Path,
+) -> None:
+    """Verify BUG-SHINING-SILVERFISH-89: Attachments are decoupled to detached branch and hidden from diff view."""
+    import subprocess
+    import shutil
+    from provider.bug_report.detached_branch import DetachedBranchBugStore
+    from provider.vcs.git_engine import GitEngine, is_file_ignored
+
+    # 1. Verify is_file_ignored ignores attachments across formats and quotation
+    assert is_file_ignored("attachments/test.png")
+    assert is_file_ignored('"attachments/with spaces/test.png"')
+    assert is_file_ignored("feedback/attachments/screenshot.jpg")
+    assert not is_file_ignored("provider/bug_report/server.py")
+
+    # 2. Setup isolated Git repository
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    subprocess.run(["git", "init", "-b", "main"], cwd=str(repo_root), check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.name", "Test User"], cwd=str(repo_root), check=True, capture_output=True
+    )
+    subprocess.run(
+        ["git", "config", "user.email", "test@workspace"], cwd=str(repo_root), check=True, capture_output=True
+    )
+
+    # Initial commit on main
+    (repo_root / "README.md").write_text("# Test Repo\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=str(repo_root), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=str(repo_root), check=True, capture_output=True)
+
+    # 3. Add an attachment to workspace
+    att_dir = repo_root / "attachments" / "BUG-SILVERFISH-1"
+    att_dir.mkdir(parents=True, exist_ok=True)
+    att_file = att_dir / "evidence.png"
+    att_bytes = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDRtest_data"
+    att_file.write_bytes(att_bytes)
+
+    # 4. Create bug database and commit to detached branch
+    bug = BugReportModel(
+        id="BUG-SILVERFISH-1",
+        uuid="4f9fe270-0b4f-4ff7-acce-8b9e66188e1c",
+        title="Sample defect with attachment",
+        status=BugStatus.OPEN,
+        severity=BugSeverity.MEDIUM,
+        category=BugCategory.INFRASTRUCTURE,
+        description="Verify attachment decoupling.",
+        attachments=[
+            BugAttachmentModel(
+                id="att-1",
+                filename="evidence.png",
+                file_type="screenshot",
+                file_path="attachments/BUG-SILVERFISH-1/evidence.png",
+                description="Test preview",
+            )
+        ],
+    )
+    db = BugDatabaseModel(bugs=[bug])
+    store = DetachedBranchBugStore(repo_root=repo_root, branch_name="bugs")
+    commit_sha = store.commit_database(db, commit_message="Add bug with attachment")
+    assert commit_sha is not None
+
+    # 5. Verify the attachment was committed directly to refs/heads/bugs
+    tree_out = subprocess.run(
+        ["git", "ls-tree", "-r", "--name-only", "refs/heads/bugs"],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert "attachments/BUG-SILVERFISH-1/evidence.png" in tree_out.splitlines()
+
+    # 6. Verify checkout_attachments restores files from detached branch
+    shutil.rmtree(repo_root / "attachments")
+    assert not att_file.exists()
+    restored = store.checkout_attachments()
+    assert att_file.exists()
+    assert att_file.read_bytes() == att_bytes
+    assert any("evidence.png" in str(p) for p in restored)
+
+    # 7. Verify GitEngine diff view does not list attachments
+    engine = GitEngine(repo_root=repo_root)
+    changed = engine.get_changed_files("working")
+    for f in changed:
+        assert not f["path"].startswith("attachments/")
+        assert not f["path"].startswith('"attachments/')

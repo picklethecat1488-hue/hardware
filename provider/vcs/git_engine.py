@@ -97,9 +97,11 @@ def is_file_ignored(file_path: str) -> bool:
     Returns:
         True if file is in IGNORED_REVIEW_FILES, in feedback/ directory, or matches ignored patterns.
     """
-    clean = file_path.replace("\\", "/").strip().lstrip("./")
+    clean = file_path.strip().strip('"').strip("'").replace("\\", "/").strip().lstrip("./")
     p = Path(clean)
     if "feedback" in p.parts:
+        return True
+    if "attachments" in p.parts:
         return True
     if p.name in IGNORED_REVIEW_FILES or clean in IGNORED_REVIEW_FILES:
         return True
@@ -1196,8 +1198,12 @@ class GitEngine:
             if " -> " in file_path:
                 file_path = file_path.split(" -> ")[1].strip()
 
-            clean_path = file_path.replace("\\", "/").strip().lstrip("./")
-            is_feedback = clean_path.startswith("feedback/") or clean_path in IGNORED_REVIEW_FILES
+            clean_path = file_path.strip().strip('"').strip("'").replace("\\", "/").strip().lstrip("./")
+            is_feedback = (
+                clean_path.startswith("feedback/")
+                or clean_path in IGNORED_REVIEW_FILES
+                or "attachments" in Path(clean_path).parts
+            )
             is_untracked = idx_status == "?" and work_status == "?"
             is_conflicted = (idx_status, work_status) in [
                 ("U", "U"),
@@ -1960,48 +1966,12 @@ class GitEngine:
         return self.commit_files(message=message)
 
     def _ensure_lfs_tracking_for_attachments(self, file_paths: Optional[List[str]] = None) -> bool:
-        """Ensure git LFS tracking is configured for attachments/ and stage .gitattributes if needed."""
-        has_attachment = False
-        if file_paths is not None:
-            has_attachment = any(
-                p.replace("\\", "/").strip().lstrip("./").startswith("attachments/") for p in file_paths
-            )
-        else:
-            try:
-                status_out = run_git_command(["status", "--porcelain"], cwd=self.repo_root)
-                has_attachment = any("attachments/" in line for line in status_out.splitlines())
-            except RuntimeError:
-                has_attachment = False
+        """Ensure git LFS tracking is configured for attachments/ and stage .gitattributes if needed.
 
-        if not has_attachment:
-            return False
-
-        gitattributes_path = self.repo_root / ".gitattributes"
-        content = gitattributes_path.read_text(encoding="utf-8") if gitattributes_path.exists() else ""
-        lfs_patterns = [
-            "attachments/* filter=lfs diff=lfs merge=lfs -text",
-            "attachments/** filter=lfs diff=lfs merge=lfs -text",
-        ]
-        new_lines = [pat for pat in lfs_patterns if pat not in content]
-        if new_lines:
-            if content and not content.endswith("\n"):
-                content += "\n"
-            content += "\n".join(new_lines) + "\n"
-            gitattributes_path.write_text(content, encoding="utf-8")
-
-        # Run git lfs track if supported
-        try:
-            run_git_command(["lfs", "track", "attachments/*", "attachments/**"], cwd=self.repo_root)
-        except Exception:
-            pass
-
-        # Stage .gitattributes
-        try:
-            run_git_command(["add", "--", ".gitattributes"], cwd=self.repo_root)
-        except RuntimeError:
-            pass
-
-        return True
+        Note: Attachments are now decoupled from code feature branches and stored
+        directly on the detached bug branch (refs/heads/bugs or refs/heads/worms).
+        """
+        return False
 
     def commit_files(
         self,

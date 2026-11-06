@@ -510,7 +510,10 @@ class Builder:
                         brep_manifest = self.build_manifest.setdefault("brep", {})
                         manifest_hash = brep_manifest.get(obj_file_name)
                     if manifest_hash != current_hash:
-                        raise ValueError(f"OBJ file for link '{label}' is out of date. ")
+                        raise ValueError(
+                            f"OBJ file for link '{label}' is out of date: "
+                            f"manifest hash '{manifest_hash}' != current hash '{current_hash}'"
+                        )
 
                 current_hash = self._get_urdf_hash(room, proj_name)
                 futures.append(

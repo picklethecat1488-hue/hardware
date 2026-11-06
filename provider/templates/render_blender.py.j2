@@ -274,9 +274,9 @@ try:
 
     # Helper for importing OBJ with upright +Z axis
     def import_obj_file(filepath):
-        if hasattr(bpy.ops.wm, "obj_import"):
+        try:
             bpy.ops.wm.obj_import(filepath=filepath, forward_axis="Y", up_axis="Z")
-        else:
+        except (AttributeError, RuntimeError):
             bpy.ops.import_scene.obj(filepath=filepath, axis_forward="Y", axis_up="Z")
 
     def find_socket(collection, name):
