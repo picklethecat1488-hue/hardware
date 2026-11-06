@@ -6,9 +6,9 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 06:43:48 UTC` |
-| **Total Issues** | `316` |
-| **Open Issues** | `1` |
+| **Report Date** | `2026-11-06 06:44:06 UTC` |
+| **Total Issues** | `317` |
+| **Open Issues** | `2` |
 | **Resolved / Closed** | `315 (99%)` |
 
 ## Issues by Severity
@@ -17,14 +17,14 @@
 | :--- | :---: | :--- |
 | **`[CRITICAL]`** | 20 | System crashes, build failures, blockages, or electrical shorts. |
 | **`[HIGH]`** | 31 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
-| **`[MEDIUM]`** | 236 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
+| **`[MEDIUM]`** | 237 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
 | **`[LOW]`** | 29 | Minor aesthetic imperfections or documentation notes. |
 
 ## Issues by Category
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 170 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`PCB`** | 171 | Schematics, routing, footprints, nets, DRC, silkscreen. |
 | **`CAD`** | 39 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 11 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
 | **`INFRASTRUCTURE`** | 83 | Build tooling, compilers, test runners, headless tools. |
@@ -348,6 +348,7 @@
 - [x] **`[MEDIUM]`** [#BUG-SPECKLED-ROACH-49](#bug-speckled-roach-49): Pump cover should snap into place `[cat_fountain]` (`CLOSED`)
 - [x] **`[LOW]`** [#BUG-GLOWING-WASP-133](#bug-glowing-wasp-133): Cat fountain-refactor and simplify code `[cat_fountain]` (`CLOSED`)
 - [ ] **`[MEDIUM]`** [#BUG-FIERCE-LONGHORN-849](#bug-fierce-longhorn-849): SWD and TMC6300 mounts- unsufficient snap ring overlap `[cat_fountain]` (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-SHINING-SILVERFISH-89](#bug-shining-silverfish-89): New Bug Report (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -28329,5 +28330,15 @@ There is insufficient snap ring overlap to hold the SWD and TMC6300 boards in pl
 | Type | Filename | Description |
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1793947358948_g28nw.png](attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793947358948_g28nw.png) | Pasted screenshot screenshot_paste_1793947358948_g28nw.png |
+
+---
+
+### <a id="bug-shining-silverfish-89"></a> 🔴 `[BUG-SHINING-SILVERFISH-89]` New Bug Report
+
+- **UUID**: `4f9fe270-0b4f-4ff7-acce-8b9e66188e1c`
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-11-06 06:44:04 UTC`
 
 ---

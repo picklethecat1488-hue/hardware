@@ -9539,7 +9539,31 @@
       "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
+    },
+    {
+      "id": "BUG-SHINING-SILVERFISH-89",
+      "uuid": "4f9fe270-0b4f-4ff7-acce-8b9e66188e1c",
+      "title": "New Bug Report",
+      "status": "OPEN",
+      "severity": "MEDIUM",
+      "category": "PCB",
+      "component": "",
+      "description": "",
+      "reproduction_steps": [],
+      "expected_behavior": "",
+      "actual_behavior": "",
+      "logs": "",
+      "attachments": [],
+      "commit_ids": [],
+      "review_tasks": [],
+      "created_at": "2026-11-06 06:44:04 UTC",
+      "updated_at": "2026-11-06 06:44:04 UTC",
+      "resolved_at": null,
+      "resolution_notes": "",
+      "rejection_notes": null,
+      "accepted_at": null,
+      "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 06:43:46 UTC"
+  "updated_at": "2026-11-06 06:44:04 UTC"
 }
