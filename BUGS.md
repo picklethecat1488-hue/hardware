@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 06:45:39 UTC` |
+| **Report Date** | `2026-11-06 06:50:59 UTC` |
 | **Total Issues** | `318` |
 | **Open Issues** | `3` |
 | **Resolved / Closed** | `315 (99%)` |
@@ -24,10 +24,10 @@
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 171 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`PCB`** | 170 | Schematics, routing, footprints, nets, DRC, silkscreen. |
 | **`CAD`** | 39 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 11 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
-| **`INFRASTRUCTURE`** | 84 | Build tooling, compilers, test runners, headless tools. |
+| **`INFRASTRUCTURE`** | 85 | Build tooling, compilers, test runners, headless tools. |
 | **`UI`** | 2 | Web dashboards, CLI viewers, review interfaces. |
 
 ## Issue Checklist
@@ -349,7 +349,7 @@
 - [x] **`[LOW]`** [#BUG-GLOWING-WASP-133](#bug-glowing-wasp-133): Cat fountain-refactor and simplify code `[cat_fountain]` (`CLOSED`)
 - [ ] **`[MEDIUM]`** [#BUG-FIERCE-LONGHORN-849](#bug-fierce-longhorn-849): SWD and TMC6300 mounts- unsufficient snap ring overlap `[cat_fountain]` (`OPEN`)
 - [ ] **`[MEDIUM]`** [#BUG-SHINING-SILVERFISH-89](#bug-shining-silverfish-89): Attachments show up in the diff view `[dashboard]` (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-BRISTLY-CENTIPEDE-327](#bug-bristly-centipede-327): New Bug Report (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-BRISTLY-CENTIPEDE-327](#bug-bristly-centipede-327): Add modal progress UIs for repo and bug actions `[dashboard]` (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -28355,12 +28355,17 @@ Attachment LFS changes show up in the diff view. Can we ensure that attachments 
 
 ---
 
-### <a id="bug-bristly-centipede-327"></a> 🔴 `[BUG-BRISTLY-CENTIPEDE-327]` New Bug Report
+### <a id="bug-bristly-centipede-327"></a> 🔴 `[BUG-BRISTLY-CENTIPEDE-327]` Add modal progress UIs for repo and bug actions
 
 - **UUID**: `4bfee9c3-96a6-4d79-b0f8-5e450e99fece`
 - **Status**: `OPEN`
 - **Severity**: `MEDIUM`
-- **Category**: `PCB`
+- **Category**: `INFRASTRUCTURE`
+- **Component**: `dashboard`
 - **Created**: `2026-11-06 06:45:37 UTC`
+
+#### Description
+
+Repo actions like sync, and bug actions like saving, approving or rejecting, and creating bugs now take sufficiently long that I think we need a modal UI to show action status, similar to the UI used for creating PRs. Can we do some profiling of repo and bug actions, optimize if needed, and add modal progress UIs for actions that take sufficiently long (>1s)? The UIs should be hidden automatically after the action completes, and only show if the action is taking a long time. We can also make this change to the sync action to make all actions behave uniformly.
 
 ---

@@ -9577,12 +9577,12 @@
     {
       "id": "BUG-BRISTLY-CENTIPEDE-327",
       "uuid": "4bfee9c3-96a6-4d79-b0f8-5e450e99fece",
-      "title": "New Bug Report",
+      "title": "Add modal progress UIs for repo and bug actions",
       "status": "OPEN",
       "severity": "MEDIUM",
-      "category": "PCB",
-      "component": "",
-      "description": "",
+      "category": "INFRASTRUCTURE",
+      "component": "dashboard",
+      "description": "Repo actions like sync, and bug actions like saving, approving or rejecting, and creating bugs now take sufficiently long that I think we need a modal UI to show action status, similar to the UI used for creating PRs. Can we do some profiling of repo and bug actions, optimize if needed, and add modal progress UIs for actions that take sufficiently long (>1s)? The UIs should be hidden automatically after the action completes, and only show if the action is taking a long time. We can also make this change to the sync action to make all actions behave uniformly.",
       "reproduction_steps": [],
       "expected_behavior": "",
       "actual_behavior": "",
@@ -9591,7 +9591,7 @@
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-06 06:45:37 UTC",
-      "updated_at": "2026-11-06 06:45:37 UTC",
+      "updated_at": "2026-11-06 06:50:56 UTC",
       "resolved_at": null,
       "resolution_notes": "",
       "rejection_notes": null,
@@ -9599,5 +9599,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 06:45:37 UTC"
+  "updated_at": "2026-11-06 06:50:56 UTC"
 }
