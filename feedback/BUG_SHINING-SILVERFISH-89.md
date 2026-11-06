@@ -2,12 +2,13 @@
 
 - **UUID**: `4f9fe270-0b4f-4ff7-acce-8b9e66188e1c`
 - **ID**: `BUG-SHINING-SILVERFISH-89`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-11-06 06:44:04 UTC`
 - **Resolved**: `2026-11-06 17:17:35 UTC`
+- **Accepted**: `2026-11-06 17:17:38 UTC`
 
 #### Description
 

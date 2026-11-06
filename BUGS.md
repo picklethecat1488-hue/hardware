@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 17:17:37 UTC` |
+| **Report Date** | `2026-11-06 17:17:38 UTC` |
 | **Total Issues** | `320` |
 | **Open Issues** | `1` |
 | **Resolved / Closed** | `319 (99%)` |
@@ -348,7 +348,7 @@
 - [x] **`[MEDIUM]`** [#BUG-SPECKLED-ROACH-49](#bug-speckled-roach-49): Pump cover should snap into place `[cat_fountain]` (`CLOSED`)
 - [x] **`[LOW]`** [#BUG-GLOWING-WASP-133](#bug-glowing-wasp-133): Cat fountain-refactor and simplify code `[cat_fountain]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-FIERCE-LONGHORN-849](#bug-fierce-longhorn-849): SWD and TMC6300 mounts- unsufficient snap ring overlap `[cat_fountain]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-SHINING-SILVERFISH-89](#bug-shining-silverfish-89): Attachments show up in the diff view `[dashboard]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-SHINING-SILVERFISH-89](#bug-shining-silverfish-89): Attachments show up in the diff view `[dashboard]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-BRISTLY-CENTIPEDE-327](#bug-bristly-centipede-327): Add modal progress UIs for repo and bug actions `[dashboard]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-LUSTROUS-HORSEFLY-593](#bug-lustrous-horsefly-593): Rename GEMINI.md to AGENTS.md (`CLOSED`)
 - [ ] **`[MEDIUM]`** [#BUG-DIURNAL-ANT-667](#bug-diurnal-ant-667): Opening commits in bug report workstation-broken `[dashboard]` (`OPEN`)
@@ -28355,12 +28355,13 @@ Configured pcb_snap_socket_cutout_margin to 0.4mm for positive snap ring overlap
 ### <a id="bug-shining-silverfish-89"></a> 🟢 `[BUG-SHINING-SILVERFISH-89]` Attachments show up in the diff view
 
 - **UUID**: `4f9fe270-0b4f-4ff7-acce-8b9e66188e1c`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-11-06 06:44:04 UTC`
 - **Resolved**: `2026-11-06 17:17:35 UTC`
+- **Accepted**: `2026-11-06 17:17:38 UTC`
 
 #### Description
 
