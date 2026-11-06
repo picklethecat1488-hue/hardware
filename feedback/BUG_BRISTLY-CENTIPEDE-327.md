@@ -2,12 +2,13 @@
 
 - **UUID**: `4bfee9c3-96a6-4d79-b0f8-5e450e99fece`
 - **ID**: `BUG-BRISTLY-CENTIPEDE-327`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-11-06 06:45:37 UTC`
 - **Resolved**: `2026-11-06 17:13:20 UTC`
+- **Accepted**: `2026-11-06 17:13:22 UTC`
 
 #### Description
 

@@ -9607,7 +9607,7 @@
       "id": "BUG-BRISTLY-CENTIPEDE-327",
       "uuid": "4bfee9c3-96a6-4d79-b0f8-5e450e99fece",
       "title": "Add modal progress UIs for repo and bug actions",
-      "status": "RESOLVED",
+      "status": "CLOSED",
       "severity": "MEDIUM",
       "category": "INFRASTRUCTURE",
       "component": "dashboard",
@@ -9630,11 +9630,11 @@
         }
       ],
       "created_at": "2026-11-06 06:45:37 UTC",
-      "updated_at": "2026-11-06 17:13:20 UTC",
+      "updated_at": "2026-11-06 17:13:22 UTC",
       "resolved_at": "2026-11-06 17:13:20 UTC",
       "resolution_notes": "Added delayed (>1s) action progress modal with live elapsed timer to dashboard and bug workstation, and optimized incremental attachment indexing.",
       "rejection_notes": "",
-      "accepted_at": null,
+      "accepted_at": "2026-11-06 17:13:22 UTC",
       "rejected_at": null
     },
     {
@@ -9672,5 +9672,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 17:13:20 UTC"
+  "updated_at": "2026-11-06 17:13:22 UTC"
 }
