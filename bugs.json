@@ -8712,33 +8712,6 @@
       "logs": "",
       "attachments": [
         {
-          "id": "att-1",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
-          "size_bytes": 0,
-          "description": "Uploaded reference questions spreadsheet from PCBWay",
-          "created_at": ""
-        },
-        {
-          "id": "att-2",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
-          "size_bytes": 0,
-          "description": "Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16",
-          "created_at": ""
-        },
-        {
-          "id": "att-3",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
-          "size_bytes": 0,
-          "description": "Legacy Excel 97-2004 format of replied quotation BOM",
-          "created_at": ""
-        },
-        {
           "id": "att-4",
           "filename": "digikey_order_2026-10-14.xlsx",
           "file_type": "reference",
@@ -8781,6 +8754,33 @@
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv",
           "size_bytes": 0,
           "description": "CSV export of clean EDA BOM Rev 3",
+          "created_at": ""
+        },
+        {
+          "id": "att-1",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
+          "size_bytes": 0,
+          "description": "Uploaded reference questions spreadsheet from PCBWay",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
+          "size_bytes": 0,
+          "description": "Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16",
+          "created_at": ""
+        },
+        {
+          "id": "att-3",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
+          "size_bytes": 0,
+          "description": "Legacy Excel 97-2004 format of replied quotation BOM",
           "created_at": ""
         }
       ],
@@ -9330,6 +9330,15 @@
       "logs": "",
       "attachments": [
         {
+          "id": "att-3",
+          "filename": "screenshot_paste_1793890911006_wvg54.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1793890911006_wvg54.png",
+          "created_at": ""
+        },
+        {
           "id": "att-1",
           "filename": "screenshot_paste_1793890876309_0c9ae.png",
           "file_type": "screenshot",
@@ -9345,15 +9354,6 @@
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png",
           "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793924149979_7f535.png",
-          "created_at": ""
-        },
-        {
-          "id": "att-3",
-          "filename": "screenshot_paste_1793890911006_wvg54.png",
-          "file_type": "screenshot",
-          "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png",
-          "size_bytes": 0,
-          "description": "Pasted screenshot screenshot_paste_1793890911006_wvg54.png",
           "created_at": ""
         }
       ],
@@ -9400,21 +9400,21 @@
       "logs": "",
       "attachments": [
         {
-          "id": "att-1",
-          "filename": "screenshot_paste_1793891547400_gyg0h.png",
-          "file_type": "screenshot",
-          "file_path": "attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891547400_gyg0h.png",
-          "size_bytes": 0,
-          "description": "Pasted screenshot screenshot_paste_1793891547400_gyg0h.png",
-          "created_at": ""
-        },
-        {
           "id": "att-2",
           "filename": "screenshot_paste_1793891379527_mc2d2.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891379527_mc2d2.png",
           "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793891379527_mc2d2.png",
+          "created_at": ""
+        },
+        {
+          "id": "att-1",
+          "filename": "screenshot_paste_1793891547400_gyg0h.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891547400_gyg0h.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1793891547400_gyg0h.png",
           "created_at": ""
         }
       ],
@@ -9533,7 +9533,7 @@
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-06 06:40:24 UTC",
-      "updated_at": "2026-11-06 06:43:43 UTC",
+      "updated_at": "",
       "resolved_at": null,
       "resolution_notes": "",
       "rejection_notes": "",
@@ -9555,22 +9555,22 @@
       "logs": "",
       "attachments": [
         {
-          "id": "ad2fdb9c",
+          "id": "att-1",
           "filename": "screenshot_paste_1793947517131_gdv1n.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-SHINING-SILVERFISH-89/screenshot_paste_1793947517131_gdv1n.png",
-          "size_bytes": 107473,
+          "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793947517131_gdv1n.png",
-          "created_at": "2026-11-06 06:45:17 UTC"
+          "created_at": ""
         }
       ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-06 06:44:04 UTC",
-      "updated_at": "2026-11-06 06:45:19 UTC",
+      "updated_at": "",
       "resolved_at": null,
       "resolution_notes": "",
-      "rejection_notes": null,
+      "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
     },
@@ -9591,13 +9591,13 @@
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-06 06:45:37 UTC",
-      "updated_at": "2026-11-06 06:50:56 UTC",
+      "updated_at": "",
       "resolved_at": null,
       "resolution_notes": "",
-      "rejection_notes": null,
+      "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 06:50:59 UTC"
+  "updated_at": "2026-11-06 06:54:19 UTC"
 }
