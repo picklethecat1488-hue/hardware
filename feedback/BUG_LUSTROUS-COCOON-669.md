@@ -24,9 +24,9 @@ Defects circled in red.
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
+| `screenshot` | [screenshot_paste_1793890876309_0c9ae.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png) | Pasted screenshot screenshot_paste_1793890876309_0c9ae.png |
 | `screenshot` | [screenshot_paste_1793924149979_7f535.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png) | Pasted screenshot screenshot_paste_1793924149979_7f535.png |
 | `screenshot` | [screenshot_paste_1793890911006_wvg54.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png) | Pasted screenshot screenshot_paste_1793890911006_wvg54.png |
-| `screenshot` | [screenshot_paste_1793890876309_0c9ae.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png) | Pasted screenshot screenshot_paste_1793890876309_0c9ae.png |
 
 #### Attached Commits
 
@@ -35,6 +35,7 @@ Defects circled in red.
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:aae67eb7 --> Inspect simplified circular motor base geometry with 3-screw pattern | `python tools/view.py cat_fountain/motor_hub`
+- [ ] <!-- task:09c39078 --> Inspect bowl socket wall to verify clean hall sensor keyway cutout with no thin slivers | `python tools/view.py cat_fountain/bowl`
 
 #### Resolution Notes
 
