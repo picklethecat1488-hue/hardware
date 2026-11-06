@@ -11,3 +11,7 @@
 #### Description
 
 Repo actions like sync, and bug actions like saving, approving or rejecting, and creating bugs now take sufficiently long that I think we need a modal UI to show action status, similar to the UI used for creating PRs. Can we do some profiling of repo and bug actions, optimize if needed, and add modal progress UIs for actions that take sufficiently long (>1s)? The UIs should be hidden automatically after the action completes, and only show if the action is taking a long time. We can also make this change to the sync action to make all actions behave uniformly.
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:c0f462e8 --> Inspect delayed (>1s) action progress modal on dashboard sync and bug workstation | `python tools/dashboard.py`
