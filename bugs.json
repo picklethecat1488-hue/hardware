@@ -9514,7 +9514,7 @@
       "severity": "MEDIUM",
       "category": "CAD",
       "component": "cat_fountain",
-      "description": "There is insufficient snap ring overlap to hold the SWD and TMC6300 boards in place. The width and height of the cutout surrounding the boards should be the width and height of the boards - some very small margin (.1mm-.5mm). Attached screenshot showing the defects in red.",
+      "description": "There is insufficient snap ring overlap to hold the SWD and TMC6300 boards in place. The width and height of the cutout surrounding the boards should be the width and height of the boards - some very small margin (.1mm-.5mm). Attached screenshot showing the defects in red.\n\nAdditionally, we should add holes on each wall to allow a small tool such as an allen wrench to be inserted beneath the boards to pop them out. Attached a second screenshow showing the desired hole locations in green (TMC6300).",
       "reproduction_steps": [],
       "expected_behavior": "",
       "actual_behavior": "",
@@ -9528,12 +9528,21 @@
           "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793947358948_g28nw.png",
           "created_at": ""
+        },
+        {
+          "id": "0894fe48",
+          "filename": "screenshot_paste_1793948449522_d1ck8.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793948449522_d1ck8.png",
+          "size_bytes": 408061,
+          "description": "Pasted screenshot screenshot_paste_1793948449522_d1ck8.png",
+          "created_at": "2026-11-06 07:00:49 UTC"
         }
       ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-06 06:40:24 UTC",
-      "updated_at": "",
+      "updated_at": "2026-11-06 07:00:49 UTC",
       "resolved_at": null,
       "resolution_notes": "",
       "rejection_notes": "",
@@ -9623,5 +9632,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 06:58:38 UTC"
+  "updated_at": "2026-11-06 07:00:49 UTC"
 }
