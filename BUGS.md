@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 04:30:56 UTC` |
+| **Report Date** | `2026-11-06 04:31:49 UTC` |
 | **Total Issues** | `315` |
 | **Open Issues** | `2` |
 | **Resolved / Closed** | `313 (99%)` |
@@ -17,14 +17,14 @@
 | :--- | :---: | :--- |
 | **`[CRITICAL]`** | 20 | System crashes, build failures, blockages, or electrical shorts. |
 | **`[HIGH]`** | 31 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
-| **`[MEDIUM]`** | 236 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
-| **`[LOW]`** | 28 | Minor aesthetic imperfections or documentation notes. |
+| **`[MEDIUM]`** | 235 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
+| **`[LOW]`** | 29 | Minor aesthetic imperfections or documentation notes. |
 
 ## Issues by Category
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 171 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`PCB`** | 170 | Schematics, routing, footprints, nets, DRC, silkscreen. |
 | **`CAD`** | 38 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 11 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
 | **`INFRASTRUCTURE`** | 83 | Build tooling, compilers, test runners, headless tools. |
@@ -346,7 +346,7 @@
 - [x] **`[HIGH]`** [#BUG-LUSTROUS-COCOON-669](#bug-lustrous-cocoon-669): Motor base design is way too complicated `[cat_fountain]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-THORACIC-HARVESTMAN-529](#bug-thoracic-harvestman-529): Add grooves for triangular motor struts to drive hub `[cat_fountain]` (`CLOSED`)
 - [ ] **`[MEDIUM]`** [#BUG-SPECKLED-ROACH-49](#bug-speckled-roach-49): Pump cover should snap into place `[cat_fountain]` (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-GLOWING-WASP-133](#bug-glowing-wasp-133): New Bug Report (`OPEN`)
+- [ ] **`[LOW]`** [#BUG-GLOWING-WASP-133](#bug-glowing-wasp-133): Cat fountain-refactor and simplify code `[cat_fountain]` (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -28249,12 +28249,35 @@ Right now, the pump cover may move freely up and down the shaft. We should use t
 
 ---
 
-### <a id="bug-glowing-wasp-133"></a> 🔴 `[BUG-GLOWING-WASP-133]` New Bug Report
+### <a id="bug-glowing-wasp-133"></a> 🔴 `[BUG-GLOWING-WASP-133]` Cat fountain-refactor and simplify code
 
 - **UUID**: `3b92ccaf-1e89-42b4-b7fb-384d898c6e9e`
 - **Status**: `OPEN`
-- **Severity**: `MEDIUM`
-- **Category**: `PCB`
+- **Severity**: `LOW`
+- **Category**: `GENERAL`
+- **Component**: `cat_fountain`
 - **Created**: `2026-11-06 04:30:54 UTC`
+
+#### Description
+
+Right now, some of the cat fountain code contains repeated patterns, particularly for creating the snap-fit ring mounts:
+
+```
+            # Add the snap-fit annular Torus ridge
+            with Locations((0, 0, self.settings.snap_ridge_z)):
+                Torus(
+                    major_radius=lid_r + self.settings.snap_ridge_major_offset,
+                    minor_radius=self.settings.snap_ridge_minor,
+                )
+
+            with BuildPart() as pocket_tool:
+                Cylinder(radius=80.0, height=6.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                bottom_edge = pocket_tool.edges().filter_by(GeomType.CIRCLE).sort_by(Axis.Z)[0]
+                fillet(bottom_edge, radius=1.5)
+            with Locations((0.0, 0.0, 3.0)):
+                add(pocket_tool, mode=Mode.SUBTRACT)
+```
+
+Can we clean up and optimize this code?
 
 ---

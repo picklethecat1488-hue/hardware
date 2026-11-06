@@ -9465,12 +9465,12 @@
     {
       "id": "BUG-GLOWING-WASP-133",
       "uuid": "3b92ccaf-1e89-42b4-b7fb-384d898c6e9e",
-      "title": "New Bug Report",
+      "title": "Cat fountain-refactor and simplify code",
       "status": "OPEN",
-      "severity": "MEDIUM",
-      "category": "PCB",
-      "component": "",
-      "description": "",
+      "severity": "LOW",
+      "category": "GENERAL",
+      "component": "cat_fountain",
+      "description": "Right now, some of the cat fountain code contains repeated patterns, particularly for creating the snap-fit ring mounts:\n\n```\n            # Add the snap-fit annular Torus ridge\n            with Locations((0, 0, self.settings.snap_ridge_z)):\n                Torus(\n                    major_radius=lid_r + self.settings.snap_ridge_major_offset,\n                    minor_radius=self.settings.snap_ridge_minor,\n                )\n\n            with BuildPart() as pocket_tool:\n                Cylinder(radius=80.0, height=6.0, align=(Align.CENTER, Align.CENTER, Align.MIN))\n                bottom_edge = pocket_tool.edges().filter_by(GeomType.CIRCLE).sort_by(Axis.Z)[0]\n                fillet(bottom_edge, radius=1.5)\n            with Locations((0.0, 0.0, 3.0)):\n                add(pocket_tool, mode=Mode.SUBTRACT)\n```\n\nCan we clean up and optimize this code?",
       "reproduction_steps": [],
       "expected_behavior": "",
       "actual_behavior": "",
@@ -9479,7 +9479,7 @@
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-06 04:30:54 UTC",
-      "updated_at": "2026-11-06 04:30:54 UTC",
+      "updated_at": "2026-11-06 04:31:47 UTC",
       "resolved_at": null,
       "resolution_notes": "",
       "rejection_notes": null,
@@ -9487,5 +9487,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 04:30:54 UTC"
+  "updated_at": "2026-11-06 04:31:47 UTC"
 }
