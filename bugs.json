@@ -9630,8 +9630,8 @@
         }
       ],
       "created_at": "2026-11-06 06:45:37 UTC",
-      "updated_at": "",
-      "resolved_at": "2026-11-06 14:12:02 UTC",
+      "updated_at": "2026-11-06 17:13:20 UTC",
+      "resolved_at": "2026-11-06 17:13:20 UTC",
       "resolution_notes": "Added delayed (>1s) action progress modal with live elapsed timer to dashboard and bug workstation, and optimized incremental attachment indexing.",
       "rejection_notes": "",
       "accepted_at": null,
@@ -9672,5 +9672,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 17:13:15 UTC"
+  "updated_at": "2026-11-06 17:13:20 UTC"
 }
