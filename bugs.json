@@ -8731,33 +8731,6 @@
         },
         {
           "id": "att-6",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
-          "size_bytes": 0,
-          "description": "Legacy Excel 97-2004 format of replied quotation BOM",
-          "created_at": ""
-        },
-        {
-          "id": "att-7",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
-          "size_bytes": 0,
-          "description": "Uploaded reference questions spreadsheet from PCBWay",
-          "created_at": ""
-        },
-        {
-          "id": "att-8",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
-          "size_bytes": 0,
-          "description": "Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16",
-          "created_at": ""
-        },
-        {
-          "id": "att-6",
           "filename": "carrier_board_bom_rev3.csv",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv",
@@ -8781,6 +8754,33 @@
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
           "size_bytes": 0,
           "description": "Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM)",
+          "created_at": ""
+        },
+        {
+          "id": "att-3",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
+          "size_bytes": 0,
+          "description": "Legacy Excel 97-2004 format of replied quotation BOM",
+          "created_at": ""
+        },
+        {
+          "id": "att-4",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
+          "size_bytes": 0,
+          "description": "Uploaded reference questions spreadsheet from PCBWay",
+          "created_at": ""
+        },
+        {
+          "id": "att-5",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
+          "size_bytes": 0,
+          "description": "Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16",
           "created_at": ""
         }
       ],
@@ -9331,6 +9331,15 @@
       "attachments": [
         {
           "id": "att-3",
+          "filename": "screenshot_paste_1793924149979_7f535.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1793924149979_7f535.png",
+          "created_at": ""
+        },
+        {
+          "id": "att-1",
           "filename": "screenshot_paste_1793890911006_wvg54.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png",
@@ -9345,15 +9354,6 @@
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png",
           "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793890876309_0c9ae.png",
-          "created_at": ""
-        },
-        {
-          "id": "att-3",
-          "filename": "screenshot_paste_1793924149979_7f535.png",
-          "file_type": "screenshot",
-          "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png",
-          "size_bytes": 0,
-          "description": "Pasted screenshot screenshot_paste_1793924149979_7f535.png",
           "created_at": ""
         }
       ],
@@ -9486,7 +9486,9 @@
       "actual_behavior": "",
       "logs": "",
       "attachments": [],
-      "commit_ids": [],
+      "commit_ids": [
+        "c051f2ea"
+      ],
       "review_tasks": [
         {
           "id": "6c9a1464",
@@ -9497,7 +9499,7 @@
         }
       ],
       "created_at": "2026-11-06 04:30:54 UTC",
-      "updated_at": "",
+      "updated_at": "2026-11-06 05:01:18 UTC",
       "resolved_at": "2026-11-06 05:00:54 UTC",
       "resolution_notes": "Refactored repeated snap ring and pocket tool patterns into reusable helpers make_snap_ring and make_filleted_pocket_tool",
       "rejection_notes": "",
@@ -9505,5 +9507,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 05:00:54 UTC"
+  "updated_at": "2026-11-06 05:01:18 UTC"
 }
