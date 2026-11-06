@@ -247,6 +247,13 @@ class CatFountainProvider(Provider):
                     Cylinder(
                         radius=snap_r, height=1.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
                     )
+                # Internal annular snap-fit groove in casing recess wall (BUG-SPECKLED-ROACH-49)
+                with Locations((0, 0, 10.0 - self.settings.pump_cover_snap_z_offset)):
+                    Torus(
+                        major_radius=snap_r,
+                        minor_radius=self.settings.pump_cover_snap_groove_minor,
+                        mode=Mode.SUBTRACT,
+                    )
             with Locations((tube_x, tube_y, floor_z + 2.0)):
                 # Tube inner cavity (starting 2mm above floor to create a bottom pocket)
                 Cylinder(
@@ -1332,6 +1339,12 @@ class CatFountainProvider(Provider):
                         height=1.5,
                         align=(Align.CENTER, Align.CENTER, Align.MIN),
                     )
+                # Annular snap-fit ridge on downward lip to lock tightly into casing recess (BUG-SPECKLED-ROACH-49)
+                with Locations((0, 0, -self.settings.pump_cover_snap_z_offset)):
+                    Torus(
+                        major_radius=snap_r + self.settings.pump_cover_snap_ridge_offset,
+                        minor_radius=self.settings.pump_cover_snap_ridge_minor,
+                    )
 
             # 2. Tube sleeve sliding down the vertical delivery tube
             with Locations((tube_x, tube_y, 0)):
@@ -1586,6 +1599,56 @@ class CatFountainProvider(Provider):
         ]:
             rgba = self.get_color(name)
             room.add(name, part, color=rgba[:3], alpha=rgba[3])
+
+        # 4. Build and add dummy PCBs / footprints for visual inspection and fitment checks (non-printable)
+        if mode != ProviderMode.SIMULATE:
+
+            def make_pcb(w: float, l: float, h: float = 2.0) -> Part:
+                with BuildPart() as pcb:
+                    Box(w, l, h, align=(Align.CENTER, Align.CENTER, Align.CENTER))
+                    r = min(1.5, min(w, l) * 0.4)
+                    if r > 0.1:
+                        fillet(pcb.edges().filter_by(Axis.Z), radius=r)
+                return cast(Part, pcb.part)
+
+            def make_sensor_pcb() -> Part:
+                with BuildPart() as pcb:
+                    Box(2.0, 25.0, 17.0, align=(Align.CENTER, Align.CENTER, Align.CENTER))
+                    fillet(pcb.edges().filter_by(Axis.X), radius=1.5)
+                return cast(Part, pcb.part)
+
+            def make_motor(dia: float = 13.8, h: float = 9.3) -> Part:
+                with BuildPart() as motor:
+                    Cylinder(radius=dia / 2.0, height=h, align=(Align.CENTER, Align.CENTER, Align.CENTER))
+                    with Locations((0, 0, h / 2.0)):
+                        Cylinder(radius=0.75, height=7.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                return cast(Part, motor.part)
+
+            yaml_path = Path(__file__).parent / "wiring.yaml"
+            wiring = Wiring(yaml_path, bowl_part)
+            pcb_footprints = wiring.footprints
+
+            for fp in pcb_footprints:
+                if fp.name == "led":
+                    continue
+                w, l, thickness = fp.dimensions
+                if fp.package == "tof_sensor":
+                    joint_name = fp.name.replace("sensor_", "sensor_port_")
+                    joint_loc = bowl_part.joints[joint_name].location
+                    s_pcb = make_sensor_pcb()
+                    s_pcb.location = joint_loc * Location((-18.3, 0, 0))
+                    room.add(f"sensor_pcb_{fp.name[7:]}", s_pcb, color="green", alpha=0.6)
+                elif fp.package == "motor":
+                    m_part = make_motor(w, thickness)
+                    m_part.location = Location(fp.position, fp.rotation)
+                    room.add(f"{fp.name}_pcb", m_part, color="grey", alpha=0.85)
+                else:
+                    pcb = make_pcb(w, l, thickness)
+                    pcb.location = Location(fp.position, fp.rotation)
+                    color = "blue" if fp.package == "battery" else "green"
+                    alpha = 0.8 if fp.package == "battery" else 0.6
+                    room.add(f"{fp.name}_pcb", pcb, color=color, alpha=alpha)
+
         self.room = room
 
     def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:

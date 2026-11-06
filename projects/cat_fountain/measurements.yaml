@@ -202,6 +202,10 @@ pump_cover_snap_clearance: 0.45
 pump_cover_lip_thickness: 1.5
 pump_cover_internal_clearance: 0.40
 pump_cover_clip_opening_width: 10.5
+pump_cover_snap_groove_minor: 0.4
+pump_cover_snap_ridge_minor: 0.35
+pump_cover_snap_ridge_offset: -0.15
+pump_cover_snap_z_offset: 0.75
 pump_outlet_radius: 4.0  # 8mm inner diameter (10mm OD)
 pump_casing_clearance: 1.0
 
