@@ -22,6 +22,7 @@ from provider.bug_report.detached_branch import DetachedBranchBugStore
 from provider.bug_report.markdown_exporter import MarkdownBugExporter
 from provider.bug_report.server import BugReportServer
 from provider.bug_report.sqlite_store import SQLiteBugStore
+from provider.dashboard.server import DashboardServer
 from tools.dashboard import main as dashboard_main
 
 
@@ -793,3 +794,141 @@ def test_bug_server_fast_incremental_save_regression(tmp_path: Path) -> None:
     detached_target = loaded_detached.get_bug("BUG-FAST-010")
     assert detached_target is not None
     assert detached_target.status == BugStatus.RESOLVED
+
+
+def test_dashboard_server_bug_lifecycle_api(tmp_path: Path) -> None:
+    """Verify DashboardServer REST endpoints for bug lifecycle: attach_commit, add_task, update_task, run_command, reject, accept."""
+    repo_dir = create_test_git_repo(tmp_path)
+    feedback_dir = repo_dir / "feedback"
+    feedback_dir.mkdir(parents=True, exist_ok=True)
+    db_file = repo_dir / "build" / "bugs.sqlite"
+    db_file.parent.mkdir(parents=True, exist_ok=True)
+
+    store = SQLiteBugStore(db_path=db_file)
+    test_bug = BugReportModel(
+        id="BUG-DASH-001",
+        title="Dashboard API Bug",
+        status=BugStatus.RESOLVED,
+        severity=BugSeverity.MEDIUM,
+        category=BugCategory.PCB,
+    )
+    store.save_bug(test_bug)
+
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    # Ensure bug_server loads from our sqlite db
+    server.bug_server.sqlite_file = db_file
+    server.bug_server.sqlite_store = store
+    server.bug_server.database.bugs = [test_bug]
+
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base_url = server.get_url()
+
+    try:
+        # 1. Attach commit
+        req = urllib.request.Request(
+            f"{base_url}/api/bugs/attach_commit",
+            data=json.dumps({"id": "BUG-DASH-001", "commit_id": "def5678"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "ok"
+            assert "def5678" in data["bug"]["commit_ids"]
+
+        # 2. Add review task
+        req = urllib.request.Request(
+            f"{base_url}/api/bugs/add_task",
+            data=json.dumps(
+                {
+                    "id": "BUG-DASH-001",
+                    "title": "Run echo test",
+                    "command": "echo 'Hello from dashboard task'",
+                }
+            ).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "ok"
+            tasks = data["bug"]["review_tasks"]
+            assert len(tasks) == 1
+            task_id = tasks[0]["id"]
+            assert tasks[0]["title"] == "Run echo test"
+
+        # 3. Update task status
+        req = urllib.request.Request(
+            f"{base_url}/api/bugs/update_task",
+            data=json.dumps(
+                {
+                    "id": "BUG-DASH-001",
+                    "task_id": task_id,
+                    "status": "COMPLETED",
+                }
+            ).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "ok"
+            assert data["bug"]["review_tasks"][0]["status"] == "COMPLETED"
+
+        # 4. Run task command
+        req = urllib.request.Request(
+            f"{base_url}/api/bugs/run_command",
+            data=json.dumps(
+                {
+                    "id": "BUG-DASH-001",
+                    "command": "echo 'Dashboard command demo output'",
+                }
+            ).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "ok"
+            assert "Dashboard command demo output" in data["stdout"]
+            assert data["exit_code"] == 0
+
+        # 5. Reject bug -> transitions RESOLVED to OPEN immediately (notes can be empty)
+        req = urllib.request.Request(
+            f"{base_url}/api/bugs/reject",
+            data=json.dumps({"id": "BUG-DASH-001", "notes": ""}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "ok"
+            assert data["bug"]["status"] == "OPEN"
+            assert data["bug"]["rejected_at"] is not None
+
+        # Re-resolve bug to test accept
+        bug_obj = server.bug_server.database.get_bug("BUG-DASH-001")
+        bug_obj.status = BugStatus.RESOLVED
+        server.bug_server.save_and_sync()
+
+        # 6. Accept bug -> transitions RESOLVED to CLOSED immediately without prompt notes
+        req = urllib.request.Request(
+            f"{base_url}/api/bugs/accept",
+            data=json.dumps({"id": "BUG-DASH-001", "notes": ""}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "ok"
+            assert data["bug"]["status"] == "CLOSED"
+            assert data["bug"]["accepted_at"] is not None
+
+    finally:
+        server.server_close()

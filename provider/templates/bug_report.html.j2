@@ -1254,13 +1254,11 @@
 
     async function acceptActiveBug() {
       if (!activeBugId) return;
-      const notes = prompt("Optional acceptance notes (leave blank if none):", "");
-      if (notes === null) return;
       try {
         const res = await fetch("/api/bugs/accept", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: activeBugId, notes: notes.trim() })
+          body: JSON.stringify({ id: activeBugId, notes: "" })
         });
         const data = await res.json();
         if (data.status === "ok") {
@@ -1284,16 +1282,11 @@
 
     async function rejectActiveBug() {
       if (!activeBugId) return;
-      const notes = prompt("Enter rejection feedback (explain why the fix failed validation):", "");
-      if (!notes || !notes.trim()) {
-        alert("Rejection feedback is required to reject a fix.");
-        return;
-      }
       try {
         const res = await fetch("/api/bugs/reject", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: activeBugId, notes: notes.trim() })
+          body: JSON.stringify({ id: activeBugId, notes: "" })
         });
         const data = await res.json();
         if (data.status === "ok") {
