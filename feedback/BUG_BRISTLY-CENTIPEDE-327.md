@@ -1,12 +1,13 @@
-# 🔴 `[BUG-BRISTLY-CENTIPEDE-327]` Add modal progress UIs for repo and bug actions
+# 🟢 `[BUG-BRISTLY-CENTIPEDE-327]` Add modal progress UIs for repo and bug actions
 
 - **UUID**: `4bfee9c3-96a6-4d79-b0f8-5e450e99fece`
 - **ID**: `BUG-BRISTLY-CENTIPEDE-327`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-11-06 06:45:37 UTC`
+- **Resolved**: `2026-11-06 14:12:02 UTC`
 
 #### Description
 
@@ -15,3 +16,7 @@ Repo actions like sync, and bug actions like saving, approving or rejecting, and
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:c0f462e8 --> Inspect delayed (>1s) action progress modal on dashboard sync and bug workstation | `python tools/dashboard.py`
+
+#### Resolution Notes
+
+Added delayed (>1s) action progress modal with live elapsed timer to dashboard and bug workstation, and optimized incremental attachment indexing.

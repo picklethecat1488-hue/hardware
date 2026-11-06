@@ -8757,7 +8757,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-6",
           "filename": "carrier_board_bom_rev3.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
@@ -8766,7 +8766,7 @@
           "created_at": ""
         },
         {
-          "id": "att-2",
+          "id": "att-7",
           "filename": "carrier_board_bom_rev2.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
@@ -8775,7 +8775,7 @@
           "created_at": ""
         },
         {
-          "id": "att-3",
+          "id": "att-8",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
@@ -9339,7 +9339,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-2",
           "filename": "screenshot_paste_1793924149979_7f535.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png",
@@ -9348,7 +9348,7 @@
           "created_at": ""
         },
         {
-          "id": "att-2",
+          "id": "att-3",
           "filename": "screenshot_paste_1793890911006_wvg54.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png",
@@ -9530,7 +9530,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-2",
           "filename": "screenshot_paste_1793947358948_g28nw.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793947358948_g28nw.png",
@@ -9607,7 +9607,7 @@
       "id": "BUG-BRISTLY-CENTIPEDE-327",
       "uuid": "4bfee9c3-96a6-4d79-b0f8-5e450e99fece",
       "title": "Add modal progress UIs for repo and bug actions",
-      "status": "OPEN",
+      "status": "RESOLVED",
       "severity": "MEDIUM",
       "category": "INFRASTRUCTURE",
       "component": "dashboard",
@@ -9628,9 +9628,9 @@
         }
       ],
       "created_at": "2026-11-06 06:45:37 UTC",
-      "updated_at": "2026-11-06 14:11:55 UTC",
-      "resolved_at": null,
-      "resolution_notes": "",
+      "updated_at": "",
+      "resolved_at": "2026-11-06 14:12:02 UTC",
+      "resolution_notes": "Added delayed (>1s) action progress modal with live elapsed timer to dashboard and bug workstation, and optimized incremental attachment indexing.",
       "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
@@ -9660,5 +9660,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-06 14:11:55 UTC"
+  "updated_at": "2026-11-06 14:12:02 UTC"
 }

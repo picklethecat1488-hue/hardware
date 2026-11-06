@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-06 14:11:56 UTC` |
+| **Report Date** | `2026-11-06 14:12:03 UTC` |
 | **Total Issues** | `319` |
-| **Open Issues** | `2` |
-| **Resolved / Closed** | `317 (99%)` |
+| **Open Issues** | `1` |
+| **Resolved / Closed** | `318 (99%)` |
 
 ## Issues by Severity
 
@@ -349,7 +349,7 @@
 - [x] **`[LOW]`** [#BUG-GLOWING-WASP-133](#bug-glowing-wasp-133): Cat fountain-refactor and simplify code `[cat_fountain]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-FIERCE-LONGHORN-849](#bug-fierce-longhorn-849): SWD and TMC6300 mounts- unsufficient snap ring overlap `[cat_fountain]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-SHINING-SILVERFISH-89](#bug-shining-silverfish-89): Attachments show up in the diff view `[dashboard]` (`RESOLVED`)
-- [ ] **`[MEDIUM]`** [#BUG-BRISTLY-CENTIPEDE-327](#bug-bristly-centipede-327): Add modal progress UIs for repo and bug actions `[dashboard]` (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-BRISTLY-CENTIPEDE-327](#bug-bristly-centipede-327): Add modal progress UIs for repo and bug actions `[dashboard]` (`RESOLVED`)
 - [ ] **`[MEDIUM]`** [#BUG-LUSTROUS-HORSEFLY-593](#bug-lustrous-horsefly-593): Rename GEMINI.md to AGENTS.md (`OPEN`)
 
 ## Detailed Issue Log
@@ -28385,14 +28385,15 @@ Decoupled attachments to dedicated refs/heads/bugs detached branch, added attach
 
 ---
 
-### <a id="bug-bristly-centipede-327"></a> 🔴 `[BUG-BRISTLY-CENTIPEDE-327]` Add modal progress UIs for repo and bug actions
+### <a id="bug-bristly-centipede-327"></a> 🟢 `[BUG-BRISTLY-CENTIPEDE-327]` Add modal progress UIs for repo and bug actions
 
 - **UUID**: `4bfee9c3-96a6-4d79-b0f8-5e450e99fece`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-11-06 06:45:37 UTC`
+- **Resolved**: `2026-11-06 14:12:02 UTC`
 
 #### Description
 
@@ -28401,6 +28402,10 @@ Repo actions like sync, and bug actions like saving, approving or rejecting, and
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:c0f462e8 --> Inspect delayed (>1s) action progress modal on dashboard sync and bug workstation | `python tools/dashboard.py`
+
+#### Resolution Notes
+
+Added delayed (>1s) action progress modal with live elapsed timer to dashboard and bug workstation, and optimized incremental attachment indexing.
 
 ---
 
