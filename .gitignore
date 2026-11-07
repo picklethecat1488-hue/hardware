@@ -9,7 +9,8 @@ scancode-report.json
 TODO.md
 recordings/
 *.rrd
-# Bug and review attachments (decoupled to detached git branch 'bugs')
+# Bug and review tracking (decoupled to detached git branch 'bugs')
+feedback/
 attachments/
 feedback/attachments/
 /*.svg
