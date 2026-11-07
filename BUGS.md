@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-07 01:23:49 UTC` |
+| **Report Date** | `2026-11-07 01:23:50 UTC` |
 | **Total Issues** | `323` |
 | **Open Issues** | `0` |
 | **Resolved / Closed** | `323 (100%)` |
@@ -353,7 +353,7 @@
 - [x] **`[MEDIUM]`** [#BUG-LUSTROUS-HORSEFLY-593](#bug-lustrous-horsefly-593): Rename GEMINI.md to AGENTS.md (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-DIURNAL-ANT-667](#bug-diurnal-ant-667): Opening commits in bug report workstation-broken `[dashboard]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-FLITTING-LOCUST-977](#bug-flitting-locust-977): Micro gapes in impeller `[cat_fountain]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-CRIMSON-MAYFLY-874](#bug-crimson-mayfly-874): Drive hub-insufficient clearance for hall sensor board (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-CRIMSON-MAYFLY-874](#bug-crimson-mayfly-874): Drive hub-insufficient clearance for hall sensor board (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-LEAPING-LOCUST-56](#bug-leaping-locust-56): Pump cover annular ring-insufficient clearance `[cat_fountain]` (`CLOSED`)
 
 ## Detailed Issue Log
@@ -28529,11 +28529,12 @@ Extended impeller blades 1.0mm into central sleeve cylinder, eliminating micro-g
 ### <a id="bug-crimson-mayfly-874"></a> 🟢 `[BUG-CRIMSON-MAYFLY-874]` Drive hub-insufficient clearance for hall sensor board
 
 - **UUID**: `692f0251-d8f8-40be-b255-5414be49c8de`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Created**: `2026-11-07 00:23:00 UTC`
 - **Resolved**: `2026-11-07 01:23:47 UTC`
+- **Accepted**: `2026-11-07 01:23:50 UTC`
 
 #### Description
 
