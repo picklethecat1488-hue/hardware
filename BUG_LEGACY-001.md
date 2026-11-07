@@ -1,6 +1,6 @@
 # 🟢 `[BUG-LEGACY-001]` Legacy resolved bug
 
-- **UUID**: `49e5ecfd-aee9-427c-97f8-69d517289c2b`
+- **UUID**: `09c76326-3118-4d46-b387-4d77a71e9603`
 - **ID**: `BUG-LEGACY-001`
 - **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
