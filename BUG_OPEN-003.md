@@ -2,12 +2,13 @@
 
 - **UUID**: `448546c4-60eb-457e-b3e7-fc7b4b6d4527`
 - **ID**: `BUG-OPEN-003`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-07 15:43:22 UTC`
 - **Resolved**: `2026-11-07 20:46:59 UTC`
+- **Accepted**: `2026-11-07 20:47:03 UTC`
 
 #### Description
 
