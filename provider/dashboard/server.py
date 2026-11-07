@@ -11,6 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import errno
 import json
 import mimetypes
+import os
 from pathlib import Path
 import re
 import socket
@@ -1324,6 +1325,7 @@ class DashboardServer(ThreadingHTTPServer):
         sqlite_review_file: Optional[Path] = None,
         markdown_bugs_path: Optional[Path] = None,
         markdown_review_path: Optional[Path] = None,
+        feedback_dir: Optional[Path] = None,
         revisions: Optional[List[str]] = None,
         fresh: bool = False,
         bind_and_activate: bool = True,
@@ -1342,11 +1344,19 @@ class DashboardServer(ThreadingHTTPServer):
         md_review = markdown_review_path
         md_bugs = markdown_bugs_path
 
-        custom_fb_dir = None
-        for sf in (sqlite_review_file, sqlite_bug_file):
-            if sf and sf.parent.name not in ("build", "target"):
-                custom_fb_dir = sf.parent / "feedback" if (sf.parent / "feedback").exists() else sf.parent
-                break
+        custom_fb_dir = feedback_dir
+        if custom_fb_dir is None:
+            for sf in (sqlite_review_file, sqlite_bug_file):
+                if sf and sf.parent.name not in ("build", "target"):
+                    custom_fb_dir = sf.parent / "feedback" if (sf.parent / "feedback").exists() else sf.parent
+                    break
+        if custom_fb_dir is None and os.environ.get("FEEDBACK_DIR"):
+            try:
+                ws_root = get_git_root().resolve()
+            except Exception:
+                ws_root = self.repo_root.resolve()
+            if self.repo_root.resolve() == ws_root:
+                custom_fb_dir = Path(os.environ["FEEDBACK_DIR"]).resolve()
 
         review_state = sqlite_review_file.with_suffix(".json") if sqlite_review_file else None
         bug_state = sqlite_bug_file.with_suffix(".json") if sqlite_bug_file else None

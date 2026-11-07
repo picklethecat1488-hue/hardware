@@ -188,8 +188,8 @@ def test_bug_server_feedback_mtime_synchronization(tmp_path: Path) -> None:
     server = BugReportServer(sqlite_file=db_file, bind_and_activate=False)
 
     b = BugReportModel(
-        id="BUG-TEST-001",
-        title="Mtime sync bug",
+        id="BUG-TEST-MTIME-001",
+        title="Mtime sync test fixture",
         status=BugStatus.OPEN,
         severity=BugSeverity.LOW,
         category=BugCategory.PCB,
@@ -198,6 +198,9 @@ def test_bug_server_feedback_mtime_synchronization(tmp_path: Path) -> None:
 
     # Immediately after save_and_sync, check_file_watch must be False (no infinite loop)
     assert not server.check_file_watch()
+    assert (server.feedback_dir / "BUG_TEST-MTIME-001.md").exists()
+    assert not (Path.cwd() / "feedback" / "BUG_TEST-MTIME-001.md").exists()
+    assert not (Path.cwd() / "feedback" / "BUG_TEST-001.md").exists()
 
 
 def test_shared_common_js_library_integrated() -> None:

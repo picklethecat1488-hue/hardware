@@ -1,6 +1,7 @@
 """Pytest configuration hooks and global fixtures."""
 
 import os
+from pathlib import Path
 
 # Limit BLAS, OpenMP, and XLA threading per worker to avoid pthread limit exhaustion in containers
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
@@ -84,3 +85,22 @@ def pytest_xdist_auto_num_workers(config):
     # Cap auto workers to prevent thread and cgroup pid exhaustion on large cloud instances (e.g. 128-core hosts)
     cpu_count = os.cpu_count() or 4
     return min(cpu_count, 8)
+
+
+@pytest.fixture(autouse=True)
+def isolate_test_feedback(tmp_path_factory, monkeypatch) -> None:
+    """Ensure all tests run with an isolated feedback directory, preventing workspace pollution."""
+    if "FEEDBACK_DIR" not in os.environ:
+        test_fb = tmp_path_factory.mktemp("test_feedback")
+        (test_fb / "attachments").mkdir(parents=True, exist_ok=True)
+        monkeypatch.setenv("FEEDBACK_DIR", str(test_fb))
+
+
+@pytest.fixture
+def test_feedback_dir(tmp_path: Path, monkeypatch) -> Path:
+    """Provide a dedicated test feedback directory for tests that explicitly test feedback."""
+    fb = tmp_path / "feedback"
+    fb.mkdir(parents=True, exist_ok=True)
+    (fb / "attachments").mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("FEEDBACK_DIR", str(fb))
+    return fb

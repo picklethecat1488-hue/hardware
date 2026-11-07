@@ -744,6 +744,14 @@ class BugReportServer(ThreadingHTTPServer):
         self.host = host
         self.port = port
         self.repo_root = repo_root or Path.cwd()
+        ws_root = self.repo_root.resolve()
+        try:
+            from provider.vcs.git_engine import get_git_root
+
+            ws_root = get_git_root().resolve()
+        except Exception:
+            pass
+
         if sqlite_file is not None and sqlite_file.parent.name not in ("build", "target"):
             self.markdown_output = markdown_output or (sqlite_file.parent / "BUGS.md")
             self.state_file = state_file or (sqlite_file.parent / "bugs_state.json")
@@ -755,6 +763,8 @@ class BugReportServer(ThreadingHTTPServer):
                 self.feedback_dir = feedback_dir
             elif markdown_output is not None and markdown_output.parent.name not in ("build", "target"):
                 self.feedback_dir = markdown_output.parent
+            elif os.environ.get("FEEDBACK_DIR") and (self.repo_root.resolve() == ws_root):
+                self.feedback_dir = Path(os.environ["FEEDBACK_DIR"]).resolve()
             else:
                 self.feedback_dir = self.repo_root / "feedback"
         if self.feedback_dir != self.repo_root / "feedback":
@@ -891,7 +901,10 @@ class BugReportServer(ThreadingHTTPServer):
         except Exception:
             pass
         is_workspace = self.repo_root.resolve() == ws_root
-        skip_detached = is_workspace and (self.sqlite_file.parent.name not in ("build", "target"))
+        is_test = bool(os.environ.get("PYTEST_CURRENT_TEST"))
+        skip_detached = (is_workspace and (self.sqlite_file.parent.name not in ("build", "target"))) or (
+            is_test and is_workspace
+        )
 
         if not self.fresh and not db.bugs and not skip_detached and (self.repo_root / ".git").exists():
             try:
@@ -984,7 +997,10 @@ class BugReportServer(ThreadingHTTPServer):
                 except Exception:
                     pass
                 is_workspace = self.repo_root.resolve() == ws_root
-                skip_detached = is_workspace and (self.sqlite_file.parent.name not in ("build", "target"))
+                is_test = bool(os.environ.get("PYTEST_CURRENT_TEST"))
+                skip_detached = (is_workspace and (self.sqlite_file.parent.name not in ("build", "target"))) or (
+                    is_test and is_workspace
+                )
 
                 if not skip_detached and not self.fresh and (self.repo_root / ".git").exists():
                     try:
@@ -995,6 +1011,7 @@ class BugReportServer(ThreadingHTTPServer):
                             commit_message=f"Update bug database (v{self.db_version})",
                             sync_local_disk=False,
                             dirty_bug_ids=dirty_bug_ids,
+                            extra_feedback_dir=self.feedback_dir,
                         )
                     except Exception:
                         pass
