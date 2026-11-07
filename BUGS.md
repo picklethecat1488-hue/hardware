@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-07 00:30:55 UTC` |
+| **Report Date** | `2026-11-07 00:30:59 UTC` |
 | **Total Issues** | `323` |
 | **Open Issues** | `2` |
 | **Resolved / Closed** | `321 (99%)` |
@@ -24,8 +24,8 @@
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 171 | Schematics, routing, footprints, nets, DRC, silkscreen. |
-| **`CAD`** | 41 | 3D geometry, step models, enclosures, mechanical assembly. |
+| **`PCB`** | 170 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`CAD`** | 42 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 11 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
 | **`INFRASTRUCTURE`** | 86 | Build tooling, compilers, test runners, headless tools. |
 | **`UI`** | 2 | Web dashboards, CLI viewers, review interfaces. |
@@ -354,7 +354,7 @@
 - [x] **`[MEDIUM]`** [#BUG-DIURNAL-ANT-667](#bug-diurnal-ant-667): Opening commits in bug report workstation-broken `[dashboard]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-FLITTING-LOCUST-977](#bug-flitting-locust-977): Micro gapes in impeller `[cat_fountain]` (`RESOLVED`)
 - [ ] **`[MEDIUM]`** [#BUG-CRIMSON-MAYFLY-874](#bug-crimson-mayfly-874): Drive hub-insufficient clearance for hall sensor board (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-LEAPING-LOCUST-56](#bug-leaping-locust-56): New Bug Report (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-LEAPING-LOCUST-56](#bug-leaping-locust-56): Pump cover annular ring-insufficient clearance `[cat_fountain]` (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -28542,12 +28542,17 @@ The drive hub has insufficient clearance for the hall sensor board; the opening 
 
 ---
 
-### <a id="bug-leaping-locust-56"></a> 🔴 `[BUG-LEAPING-LOCUST-56]` New Bug Report
+### <a id="bug-leaping-locust-56"></a> 🔴 `[BUG-LEAPING-LOCUST-56]` Pump cover annular ring-insufficient clearance
 
 - **UUID**: `2c95825d-9a2a-4977-a1ed-8d6df2694fb3`
 - **Status**: `OPEN`
 - **Severity**: `MEDIUM`
-- **Category**: `PCB`
+- **Category**: `CAD`
+- **Component**: `cat_fountain`
 - **Created**: `2026-11-07 00:27:53 UTC`
+
+#### Description
+
+The inner annular ring for the pump cover may have insufficient clearance to fit inside the bowl’s pump cover mount when epoxy is applied. Can we move the annular ring and mount lower (-Z)?
 
 ---

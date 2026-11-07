@@ -9796,12 +9796,12 @@
     {
       "id": "BUG-LEAPING-LOCUST-56",
       "uuid": "2c95825d-9a2a-4977-a1ed-8d6df2694fb3",
-      "title": "New Bug Report",
+      "title": "Pump cover annular ring-insufficient clearance",
       "status": "OPEN",
       "severity": "MEDIUM",
-      "category": "PCB",
-      "component": "",
-      "description": "",
+      "category": "CAD",
+      "component": "cat_fountain",
+      "description": "The inner annular ring for the pump cover may have insufficient clearance to fit inside the bowl’s pump cover mount when epoxy is applied. Can we move the annular ring and mount lower (-Z)?",
       "reproduction_steps": [],
       "expected_behavior": "",
       "actual_behavior": "",
@@ -9810,7 +9810,7 @@
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-07 00:27:53 UTC",
-      "updated_at": "2026-11-07 00:27:53 UTC",
+      "updated_at": "2026-11-07 00:30:57 UTC",
       "resolved_at": null,
       "resolution_notes": "",
       "rejection_notes": null,
@@ -9818,5 +9818,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-07 00:30:53 UTC"
+  "updated_at": "2026-11-07 00:30:57 UTC"
 }
