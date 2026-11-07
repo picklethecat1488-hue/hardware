@@ -259,10 +259,11 @@ def test_sync_branch_pushes_feedback_and_attachments(repo_with_remote) -> None:
     remote_bug_commit = run_git(["rev-parse", "refs/heads/bugs"], cwd=remote_dir).stdout.strip()
     assert remote_bug_commit == res["commit"]
 
-    # Verify remote has bugs.json, feedback file, and attachment
+    # Verify remote has feedback file and attachment, but explicitly NO bugs.json or BUGS.md
     ls_remote = run_git(["ls-tree", "-r", "--name-only", "refs/heads/bugs"], cwd=remote_dir).stdout
-    assert "bugs.json" in ls_remote
-    assert "BUGS.md" in ls_remote
+    assert "bugs.json" not in ls_remote
+    assert "BUGS.md" not in ls_remote
+    assert "BUGS.json" not in ls_remote
     assert f"feedback/BUG_{bug_id.removeprefix('BUG-')}.md" in ls_remote
     assert f"attachments/{bug_id}/sample.log" in ls_remote
 

@@ -321,12 +321,6 @@ class GitEngine:
             except Exception as e:
                 detached_res = {"status": "error", "message": str(e)}
 
-            staged_files: List[str] = []
-            try:
-                staged_files = self.stage_feedback_files()
-            except Exception:
-                pass
-
             detached_pushed = detached_res.get("pushed", False)
             push_info = " Feedback and attachments pushed." if detached_pushed else ""
             msg = f"{out.strip() or 'Repository synchronized.'}{push_info}".strip()
@@ -335,7 +329,6 @@ class GitEngine:
                 "status": "ok",
                 "message": msg,
                 "detached": detached_res,
-                "staged_feedback": staged_files,
             }
         except RuntimeError as err:
             return {
