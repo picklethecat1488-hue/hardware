@@ -22,6 +22,10 @@ The drive hub has insufficient clearance for the hall sensor board; the opening 
 
 - `b1d14ba5b2740f295c23320db2e2d82bebccd03b`
 
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:10c182f6 --> Inspect 3D CAD view of cat_fountain motor_hub to verify wide Hall sensor collar opening and solid South collar wall | `python tools/view.py cat_fountain/motor_hub:part`
+
 #### Resolution Notes
 
 Widened motor hub collar opening to 16.0mm across Hall sensor tongue and eliminated accidental opposite slit at South wall
