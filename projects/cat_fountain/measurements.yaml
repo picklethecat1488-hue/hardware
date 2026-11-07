@@ -175,6 +175,7 @@ motor_driver_standoff_height: 4.0
 hall_sensor_spacing_x: 10.0
 hall_sensor_spacing_y: 20.0
 hall_sensor_standoff_height: 4.0
+hall_sensor_clearance_width: 16.0
 
 # SWD Breakout Board (Treedix JTAG/SWD Adapter)
 swd_board_length: 19.1
@@ -212,7 +213,8 @@ pump_cover_clip_opening_width: 10.5
 pump_cover_snap_groove_minor: 0.4
 pump_cover_snap_ridge_minor: 0.35
 pump_cover_snap_ridge_offset: -0.15
-pump_cover_snap_z_offset: 0.75
+pump_cover_mount_depth: 2.5
+pump_cover_snap_z_offset: 1.5
 pump_outlet_radius: 4.0  # 8mm inner diameter (10mm OD)
 pump_casing_clearance: 1.0
 

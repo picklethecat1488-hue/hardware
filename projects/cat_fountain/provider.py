@@ -271,12 +271,16 @@ class CatFountainProvider(Provider):
                 Cylinder(
                     radius=chamber_r, height=10.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
                 )
-                # Snap fit recess for pump cover at the top rim
-                with Locations((0, 0, 8.5)):
+                # Snap fit recess for pump cover at the top rim (BUG-LEAPING-LOCUST-56)
+                mount_depth = self.settings.pump_cover_mount_depth or 1.5
+                with Locations((0, 0, 10.0 - mount_depth)):
                     Cylinder(
-                        radius=snap_r, height=1.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
+                        radius=snap_r,
+                        height=mount_depth,
+                        align=(Align.CENTER, Align.CENTER, Align.MIN),
+                        mode=Mode.SUBTRACT,
                     )
-                # Internal annular snap-fit groove in casing recess wall (BUG-SPECKLED-ROACH-49)
+                # Internal annular snap-fit groove in casing recess wall (BUG-SPECKLED-ROACH-49, BUG-LEAPING-LOCUST-56)
                 with Locations((0, 0, 10.0 - self.settings.pump_cover_snap_z_offset)):
                     Torus(
                         major_radius=snap_r,
@@ -353,7 +357,7 @@ class CatFountainProvider(Provider):
             # Keyway slot at North (+Y) in socket wall allowing Hall sensor platform and cabling to pass through (BUG-LUSTROUS-COCOON-669)
             # Fits hall sensor mount to prevent rotation during spinning without cutting into the bowl floor above ceiling_z.
             # Cut from Y = 0 (well inside hollow bore radius 18mm) outwards past the socket wall to eliminate thin sliver walls at the curved corners
-            keyway_w = self.settings.hall_sensor_spacing_x + 6.0
+            keyway_w = self.settings.hall_sensor_clearance_width or (self.settings.hall_sensor_spacing_x + 6.0)
             with Locations((0, 0, floor_z - t)):
                 Box(
                     keyway_w,
@@ -1418,12 +1422,13 @@ class CatFountainProvider(Provider):
             # 1. Main casing cap over impeller volute (Z = 0 at casing top rim)
             with Locations((0, 0, 0)):
                 Cylinder(radius=casing_r, height=cover_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
-                # Downward lip entering casing snap recess (Z = -1.5 to 0) with tapered entry chamfer
-                with Locations((0, 0, -1.5)):
+                mount_depth = self.settings.pump_cover_mount_depth or 1.5
+                # Downward lip entering casing snap recess (Z = -mount_depth to 0) with tapered entry chamfer (BUG-LEAPING-LOCUST-56)
+                with Locations((0, 0, -mount_depth)):
                     Cone(
                         bottom_radius=cover_r - 0.3,
                         top_radius=cover_r,
-                        height=1.5,
+                        height=mount_depth,
                         align=(Align.CENTER, Align.CENTER, Align.MIN),
                     )
                 # Annular snap-fit ridge on downward lip to lock tightly into casing recess (BUG-SPECKLED-ROACH-49)
@@ -1470,7 +1475,7 @@ class CatFountainProvider(Provider):
                     )
 
             # 6. Subtract internal impeller / guide post clearance cavity inside casing cap
-            with Locations((0, 0, -1.5)):
+            with Locations((0, 0, -mount_depth)):
                 Cylinder(
                     radius=lip_in_r,
                     height=cover_h,
@@ -1810,16 +1815,18 @@ class CatFountainProvider(Provider):
             with Locations((0, 0, clip_h + 2.0)):
                 add(snap_ring_part)
 
-            # Vertical expansion slits to provide radial snap compliance during insertion/removal
-            with Locations(Rot(0, 0, 45)), Locations(Rot(0, 0, 135)):
-                with Locations((0, 0, clip_h)):
-                    Box(
-                        1.2,
-                        collar_r * 2.0 + 2.0,
-                        collar_h + 1.0,
-                        align=(Align.CENTER, Align.CENTER, Align.MIN),
-                        mode=Mode.SUBTRACT,
-                    )
+            # Hall sensor clearance opening through North (+Y) collar wall (BUG-CRIMSON-MAYFLY-874)
+            # Extends across the full width of the Hall sensor tongue so the sensor module passes through unobstructed.
+            # Only cuts North (+Y) wall starting from Y = 10.0 outwards; South (-Y) collar wall remains continuous and solid.
+            hall_opening_w = self.settings.hall_sensor_clearance_width or rect_w
+            with Locations((0, 10.0, clip_h)):
+                Box(
+                    hall_opening_w,
+                    collar_r - 10.0 + 5.0,
+                    collar_h + 2.0,
+                    align=(Align.CENTER, Align.MIN, Align.MIN),
+                    mode=Mode.SUBTRACT,
+                )
 
             # 3. Dedicated Hall sensor PCB module mount on the rectangular tongue (FORIOT A3144 module)
             post_r = self.settings.pcb_mounting_post_diameter / 2.0

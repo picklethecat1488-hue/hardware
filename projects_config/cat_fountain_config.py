@@ -454,6 +454,11 @@ class CatFountainConfig(BaseModel):
         """Return standoff height for the Hall sensor board."""
         return float(self._raw_data.get("hall_sensor_standoff_height", 4.0))
 
+    @cached_property
+    def hall_sensor_clearance_width(self) -> float:
+        """Return the clearance opening width for the Hall sensor board."""
+        return float(self._raw_data.get("hall_sensor_clearance_width", 0.0))
+
     # SWD Breakout Board (Treedix JTAG/SWD Adapter)
     @cached_property
     def swd_board_length(self) -> float:
@@ -876,9 +881,14 @@ class CatFountainConfig(BaseModel):
         return float(self._raw_data.get("pump_cover_snap_ridge_offset", -0.15))
 
     @cached_property
+    def pump_cover_mount_depth(self) -> float:
+        """Return the vertical mounting depth of the pump cover recess and downward lip."""
+        return float(self._raw_data.get("pump_cover_mount_depth", 0.0))
+
+    @cached_property
     def pump_cover_snap_z_offset(self) -> float:
         """Return the vertical Z offset from casing top for the pump cover snap fit ring."""
-        return float(self._raw_data.get("pump_cover_snap_z_offset", 0.75))
+        return float(self._raw_data.get("pump_cover_snap_z_offset", 0.0))
 
     @cached_property
     def pump_outlet_radius(self) -> float:

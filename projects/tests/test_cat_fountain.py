@@ -1665,6 +1665,9 @@ class TestCatFountainProvider:
         chamber_r = impeller_r + provider.settings.pump_casing_clearance
         snap_r = chamber_r + 1.0
         z_offset = provider.settings.pump_cover_snap_z_offset
+        mount_depth = provider.settings.pump_cover_mount_depth
+        assert mount_depth >= 2.0, f"Expected mount depth >= 2.0mm for epoxy clearance, got {mount_depth}"
+        assert z_offset >= 1.2, f"Expected annular ring Z offset >= 1.2mm for epoxy clearance, got {z_offset}"
 
         # 1. Pump cover downward lip has an annular snap ridge protruding beyond snap_r
         ridge_outer_r = (
@@ -2319,6 +2322,19 @@ class TestCatFountainProvider:
         assert motor_hub.part.is_inside((collar_r + 0.3, 0.0, clip_h + 2.0)), (
             "Motor hub collar must feature an external annular snap ridge to engage socket groove"
         )
+        # Verify Hall sensor clearance opening at +Y and solid collar wall at -Y (BUG-CRIMSON-MAYFLY-874)
+        assert not motor_hub.part.is_inside((0.0, r_collar_wall, clip_h + 3.0)), (
+            "Collar wall at +Y must be open for Hall sensor clearance"
+        )
+        assert not motor_hub.part.is_inside((5.0, r_collar_wall, clip_h + 3.0)), (
+            "Collar wall at +Y must have wide clearance opening for Hall sensor board"
+        )
+        assert not motor_hub.part.is_inside((-5.0, r_collar_wall, clip_h + 3.0)), (
+            "Collar wall at +Y must have wide clearance opening for Hall sensor board"
+        )
+        assert motor_hub.part.is_inside((0.0, -r_collar_wall, clip_h + 3.0)), (
+            "Collar wall at -Y must be solid with no unexpected second opening"
+        )
 
         # 7. TMC6300 hole-less PCB snap socket features outer frame walls and internal snap groove retention (BUG-STINGING-LACEWING-799)
         t = provider.settings.bowl_thickness
@@ -2570,3 +2586,99 @@ class TestCatFountainProvider:
         assert not solid.is_inside((0.0, 0.0, blade_z)), "Central bore obstructed at blade height!"
         pin_clearance_r = provider.settings.impeller_shaft_radius + provider.settings.impeller_shaft_clearance - 0.05
         assert not solid.is_inside((pin_clearance_r, 0.0, blade_z)), "Central bore clearance obstructed!"
+
+    def test_regression_bug_crimson_mayfly_874_hall_sensor_clearance(self, provider):
+        """Verify that drive/motor hub has wide clearance for Hall sensor board and no opposite opening (BUG-CRIMSON-MAYFLY-874).
+
+        Asserts:
+        1. Hall sensor clearance width is parameterized and >= 16.0mm.
+        2. Motor hub collar wall at North (+Y) is completely open across the sensor platform width.
+        3. Motor hub collar wall at South (-Y) is continuous and solid with no unexpected slit.
+        """
+        motor_hub = provider.build_motor_hub("motor_hub")
+        solid = motor_hub.part
+        assert solid.is_valid and solid.volume > 0.0
+
+        hall_clearance_w = provider.settings.hall_sensor_clearance_width
+        assert hall_clearance_w >= 16.0, f"Expected Hall sensor clearance width >= 16.0mm, got {hall_clearance_w}"
+
+        clip_h = provider.settings.motor_hub_thickness
+        socket_in_r = provider.settings.motor_hub_socket_radius
+        collar_r = socket_in_r - provider.settings.motor_hub_collar_clearance
+        r_collar_wall = (collar_r + 13.5) / 2.0
+        test_z = clip_h + 3.0
+
+        # Across the opening width (|X| < hall_clearance_w / 2 - 0.5), +Y wall is open
+        for test_x in [-7.0, -5.0, 0.0, 5.0, 7.0]:
+            assert not solid.is_inside((test_x, r_collar_wall, test_z)), (
+                f"Collar wall at +Y (X={test_x}) must be open for Hall sensor module clearance"
+            )
+
+        # Opposite opening at -Y is eliminated: entire South collar wall is solid
+        for test_x in [-7.0, -5.0, 0.0, 5.0, 7.0]:
+            assert solid.is_inside((test_x, -r_collar_wall, test_z)), (
+                f"Collar wall at -Y (X={test_x}) must be solid (no unexpected second opening)"
+            )
+
+    @pytest.mark.slow
+    def test_regression_bug_leaping_locust_56_pump_cover_annular_ring_lower_z(self, provider):
+        """Verify that pump cover mount and annular snap ring are moved lower (-Z) for epoxy clearance (BUG-LEAPING-LOCUST-56).
+
+        Asserts:
+        1. Pump cover mount depth is parameterized and >= 2.0mm.
+        2. Pump cover annular ring Z offset is parameterized and >= 1.2mm (lower -Z into casing).
+        3. Pump cover downward lip reaches down to -mount_depth with solid entry.
+        4. Bowl casing snap recess reaches down to floor_z + 10.0 - mount_depth.
+        5. Annular snap ridge on pump cover and groove in bowl align with zero interference when assembled.
+        """
+        from build123d import Location
+
+        bowl = provider.build_bowl("bowl")
+        cover = provider.build_pump_cover("pump_cover")
+        bowl_part = bowl.part
+        cover_part = cover.part
+        assert bowl_part is not None and cover_part is not None
+
+        mount_depth = provider.settings.pump_cover_mount_depth
+        snap_z_offset = provider.settings.pump_cover_snap_z_offset
+        assert mount_depth >= 2.0, f"Expected mount depth >= 2.0mm, got {mount_depth}"
+        assert snap_z_offset >= 1.2, f"Expected snap ring offset >= 1.2mm, got {snap_z_offset}"
+
+        floor_z = provider.settings.floor_z
+        hub_r = provider.settings.impeller_radius + provider.settings.magnet_radius + 1.0
+        chamber_r = hub_r + 4.0 + provider.settings.pump_casing_clearance
+        snap_r = chamber_r + 1.0
+        snap_clearance = provider.settings.pump_cover_snap_clearance
+        cover_r = snap_r - snap_clearance
+
+        # Downward lip extends down below Z = -1.5 (specifically down to -mount_depth + 0.5)
+        assert cover_part.is_inside((cover_r - 0.5, 0.0, -mount_depth + 0.5)), (
+            "Downward lip must extend into lower -Z region for deep mount engagement"
+        )
+
+        # Bowl casing recess extends down to floor_z + 10.0 - mount_depth + 0.5
+        recess_low_z = floor_z + 10.0 - mount_depth + 0.5
+        assert not bowl_part.is_inside((snap_r - 0.2, 0.0, recess_low_z)), (
+            "Bowl casing recess must extend down into lower -Z region"
+        )
+
+        # Snap ridge on pump cover is at lower -Z: Z = -snap_z_offset
+        ridge_outer_r = (
+            snap_r + provider.settings.pump_cover_snap_ridge_offset + provider.settings.pump_cover_snap_ridge_minor
+        )
+        assert cover_part.is_inside((ridge_outer_r - 0.05, 0.0, -snap_z_offset)), (
+            f"Pump cover snap ridge must be located at lower Z = -{snap_z_offset}"
+        )
+
+        # Matching groove in bowl is at lower -Z: Z = floor_z + 10.0 - snap_z_offset
+        groove_low_z = floor_z + 10.0 - snap_z_offset
+        assert not bowl_part.is_inside((snap_r + 0.2, 0.0, groove_low_z)), (
+            f"Bowl casing groove must be located at lower Z = {groove_low_z}"
+        )
+
+        # Assembled configuration has zero interference
+        seat_loc = Location((0, 0, floor_z + 10.0))
+        cover_placed = cover_part.located(seat_loc)
+        intersection = bowl_part.intersect(cover_placed)
+        vol = sum(s.volume for s in intersection.solids()) if intersection else 0.0
+        assert vol < 0.2, f"Interference detected between bowl and snapped pump cover: {vol:.4f} mm3"
