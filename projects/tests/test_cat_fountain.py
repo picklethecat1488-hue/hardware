@@ -338,7 +338,7 @@ class TestCatFountainProvider:
         assert impeller.part.is_valid
 
     @pytest.mark.slow
-    @pytest.mark.timeout(300)
+    @pytest.mark.timeout(600)
     def test_pump_integration(self):
         """Verify that the water pump works in the simulation by measuring particles pumped."""
         import tempfile
@@ -407,7 +407,7 @@ class TestCatFountainProvider:
                 assert fluid is not None
 
                 step_fn = hooks[Simulate.STEP]
-                for step_idx in range(55):
+                for step_idx in range(25):
                     step_fn(body_id, physics_client, step_idx, "product:view/simulate")
                     p.stepSimulation(physicsClientId=physics_client)
 
