@@ -1,11 +1,3 @@
-$ git status
-On branch fix/bug-translucent-termite-733
-Your branch is based on 'origin/fix/bug-translucent-termite-733', but the upstream is gone.
-  (use "git branch --unset-upstream" to fixup)
-
-Untracked files:
-  (use "git add <file>..." to include in what will be committed)
-        feedback/
-
-nothing added to commit but untracked files present (use "git add" to track)
-(cq) 
+version https://git-lfs.github.com/spec/v1
+oid sha256:9d54dd0f24376a5e0c02321271077094c49a5fd1a19598fd29aa14889dc333cb
+size 378
