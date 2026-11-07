@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-07 00:27:58 UTC` |
+| **Report Date** | `2026-11-07 00:28:11 UTC` |
 | **Total Issues** | `323` |
 | **Open Issues** | `3` |
 | **Resolved / Closed** | `320 (99%)` |
@@ -24,8 +24,8 @@
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 172 | Schematics, routing, footprints, nets, DRC, silkscreen. |
-| **`CAD`** | 40 | 3D geometry, step models, enclosures, mechanical assembly. |
+| **`PCB`** | 171 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`CAD`** | 41 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 11 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
 | **`INFRASTRUCTURE`** | 86 | Build tooling, compilers, test runners, headless tools. |
 | **`UI`** | 2 | Web dashboards, CLI viewers, review interfaces. |
@@ -28518,7 +28518,7 @@ There are micro gaps between the impeller blades and central shaft, we should pa
 - **UUID**: `692f0251-d8f8-40be-b255-5414be49c8de`
 - **Status**: `OPEN`
 - **Severity**: `MEDIUM`
-- **Category**: `PCB`
+- **Category**: `CAD`
 - **Created**: `2026-11-07 00:23:00 UTC`
 
 #### Description

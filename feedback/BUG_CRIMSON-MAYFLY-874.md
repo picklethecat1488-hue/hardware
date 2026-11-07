@@ -4,7 +4,7 @@
 - **ID**: `BUG-CRIMSON-MAYFLY-874`
 - **Status**: `OPEN`
 - **Severity**: `MEDIUM`
-- **Category**: `PCB`
+- **Category**: `CAD`
 - **Created**: `2026-11-07 00:23:00 UTC`
 
 #### Description
