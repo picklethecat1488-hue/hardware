@@ -14,3 +14,9 @@ There are feedbacks on our Gerber’s (see attached), can you please fill out th
 1) I’m OK with making our PCB .zip files Gerber standard files only. They highlighted the files they wanted removed
 6) We can provide whatever feedback or updates are necessary
 7) Please correct our impedence info in the design files and I will send updated Gerbers back to them
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `document` | [W908185ASE67-EQ.csv](attachments/BUG-OPEN-003/W908185ASE67-EQ.csv) | Uploaded document W908185ASE67-EQ.csv |
