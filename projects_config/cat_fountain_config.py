@@ -144,6 +144,11 @@ class CatFountainConfig(BaseModel):
         return float(self._raw_data.get("impeller_sleeve_radius", 2.75))
 
     @cached_property
+    def impeller_blade_overlap(self) -> float:
+        """Return the radial overlap extending the impeller blade into the central sleeve to eliminate micro-gaps."""
+        return float(self._raw_data.get("impeller_blade_overlap", 0.0))
+
+    @cached_property
     def impeller_base_height(self) -> float:
         """Return the height of the impeller base disk."""
         return float(self._raw_data.get("impeller_base_height", 6.0))

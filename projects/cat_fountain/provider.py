@@ -896,7 +896,9 @@ class CatFountainProvider(Provider):
         center_r = 4.0
         num_blades = self.settings.impeller_blades
         blade_h = 4.0
-        blade_len = (ring_r + lobe_r) - sleeve_r
+        blade_overlap = self.settings.impeller_blade_overlap
+        blade_start_r = sleeve_r - blade_overlap
+        blade_len = (ring_r + lobe_r) - blade_start_r
 
         with BuildPart() as impeller:
             # 1. 3-lobed convex hull base carrying the magnets (minimizes inertia and startup torque)
@@ -920,14 +922,13 @@ class CatFountainProvider(Provider):
                     align=(Align.CENTER, Align.CENTER, Align.MIN),
                 )
 
-            # 3. Subtract guide post central hole (with generous clearance for free rotation after resin coating)
-            # Rests directly on top of the bowl's 2.0mm post flange shoulder, elevating the base 2.0mm off the floor
-            Cylinder(
-                radius=pin_r + pin_clearance,
-                height=14.0,
-                align=(Align.CENTER, Align.CENTER, Align.MIN),
-                mode=Mode.SUBTRACT,
-            )
+            # 3. Add 3 radial blades on the top face of the hub base (Z = hub_h)
+            # Situated directly atop the 3 lobes of the convex hull base, extending into the central sleeve to prevent micro-gaps
+            for i in range(num_blades):
+                angle = i * (360.0 / num_blades)
+                with Locations(Location((0, 0, hub_h)) * Rot(0, 0, angle)):
+                    with Locations((blade_start_r, 0, 0)):
+                        Box(blade_len, 1.2, blade_h, align=(Align.MIN, Align.CENTER, Align.MIN))
 
             # 4. Subtract magnet pockets on the bottom face of each lobe
             for i in range(self.settings.magnet_count):
@@ -938,13 +939,15 @@ class CatFountainProvider(Provider):
                             radius=mr, height=mt, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
                         )
 
-            # 5. Add 3 radial blades on the top face of the hub base (Z = hub_h)
-            # Situated directly atop the 3 lobes of the convex hull base starting at the central sleeve
-            for i in range(num_blades):
-                angle = i * (360.0 / num_blades)
-                with Locations(Location((0, 0, hub_h)) * Rot(0, 0, angle)):
-                    with Locations((sleeve_r, 0, 0)):
-                        Box(blade_len, 1.2, blade_h, align=(Align.MIN, Align.CENTER, Align.MIN))
+            # 5. Subtract guide post central hole (with generous clearance for free rotation after resin coating)
+            # Rests directly on top of the bowl's 2.0mm post flange shoulder, elevating the base 2.0mm off the floor.
+            # Subtracted after blades to guarantee bore is completely unobstructed.
+            Cylinder(
+                radius=pin_r + pin_clearance,
+                height=14.0,
+                align=(Align.CENTER, Align.CENTER, Align.MIN),
+                mode=Mode.SUBTRACT,
+            )
 
             with URDFMetadata(
                 label=target,

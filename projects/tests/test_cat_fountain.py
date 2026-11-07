@@ -1102,6 +1102,11 @@ class TestCatFountainProvider:
         blade_root_point = (sleeve_r + 0.5, 0.0, blade_mid_z)
         assert solid.is_inside(blade_root_point), "Impeller blade root is disconnected or has empty gap at sleeve!"
 
+        # Ensure blade corners at sleeve junction have zero micro-gaps (BUG-FLITTING-LOCUST-977)
+        assert solid.is_inside((2.70, 0.55, blade_mid_z)), "Micro-gap detected at positive blade corner junction!"
+        assert solid.is_inside((2.70, -0.55, blade_mid_z)), "Micro-gap detected at negative blade corner junction!"
+        assert solid.is_inside((2.68, 0.55, blade_mid_z)), "Micro-gap detected at sleeve cylinder perimeter!"
+
         # 5. Ensure single contiguous solid
         assert len(solid.solids()) == 1, "Impeller is split into disconnected parts!"
 
@@ -2518,3 +2523,50 @@ class TestCatFountainProvider:
         assert solid.is_inside((cx + swd_span / 2.0 + wall_t / 2.0, cy + swd_slide / 2.0 + wall_t / 2.0, opening_z)), (
             "SWD corner post must remain solid"
         )
+
+    @pytest.mark.slow
+    def test_regression_bug_flitting_locust_977_impeller_blade_micro_gaps(self, provider):
+        """Verify that impeller blades extend into the central sleeve without micro-gaps (BUG-FLITTING-LOCUST-977).
+
+        Asserts:
+        1. Blade overlap parameter is positive and properly defined in settings.
+        2. Corner points along the blade sides at the cylindrical sleeve seam are solid.
+        3. All 3 blades have contiguous, gap-free intersections with the central sleeve.
+        4. Central guide post bore remains completely clear and unobstructed.
+        """
+        import math
+
+        impeller = provider.build_impeller("impeller")
+        solid = impeller.part
+        assert solid.is_valid and solid.volume > 0.0
+
+        overlap = provider.settings.impeller_blade_overlap
+        assert overlap >= 0.5, f"Expected blade overlap >= 0.5mm, got {overlap}"
+
+        sleeve_r = provider.settings.impeller_sleeve_radius
+        base_h = provider.settings.impeller_base_height
+        blade_z = base_h + 2.0
+        num_blades = provider.settings.impeller_blades
+        blade_half_w = 0.55  # Just inside the 1.2mm blade width (+-0.6mm)
+
+        for i in range(num_blades):
+            angle_deg = i * (360.0 / num_blades)
+            angle_rad = math.radians(angle_deg)
+            cos_a = math.cos(angle_rad)
+            sin_a = math.sin(angle_rad)
+
+            for offset_y in [-blade_half_w, blade_half_w]:
+                # Test corner point right at the sleeve seam (r = sleeve_r - 0.05)
+                # Local coords: x = sleeve_r - 0.05, y = offset_y
+                local_x = sleeve_r - 0.05
+                local_y = offset_y
+                gx = local_x * cos_a - local_y * sin_a
+                gy = local_x * sin_a + local_y * cos_a
+                assert solid.is_inside((gx, gy, blade_z)), (
+                    f"Blade {i} has micro-gap at sleeve seam ({gx:.3f}, {gy:.3f}, {blade_z})!"
+                )
+
+        # Pin bore must remain hollow
+        assert not solid.is_inside((0.0, 0.0, blade_z)), "Central bore obstructed at blade height!"
+        pin_clearance_r = provider.settings.impeller_shaft_radius + provider.settings.impeller_shaft_clearance - 0.05
+        assert not solid.is_inside((pin_clearance_r, 0.0, blade_z)), "Central bore clearance obstructed!"
