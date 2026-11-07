@@ -1,0 +1,8 @@
+# 🔴 `[BUG-SEGMENTED-TREEHOPPER-120]` Bug BUG-FLITTING-STINKBUG-995
+
+- **UUID**: `653ca089-b0c9-4e2c-950b-6a6de43a2844`
+- **ID**: `BUG-SEGMENTED-TREEHOPPER-120`
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `GENERAL`
+- **Created**: `2026-11-07 11:46:57 UTC`
