@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-07 01:23:55 UTC` |
+| **Report Date** | `2026-11-07 01:23:57 UTC` |
 | **Total Issues** | `323` |
 | **Open Issues** | `0` |
 | **Resolved / Closed** | `323 (100%)` |
@@ -352,7 +352,7 @@
 - [x] **`[MEDIUM]`** [#BUG-BRISTLY-CENTIPEDE-327](#bug-bristly-centipede-327): Add modal progress UIs for repo and bug actions `[dashboard]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-LUSTROUS-HORSEFLY-593](#bug-lustrous-horsefly-593): Rename GEMINI.md to AGENTS.md (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-DIURNAL-ANT-667](#bug-diurnal-ant-667): Opening commits in bug report workstation-broken `[dashboard]` (`CLOSED`)
-- [x] **`[MEDIUM]`** [#BUG-FLITTING-LOCUST-977](#bug-flitting-locust-977): Micro gapes in impeller `[cat_fountain]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-FLITTING-LOCUST-977](#bug-flitting-locust-977): Micro gapes in impeller `[cat_fountain]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-CRIMSON-MAYFLY-874](#bug-crimson-mayfly-874): Drive hub-insufficient clearance for hall sensor board (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-LEAPING-LOCUST-56](#bug-leaping-locust-56): Pump cover annular ring-insufficient clearance `[cat_fountain]` (`CLOSED`)
 
@@ -28495,12 +28495,13 @@ Attached commits in Bug Report now navigate directly to Code Review for that com
 ### <a id="bug-flitting-locust-977"></a> 🟢 `[BUG-FLITTING-LOCUST-977]` Micro gapes in impeller
 
 - **UUID**: `1618734f-1a48-4cb3-af0b-3658beb2d978`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-07 00:15:58 UTC`
 - **Resolved**: `2026-11-07 01:23:53 UTC`
+- **Accepted**: `2026-11-07 01:23:56 UTC`
 
 #### Description
 
