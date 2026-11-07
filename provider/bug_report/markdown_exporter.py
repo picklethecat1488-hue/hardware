@@ -622,28 +622,60 @@ class MarkdownBugExporter:
     def merge_databases(self, base_db: BugDatabaseModel, md_db: BugDatabaseModel) -> BugDatabaseModel:
         """Merge markdown database changes into base database using Read-Modify-Write rules.
 
+        Matches bugs primarily by unique UUID. If an incoming bug shares an ID with an existing
+        bug but has a different UUID, collision mitigation generates a new unique ID for the incoming
+        bug so neither bug's content or state is clobbered.
+
         Args:
             base_db: Current base database model (e.g. from SQLite).
             md_db: Database model parsed from BUGS.md.
 
         Returns:
-            Updated base_db with all merged changes.
+            Updated base_db with all merged changes and disambiguated bugs.
         """
-        existing_map = {b.id: b for b in base_db.bugs}
-        existing_uuids = {b.uuid: b for b in base_db.bugs if b.uuid}
+        existing_by_uuid = {b.uuid: b for b in base_db.bugs if b.uuid}
+        existing_by_id = {b.id: b for b in base_db.bugs}
+        all_ids = {b.id for b in base_db.bugs} | {b.id for b in md_db.bugs}
 
         for md_bug in md_db.bugs:
-            existing = existing_map.get(md_bug.id)
-            if not existing and md_bug.uuid and md_bug.uuid in existing_uuids:
-                existing = existing_uuids[md_bug.uuid]
+            existing = None
+            is_collision = False
 
-            if not existing:
-                # Newly added bug in BUGS.md
+            if md_bug.uuid and md_bug.uuid in existing_by_uuid:
+                existing = existing_by_uuid[md_bug.uuid]
+            elif md_bug.id in existing_by_id:
+                cand = existing_by_id[md_bug.id]
+                if not md_bug.uuid and not cand.uuid and md_bug.title == cand.title:
+                    existing = cand
+                else:
+                    is_collision = True
+
+            if is_collision:
+                # Mitigate collision: assign new unique ID
+                new_id = base_db.generate_bug_id(existing_ids=all_ids)
+                all_ids.add(new_id)
+                md_bug.id = new_id
+                if not md_bug.uuid:
+                    md_bug.uuid = str(uuid_pkg.uuid4())
                 base_db.bugs.append(md_bug)
-                existing_map[md_bug.id] = md_bug
-                if md_bug.uuid:
-                    existing_uuids[md_bug.uuid] = md_bug
+                existing_by_uuid[md_bug.uuid] = md_bug
+                existing_by_id[new_id] = md_bug
+                continue
+
+            if existing is None:
+                # Newly added bug in BUGS.md
+                if not md_bug.uuid:
+                    md_bug.uuid = str(uuid_pkg.uuid4())
+                base_db.bugs.append(md_bug)
+                existing_by_uuid[md_bug.uuid] = md_bug
+                existing_by_id[md_bug.id] = md_bug
             else:
+                # Existing bug matched by UUID or legacy title match
+                if md_bug.id != existing.id:
+                    if md_bug.id not in existing_by_id or existing_by_id[md_bug.id] is existing:
+                        existing_by_id.pop(existing.id, None)
+                        existing.id = md_bug.id
+                        existing_by_id[existing.id] = existing
                 # Status update: protect resolved/closed bugs from being regressed to OPEN by stale markdown without notes
                 if (
                     existing.status in (BugStatus.RESOLVED, BugStatus.CLOSED)
@@ -1228,6 +1260,15 @@ class MarkdownBugExporter:
             else:
                 if expected_id_from_fn:
                     md_bug.id = expected_id_from_fn
+                # Check collision with existing bug ID
+                cand = database.get_bug(md_bug.id)
+                if cand and (not md_bug.uuid or cand.uuid != md_bug.uuid):
+                    # Duplicate ID collision detected: mitigate by reassigning unique ID
+                    new_id = database.generate_bug_id(existing_ids={b.id for b in database.bugs})
+                    md_bug.id = new_id
+                    if not md_bug.uuid:
+                        md_bug.uuid = str(uuid_pkg.uuid4())
+                    self.export_individual_bug(md_bug, feedback_dir)
                 database.add_or_update(md_bug)
                 merged += 1
 

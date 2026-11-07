@@ -1033,7 +1033,11 @@ def main(cli_args: Optional[List[str]] = None) -> None:
             return
         case "sync":
             print(f"\n[Quake VCS] Syncing repository {repo_root.name} from remote...")
-            res = engine.sync_repo()
+            try:
+                server.sync_feedback()
+            except Exception:
+                pass
+            res = engine.sync_repo(push=True)
             print(f"Status : {res.get('status')}")
             print(f"Message: {res.get('message')}\n")
             return
@@ -1350,7 +1354,11 @@ def main(cli_args: Optional[List[str]] = None) -> None:
     # Direct CLI git sync
     if getattr(args, "sync", False):
         print(f"\n[Quake VCS] Syncing repository {repo_root.name} from remote...")
-        res = engine.sync_repo()
+        try:
+            server.sync_feedback()
+        except Exception:
+            pass
+        res = engine.sync_repo(push=True)
         print(f"Status : {res.get('status')}")
         print(f"Message: {res.get('message')}\n")
         return

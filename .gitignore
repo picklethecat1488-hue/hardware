@@ -13,6 +13,9 @@ recordings/
 feedback/
 attachments/
 feedback/attachments/
+WORMS.md
+BUGS.md
+CR.md
 /*.svg
 
 # Anvil Cloud Runner Environment & Lock Files

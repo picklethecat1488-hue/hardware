@@ -330,12 +330,21 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
 
         match path:
             case "/api/sync":
-                res = self.server.git_engine.sync_repo()
+                feedback_res = {}
                 try:
                     feedback_res = self.server.sync_feedback()
-                    res["feedback"] = feedback_res
+                except Exception as e:
+                    feedback_res = {"error": str(e)}
+
+                res = self.server.git_engine.sync_repo(push=True)
+                res["feedback"] = feedback_res
+
+                # Re-sync feedback if remote detached branch introduced new/updated markdown files
+                try:
+                    self.server.sync_feedback()
                 except Exception:
                     pass
+
                 self._send_json(res)
             case "/api/rebase":
                 upstream = data.get("upstream") if isinstance(data, dict) else None

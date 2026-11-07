@@ -32,7 +32,7 @@ echo "🧹 [3/4] Checking linting rules..."
 ruff check .
 
 echo "🧪 [4/4] Running fast test suite (excluding slow CAD/physics)..."
-NUM_CPUS=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+NUM_CPUS=$(OMP_NUM_THREADS= nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 if [ "${NUM_CPUS}" -gt 4 ]; then
     PYTEST_WORKERS=4
 else
