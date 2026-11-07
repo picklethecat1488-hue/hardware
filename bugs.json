@@ -9736,21 +9736,11 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [
-        {
-          "id": "9020a065",
-          "filename": "clipboard_text_1794010747591.txt",
-          "file_type": "document",
-          "file_path": "attachments/BUG-FLITTING-LOCUST-977/clipboard_text_1794010747591.txt",
-          "size_bytes": 378,
-          "description": "Pasted text document",
-          "created_at": "2026-11-07 00:19:07 UTC"
-        }
-      ],
+      "attachments": [],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-07 00:15:58 UTC",
-      "updated_at": "2026-11-07 00:19:07 UTC",
+      "updated_at": "2026-11-07 00:19:12 UTC",
       "resolved_at": null,
       "resolution_notes": "",
       "rejection_notes": null,
@@ -9758,5 +9748,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-07 00:19:07 UTC"
+  "updated_at": "2026-11-07 00:19:12 UTC"
 }

@@ -11,9 +11,3 @@
 #### Description
 
 There are micro gaps between the impeller blades and central shaft, we should patch these by extending the impeller blades into the central shaft to ensure unioning the two shapes creates a smooth object
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `document` | [clipboard_text_1794010747591.txt](attachments/BUG-FLITTING-LOCUST-977/clipboard_text_1794010747591.txt) | Pasted text document |
