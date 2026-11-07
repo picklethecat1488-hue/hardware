@@ -23,6 +23,10 @@ There are micro gaps between the impeller blades and central shaft, we should pa
 
 - `b2815fdce8ff602a0775696e6ff55eb72550d8ec`
 
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:5ce603e6 --> Inspect 3D CAD view of cat_fountain product assembly to verify seamless gap-free impeller blade roots | `python tools/view.py cat_fountain/product:view`
+
 #### Resolution Notes
 
 Extended impeller blades 1.0mm into central sleeve cylinder, eliminating micro-gaps at blade corner junctions while preserving guide pin clearance
