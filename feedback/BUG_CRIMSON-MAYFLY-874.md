@@ -1,11 +1,12 @@
-# 🔴 `[BUG-CRIMSON-MAYFLY-874]` Drive hub-insufficient clearance for hall sensor board
+# 🟢 `[BUG-CRIMSON-MAYFLY-874]` Drive hub-insufficient clearance for hall sensor board
 
 - **UUID**: `692f0251-d8f8-40be-b255-5414be49c8de`
 - **ID**: `BUG-CRIMSON-MAYFLY-874`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Created**: `2026-11-07 00:23:00 UTC`
+- **Resolved**: `2026-11-07 00:35:47 UTC`
 
 #### Description
 
@@ -16,3 +17,7 @@ The drive hub has insufficient clearance for the hall sensor board; the opening 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1794011081865_vz46w.png](attachments/BUG-CRIMSON-MAYFLY-874/screenshot_paste_1794011081865_vz46w.png) | Pasted screenshot screenshot_paste_1794011081865_vz46w.png |
+
+#### Resolution Notes
+
+Widened motor hub collar opening to 16.0mm across Hall sensor tongue and eliminated accidental opposite slit at South wall

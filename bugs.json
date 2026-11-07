@@ -8713,33 +8713,6 @@
       "attachments": [
         {
           "id": "att-4",
-          "filename": "digikey_order_2026-10-14.xlsx",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx",
-          "size_bytes": 0,
-          "description": "Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2)",
-          "created_at": ""
-        },
-        {
-          "id": "att-5",
-          "filename": "carrier_board_bom_rev3.csv",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv",
-          "size_bytes": 0,
-          "description": "CSV export of clean EDA BOM Rev 3",
-          "created_at": ""
-        },
-        {
-          "id": "att-6",
-          "filename": "carrier_board_bom_rev2.csv",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv",
-          "size_bytes": 0,
-          "description": "CSV export of clean EDA BOM",
-          "created_at": ""
-        },
-        {
-          "id": "att-7",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
@@ -8748,7 +8721,7 @@
           "created_at": ""
         },
         {
-          "id": "att-8",
+          "id": "att-5",
           "filename": "carrier_board_bom_rev3.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
@@ -8757,7 +8730,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-6",
           "filename": "carrier_board_bom_rev2.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
@@ -8766,7 +8739,7 @@
           "created_at": ""
         },
         {
-          "id": "att-2",
+          "id": "att-7",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
@@ -8775,12 +8748,39 @@
           "created_at": ""
         },
         {
-          "id": "att-3",
+          "id": "att-8",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
           "size_bytes": 0,
           "description": "Legacy Excel 97-2004 format of replied quotation BOM",
+          "created_at": ""
+        },
+        {
+          "id": "att-1",
+          "filename": "digikey_order_2026-10-14.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx",
+          "size_bytes": 0,
+          "description": "Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2)",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "carrier_board_bom_rev3.csv",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv",
+          "size_bytes": 0,
+          "description": "CSV export of clean EDA BOM Rev 3",
+          "created_at": ""
+        },
+        {
+          "id": "att-3",
+          "filename": "carrier_board_bom_rev2.csv",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv",
+          "size_bytes": 0,
+          "description": "CSV export of clean EDA BOM",
           "created_at": ""
         }
       ],
@@ -9331,6 +9331,15 @@
       "attachments": [
         {
           "id": "att-3",
+          "filename": "screenshot_paste_1793890911006_wvg54.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1793890911006_wvg54.png",
+          "created_at": ""
+        },
+        {
+          "id": "att-1",
           "filename": "screenshot_paste_1793890876309_0c9ae.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png",
@@ -9339,21 +9348,12 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-2",
           "filename": "screenshot_paste_1793924149979_7f535.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png",
           "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793924149979_7f535.png",
-          "created_at": ""
-        },
-        {
-          "id": "att-2",
-          "filename": "screenshot_paste_1793890911006_wvg54.png",
-          "file_type": "screenshot",
-          "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png",
-          "size_bytes": 0,
-          "description": "Pasted screenshot screenshot_paste_1793890911006_wvg54.png",
           "created_at": ""
         }
       ],
@@ -9522,20 +9522,20 @@
       "attachments": [
         {
           "id": "att-2",
-          "filename": "screenshot_paste_1793948449522_d1ck8.png",
-          "file_type": "screenshot",
-          "file_path": "attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793948449522_d1ck8.png",
-          "size_bytes": 0,
-          "description": "Pasted screenshot screenshot_paste_1793948449522_d1ck8.png",
-          "created_at": ""
-        },
-        {
-          "id": "att-1",
           "filename": "screenshot_paste_1793947358948_g28nw.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793947358948_g28nw.png",
           "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1793947358948_g28nw.png",
+          "created_at": ""
+        },
+        {
+          "id": "att-1",
+          "filename": "screenshot_paste_1793948449522_d1ck8.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793948449522_d1ck8.png",
+          "size_bytes": 0,
+          "description": "Pasted screenshot screenshot_paste_1793948449522_d1ck8.png",
           "created_at": ""
         }
       ],
@@ -9771,7 +9771,7 @@
       "id": "BUG-CRIMSON-MAYFLY-874",
       "uuid": "692f0251-d8f8-40be-b255-5414be49c8de",
       "title": "Drive hub-insufficient clearance for hall sensor board",
-      "status": "OPEN",
+      "status": "RESOLVED",
       "severity": "MEDIUM",
       "category": "CAD",
       "component": "",
@@ -9795,9 +9795,9 @@
       "review_tasks": [],
       "created_at": "2026-11-07 00:23:00 UTC",
       "updated_at": "2026-11-07 00:28:06 UTC",
-      "resolved_at": null,
-      "resolution_notes": "",
-      "rejection_notes": null,
+      "resolved_at": "2026-11-07 00:35:47 UTC",
+      "resolution_notes": "Widened motor hub collar opening to 16.0mm across Hall sensor tongue and eliminated accidental opposite slit at South wall",
+      "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
     },
@@ -9821,10 +9821,10 @@
       "updated_at": "2026-11-07 00:30:57 UTC",
       "resolved_at": null,
       "resolution_notes": "",
-      "rejection_notes": null,
+      "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-07 00:31:08 UTC"
+  "updated_at": "2026-11-07 00:35:47 UTC"
 }

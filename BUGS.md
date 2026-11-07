@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-07 00:31:09 UTC` |
+| **Report Date** | `2026-11-07 00:35:48 UTC` |
 | **Total Issues** | `323` |
-| **Open Issues** | `2` |
-| **Resolved / Closed** | `321 (99%)` |
+| **Open Issues** | `1` |
+| **Resolved / Closed** | `322 (99%)` |
 
 ## Issues by Severity
 
@@ -353,7 +353,7 @@
 - [x] **`[MEDIUM]`** [#BUG-LUSTROUS-HORSEFLY-593](#bug-lustrous-horsefly-593): Rename GEMINI.md to AGENTS.md (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-DIURNAL-ANT-667](#bug-diurnal-ant-667): Opening commits in bug report workstation-broken `[dashboard]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-FLITTING-LOCUST-977](#bug-flitting-locust-977): Micro gapes in impeller `[cat_fountain]` (`RESOLVED`)
-- [ ] **`[MEDIUM]`** [#BUG-CRIMSON-MAYFLY-874](#bug-crimson-mayfly-874): Drive hub-insufficient clearance for hall sensor board (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-CRIMSON-MAYFLY-874](#bug-crimson-mayfly-874): Drive hub-insufficient clearance for hall sensor board (`RESOLVED`)
 - [ ] **`[MEDIUM]`** [#BUG-LEAPING-LOCUST-56](#bug-leaping-locust-56): Pump cover annular ring-insufficient clearance `[cat_fountain]` (`OPEN`)
 
 ## Detailed Issue Log
@@ -27573,14 +27573,14 @@ Pls see attached, we should plan to consign all remaining components to them exc
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
-| `reference` | [digikey_order_2026-10-14.xlsx](attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx) | Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2) |
-| `reference` | [carrier_board_bom_rev3.csv](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv) | CSV export of clean EDA BOM Rev 3 |
-| `reference` | [carrier_board_bom_rev2.csv](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv) | CSV export of clean EDA BOM |
 | `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx) | Uploaded reference questions spreadsheet from PCBWay |
 | `reference` | [carrier_board_bom_rev3.xlsx](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx) | Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM) |
 | `reference` | [carrier_board_bom_rev2.xlsx](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx) | Clean EDA export BOM generated directly from updated carrier board model |
 | `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx) | Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16 |
 | `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls) | Legacy Excel 97-2004 format of replied quotation BOM |
+| `reference` | [digikey_order_2026-10-14.xlsx](attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx) | Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2) |
+| `reference` | [carrier_board_bom_rev3.csv](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv) | CSV export of clean EDA BOM Rev 3 |
+| `reference` | [carrier_board_bom_rev2.csv](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv) | CSV export of clean EDA BOM |
 
 #### Resolution Notes
 
@@ -28186,9 +28186,9 @@ Defects circled in red.
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
+| `screenshot` | [screenshot_paste_1793890911006_wvg54.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png) | Pasted screenshot screenshot_paste_1793890911006_wvg54.png |
 | `screenshot` | [screenshot_paste_1793890876309_0c9ae.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png) | Pasted screenshot screenshot_paste_1793890876309_0c9ae.png |
 | `screenshot` | [screenshot_paste_1793924149979_7f535.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png) | Pasted screenshot screenshot_paste_1793924149979_7f535.png |
-| `screenshot` | [screenshot_paste_1793890911006_wvg54.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png) | Pasted screenshot screenshot_paste_1793890911006_wvg54.png |
 
 #### Attached Commits
 
@@ -28340,8 +28340,8 @@ Additionally, we should add holes on each wall to allow a small tool such as an 
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1793948449522_d1ck8.png](attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793948449522_d1ck8.png) | Pasted screenshot screenshot_paste_1793948449522_d1ck8.png |
 | `screenshot` | [screenshot_paste_1793947358948_g28nw.png](attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793947358948_g28nw.png) | Pasted screenshot screenshot_paste_1793947358948_g28nw.png |
+| `screenshot` | [screenshot_paste_1793948449522_d1ck8.png](attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793948449522_d1ck8.png) | Pasted screenshot screenshot_paste_1793948449522_d1ck8.png |
 
 #### Attached Commits
 
@@ -28526,13 +28526,14 @@ Extended impeller blades 1.0mm into central sleeve cylinder, eliminating micro-g
 
 ---
 
-### <a id="bug-crimson-mayfly-874"></a> 🔴 `[BUG-CRIMSON-MAYFLY-874]` Drive hub-insufficient clearance for hall sensor board
+### <a id="bug-crimson-mayfly-874"></a> 🟢 `[BUG-CRIMSON-MAYFLY-874]` Drive hub-insufficient clearance for hall sensor board
 
 - **UUID**: `692f0251-d8f8-40be-b255-5414be49c8de`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Created**: `2026-11-07 00:23:00 UTC`
+- **Resolved**: `2026-11-07 00:35:47 UTC`
 
 #### Description
 
@@ -28543,6 +28544,10 @@ The drive hub has insufficient clearance for the hall sensor board; the opening 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1794011081865_vz46w.png](attachments/BUG-CRIMSON-MAYFLY-874/screenshot_paste_1794011081865_vz46w.png) | Pasted screenshot screenshot_paste_1794011081865_vz46w.png |
+
+#### Resolution Notes
+
+Widened motor hub collar opening to 16.0mm across Hall sensor tongue and eliminated accidental opposite slit at South wall
 
 ---
 
