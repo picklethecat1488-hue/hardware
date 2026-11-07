@@ -6,9 +6,9 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-07 00:19:36 UTC` |
-| **Total Issues** | `321` |
-| **Open Issues** | `1` |
+| **Report Date** | `2026-11-07 00:23:02 UTC` |
+| **Total Issues** | `322` |
+| **Open Issues** | `2` |
 | **Resolved / Closed** | `320 (99%)` |
 
 ## Issues by Severity
@@ -17,14 +17,14 @@
 | :--- | :---: | :--- |
 | **`[CRITICAL]`** | 20 | System crashes, build failures, blockages, or electrical shorts. |
 | **`[HIGH]`** | 31 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
-| **`[MEDIUM]`** | 241 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
+| **`[MEDIUM]`** | 242 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
 | **`[LOW]`** | 29 | Minor aesthetic imperfections or documentation notes. |
 
 ## Issues by Category
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 170 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`PCB`** | 171 | Schematics, routing, footprints, nets, DRC, silkscreen. |
 | **`CAD`** | 40 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 11 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
 | **`INFRASTRUCTURE`** | 86 | Build tooling, compilers, test runners, headless tools. |
@@ -353,6 +353,7 @@
 - [x] **`[MEDIUM]`** [#BUG-LUSTROUS-HORSEFLY-593](#bug-lustrous-horsefly-593): Rename GEMINI.md to AGENTS.md (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-DIURNAL-ANT-667](#bug-diurnal-ant-667): Opening commits in bug report workstation-broken `[dashboard]` (`CLOSED`)
 - [ ] **`[MEDIUM]`** [#BUG-FLITTING-LOCUST-977](#bug-flitting-locust-977): Micro gapes in impeller `[cat_fountain]` (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-CRIMSON-MAYFLY-874](#bug-crimson-mayfly-874): New Bug Report (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -28508,5 +28509,15 @@ There are micro gaps between the impeller blades and central shaft, we should pa
 | Type | Filename | Description |
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1794010762260_ohrw4.png](attachments/BUG-FLITTING-LOCUST-977/screenshot_paste_1794010762260_ohrw4.png) | Pasted screenshot screenshot_paste_1794010762260_ohrw4.png |
+
+---
+
+### <a id="bug-crimson-mayfly-874"></a> 🔴 `[BUG-CRIMSON-MAYFLY-874]` New Bug Report
+
+- **UUID**: `692f0251-d8f8-40be-b255-5414be49c8de`
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-11-07 00:23:00 UTC`
 
 ---
