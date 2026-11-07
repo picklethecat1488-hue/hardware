@@ -287,6 +287,14 @@ def test_git_engine_sync_repo_pushes_detached_branch(repo_with_remote) -> None:
     )
     store.commit_database(db, commit_message="Bug for GitEngine sync")
 
+    # Add an unpushed local commit to main
+    test_code_file = local_dir / "test.txt"
+    test_code_file.write_text("unpushed code\n", encoding="utf-8")
+    run_git(["add", "test.txt"], cwd=local_dir)
+    run_git(["commit", "-m", "Unpushed code commit"], cwd=local_dir)
+    local_main_sha = run_git(["rev-parse", "main"], cwd=local_dir).stdout.strip()
+    remote_main_before = run_git(["rev-parse", "main"], cwd=remote_dir).stdout.strip()
+
     # Run sync_repo with push=True
     sync_res = engine.sync_repo(push=True)
     assert sync_res["status"] == "ok"
@@ -296,3 +304,8 @@ def test_git_engine_sync_repo_pushes_detached_branch(repo_with_remote) -> None:
     # Verify remote has the bug ref
     remote_sha = run_git(["rev-parse", "refs/heads/bugs"], cwd=remote_dir).stdout.strip()
     assert len(remote_sha) == 40
+
+    # Verify remote main was NOT pushed (code branches must only be pushed via user-managed PRs)
+    remote_main_after = run_git(["rev-parse", "main"], cwd=remote_dir).stdout.strip()
+    assert remote_main_after == remote_main_before
+    assert remote_main_after != local_main_sha

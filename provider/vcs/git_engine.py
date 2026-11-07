@@ -321,28 +321,9 @@ class GitEngine:
             except Exception as e:
                 detached_res = {"status": "error", "message": str(e)}
 
-            code_push_msg = ""
-            if push:
-                try:
-                    upstream = run_git_command(["rev-parse", "--abbrev-ref", "@{u}"], cwd=self.repo_root).strip()
-                    if upstream:
-                        push_proc = subprocess.run(
-                            ["git", "push"],
-                            cwd=str(self.repo_root),
-                            capture_output=True,
-                            text=True,
-                            check=False,
-                        )
-                        if push_proc.returncode == 0:
-                            code_push_msg = " Active code branch pushed to upstream."
-                        else:
-                            code_push_msg = f" (Active branch push note: {push_proc.stderr.strip()})"
-                except Exception:
-                    pass
-
             detached_pushed = detached_res.get("pushed", False)
             push_info = " Feedback and attachments pushed." if detached_pushed else ""
-            msg = f"{out.strip() or 'Repository synchronized.'}{push_info}{code_push_msg}".strip()
+            msg = f"{out.strip() or 'Repository synchronized.'}{push_info}".strip()
 
             return {
                 "status": "ok",
