@@ -1593,16 +1593,46 @@
       const progressPercent = document.getElementById("syncProgressPercent");
 
       if (modal) modal.style.display = "flex";
-      if (progressBar) progressBar.style.width = "35%";
-      if (progressPercent) progressPercent.textContent = "35%";
-      if (statusText) statusText.textContent = "Scanning feedback/ files and merging into SQLite...";
+      let progress = 12;
+      const startTime = Date.now();
+
+      const updateProgress = () => {
+        const elapsed = (Date.now() - startTime) / 1000;
+        if (progress < 94) {
+          if (elapsed < 0.6) {
+            progress = 12 + (elapsed / 0.6) * 23; // 12% to 35%
+          } else if (elapsed < 2.0) {
+            progress = 35 + ((elapsed - 0.6) / 1.4) * 30; // 35% to 65%
+          } else if (elapsed < 4.5) {
+            progress = 65 + ((elapsed - 2.0) / 2.5) * 22; // 65% to 87%
+          } else {
+            progress += (95 - progress) * 0.02; // Asymptotic up to 95%
+          }
+        }
+        const pct = Math.min(96, Math.floor(progress));
+        if (progressBar) progressBar.style.width = `${pct}%`;
+        if (progressPercent) progressPercent.textContent = `${pct}%`;
+
+        if (statusText) {
+          if (pct < 30) {
+            statusText.textContent = "Scanning feedback/ directory and discovering markdown files...";
+          } else if (pct < 60) {
+            statusText.textContent = "Merging feedback markdown records into SQLite store...";
+          } else if (pct < 85) {
+            statusText.textContent = "Reconciling review comments and bug tracking tags...";
+          } else {
+            statusText.textContent = "Building smartlog DAG and computing file changes...";
+          }
+        }
+      };
+
+      const syncTimer = setInterval(updateProgress, 50);
+      updateProgress();
 
       try {
         const resp = await fetch("/api/sync_feedback", { method: "POST" });
-        if (progressBar) progressBar.style.width = "85%";
-        if (progressPercent) progressPercent.textContent = "85%";
-        if (statusText) statusText.textContent = "Updating database records and commit tags...";
         const data = await resp.json();
+        clearInterval(syncTimer);
 
         if (progressBar) progressBar.style.width = "100%";
         if (progressPercent) progressPercent.textContent = "100%";
@@ -1617,6 +1647,7 @@
           }
         }, 400);
       } catch (err) {
+        clearInterval(syncTimer);
         console.error("Sync error:", err);
         if (statusText) statusText.textContent = "Sync complete with warnings. Continuing...";
         setTimeout(() => {
@@ -2763,10 +2794,21 @@
     }
 
     // Action Progress Modal Management (BUG-327)
+    let actionProgressDepth = 0;
     let actionProgressTimer = null;
     let actionProgressInterval = null;
 
     async function runWithActionModal(options, asyncFn) {
+      if (actionProgressDepth > 0) {
+        actionProgressDepth++;
+        try {
+          return await asyncFn();
+        } finally {
+          actionProgressDepth--;
+        }
+      }
+
+      actionProgressDepth = 1;
       const thresholdMs = (options && options.delayMs !== undefined) ? options.delayMs : 1000;
       const overlay = document.getElementById("actionProgressModalOverlay");
       const titleEl = document.getElementById("actionProgressTitle");
@@ -2779,7 +2821,7 @@
 
       let isModalVisible = false;
       const startTime = Date.now();
-      let progress = 15;
+      let progress = 14;
 
       if (actionProgressTimer) {
         clearTimeout(actionProgressTimer);
@@ -2790,34 +2832,88 @@
         actionProgressInterval = null;
       }
 
+      const getStageMessage = (pct) => {
+        if (options && options.stages && Array.isArray(options.stages)) {
+          for (const s of options.stages) {
+            if (pct <= s.at) return s.text;
+          }
+          return options.stages[options.stages.length - 1].text;
+        }
+
+        const titleUpper = ((options && options.title) || "").toUpperCase();
+        if (titleUpper.includes("SYNC") || titleUpper.includes("SYNCHRONIZ")) {
+          if (pct < 28) return "Scanning working tree and local feedback files...";
+          if (pct < 55) return "Reconciling feedback worktree database...";
+          if (pct < 78) return "Synchronizing commits and remote refs...";
+          if (pct < 92) return "Recomputing smartlog DAG and commit tags...";
+          return "Finalizing workspace synchronization...";
+        } else if (titleUpper.includes("REBASE")) {
+          if (pct < 30) return "Locating upstream ancestor merge-base...";
+          if (pct < 60) return "Replaying commits onto target branch...";
+          if (pct < 85) return "Verifying tree integrity and merge conflicts...";
+          return "Updating working tree and branch HEAD...";
+        } else if (titleUpper.includes("PR") || titleUpper.includes("SUBMIT")) {
+          if (pct < 30) return "Analyzing commit stack hierarchy...";
+          if (pct < 60) return "Pushing feature branches to origin...";
+          if (pct < 85) return "Creating and linking GitHub pull requests...";
+          return "Registering upstream tracking references...";
+        } else if (titleUpper.includes("SAVE") || titleUpper.includes("BUG") || titleUpper.includes("WORM")) {
+          if (pct < 30) return "Validating issue fields and markdown syntax...";
+          if (pct < 60) return "Writing records to SQLite and feedback worktree...";
+          if (pct < 85) return "Updating review tasks and checklist invariants...";
+          return "Finalizing issue status...";
+        } else if (titleUpper.includes("STAGE") || titleUpper.includes("COMMIT")) {
+          if (pct < 35) return "Inspecting index and staged file changes...";
+          if (pct < 70) return "Writing tree object and commit hash...";
+          return "Updating HEAD reference and branch state...";
+        }
+
+        if (pct < 30) return (options && options.stepText) || "Initializing operation...";
+        if (pct < 60) return "Executing task runner...";
+        if (pct < 85) return "Reconciling changes with repository...";
+        return "Finalizing updates...";
+      };
+
       actionProgressTimer = setTimeout(() => {
         if (!overlay) return;
         isModalVisible = true;
         if (titleEl) titleEl.textContent = (options && options.title) || "PROCESSING ACTION";
         if (descEl) descEl.textContent = (options && options.description) || "Please wait while the operation completes...";
-        if (statusEl) statusEl.textContent = (options && options.stepText) || "Working...";
+        if (statusEl) statusEl.textContent = (options && options.stepText) || getStageMessage(progress);
         if (iconEl && options && options.icon) iconEl.textContent = options.icon;
-        if (barEl) barEl.style.width = "20%";
-        if (percentEl) percentEl.textContent = "20%";
-        if (elapsedEl) elapsedEl.textContent = ((Date.now() - startTime) / 1000).toFixed(1) + "s";
+        if (barEl) barEl.style.width = "14%";
+        if (percentEl) percentEl.textContent = "14%";
+        if (elapsedEl) elapsedEl.textContent = "0.0s";
         overlay.style.display = "flex";
 
         actionProgressInterval = setInterval(() => {
-          const elapsedSec = ((Date.now() - startTime) / 1000).toFixed(1);
-          if (elapsedEl) elapsedEl.textContent = `${elapsedSec}s`;
-          if (progress < 90) {
-            progress += Math.floor(Math.random() * 6) + 2;
-            if (progress > 90) progress = 90;
-            if (barEl) barEl.style.width = `${progress}%`;
-            if (percentEl) percentEl.textContent = `${progress}%`;
+          const elapsedSec = (Date.now() - startTime) / 1000;
+          if (elapsedEl) elapsedEl.textContent = `${elapsedSec.toFixed(1)}s`;
+
+          // Continuous asymptotic progression
+          if (progress < 94) {
+            if (elapsedSec < 1.0) {
+              progress = 14 + (elapsedSec / 1.0) * 26; // 14% to 40%
+            } else if (elapsedSec < 3.0) {
+              progress = 40 + ((elapsedSec - 1.0) / 2.0) * 32; // 40% to 72%
+            } else if (elapsedSec < 7.0) {
+              progress = 72 + ((elapsedSec - 3.0) / 4.0) * 18; // 72% to 90%
+            } else {
+              progress += (96 - progress) * 0.015; // Asymptotic up to 96%
+            }
           }
-        }, 200);
+          const pct = Math.min(96, Math.floor(progress));
+          if (barEl) barEl.style.width = `${pct}%`;
+          if (percentEl) percentEl.textContent = `${pct}%`;
+          if (statusEl) statusEl.textContent = getStageMessage(pct);
+        }, 50);
       }, thresholdMs);
 
       try {
         const result = await asyncFn();
         return result;
       } finally {
+        actionProgressDepth--;
         if (actionProgressTimer) {
           clearTimeout(actionProgressTimer);
           actionProgressTimer = null;
@@ -2829,7 +2925,8 @@
         if (isModalVisible && overlay) {
           if (barEl) barEl.style.width = "100%";
           if (percentEl) percentEl.textContent = "100%";
-          if (statusEl) statusEl.textContent = "Complete!";
+          const totalElapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+          if (statusEl) statusEl.textContent = `✓ Complete in ${totalElapsed}s`;
           setTimeout(() => {
             overlay.style.display = "none";
           }, 250);
@@ -3407,20 +3504,37 @@
       if (btnDone) btnDone.style.display = "none";
       if (btnClose) btnClose.style.display = "none";
 
-      let progress = 15;
+      let progress = 14;
+      const startTime = Date.now();
       clearInterval(prSubmitInterval);
       prSubmitInterval = setInterval(() => {
-        if (progress < 85) {
-          progress += Math.floor(Math.random() * 8) + 3;
-          if (progress > 85) progress = 85;
-          if (pBar) pBar.style.width = `${progress}%`;
-          if (pText) pText.textContent = `${progress}%`;
-          if (sText) {
-            if (progress > 60) sText.textContent = "Creating and synchronizing pull requests on GitHub...";
-            else if (progress > 30) sText.textContent = "Pushing commit stack to remote repository...";
+        const elapsedSec = (Date.now() - startTime) / 1000;
+        if (progress < 94) {
+          if (elapsedSec < 1.0) {
+            progress = 14 + (elapsedSec / 1.0) * 26; // 14% to 40%
+          } else if (elapsedSec < 3.0) {
+            progress = 40 + ((elapsedSec - 1.0) / 2.0) * 28; // 40% to 68%
+          } else if (elapsedSec < 7.0) {
+            progress = 68 + ((elapsedSec - 3.0) / 4.0) * 20; // 68% to 88%
+          } else {
+            progress += (96 - progress) * 0.015; // Asymptotic up to 96%
           }
         }
-      }, 300);
+        const pct = Math.min(96, Math.floor(progress));
+        if (pBar) pBar.style.width = `${pct}%`;
+        if (pText) pText.textContent = `${pct}%`;
+        if (sText) {
+          if (pct < 35) {
+            sText.textContent = "Inspecting commit stack and preparing branch references...";
+          } else if (pct < 65) {
+            sText.textContent = "Pushing feature branch commits to remote repository...";
+          } else if (pct < 85) {
+            sText.textContent = "Creating and synchronizing pull requests on GitHub...";
+          } else {
+            sText.textContent = "Awaiting remote GitHub API confirmation...";
+          }
+        }
+      }, 50);
     }
 
     function closePrSubmitModal() {
