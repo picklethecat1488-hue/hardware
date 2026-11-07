@@ -13,11 +13,6 @@ GERBER_EXTENSIONS: set[str] = {
     ".gbr",
     ".drl",
     ".gbrjob",
-    ".kicad_pcb",
-    ".pcb",
-    ".pcbdoc",
-    ".cam",
-    ".brd",
     ".txt",
     ".rpt",
 }
@@ -125,7 +120,7 @@ def generate_pcb_project_summary(
         impedance_entries: list[dict[str, str]] = []
     else:
         order_category = "Standard FR4 Rigid Board"
-        base_material = "TG150/TG170 FR-4"
+        base_material = "TG150 FR-4"
         cu_files = list(board_dir.glob(f"{name}*Cu.gbr"))
         layer_count = len(cu_files) if len(cu_files) >= 2 else (job_layers or 6)
         w = _get_dim("board_width", size_x or 60.0)
@@ -150,7 +145,7 @@ def generate_pcb_project_summary(
                 "target_z": "50 Ohm (+/- 10%)",
                 "layer": "Layer 1 (F.Cu)",
                 "ref_layer": "Layer 2 (In1.Cu GND)",
-                "width": "0.180 mm (7.1 mil)",
+                "width": "0.120 mm (4.7 mil)",
                 "spacing": "N/A",
             },
             {
@@ -159,17 +154,8 @@ def generate_pcb_project_summary(
                 "target_z": "90 Ohm (+/- 10%)",
                 "layer": "Layer 1 (F.Cu)",
                 "ref_layer": "Layer 2 (In1.Cu GND)",
-                "width": "0.160 mm (6.3 mil)",
-                "spacing": "0.180 mm (7.1 mil)",
-            },
-            {
-                "net_class": "PCIe / Diff Pairs",
-                "topology": "Edge-Coupled Diff Microstrip",
-                "target_z": "85 Ohm (+/- 10%)",
-                "layer": "Layer 1 (F.Cu)",
-                "ref_layer": "Layer 2 (In1.Cu GND)",
-                "width": "0.180 mm (7.1 mil)",
-                "spacing": "0.150 mm (5.9 mil)",
+                "width": "0.120 mm (4.7 mil)",
+                "spacing": "0.120 mm (4.7 mil)",
             },
         ]
 
@@ -222,10 +208,10 @@ def generate_pcb_project_summary(
     else:
         chips_note = "U1 0.4mm BGA, U2 QFN" if bga_qfn_chips else "SMT chips"
         remarks = (
-            f"{layer_count}-Layer Rigid FR4 (TG170), {int(w)}x{int(l)}mm, {t:.1f}mm, ENIG, Matte Black mask, White silk. "
+            f"{layer_count}-Layer Rigid FR4 (TG150), {int(w)}x{int(l)}mm, {t:.1f}mm, ENIG, Matte Black mask, White silk. "
             "Min 4/4 mil, min drill 0.25mm. Double-sided SMT: "
-            f"{chips_note}. IMPEDANCE: 50Ω SE (L1 w=0.18mm ref L2), 90Ω diff (L1 w=0.16mm, s=0.18mm ref L2), "
-            "85Ω diff (L1 w=0.18mm, s=0.15mm ref L2). VIAS: Fill all vias in BGA/SMD pads with resin and cap (VIPPO/IPC-4761 Type VII). "
+            f"{chips_note}. IMPEDANCE: 50Ω SE (L1 w=0.12mm ref L2), 90Ω diff (L1 w=0.12mm, s=0.12mm ref L2). "
+            "VIAS: Fill all vias in BGA/SMD pads with resin and cap (VIPPO/IPC-4761 Type VII). "
             "SAC305 lead-free RoHS, 100% 3D AOI & AXI."
         )
 
@@ -305,7 +291,7 @@ CONTROLLED IMPEDANCE & VIA PROCESS SPECIFICATION
 Project:               {provider_name}
 Subassembly / Board:   {name}
 Layer Count:           {layer_count} Layers
-Base Material:         TG150/TG170 FR-4
+Base Material:         TG150 FR-4
 Stackup Reference:     L1 Microstrip referenced to unbroken L2 GND plane (H=0.100 mm, Er=4.2)
 Solder Mask:           Matte Black LPI Solder Mask (Both Sides)
 Surface Finish:        ENIG (Electroless Nickel Immersion Gold)
@@ -317,23 +303,16 @@ CONTROLLED IMPEDANCE TARGETS:
    - Layer / Position:      Layer 1 (F.Cu - Top Layer)
    - Reference Plane:       Layer 2 (In1.Cu - Continuous GND Plane)
    - Target Impedance:      50.0 Ohms +/- 10% (45.0 - 55.0 Ohms)
-   - Nominal Trace Width:   0.180 mm (7.09 mil)
+   - Nominal Trace Width:   0.120 mm (4.72 mil)
    - Dielectric Distance:   0.100 mm (Prepreg 2116, Er = 4.2)
 
 2. Differential Microstrip (USB 2.0 High-Speed D+ / D-):
    - Layer / Position:      Layer 1 (F.Cu - Top Layer)
    - Reference Plane:       Layer 2 (In1.Cu - Continuous GND Plane)
    - Target Impedance:      90.0 Ohms +/- 10% (81.0 - 99.0 Ohms differential)
-   - Nominal Trace Width:   0.160 mm (6.30 mil)
-   - Nominal Trace Spacing: 0.180 mm (7.09 mil)
+   - Nominal Trace Width:   0.120 mm (4.72 mil)
+   - Nominal Trace Spacing: 0.120 mm (4.72 mil)
    - Intra-Pair Skew:       < 0.15 mm (< 1.0 ps)
-
-3. Differential Microstrip (PCIe / High-Speed Differential Pairs):
-   - Layer / Position:      Layer 1 (F.Cu - Top Layer)
-   - Reference Plane:       Layer 2 (In1.Cu - Continuous GND Plane)
-   - Target Impedance:      85.0 Ohms +/- 10% (76.5 - 93.5 Ohms differential)
-   - Nominal Trace Width:   0.180 mm (7.09 mil)
-   - Nominal Trace Spacing: 0.150 mm (5.91 mil)
 
 VIA PROCESS & HOLE PLUGGING SPECIFICATION:
 --------------------------------------------------------------------------------
@@ -392,21 +371,12 @@ def package_supplier_pcb_files(
     if not pcb_names and hasattr(provider, "name"):
         pcb_names = [provider.name]
 
-    # Ensure companion files (.pcb, .pcbdoc, .brd, .cam) exist for each PCB
+    # Clean up non-standard companion files (.pcb, .pcbdoc, .brd, .cam) per BUG-OPEN-003
     for name in pcb_names:
-        kicad_pcb = board_dir / f"{name}.kicad_pcb"
-        if kicad_pcb.exists():
-            for ext in (".pcb", ".pcbdoc", ".brd"):
-                companion = board_dir / f"{name}{ext}"
-                if not companion.exists():
-                    shutil.copy2(kicad_pcb, companion)
-        job_file = board_dir / f"{name}-job.gbrjob"
-        cam_file = board_dir / f"{name}.cam"
-        if not cam_file.exists():
-            if job_file.exists():
-                shutil.copy2(job_file, cam_file)
-            elif kicad_pcb.exists():
-                shutil.copy2(kicad_pcb, cam_file)
+        for ext in (".pcb", ".pcbdoc", ".brd", ".cam"):
+            stray = board_dir / f"{name}{ext}"
+            if stray.is_file():
+                stray.unlink(missing_ok=True)
 
     created_zips: dict[str, Path] = {}
     all_bom_items: list[tuple[Path, str]] = []
