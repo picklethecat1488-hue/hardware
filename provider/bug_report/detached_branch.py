@@ -47,23 +47,47 @@ class DetachedBranchBugStore:
         self.remote_ref_name = f"refs/remotes/origin/{branch_name}"
         self.exporter = MarkdownBugExporter(self.repo_root)
 
-    def _hash_object(self, data: bytes) -> str:
-        """Create a git blob object directly in the git object database.
+    def _hash_object(self, data: bytes, rel_path: Optional[str] = None) -> str:
+        """Create a git blob object directly in the git object database with optional path filtering.
 
         Args:
             data: Raw byte content to hash and store.
+            rel_path: Optional relative path to apply git attributes and filter processes (e.g. Git LFS).
+
+        Returns:
+            The SHA-1 object hash string.
+        """
+        cmd = ["git", "hash-object", "-w", "--stdin"]
+        if rel_path:
+            cmd.append(f"--path={rel_path}")
+        proc = subprocess.run(
+            cmd,
+            input=data,
+            cwd=str(self.repo_root),
+            capture_output=True,
+            check=True,
+            text=True,
+        )
+        return proc.stdout.strip()
+
+    def _hash_file(self, file_path: Path, rel_path: str) -> str:
+        """Hash a file on disk using git hash-object with path filtering (e.g. Git LFS).
+
+        Args:
+            file_path: Absolute or relative Path to file on disk.
+            rel_path: Relative path within git repository used for filter evaluation.
 
         Returns:
             The SHA-1 object hash string.
         """
         proc = subprocess.run(
-            ["git", "hash-object", "-w", "--stdin"],
-            input=data,
+            ["git", "hash-object", "-w", f"--path={rel_path}", str(file_path)],
             cwd=str(self.repo_root),
             capture_output=True,
             check=True,
+            text=True,
         )
-        return proc.stdout.decode("utf-8").strip()
+        return proc.stdout.strip()
 
     def _git_blob_sha(self, data: bytes) -> str:
         """Calculate Git blob SHA-1 hash for bytes in memory."""
@@ -281,6 +305,7 @@ class DetachedBranchBugStore:
                                 continue
 
             # 5. Include attachments from attachments/ and feedback/attachments/
+            target_disk_files: Dict[str, Path] = {}
             if dirty_bug_ids is not None:
                 for b_id in dirty_bug_ids:
                     clean_b_id = (
@@ -292,10 +317,7 @@ class DetachedBranchBugStore:
                                 for att_file in cand.rglob("*"):
                                     if att_file.is_file():
                                         rel_p = att_file.relative_to(self.repo_root).as_posix()
-                                        try:
-                                            target_files[rel_p] = att_file.read_bytes()
-                                        except OSError:
-                                            continue
+                                        target_disk_files[rel_p] = att_file
             else:
                 for att_dir_name in ("attachments", "feedback/attachments"):
                     att_dir = self.repo_root / att_dir_name
@@ -303,10 +325,7 @@ class DetachedBranchBugStore:
                         for att_file in att_dir.rglob("*"):
                             if att_file.is_file():
                                 rel_p = att_file.relative_to(self.repo_root).as_posix()
-                                try:
-                                    target_files[rel_p] = att_file.read_bytes()
-                                except OSError:
-                                    continue
+                                target_disk_files[rel_p] = att_file
 
             # Batch update index
             index_updates: List[str] = []
@@ -314,6 +333,11 @@ class DetachedBranchBugStore:
                 sha = self._git_blob_sha(data)
                 if current_index.get(fn) != sha:
                     self._ensure_blob_written(data, sha, git_objects_dir)
+                    index_updates.append(f"{FILE_MODE_STANDARD} {sha} 0\t{fn}\n")
+
+            for fn, disk_path in target_disk_files.items():
+                sha = self._hash_file(disk_path, fn)
+                if current_index.get(fn) != sha:
                     index_updates.append(f"{FILE_MODE_STANDARD} {sha} 0\t{fn}\n")
 
             if current_index:
