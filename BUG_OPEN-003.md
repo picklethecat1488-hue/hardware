@@ -1,12 +1,13 @@
-# 🔴 `[BUG-OPEN-003]` EQ of order W908185ASE67_gerbers
+# 🟢 `[BUG-OPEN-003]` EQ of order W908185ASE67_gerbers
 
 - **UUID**: `448546c4-60eb-457e-b3e7-fc7b4b6d4527`
 - **ID**: `BUG-OPEN-003`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `HIGH`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-07 15:43:22 UTC`
+- **Resolved**: `2026-11-07 20:35:00 UTC`
 
 #### Description
 
@@ -34,5 +35,16 @@ There are feedbacks on our Gerber’s (see attached), can you please fill out th
 
 #### Review Tasks & Functional Checklist
 
+- [ ] <!-- task:53ab785b --> Verify customer reply document and responses | `cat feedback/attachments/BUG-OPEN-003/W908185ASE67-EQ.csv`
+- [ ] <!-- task:da9072b2 --> Verify carrier board PCB layout with balanced In2.Cu copper plane and updated silkscreen fab notes | `python tools/view.py carrier_board:pcb`
 - [ ] <!-- task:3b8d1948 --> Verify generated supplier packages strictly contain standard Gerber files | `unzip -l build/board/carrier_board/carrier_board/gerbers.zip`
 - [ ] <!-- task:9d48fade --> Verify controlled impedance specification and VIPPO notes | `cat build/board/carrier_board/carrier_board/impedance_control_info.txt`
+
+#### Resolution Notes
+
+Resolved fab engineering queries (EQ) for order W908185ASE67_gerbers:
+1. Populated Customer Reply section for all 7 items in W908185ASE67-EQ.csv, .xls, and .xlsx.
+2. Standardized PCB zip packaging in provider/pcb/supplier.py to strictly include Gerber standard files (.gbr, .drl, .gbrjob, reports), removing companion CAD files (.pcb, .pcbdoc, .cam, .brd, .kicad_pcb).
+3. Synchronized laminate specification to TG150 across fab notes, project summary, and supplier orders.
+4. Added GND copper plane fill across blank regions of In2.Cu to achieve copper balance and prevent board warpage/delamination.
+5. Corrected impedance specifications in design files (Dwgs.User silkscreen, project_summary, impedance_control_info.txt) to match actual 0.120mm routed trace width and 0.120mm spacing for USB 2.0 90 Ohm differential microstrip and 50 Ohm single-ended microstrip referenced to L2 GND.
