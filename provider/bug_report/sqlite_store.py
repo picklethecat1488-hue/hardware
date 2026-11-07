@@ -390,6 +390,10 @@ class SQLiteBugStore:
         commit_ids_json = json.dumps(bug.commit_ids)
         review_tasks_json = json.dumps([t.model_dump(mode="json") for t in bug.review_tasks])
         b_uuid = bug.uuid or str(uuid_pkg.uuid4())
+        existing_with_uuid = conn.execute("SELECT id FROM bugs WHERE uuid = ? AND id != ?", (b_uuid, bug.id)).fetchone()
+        if existing_with_uuid:
+            b_uuid = str(uuid_pkg.uuid4())
+            bug.uuid = b_uuid
         conn.execute(
             """
             INSERT INTO bugs (
@@ -611,6 +615,10 @@ class SQLiteBugStore:
                 return
             old_id = row["id"]
             if old_id == new_id:
+                return
+            existing_target = conn.execute("SELECT uuid FROM bugs WHERE id = ?", (new_id,)).fetchone()
+            if existing_target and existing_target["uuid"] != bug_uuid:
+                # Target ID already occupied in SQLite; do not crash on unique constraint
                 return
             conn.execute("PRAGMA foreign_keys = OFF")
             conn.execute("UPDATE bugs SET id = ? WHERE uuid = ?", (new_id, bug_uuid))

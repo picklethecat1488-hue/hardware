@@ -363,8 +363,8 @@ class MarkdownBugExporter:
         try:
             data = json.loads(state_path.read_text(encoding="utf-8"))
             return BugDatabaseModel.model_validate(data)
-        except Exception as err:
-            raise ValueError(f"Failed to parse bug markdown file {file_path}: {err}") from err
+        except Exception:
+            return None
 
     def parse_markdown(self, markdown_path: Path) -> Optional[BugDatabaseModel]:
         """Parse an existing BUGS.md file into a BugDatabaseModel.
@@ -380,8 +380,8 @@ class MarkdownBugExporter:
         try:
             content = markdown_path.read_text(encoding="utf-8")
             return self.parse_markdown_text(content)
-        except Exception as err:
-            raise ValueError(f"Failed to parse bug markdown file {file_path}: {err}") from err
+        except Exception:
+            return None
 
     def parse_markdown_text(self, content: str) -> BugDatabaseModel:
         """Parse raw BUGS.md text content into a BugDatabaseModel.
@@ -938,10 +938,25 @@ class MarkdownBugExporter:
             return None
         try:
             content = file_path.read_text(encoding="utf-8")
+            return self.parse_bug_markdown_content(content, default_filename=file_path.name)
+        except Exception:
+            return None
+
+    def parse_bug_markdown_content(self, content: str, default_filename: str = "") -> Optional[BugReportModel]:
+        """Parse raw markdown text of an individual BUG_<id>.md report into a BugReportModel.
+
+        Args:
+            content: Raw markdown text content.
+            default_filename: Optional filename hint (e.g. BUG_001.md).
+
+        Returns:
+            BugReportModel if valid, else None.
+        """
+        try:
             m_header = re.search(
                 r"^#\s+(?:[^\n\[]*?)?`\[((?:BUG|WORM)-[^\]]+|[^\]]+)\]`\s*(.*?)$", content, re.MULTILINE
             )
-            m_fn = re.match(r"^(BUG|WORM)[_-](.+)\.md$", file_path.name, re.IGNORECASE)
+            m_fn = re.match(r"^(BUG|WORM)[_-](.+)\.md$", default_filename, re.IGNORECASE) if default_filename else None
             fn_id = ""
             if m_fn:
                 prefix = m_fn.group(1).upper()
@@ -1149,8 +1164,10 @@ class MarkdownBugExporter:
                 accepted_at=accepted_val,
                 rejected_at=rejected_val,
             )
-        except Exception as err:
-            raise ValueError(f"Failed to parse bug markdown file {file_path}: {err}") from err
+        except Exception:
+            return None
+
+    parse_worm_markdown_content = parse_bug_markdown_content
 
     def scan_and_sync_feedback_dir(
         self,
@@ -1237,12 +1254,27 @@ class MarkdownBugExporter:
             existing_by_uuid = database.get_bug_by_uuid(md_bug.uuid)
             if existing_by_uuid:
                 # File name rename detection!
+                old_id = existing_by_uuid.id or ""
+                norm_old = old_id.removeprefix("BUG-").removeprefix("WORM-")
+                old_file_exists = (feedback_dir / f"BUG_{norm_old}.md").exists() or (
+                    feedback_dir / f"WORM_{norm_old}.md"
+                ).exists()
                 if expected_id_from_fn and existing_by_uuid.id != expected_id_from_fn:
-                    existing_by_uuid.id = expected_id_from_fn
-                    md_bug.id = expected_id_from_fn
-                    if store and hasattr(store, "update_bug_id"):
-                        store.update_bug_id(existing_by_uuid.uuid, expected_id_from_fn)
-                    renamed += 1
+                    cand_by_id = database.get_bug(expected_id_from_fn)
+                    if cand_by_id and cand_by_id.uuid != existing_by_uuid.uuid:
+                        # Target ID is already claimed by another bug; treat as UUID collision
+                        md_bug.uuid = str(uuid_pkg.uuid4())
+                        self.export_individual_bug(md_bug, feedback_dir)
+                    elif not old_file_exists:
+                        existing_by_uuid.id = expected_id_from_fn
+                        md_bug.id = expected_id_from_fn
+                        if store and hasattr(store, "update_bug_id"):
+                            store.update_bug_id(existing_by_uuid.uuid, expected_id_from_fn)
+                        renamed += 1
+                    else:
+                        # Both files exist on disk simultaneously: UUID collision mitigation!
+                        md_bug.uuid = str(uuid_pkg.uuid4())
+                        self.export_individual_bug(md_bug, feedback_dir)
                 if (
                     existing_by_uuid.status in (BugStatus.RESOLVED, BugStatus.CLOSED)
                     and md_bug.status == BugStatus.OPEN

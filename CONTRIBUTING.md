@@ -5,7 +5,7 @@
  - **tools/build.py** - Orchestrates the generation and export of 3D-printable geometry.
  - **tools/config.py** - Automated utility for part placement and geometry optimization.
  - **tools/view.py** - Interactive CAD visualization tool for inspection and debugging.
- - **tools/dashboard.py** - Unified Quake-themed workstation integrating VCS Diff Viewer, Smartlog DAG tree, Code Review, and Bug Tracker.
+ - **tools/forge.py** - Unified Quake-themed workstation integrating VCS Diff Viewer, Smartlog DAG tree, Code Review, and Bug Tracker.
  - **model/** - Core application data models and configuration schemas.
  - **provider/** - Framework for geometry generation and build orchestration.
  - **projects/** - Specific geometry provider implementations.
@@ -319,39 +319,39 @@ tools/anvil stop                     # Clean up remote processes on anvil
 
 Before submitting or approving pull requests, you can audit commits and staged changes using the interactive Quake-styled code review tool:
 
-## Interactive VCS Dashboard, Code Review & Bug Tracker Workstation
+## Interactive VCS Workstation, Code Review & Bug Tracker (`tools/forge.py`)
 
-Inspect commits, branches, working tree states, ancestors, code review findings, and bug reports using the unified Quake-styled engineering dashboard:
+Inspect commits, branches, working tree states, ancestors, code review findings, and bug reports using the unified Quake-styled engineering workstation:
 
 ```bash
-# Launch interactive dashboard web workstation (Diff View at /, Code Review at /review, Bugs at /bugs)
-python tools/dashboard.py
+# Launch interactive forge web workstation (Diff View at /, Code Review at /review, Bugs at /bugs)
+python tools/forge.py
 
 # Print the smartlog ancestor tree (sl) and working tree status directly to the terminal
-python tools/dashboard.py --list
+python tools/forge.py --list
 
 # Inspect a specific branch or jump to a commit
-python tools/dashboard.py --branch main
-python tools/dashboard.py --goto 75d5f92
+python tools/forge.py --branch main
+python tools/forge.py --goto 75d5f92
 
 # Download latest changes from remote repository
-python tools/dashboard.py --sync
+python tools/forge.py --sync
 
 # Launch on custom port
-python tools/dashboard.py --port 8767
+python tools/forge.py --port 8767
 
 # Bug tracking via CLI
-python tools/dashboard.py --bugs
-python tools/dashboard.py --bugs --open
-python tools/dashboard.py --add-bug "Antenna on Q1" --severity HIGH --category PCB --component carrier_board
-python tools/dashboard.py --resolve-bug BUG-014 --notes "Fixed trace routing"
+python tools/forge.py --bugs
+python tools/forge.py --bugs --open
+python tools/forge.py --add-bug "Antenna on Q1" --severity HIGH --category PCB --component carrier_board
+python tools/forge.py --resolve-bug BUG-014 --notes "Fixed trace routing"
 
 # Code review via CLI
-python tools/dashboard.py --reviews
-python tools/dashboard.py --reviews --open
-python tools/dashboard.py --add-comment "Check crystal routing" --file tools/dashboard.py --line 10 --severity MUST_FIX
-python tools/dashboard.py --resolve-comment abc123
-python tools/dashboard.py --verdict APPROVED
+python tools/forge.py --reviews
+python tools/forge.py --reviews --open
+python tools/forge.py --add-comment "Check crystal routing" --file tools/forge.py --line 10 --severity MUST_FIX
+python tools/forge.py --resolve-comment abc123
+python tools/forge.py --verdict APPROVED
 ```
 
 ### Dashboard Features & Workflow

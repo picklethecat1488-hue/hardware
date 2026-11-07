@@ -30,7 +30,7 @@ def test_regression_bug_translucent_termite_733_repo_structure():
     expected_tools = [
         "build.py",
         "view.py",
-        "dashboard.py",
+        "forge.py",
         "daemon.py",
         "list.py",
         "shell.py",
