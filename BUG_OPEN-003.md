@@ -21,3 +21,4 @@ There are feedbacks on our Gerber’s (see attached), can you please fill out th
 | :--- | :--- | :--- |
 | `document` | [W908185ASE67-EQ.csv](attachments/BUG-OPEN-003/W908185ASE67-EQ.csv) | Uploaded document W908185ASE67-EQ.csv |
 | `screenshot` | [screenshot_paste_1794082523598_un4js.png](attachments/BUG-OPEN-003/screenshot_paste_1794082523598_un4js.png) | Pasted screenshot screenshot_paste_1794082523598_un4js.png |
+| `screenshot` | [screenshot_paste_1794082544131_e1kse.png](attachments/BUG-OPEN-003/screenshot_paste_1794082544131_e1kse.png) | Pasted screenshot screenshot_paste_1794082544131_e1kse.png |
