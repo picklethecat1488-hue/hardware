@@ -19,7 +19,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from dashboard import (
+from forge import (
     check_existing_instance,
     get_dashboard_lock_file,
     parse_arguments,
@@ -37,15 +37,15 @@ def test_dashboard_lock_file_path(tmp_path: Path) -> None:
 
 def test_cli_detach_flags() -> None:
     """Verify parse_arguments handles --no-detach and --stop flags."""
-    with patch("sys.argv", ["dashboard.py", "--no-detach"]):
+    with patch("sys.argv", ["forge.py", "--no-detach"]):
         args = parse_arguments()
         assert getattr(args, "no_detach", False) is True
 
-    with patch("sys.argv", ["dashboard.py", "--foreground"]):
+    with patch("sys.argv", ["forge.py", "--foreground"]):
         args = parse_arguments()
         assert getattr(args, "no_detach", False) is True
 
-    with patch("sys.argv", ["dashboard.py", "--stop"]):
+    with patch("sys.argv", ["forge.py", "--stop"]):
         args = parse_arguments()
         assert getattr(args, "stop", False) is True
 
@@ -56,7 +56,7 @@ def test_check_existing_instance_active(tmp_path: Path) -> None:
     current_pid = os.getpid()
     lock_file.write_text(json.dumps({"pid": current_pid, "url": "http://127.0.0.1:8877"}), encoding="utf-8")
 
-    with patch("dashboard.is_port_in_use", return_value=True):
+    with patch("forge.is_port_in_use", return_value=True):
         existing = check_existing_instance(lock_file, "127.0.0.1", 8877)
         assert existing is not None
         pid, url = existing
@@ -70,7 +70,7 @@ def test_check_existing_instance_stale(tmp_path: Path) -> None:
     fake_pid = 99999999
     lock_file.write_text(json.dumps({"pid": fake_pid, "url": "http://127.0.0.1:8877"}), encoding="utf-8")
 
-    with patch("dashboard.is_port_in_use", return_value=False):
+    with patch("forge.is_port_in_use", return_value=False):
         existing = check_existing_instance(lock_file, "127.0.0.1", 8877)
         assert existing is None
         assert not lock_file.exists(), "Stale lock file should have been cleaned up"
@@ -82,15 +82,15 @@ def test_second_instance_exits_cleanly(tmp_path: Path) -> None:
     current_pid = os.getpid()
     lock_file.write_text(json.dumps({"pid": current_pid, "url": "http://127.0.0.1:8877"}), encoding="utf-8")
 
-    from dashboard import main
+    from forge import main
 
     out = StringIO()
     with (
-        patch("dashboard.get_dashboard_lock_file", return_value=lock_file),
-        patch("dashboard.is_port_in_use", return_value=True),
-        patch("dashboard.launch_browser") as mock_launch,
+        patch("forge.get_dashboard_lock_file", return_value=lock_file),
+        patch("forge.is_port_in_use", return_value=True),
+        patch("forge.launch_browser") as mock_launch,
         patch("sys.stdout", out),
-        patch("sys.argv", ["dashboard.py"]),
+        patch("sys.argv", ["forge.py"]),
     ):
         main()
 
@@ -104,16 +104,16 @@ def test_cli_stop_active_instance(tmp_path: Path) -> None:
     lock_file = tmp_path / "dashboard_8767.lock"
     lock_file.write_text(json.dumps({"pid": 12345, "url": "http://127.0.0.1:8767"}), encoding="utf-8")
 
-    from dashboard import main
+    from forge import main
 
     out = StringIO()
     with (
-        patch("dashboard.get_dashboard_lock_file", return_value=lock_file),
-        patch("dashboard.check_existing_instance", return_value=(12345, "http://127.0.0.1:8767")),
-        patch("dashboard.is_pid_alive", return_value=False),
+        patch("forge.get_dashboard_lock_file", return_value=lock_file),
+        patch("forge.check_existing_instance", return_value=(12345, "http://127.0.0.1:8767")),
+        patch("forge.is_pid_alive", return_value=False),
         patch("os.kill") as mock_kill,
         patch("sys.stdout", out),
-        patch("sys.argv", ["dashboard.py", "--stop"]),
+        patch("sys.argv", ["forge.py", "--stop"]),
     ):
         main()
 
@@ -126,14 +126,14 @@ def test_cli_stop_no_instance(tmp_path: Path) -> None:
     """Verify --stop flag prints message when no instance is running."""
     lock_file = tmp_path / "dashboard_8767.lock"
 
-    from dashboard import main
+    from forge import main
 
     out = StringIO()
     with (
-        patch("dashboard.get_dashboard_lock_file", return_value=lock_file),
-        patch("dashboard.check_existing_instance", return_value=None),
+        patch("forge.get_dashboard_lock_file", return_value=lock_file),
+        patch("forge.check_existing_instance", return_value=None),
         patch("sys.stdout", out),
-        patch("sys.argv", ["dashboard.py", "--stop"]),
+        patch("sys.argv", ["forge.py", "--stop"]),
     ):
         main()
 
@@ -145,17 +145,17 @@ def test_cli_restart_active_instance(tmp_path: Path) -> None:
     lock_file = tmp_path / "dashboard_8767.lock"
     lock_file.write_text(json.dumps({"pid": 12345, "url": "http://127.0.0.1:8767"}), encoding="utf-8")
 
-    from dashboard import main
+    from forge import main
 
     out = StringIO()
     with (
-        patch("dashboard.get_dashboard_lock_file", return_value=lock_file),
-        patch("dashboard.check_existing_instance", side_effect=[(12345, "http://127.0.0.1:8767"), None]),
-        patch("dashboard.stop_dashboard_instance") as mock_stop,
-        patch("dashboard.DashboardServer") as mock_server,
-        patch("dashboard.launch_browser"),
+        patch("forge.get_dashboard_lock_file", return_value=lock_file),
+        patch("forge.check_existing_instance", side_effect=[(12345, "http://127.0.0.1:8767"), None]),
+        patch("forge.stop_dashboard_instance") as mock_stop,
+        patch("forge.DashboardServer") as mock_server,
+        patch("forge.launch_browser"),
         patch("sys.stdout", out),
-        patch("sys.argv", ["dashboard.py", "--restart", "--no-detach", "--no-browser"]),
+        patch("sys.argv", ["forge.py", "--restart", "--no-detach", "--no-browser"]),
     ):
         mock_server.return_value.get_url.return_value = "http://127.0.0.1:8767"
         main()
@@ -169,17 +169,17 @@ def test_cli_restart_subcommand(tmp_path: Path) -> None:
     lock_file = tmp_path / "dashboard_8767.lock"
     lock_file.write_text(json.dumps({"pid": 12345, "url": "http://127.0.0.1:8767"}), encoding="utf-8")
 
-    from dashboard import main
+    from forge import main
 
     out = StringIO()
     with (
-        patch("dashboard.get_dashboard_lock_file", return_value=lock_file),
-        patch("dashboard.check_existing_instance", side_effect=[(12345, "http://127.0.0.1:8767"), None]),
-        patch("dashboard.stop_dashboard_instance") as mock_stop,
-        patch("dashboard.DashboardServer") as mock_server,
-        patch("dashboard.launch_browser"),
+        patch("forge.get_dashboard_lock_file", return_value=lock_file),
+        patch("forge.check_existing_instance", side_effect=[(12345, "http://127.0.0.1:8767"), None]),
+        patch("forge.stop_dashboard_instance") as mock_stop,
+        patch("forge.DashboardServer") as mock_server,
+        patch("forge.launch_browser"),
         patch("sys.stdout", out),
-        patch("sys.argv", ["dashboard.py", "restart", "--no-detach", "--no-browser"]),
+        patch("sys.argv", ["forge.py", "restart", "--no-detach", "--no-browser"]),
     ):
         mock_server.return_value.get_url.return_value = "http://127.0.0.1:8767"
         main()

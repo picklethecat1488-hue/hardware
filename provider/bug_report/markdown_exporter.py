@@ -1254,12 +1254,27 @@ class MarkdownBugExporter:
             existing_by_uuid = database.get_bug_by_uuid(md_bug.uuid)
             if existing_by_uuid:
                 # File name rename detection!
+                old_id = existing_by_uuid.id or ""
+                norm_old = old_id.removeprefix("BUG-").removeprefix("WORM-")
+                old_file_exists = (feedback_dir / f"BUG_{norm_old}.md").exists() or (
+                    feedback_dir / f"WORM_{norm_old}.md"
+                ).exists()
                 if expected_id_from_fn and existing_by_uuid.id != expected_id_from_fn:
-                    existing_by_uuid.id = expected_id_from_fn
-                    md_bug.id = expected_id_from_fn
-                    if store and hasattr(store, "update_bug_id"):
-                        store.update_bug_id(existing_by_uuid.uuid, expected_id_from_fn)
-                    renamed += 1
+                    cand_by_id = database.get_bug(expected_id_from_fn)
+                    if cand_by_id and cand_by_id.uuid != existing_by_uuid.uuid:
+                        # Target ID is already claimed by another bug; treat as UUID collision
+                        md_bug.uuid = str(uuid_pkg.uuid4())
+                        self.export_individual_bug(md_bug, feedback_dir)
+                    elif not old_file_exists:
+                        existing_by_uuid.id = expected_id_from_fn
+                        md_bug.id = expected_id_from_fn
+                        if store and hasattr(store, "update_bug_id"):
+                            store.update_bug_id(existing_by_uuid.uuid, expected_id_from_fn)
+                        renamed += 1
+                    else:
+                        # Both files exist on disk simultaneously: UUID collision mitigation!
+                        md_bug.uuid = str(uuid_pkg.uuid4())
+                        self.export_individual_bug(md_bug, feedback_dir)
                 if (
                     existing_by_uuid.status in (BugStatus.RESOLVED, BugStatus.CLOSED)
                     and md_bug.status == BugStatus.OPEN

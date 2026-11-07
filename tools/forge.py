@@ -6,18 +6,18 @@ commit split/combine, merge conflict resolution, interactive line-by-line Code R
 and integrated Bug Tracker, all served under a single endpoint.
 
 Usage:
-    python tools/dashboard.py
-    python tools/dashboard.py --port 8767
-    python tools/dashboard.py --list
-    python tools/dashboard.py --branch main
-    python tools/dashboard.py --goto 75d5f92
-    python tools/dashboard.py --bugs
-    python tools/dashboard.py --add-bug "Antenna on Q2" --severity HIGH --category PCB
-    python tools/dashboard.py --resolve-bug BUG-014 --notes "Fixed trace routing"
-    python tools/dashboard.py --reviews
-    python tools/dashboard.py --add-comment "Check crystal routing" --file provider/pcb/router.py --line 10
-    python tools/dashboard.py --resolve-comment abc123
-    python tools/dashboard.py --verdict APPROVED
+    python tools/forge.py
+    python tools/forge.py --port 8767
+    python tools/forge.py --list
+    python tools/forge.py --branch main
+    python tools/forge.py --goto 75d5f92
+    python tools/forge.py --bugs
+    python tools/forge.py --add-bug "Antenna on Q2" --severity HIGH --category PCB
+    python tools/forge.py --resolve-bug BUG-014 --notes "Fixed trace routing"
+    python tools/forge.py --reviews
+    python tools/forge.py --add-comment "Check crystal routing" --file provider/pcb/router.py --line 10
+    python tools/forge.py --resolve-comment abc123
+    python tools/forge.py --verdict APPROVED
 """
 
 import argparse
@@ -890,6 +890,7 @@ def main(cli_args: Optional[List[str]] = None) -> None:
     args = parse_arguments(cli_args)
     repo_root = get_git_root()
     engine = GitEngine(repo_root=repo_root)
+    engine.ensure_feedback_worktree()
 
     subcmd = getattr(args, "subcommand", None)
 

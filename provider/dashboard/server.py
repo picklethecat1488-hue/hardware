@@ -1326,6 +1326,7 @@ class DashboardServer(ThreadingHTTPServer):
         ensure_high_fd_limit()
         self.repo_root = (repo_root or get_git_root()).resolve()
         self.git_engine = GitEngine(repo_root=self.repo_root)
+        self.git_engine.ensure_feedback_worktree()
         self.host = host
         self.port = port
         self.active_branch = initial_branch or self.git_engine.get_current_branch()

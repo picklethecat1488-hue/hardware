@@ -14,7 +14,7 @@ _src_dir = Path(__file__).resolve().parent.parent
 if str(_src_dir) not in sys.path:
     sys.path.insert(0, str(_src_dir))
 
-from dashboard import parse_arguments, launch_browser
+from forge import parse_arguments, launch_browser
 from provider.dashboard.server import DashboardServer
 from provider.eel.launcher import launch_eel
 from provider.vcs.git_engine import get_git_root
@@ -23,50 +23,50 @@ from provider.vcs.git_engine import get_git_root
 def test_cli_eel_arguments_and_defaults() -> None:
     """Verify CLI arguments default to native webview and support Eel as an alternative."""
     # 1. Default should be 'webview' native standalone window
-    with patch("sys.argv", ["dashboard.py"]):
+    with patch("sys.argv", ["forge.py"]):
         args = parse_arguments()
-        assert args.browser == "webview", "Dashboard CLI should default to 'webview' standalone window mode"
+        assert args.browser == "webview", "Forge CLI should default to 'webview' standalone window mode"
         assert not args.no_browser
 
     # 2. --webview flag sets browser to webview
-    with patch("sys.argv", ["dashboard.py", "--webview"]):
+    with patch("sys.argv", ["forge.py", "--webview"]):
         args = parse_arguments()
         assert args.browser == "webview"
 
     # 3. --eel flag sets browser to eel
-    with patch("sys.argv", ["dashboard.py", "--eel"]):
+    with patch("sys.argv", ["forge.py", "--eel"]):
         args = parse_arguments()
         assert args.browser == "eel"
 
     # 4. --app flag sets browser to webview
-    with patch("sys.argv", ["dashboard.py", "--app"]):
+    with patch("sys.argv", ["forge.py", "--app"]):
         args = parse_arguments()
         assert args.browser == "webview"
 
     # 5. Explicit --browser webview and --browser eel
-    with patch("sys.argv", ["dashboard.py", "--browser", "webview"]):
+    with patch("sys.argv", ["forge.py", "--browser", "webview"]):
         args = parse_arguments()
         assert args.browser == "webview"
 
-    with patch("sys.argv", ["dashboard.py", "--browser", "eel"]):
+    with patch("sys.argv", ["forge.py", "--browser", "eel"]):
         args = parse_arguments()
         assert args.browser == "eel"
 
     # 6. Non-supported browser targets are strictly rejected
     with pytest.raises(SystemExit):
-        with patch("sys.argv", ["dashboard.py", "--browser", "vscode"]):
+        with patch("sys.argv", ["forge.py", "--browser", "vscode"]):
             parse_arguments()
 
     with pytest.raises(SystemExit):
-        with patch("sys.argv", ["dashboard.py", "--browser", "system"]):
+        with patch("sys.argv", ["forge.py", "--browser", "system"]):
             parse_arguments()
 
     # 7. --no-browser and --no-app disable launching the window
-    with patch("sys.argv", ["dashboard.py", "--no-browser"]):
+    with patch("sys.argv", ["forge.py", "--no-browser"]):
         args = parse_arguments()
         assert args.no_browser
 
-    with patch("sys.argv", ["dashboard.py", "--no-app"]):
+    with patch("sys.argv", ["forge.py", "--no-app"]):
         args = parse_arguments()
         assert args.no_browser
 
