@@ -1,7 +1,7 @@
-# 🟢 `[WORM-CREEPING-LARVA-820]` Regression tests are not useful
+# 🟢 `[BUG-ARMORED-CICADA-792]` Regression tests are not useful
 
-- **UUID**: `c9679ffa-7211-4f3f-bea5-a57be3bc91a4`
-- **ID**: `WORM-CREEPING-LARVA-820`
+- **UUID**: `264cb567-a8cf-4636-bb09-7bdc7f5fd4a7`
+- **ID**: `BUG-ARMORED-CICADA-792`
 - **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `GENERAL`

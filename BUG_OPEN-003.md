@@ -31,3 +31,4 @@ There are feedbacks on our Gerber’s (see attached), can you please fill out th
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:3b8d1948 --> Verify generated supplier packages strictly contain standard Gerber files | `unzip -l build/board/carrier_board/carrier_board/gerbers.zip`
+- [ ] <!-- task:9d48fade --> Verify controlled impedance specification and VIPPO notes | `cat build/board/carrier_board/carrier_board/impedance_control_info.txt`
