@@ -1,7 +1,7 @@
-# 🟢 `[WORM-CREEPING-LARVA-820]` Regression tests are not useful
+# 🟢 `[BUG-QUICK-GNAT-551]` Regression tests are not useful
 
-- **UUID**: `c9679ffa-7211-4f3f-bea5-a57be3bc91a4`
-- **ID**: `WORM-CREEPING-LARVA-820`
+- **UUID**: `42cef93e-ecb3-46e7-9b2c-e770d6054bf8`
+- **ID**: `BUG-QUICK-GNAT-551`
 - **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `GENERAL`
