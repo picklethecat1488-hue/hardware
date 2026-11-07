@@ -8712,7 +8712,7 @@
       "logs": "",
       "attachments": [
         {
-          "id": "att-4",
+          "id": "att-1",
           "filename": "digikey_order_2026-10-14.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx",
@@ -8721,7 +8721,7 @@
           "created_at": ""
         },
         {
-          "id": "att-5",
+          "id": "att-2",
           "filename": "carrier_board_bom_rev3.csv",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv",
@@ -8730,7 +8730,7 @@
           "created_at": ""
         },
         {
-          "id": "att-6",
+          "id": "att-3",
           "filename": "carrier_board_bom_rev2.csv",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv",
@@ -8739,7 +8739,7 @@
           "created_at": ""
         },
         {
-          "id": "att-7",
+          "id": "att-4",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx",
@@ -8748,7 +8748,7 @@
           "created_at": ""
         },
         {
-          "id": "att-8",
+          "id": "att-5",
           "filename": "carrier_board_bom_rev3.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
@@ -8757,7 +8757,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-6",
           "filename": "carrier_board_bom_rev2.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
@@ -8766,7 +8766,7 @@
           "created_at": ""
         },
         {
-          "id": "att-2",
+          "id": "att-7",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
@@ -8775,7 +8775,7 @@
           "created_at": ""
         },
         {
-          "id": "att-3",
+          "id": "att-8",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
@@ -9090,7 +9090,7 @@
         }
       ],
       "created_at": "2026-10-23 23:00:18 UTC",
-      "updated_at": "2026-11-06 00:18:47 UTC",
+      "updated_at": "",
       "resolved_at": "2026-11-05 15:45:39 UTC",
       "resolution_notes": "Eliminate duplicate outer window borders and resize grippers by applying .in-iframe rules to common.css and workstation templates, and add frame-busting to diff_view.",
       "rejection_notes": "",
@@ -9148,7 +9148,7 @@
         }
       ],
       "created_at": "2026-10-23 23:04:38 UTC",
-      "updated_at": "2026-11-06 00:18:54 UTC",
+      "updated_at": "",
       "resolved_at": "2026-11-06 00:18:54 UTC",
       "resolution_notes": "Optimized bug persistence and detached branch commits: 1) Batch git index updates via 'git update-index --index-info' instead of per-bug subprocess calls; 2) In-memory SHA-1 computation and direct blob persistence; 3) Incremental dirty bug saving in SQLite and markdown exporter; reducing save times from >12s to sub-second.",
       "rejection_notes": "",
@@ -9264,7 +9264,7 @@
         }
       ],
       "created_at": "2026-11-05 14:44:07 UTC",
-      "updated_at": "2026-11-06 00:18:37 UTC",
+      "updated_at": "",
       "resolved_at": "2026-11-05 16:25:54 UTC",
       "resolution_notes": "Simplify proximity sensor shield on inner bowl wall to an extruded hollow rectangle centered on pocket opening, eliminating inner lip and protruding tails.",
       "rejection_notes": "",
@@ -9308,7 +9308,7 @@
         }
       ],
       "created_at": "2026-11-05 14:49:40 UTC",
-      "updated_at": "2026-11-06 00:18:19 UTC",
+      "updated_at": "",
       "resolved_at": "2026-11-05 17:04:16 UTC",
       "resolution_notes": "Replaced slide-in guide rail system for hole-less PCBs with axial snap-socket frame featuring an internal perimeter snap groove and entrance lead-in chamfer, eliminating micro-gaps and assembly collision with current sensor.",
       "rejection_notes": "",
@@ -9330,7 +9330,7 @@
       "logs": "",
       "attachments": [
         {
-          "id": "att-3",
+          "id": "att-1",
           "filename": "screenshot_paste_1793890876309_0c9ae.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png",
@@ -9339,7 +9339,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-2",
           "filename": "screenshot_paste_1793924149979_7f535.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png",
@@ -9348,7 +9348,7 @@
           "created_at": ""
         },
         {
-          "id": "att-2",
+          "id": "att-3",
           "filename": "screenshot_paste_1793890911006_wvg54.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png",
@@ -9521,7 +9521,7 @@
       "logs": "",
       "attachments": [
         {
-          "id": "att-2",
+          "id": "att-1",
           "filename": "screenshot_paste_1793948449522_d1ck8.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793948449522_d1ck8.png",
@@ -9530,7 +9530,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-2",
           "filename": "screenshot_paste_1793947358948_g28nw.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793947358948_g28nw.png",
@@ -9604,7 +9604,7 @@
         }
       ],
       "created_at": "2026-11-06 06:44:04 UTC",
-      "updated_at": "2026-11-06 17:17:38 UTC",
+      "updated_at": "",
       "resolved_at": "2026-11-06 17:17:35 UTC",
       "resolution_notes": "Decoupled attachments to dedicated refs/heads/bugs detached branch, added attachments to .gitignore, hid attachments from git_engine diff view, and added checkout_attachments restoration.",
       "rejection_notes": "",
@@ -9638,7 +9638,7 @@
         }
       ],
       "created_at": "2026-11-06 06:45:37 UTC",
-      "updated_at": "2026-11-06 17:13:22 UTC",
+      "updated_at": "",
       "resolved_at": "2026-11-06 17:13:20 UTC",
       "resolution_notes": "Added delayed (>1s) action progress modal with live elapsed timer to dashboard and bug workstation, and optimized incremental attachment indexing.",
       "rejection_notes": "",
@@ -9672,7 +9672,7 @@
         }
       ],
       "created_at": "2026-11-06 06:54:27 UTC",
-      "updated_at": "2026-11-06 17:13:15 UTC",
+      "updated_at": "",
       "resolved_at": "2026-11-06 17:13:12 UTC",
       "resolution_notes": "Renamed GEMINI.md to AGENTS.md and updated all documentation and test references across hardware and firmware.",
       "rejection_notes": "",
@@ -9738,59 +9738,49 @@
       "logs": "",
       "attachments": [
         {
-          "id": "d04a6acc",
+          "id": "att-1",
           "filename": "screenshot_paste_1794010762260_ohrw4.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-FLITTING-LOCUST-977/screenshot_paste_1794010762260_ohrw4.png",
-          "size_bytes": 198966,
+          "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1794010762260_ohrw4.png",
-          "created_at": "2026-11-07 00:19:22 UTC"
+          "created_at": ""
         }
       ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-07 00:15:58 UTC",
-      "updated_at": "2026-11-07 00:19:31 UTC",
+      "updated_at": "",
       "resolved_at": null,
       "resolution_notes": "",
-      "rejection_notes": null,
+      "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
     },
     {
       "id": "BUG-CRIMSON-MAYFLY-874",
       "uuid": "692f0251-d8f8-40be-b255-5414be49c8de",
-      "title": "Drive hub-insufficient clearance for hall sensor board",
+      "title": "New Bug Report",
       "status": "OPEN",
       "severity": "MEDIUM",
       "category": "PCB",
       "component": "",
-      "description": "The drive hub has insufficient clearance for the hall sensor board; the opening is too narrow for the sensor to fit thru. There is also an unexpected second opening opposite the hall sensor. Defects highlighted in red on the attached screenshot, and desired sensor clearance in green.",
+      "description": "",
       "reproduction_steps": [],
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [
-        {
-          "id": "f3258a84",
-          "filename": "screenshot_paste_1794011081865_vz46w.png",
-          "file_type": "screenshot",
-          "file_path": "attachments/BUG-CRIMSON-MAYFLY-874/screenshot_paste_1794011081865_vz46w.png",
-          "size_bytes": 162613,
-          "description": "Pasted screenshot screenshot_paste_1794011081865_vz46w.png",
-          "created_at": "2026-11-07 00:24:41 UTC"
-        }
-      ],
+      "attachments": [],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-07 00:23:00 UTC",
-      "updated_at": "2026-11-07 00:24:41 UTC",
+      "updated_at": "",
       "resolved_at": null,
       "resolution_notes": "",
-      "rejection_notes": null,
+      "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-07 00:24:41 UTC"
+  "updated_at": "2026-11-07 00:24:45 UTC"
 }

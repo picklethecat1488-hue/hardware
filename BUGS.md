@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-07 00:24:45 UTC` |
+| **Report Date** | `2026-11-07 00:24:47 UTC` |
 | **Total Issues** | `322` |
 | **Open Issues** | `2` |
 | **Resolved / Closed** | `320 (99%)` |
@@ -353,7 +353,7 @@
 - [x] **`[MEDIUM]`** [#BUG-LUSTROUS-HORSEFLY-593](#bug-lustrous-horsefly-593): Rename GEMINI.md to AGENTS.md (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-DIURNAL-ANT-667](#bug-diurnal-ant-667): Opening commits in bug report workstation-broken `[dashboard]` (`CLOSED`)
 - [ ] **`[MEDIUM]`** [#BUG-FLITTING-LOCUST-977](#bug-flitting-locust-977): Micro gapes in impeller `[cat_fountain]` (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-CRIMSON-MAYFLY-874](#bug-crimson-mayfly-874): Drive hub-insufficient clearance for hall sensor board (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-CRIMSON-MAYFLY-874](#bug-crimson-mayfly-874): New Bug Report (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -28512,22 +28512,12 @@ There are micro gaps between the impeller blades and central shaft, we should pa
 
 ---
 
-### <a id="bug-crimson-mayfly-874"></a> 🔴 `[BUG-CRIMSON-MAYFLY-874]` Drive hub-insufficient clearance for hall sensor board
+### <a id="bug-crimson-mayfly-874"></a> 🔴 `[BUG-CRIMSON-MAYFLY-874]` New Bug Report
 
 - **UUID**: `692f0251-d8f8-40be-b255-5414be49c8de`
 - **Status**: `OPEN`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-11-07 00:23:00 UTC`
-
-#### Description
-
-The drive hub has insufficient clearance for the hall sensor board; the opening is too narrow for the sensor to fit thru. There is also an unexpected second opening opposite the hall sensor. Defects highlighted in red on the attached screenshot, and desired sensor clearance in green.
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1794011081865_vz46w.png](attachments/BUG-CRIMSON-MAYFLY-874/screenshot_paste_1794011081865_vz46w.png) | Pasted screenshot screenshot_paste_1794011081865_vz46w.png |
 
 ---
