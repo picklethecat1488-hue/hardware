@@ -511,6 +511,9 @@ class DetachedBranchBugStore:
         restored: List[Path] = []
         for line in tree_proc.stdout.splitlines():
             path_str = line.strip()
+            # Explicitly exclude aggregated index files to prevent workspace conflicts
+            if path_str in ("WORMS.md", "BUGS.md", "CR.md", "feedback/WORMS.md", "feedback/BUGS.md", "feedback/CR.md"):
+                continue
             if not path_str.startswith("feedback/"):
                 continue
             if path_str.startswith("feedback/attachments/"):
@@ -529,6 +532,19 @@ class DetachedBranchBugStore:
                     restored.append(dest_file)
             except (subprocess.CalledProcessError, OSError):
                 pass
+
+        # Ensure index files never linger in feedback directory
+        for unwanted in (
+            self.repo_root / "feedback" / "WORMS.md",
+            self.repo_root / "feedback" / "BUGS.md",
+            self.repo_root / "feedback" / "CR.md",
+        ):
+            if unwanted.exists():
+                try:
+                    unwanted.unlink()
+                except OSError:
+                    pass
+
         return restored
 
     def seed_from_workspace(

@@ -309,3 +309,42 @@ def test_git_engine_sync_repo_pushes_detached_branch(repo_with_remote) -> None:
     remote_main_after = run_git(["rev-parse", "main"], cwd=remote_dir).stdout.strip()
     assert remote_main_after == remote_main_before
     assert remote_main_after != local_main_sha
+
+
+def test_stage_feedback_files_tracks_bugs_crs_and_excludes_index_files(repo_with_remote) -> None:
+    """Verify GitEngine.stage_feedback_files stages BUG_*.md, CR_*.md and explicitly excludes index files."""
+    local_dir, _ = repo_with_remote
+    engine = GitEngine(local_dir)
+
+    feedback_dir = local_dir / "feedback"
+    feedback_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create individual bug and CR files
+    bug_file = feedback_dir / "BUG_TEST-101.md"
+    bug_file.write_text("# Bug 101\n", encoding="utf-8")
+    cr_file = feedback_dir / "CR_1234567.md"
+    cr_file.write_text("# CR 1234567\n", encoding="utf-8")
+
+    # Create index files that MUST NOT be staged/tracked
+    bugs_idx = feedback_dir / "BUGS.md"
+    bugs_idx.write_text("# BUGS Index\n", encoding="utf-8")
+    cr_idx = feedback_dir / "CR.md"
+    cr_idx.write_text("# CR Index\n", encoding="utf-8")
+    root_bugs_idx = local_dir / "BUGS.md"
+    root_bugs_idx.write_text("# Root BUGS Index\n", encoding="utf-8")
+
+    # Call stage_feedback_files
+    staged = engine.stage_feedback_files()
+    assert "feedback/BUG_TEST-101.md" in staged
+    assert "feedback/CR_1234567.md" in staged
+    assert "feedback/BUGS.md" not in staged
+    assert "feedback/CR.md" not in staged
+    assert "BUGS.md" not in staged
+
+    # Verify git index via diff --cached
+    staged_in_git = run_git(["diff", "--cached", "--name-only"], cwd=local_dir).stdout.splitlines()
+    assert "feedback/BUG_TEST-101.md" in staged_in_git
+    assert "feedback/CR_1234567.md" in staged_in_git
+    assert "feedback/BUGS.md" not in staged_in_git
+    assert "feedback/CR.md" not in staged_in_git
+    assert "BUGS.md" not in staged_in_git

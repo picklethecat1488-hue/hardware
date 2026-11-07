@@ -321,6 +321,12 @@ class GitEngine:
             except Exception as e:
                 detached_res = {"status": "error", "message": str(e)}
 
+            staged_files: List[str] = []
+            try:
+                staged_files = self.stage_feedback_files()
+            except Exception:
+                pass
+
             detached_pushed = detached_res.get("pushed", False)
             push_info = " Feedback and attachments pushed." if detached_pushed else ""
             msg = f"{out.strip() or 'Repository synchronized.'}{push_info}".strip()
@@ -329,6 +335,7 @@ class GitEngine:
                 "status": "ok",
                 "message": msg,
                 "detached": detached_res,
+                "staged_feedback": staged_files,
             }
         except RuntimeError as err:
             return {
@@ -1903,6 +1910,64 @@ class GitEngine:
     def unstage_file(self, file_path: str) -> None:
         """Remove file changes from git index while preserving working tree changes."""
         run_git_command(["reset", "HEAD", "--", file_path], cwd=self.repo_root)
+
+    def stage_feedback_files(self) -> List[str]:
+        """Stage all individual feedback markdown files while explicitly excluding index files.
+
+        Tracks and stages:
+            - feedback/WORM_*.md (or feedback/BUG_*.md)
+            - feedback/CR_*.md
+
+        Explicitly excludes from staging to prevent merge collisions:
+            - WORMS.md, BUGS.md, CR.md
+            - feedback/WORMS.md, feedback/BUGS.md, feedback/CR.md
+            - attachments/ and feedback/attachments/
+
+        Returns:
+            List of relative file paths that were staged.
+        """
+        feedback_dir = self.repo_root / "feedback"
+        if not feedback_dir.is_dir():
+            return []
+
+        # Find all individual WORM_*.md, BUG_*.md, and CR_*.md files
+        files_to_stage: List[str] = []
+        for p in feedback_dir.glob("*.md"):
+            name = p.name
+            # Explicitly exclude aggregated index files
+            if name in ("WORMS.md", "BUGS.md", "CR.md"):
+                continue
+            if name.startswith("WORM_") or name.startswith("BUG_") or name.startswith("CR_"):
+                files_to_stage.append(f"feedback/{name}")
+
+        staged: List[str] = []
+        if files_to_stage:
+            # Batch add in chunks of 50 to avoid shell argument length limits
+            chunk_size = 50
+            for i in range(0, len(files_to_stage), chunk_size):
+                chunk = files_to_stage[i : i + chunk_size]
+                try:
+                    run_git_command(["add", "-f", "--"] + chunk, cwd=self.repo_root)
+                    staged.extend(chunk)
+                except Exception:
+                    pass
+
+        # Ensure index files are un-staged if they were inadvertently staged
+        index_candidates = [
+            "WORMS.md",
+            "BUGS.md",
+            "CR.md",
+            "feedback/WORMS.md",
+            "feedback/BUGS.md",
+            "feedback/CR.md",
+        ]
+        for idx in index_candidates:
+            try:
+                run_git_command(["reset", "HEAD", "--", idx], cwd=self.repo_root)
+            except Exception:
+                pass
+
+        return staged
 
     def get_head_commit_message(self) -> str:
         """Retrieve full commit message (subject and body) of HEAD commit.
