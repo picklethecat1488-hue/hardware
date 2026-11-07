@@ -8757,7 +8757,7 @@
           "created_at": ""
         },
         {
-          "id": "att-6",
+          "id": "att-1",
           "filename": "carrier_board_bom_rev2.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
@@ -8766,7 +8766,7 @@
           "created_at": ""
         },
         {
-          "id": "att-7",
+          "id": "att-2",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
@@ -8775,7 +8775,7 @@
           "created_at": ""
         },
         {
-          "id": "att-8",
+          "id": "att-3",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
@@ -9339,7 +9339,7 @@
           "created_at": ""
         },
         {
-          "id": "att-2",
+          "id": "att-1",
           "filename": "screenshot_paste_1793924149979_7f535.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png",
@@ -9348,7 +9348,7 @@
           "created_at": ""
         },
         {
-          "id": "att-3",
+          "id": "att-2",
           "filename": "screenshot_paste_1793890911006_wvg54.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png",
@@ -9530,7 +9530,7 @@
           "created_at": ""
         },
         {
-          "id": "att-2",
+          "id": "att-1",
           "filename": "screenshot_paste_1793947358948_g28nw.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793947358948_g28nw.png",
@@ -9760,7 +9760,7 @@
         }
       ],
       "created_at": "2026-11-07 00:15:58 UTC",
-      "updated_at": "2026-11-07 00:31:05 UTC",
+      "updated_at": "",
       "resolved_at": "2026-11-07 00:30:37 UTC",
       "resolution_notes": "Extended impeller blades 1.0mm into central sleeve cylinder, eliminating micro-gaps at blade corner junctions while preserving guide pin clearance",
       "rejection_notes": "",
@@ -9797,7 +9797,7 @@
       "updated_at": "2026-11-07 00:28:06 UTC",
       "resolved_at": null,
       "resolution_notes": "",
-      "rejection_notes": "",
+      "rejection_notes": null,
       "accepted_at": null,
       "rejected_at": null
     },
@@ -9818,13 +9818,13 @@
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-07 00:27:53 UTC",
-      "updated_at": "",
+      "updated_at": "2026-11-07 00:30:57 UTC",
       "resolved_at": null,
       "resolution_notes": "",
-      "rejection_notes": "",
+      "rejection_notes": null,
       "accepted_at": null,
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-07 00:31:05 UTC"
+  "updated_at": "2026-11-07 00:31:08 UTC"
 }
