@@ -1,6 +1,6 @@
 # 🟢 `[BUG-TARSIAL-SAWFLY-529]` Recently resolved bug awaiting review
 
-- **UUID**: `b735e79e-7f10-4bdb-bca0-b1a9f17c6280`
+- **UUID**: `b1ff94ac-93bd-422d-a7ef-e88447014abe`
 - **ID**: `BUG-TARSIAL-SAWFLY-529`
 - **Status**: `RESOLVED`
 - **Severity**: `HIGH`
