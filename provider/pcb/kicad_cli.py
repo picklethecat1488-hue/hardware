@@ -169,8 +169,13 @@ class KiCadCLI:
 
     @property
     def supports_render(self) -> bool:
-        """Return True if kicad-cli supports the 'pcb render' subcommand (KiCad 8+)."""
-        return self.is_available and self.major_version >= 8
+        """Return True if kicad-cli supports the 'pcb render' subcommand (KiCad 9+)."""
+        return self.is_available and self.major_version >= 9
+
+    @property
+    def supports_refill_zones(self) -> bool:
+        """Return True if kicad-cli supports standalone zone refilling via 'pcb drc --refill-zones --save-board' (KiCad 9+)."""
+        return self.is_available and self.major_version >= 9
 
     def run_command(self, args: List[str]) -> str:
         """Execute a kicad-cli command locally."""
@@ -186,25 +191,37 @@ class KiCadCLI:
         return result.stdout
 
     def refill_zones(self, kicad_pcb_path: str | Path) -> None:
-        """Refill copper zones and save the board file in-place using kicad-cli (KiCad 8+)."""
-        if not self.supports_drc:
-            return
-
-        import tempfile
-
+        """Refill copper zones and save the board file in-place using kicad-cli or python pcbnew."""
         pcb_file = Path(kicad_pcb_path).resolve()
         if not pcb_file.is_file():
             raise FileNotFoundError(f"KiCad PCB file not found: {pcb_file}")
 
-        with tempfile.NamedTemporaryFile(suffix="-drc.rpt", delete=False) as tmp_rpt:
-            tmp_rpt_path = Path(tmp_rpt.name)
+        if self.supports_refill_zones:
+            import tempfile
 
-        try:
-            args = ["pcb", "drc", "--refill-zones", "--save-board", "-o", str(tmp_rpt_path), str(pcb_file)]
-            self.run_command(args)
-        finally:
-            if tmp_rpt_path.exists():
-                tmp_rpt_path.unlink()
+            with tempfile.NamedTemporaryFile(suffix="-drc.rpt", delete=False) as tmp_rpt:
+                tmp_rpt_path = Path(tmp_rpt.name)
+
+            try:
+                args = ["pcb", "drc", "--refill-zones", "--save-board", "-o", str(tmp_rpt_path), str(pcb_file)]
+                self.run_command(args)
+            finally:
+                if tmp_rpt_path.exists():
+                    tmp_rpt_path.unlink()
+            return
+
+        # KiCad 8 fallback: use pcbnew via python
+        py_code = (
+            "import pcbnew\n"
+            f"board = pcbnew.LoadBoard({repr(str(pcb_file))})\n"
+            "filler = pcbnew.ZONE_FILLER(board)\n"
+            "filler.Fill(board.Zones())\n"
+            f"board.Save({repr(str(pcb_file))})\n"
+        )
+        for py_bin in ("/usr/bin/python3", "python3"):
+            res = subprocess.run([py_bin, "-c", py_code], capture_output=True, text=True, check=False)
+            if res.returncode == 0:
+                break
 
     def export_gerbers(
         self,
@@ -221,7 +238,7 @@ class KiCadCLI:
             raise FileNotFoundError(f"KiCad PCB file not found: {pcb_file}")
 
         args = ["pcb", "export", "gerbers", "--no-protel-ext"]
-        if self.major_version >= 8:
+        if self.major_version >= 9:
             args.append("--check-zones")
         args.extend(["-o", f"{out_dir}/"])
         if layers:
@@ -258,7 +275,7 @@ class KiCadCLI:
             "--map-format",
             "gerberx2",
         ]
-        if self.major_version >= 8:
+        if self.major_version >= 9:
             args_sep.append("--generate-report")
         args_sep.extend(["-o", f"{out_dir}/", str(pcb_file)])
         self.run_command(args_sep)

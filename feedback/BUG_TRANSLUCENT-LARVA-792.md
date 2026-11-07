@@ -2,12 +2,13 @@
 
 - **UUID**: `2b7ef56e-6d35-4c8a-9c8e-6f586aea730f`
 - **ID**: `BUG-TRANSLUCENT-LARVA-792`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-10-10 23:00:34 UTC`
 - **Resolved**: `2026-10-11 00:28:20 UTC`
+- **Accepted**: `2026-10-11 00:28:20 UTC`
 
 #### Description
 

@@ -259,7 +259,7 @@ pcb_materials.yaml imports -> manifest.yaml -> .kicad_pcb / .kicad_sch targets -
 
 ### 2. KiCad Dependency & Multi-Platform Support
 - **Local Installation**: Install KiCad (v7+ or v8+) locally via Homebrew on macOS (`brew install --cask kicad`), apt on Linux (`sudo apt-get install -y kicad`), or the Windows installer from [kicad.org](https://www.kicad.org/).
-- **Discovery & Binary Override**: `KiCadCLI` automatically discovers standard installation paths across macOS, Linux, and Windows, and respects PATH and the `KICAD_CLI_BIN` environment variable override. Remote execution can be dispatched via `bin/anvil run`.
+- **Discovery & Binary Override**: `KiCadCLI` automatically discovers standard installation paths across macOS, Linux, and Windows, and respects PATH and the `KICAD_CLI_BIN` environment variable override. Remote execution can be dispatched via `tools/anvil run`.
 
 ### 3. Viewing & Inspecting Board Files
 - **In VS Code (KiCode)**: Install the recommended [KiCode](https://marketplace.visualstudio.com/items?itemName=SajadGhorbani.KiCode) (`sajadghorbani.kicode`) extension (powered by KiCanvas). Opening any `.kicad_pcb` or `.kicad_sch` file opens an interactive webview tab with layer toggling, zoom/pan, net highlighting, and component inspection directly in VS Code.
@@ -295,6 +295,22 @@ This will run unit tests, then build all project files, simulating a release:
 ```
 pytest
 python build.py
+```
+
+### Remote Cloud Execution (`tools/anvil` / Vast.ai)
+For offloading heavy simulation grids, parameter sweeps, and full test suites to the cloud server:
+```bash
+tools/anvil provision                # Rent Vast.ai Ubuntu instance and configure ~/.anvil.env
+tools/anvil bootstrap                # Install build tools, Rust, Miniforge, and cq conda env on remote VM
+tools/anvil status                   # Check instance health, IP/port, GPU, and lock state
+tools/anvil sync                     # Sync repository to cloud container (/workspace/hardware)
+tools/anvil pytest [args...]         # Run pytest remotely in the cq conda environment
+tools/anvil simulate [args...]       # Run simulation on remote GPU and auto-download results
+tools/anvil stages                   # Sync staged .rrd checkpoint recordings
+tools/anvil smoke                    # Run integration smoke tests remotely
+tools/anvil auto-release             # Release instance if idle or past Close of Business (COB)
+tools/anvil release                  # Destroy rented instance and clean up ~/.anvil.env
+tools/anvil stop                     # Clean up remote processes on anvil
 ```
 
 **Note:** All CI gates (tests, linting, and build checks) must pass successfully in the GitHub Actions workflow before a pull request can be merged.

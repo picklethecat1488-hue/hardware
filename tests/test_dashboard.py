@@ -755,10 +755,10 @@ def test_regression_bug_194_lfs_tracked_files_grouping_and_styling(tmp_path: Pat
     assert "📦 LFS Tracked Files" in tpl_text
     assert 'class="file-status-badge status-lfs">LFS</span>' in tpl_text
 
-    # 2. Create LFS tracked file under attachments/ and a regular file
-    att_dir = repo_dir / "attachments"
-    att_dir.mkdir(parents=True, exist_ok=True)
-    lfs_file = att_dir / "diagram.png"
+    # 2. Create LFS tracked file under assets/ and a regular file
+    assets_dir = repo_dir / "assets"
+    assets_dir.mkdir(parents=True, exist_ok=True)
+    lfs_file = assets_dir / "diagram.png"
     lfs_file.write_bytes(b"\x89PNG\r\n\x1a\ntestdiagram")
 
     reg_file = repo_dir / "main.py"
@@ -766,20 +766,20 @@ def test_regression_bug_194_lfs_tracked_files_grouping_and_styling(tmp_path: Pat
 
     # Ensure .gitattributes has LFS pattern
     ga = repo_dir / ".gitattributes"
-    ga.write_text("attachments/* filter=lfs diff=lfs merge=lfs -text\n", encoding="utf-8")
+    ga.write_text("assets/* filter=lfs diff=lfs merge=lfs -text\n", encoding="utf-8")
 
     # 3. Check get_working_tree_files identifies is_lfs
     working = engine.get_working_tree_files()
     lfs_items = [w for w in working if w.is_lfs]
     reg_items = [w for w in working if not w.is_lfs and not w.is_feedback]
-    assert any(w.path == "attachments/diagram.png" for w in lfs_items)
+    assert any(w.path == "assets/diagram.png" for w in lfs_items)
     assert any(w.path == "main.py" for w in reg_items)
 
     # 4. Check get_changed_files identifies is_lfs
     changed = engine.get_changed_files("working", include_feedback=False)
     lfs_changed = [c for c in changed if c.get("is_lfs")]
     reg_changed = [c for c in changed if not c.get("is_lfs")]
-    assert any(c["path"] == "attachments/diagram.png" for c in lfs_changed)
+    assert any(c["path"] == "assets/diagram.png" for c in lfs_changed)
     assert any(c["path"] == "main.py" for c in reg_changed)
 
     # 5. Check API endpoint /api/working returns is_lfs: true
@@ -800,7 +800,7 @@ def test_regression_bug_194_lfs_tracked_files_grouping_and_styling(tmp_path: Pat
             data = json.loads(resp.read().decode("utf-8"))
             lfs_api = [f for f in data if f.get("is_lfs")]
             reg_api = [f for f in data if not f.get("is_lfs") and not f.get("is_feedback")]
-            assert any(f["path"] == "attachments/diagram.png" for f in lfs_api)
+            assert any(f["path"] == "assets/diagram.png" for f in lfs_api)
             assert any(f["path"] == "main.py" for f in reg_api)
     finally:
         server.shutdown()
@@ -3434,3 +3434,83 @@ def test_common_stylesheet_linkage_and_presence() -> None:
         assert '<link rel="stylesheet" href="/static/common.css">' in content, (
             f'{tmpl} missing <link rel="stylesheet" href="/static/common.css">'
         )
+
+
+def test_diff_view_optimizations_polling_and_file_priority() -> None:
+    """Verify diff view optimizations: 10s auto-sync polling interval and regular files prioritized over LFS."""
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+
+    # 1. Lightweight Polling: Auto-sync interval set to 10s (10000ms)
+    assert "setInterval(syncWorkingAndCommitsSilently, 10000)" in tpl_text
+
+    # 2. Prioritize Regular Files Over Attachments:
+    # renderCommitFiles must auto-select regular files before LFS files
+    assert "const first = regular[0]?.path || lfs[0]?.path || feedback[0]?.path;" in tpl_text
+
+    # renderWorkingTreeFiles must auto-select staged/unstaged/untracked before LFS files
+    assert (
+        "conflicts[0]?.path || staged[0]?.path || unstaged[0]?.path || untracked[0]?.path || lfs[0]?.path ||"
+        " feedback[0]?.path;" in tpl_text
+    )
+
+
+def test_regression_bug_barbed_midge_630_iframe_border_prevention() -> None:
+    """Verify BUG-BARBED-MIDGE-630: nested borders and resize grippers are suppressed when embedded in iframes."""
+    static_css = Path(__file__).resolve().parent.parent / "provider" / "code_review" / "static" / "common.css"
+    css_content = static_css.read_text(encoding="utf-8")
+    assert "html.in-iframe" in css_content
+    assert "body.in-iframe" in css_content
+    assert "border: none !important;" in css_content
+    assert "box-shadow: none !important;" in css_content
+    assert "display: none !important;" in css_content
+
+    tpl_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    for tmpl in ["diff_view.html.j2", "code_review.html.j2", "bug_report.html.j2"]:
+        content = (tpl_dir / tmpl).read_text(encoding="utf-8")
+        assert "html.in-iframe" in content, f"{tmpl} missing html.in-iframe style rule"
+        assert "body.in-iframe" in content, f"{tmpl} missing body.in-iframe style rule"
+        assert 'document.documentElement.classList.add("in-iframe");' in content, (
+            f"{tmpl} missing iframe class detection script"
+        )
+
+    # Frame busting in diff_view.html.j2 to prevent multi-level nested diff views
+    diff_text = (tpl_dir / "diff_view.html.j2").read_text(encoding="utf-8")
+    assert "if (window.top && window.top !== window)" in diff_text
+    assert "window.top.location.href = window.location.href;" in diff_text
+
+    # Top target navigation in code review and bug report close buttons
+    cr_text = (tpl_dir / "code_review.html.j2").read_text(encoding="utf-8")
+    bug_text = (tpl_dir / "bug_report.html.j2").read_text(encoding="utf-8")
+    assert 'target="hardware_vcs_diff_viewer"' in cr_text
+    assert 'target="hardware_vcs_diff_viewer"' in bug_text
+    assert "window.top.location.href = " in cr_text
+    assert "window.top.location.href = " in bug_text
+
+
+def test_regression_bug_diurnal_ant_667_commit_review_navigation() -> None:
+    """Verify BUG-DIURNAL-ANT-667: Opening attached commits in bug report navigates to Code Review with back navigation."""
+    tpl_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    bug_text = (tpl_dir / "bug_report.html.j2").read_text(encoding="utf-8")
+    cr_text = (tpl_dir / "code_review.html.j2").read_text(encoding="utf-8")
+    diff_text = (tpl_dir / "diff_view.html.j2").read_text(encoding="utf-8")
+
+    # 1. Bug Report attached commit chip must target Code Review, not VCS toplevel diff view
+    assert "const crUrl = `/review?revisions=${encodeURIComponent(cid)}&from=bugs" in bug_text
+    assert "openCommitInCodeReview(event, '${cid}')" in bug_text
+    assert '<a href="/?commit=' not in bug_text
+    assert "async function openCommitInCodeReview(event, commitHash)" in bug_text
+
+    # 2. Code Review must provide toolbar/header back button to return to Bug Report
+    assert 'id="btnBackToBugsHeader"' in cr_text
+    assert 'id="btnBackToBugsToolbar"' in cr_text
+    assert 'id="btnBugTracker"' in cr_text
+    assert "function returnToBugReport()" in cr_text
+    assert "function initBugNavigation()" in cr_text
+    assert "initBugNavigation();" in cr_text
+    assert 'urlParams.get("from") === "bugs"' in cr_text
+    assert "returnToBugReport();" in cr_text
+
+    # 3. Diff View must handle ?commit= or ?goto= in URL parameters
+    assert 'urlParams.get("commit") || urlParams.get("goto")' in diff_text
+    assert "selectCommit(urlCommit);" in diff_text

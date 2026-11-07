@@ -43,6 +43,14 @@ class BugCategory(StrEnum):
     GENERAL = "GENERAL"
 
 
+class ReviewTaskStatus(StrEnum):
+    """Lifecycle status for a functional review task."""
+
+    PENDING = "PENDING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
 class BugAttachmentModel(BaseModel):
     """File attachment (log, screenshot, CAD artifact, reference) associated with a bug."""
 
@@ -53,6 +61,16 @@ class BugAttachmentModel(BaseModel):
     size_bytes: int = 0
     description: str = ""
     created_at: str = ""
+
+
+class ReviewTaskModel(BaseModel):
+    """A functional verification or review task for a bug."""
+
+    id: str = Field(default_factory=lambda: str(uuid_pkg.uuid4())[:8])
+    title: str
+    command: str = ""  # Shell command or visualization action to demo functionality
+    status: ReviewTaskStatus = ReviewTaskStatus.PENDING
+    notes: str = ""
 
 
 class BugReportModel(BaseModel):
@@ -71,10 +89,15 @@ class BugReportModel(BaseModel):
     actual_behavior: str = ""
     logs: str = ""
     attachments: List[BugAttachmentModel] = Field(default_factory=list)
+    commit_ids: List[str] = Field(default_factory=list)
+    review_tasks: List[ReviewTaskModel] = Field(default_factory=list)
     created_at: str = ""
     updated_at: str = ""
     resolved_at: Optional[str] = None
     resolution_notes: str = ""
+    rejection_notes: Optional[str] = None
+    accepted_at: Optional[str] = None
+    rejected_at: Optional[str] = None
 
 
 class BugDatabaseModel(BaseModel):
@@ -108,13 +131,50 @@ class BugDatabaseModel(BaseModel):
                 return b
         return None
 
-    def add_or_update(self, bug: BugReportModel) -> None:
-        """Add a new bug or update an existing bug matching UUID or ID."""
+    def add_or_update(self, bug: BugReportModel) -> str:
+        """Add a new bug or update an existing bug matching UUID or ID.
+
+        Performs collision detection: If a bug arrives with an existing ID but a different
+        UUID, it is identified as a distinct entity and automatically assigned a new unique
+        ID to prevent data loss or clobbering.
+
+        Returns:
+            The canonical (possibly reassigned) bug ID.
+        """
+        existing_by_uuid_idx = None
+        existing_by_id_idx = None
         for idx, existing in enumerate(self.bugs):
-            if existing.uuid == bug.uuid or existing.id == bug.id:
-                self.bugs[idx] = bug
-                return
-        self.bugs.append(bug)
+            if bug.uuid and existing.uuid == bug.uuid:
+                existing_by_uuid_idx = idx
+            if existing.id == bug.id:
+                existing_by_id_idx = idx
+
+        if existing_by_uuid_idx is not None and existing_by_id_idx is not None:
+            if existing_by_uuid_idx == existing_by_id_idx:
+                self.bugs[existing_by_uuid_idx] = bug
+                return bug.id
+            else:
+                # UUID matches bug A, but requested ID is already held by bug B
+                known_ids = {b.id for b in self.bugs}
+                bug.id = self.generate_bug_id(existing_ids=known_ids)
+                self.bugs[existing_by_uuid_idx] = bug
+                return bug.id
+        elif existing_by_uuid_idx is not None:
+            self.bugs[existing_by_uuid_idx] = bug
+            return bug.id
+        elif existing_by_id_idx is not None:
+            # Collision! Different UUID (or new bug) has an ID already taken by an existing bug
+            known_ids = {b.id for b in self.bugs}
+            bug.id = self.generate_bug_id(existing_ids=known_ids)
+            if not bug.uuid:
+                bug.uuid = str(uuid_pkg.uuid4())
+            self.bugs.append(bug)
+            return bug.id
+        else:
+            if not bug.uuid:
+                bug.uuid = str(uuid_pkg.uuid4())
+            self.bugs.append(bug)
+            return bug.id
 
     def count_by_status(self) -> Dict[str, int]:
         """Tally bugs grouped by lifecycle status."""

@@ -6,6 +6,7 @@ and UI synchronization states.
 """
 
 from pathlib import Path
+import time
 import uuid
 
 import pytest
@@ -390,3 +391,83 @@ def test_baseline_reports_default_to_build_and_preserve_feedback_granularity(tmp
     assert (mock_repo / "build" / "BUGS.md").is_file()
     assert (mock_repo / "feedback" / "BUG_999.md").is_file()
     assert not (mock_repo / "feedback" / "BUGS.md").exists()
+
+
+def test_scan_and_sync_incremental_mtime_caching(tmp_path: Path) -> None:
+    """Verify scan_and_sync_feedback_dir skips unchanged files and caches mtimes in SQLite."""
+    feedback_dir = tmp_path / "feedback"
+    feedback_dir.mkdir(parents=True, exist_ok=True)
+    db_file = tmp_path / "bugs.sqlite"
+    store = SQLiteBugStore(db_file)
+    exporter = MarkdownBugExporter(tmp_path)
+
+    bug1 = BugReportModel(
+        id="BUG-001",
+        uuid=str(uuid.uuid4()),
+        title="First Bug",
+        status=BugStatus.OPEN,
+        severity=BugSeverity.LOW,
+        category=BugCategory.GENERAL,
+    )
+    bug2 = BugReportModel(
+        id="BUG-002",
+        uuid=str(uuid.uuid4()),
+        title="Second Bug",
+        status=BugStatus.OPEN,
+        severity=BugSeverity.HIGH,
+        category=BugCategory.PCB,
+    )
+    exporter.export_individual_bug(bug1, feedback_dir)
+    exporter.export_individual_bug(bug2, feedback_dir)
+
+    db = BugDatabaseModel(bugs=[])
+
+    # 1. First scan: merges both files and updates SQLite store and cached mtimes
+    stats1 = exporter.scan_and_sync_feedback_dir(feedback_dir, db, store)
+    assert stats1["scanned"] == 2
+    assert stats1["merged"] == 2
+    assert stats1["renamed"] == 0
+
+    cached_mtimes = store.get_file_mtimes()
+    assert "BUG_001.md" in cached_mtimes
+    assert "BUG_002.md" in cached_mtimes
+
+    # 2. Second scan with no modifications: skips re-parsing, merged == 0
+    stats2 = exporter.scan_and_sync_feedback_dir(feedback_dir, db, store)
+    assert stats2["scanned"] == 2
+    assert stats2["merged"] == 0
+    assert stats2["renamed"] == 0
+
+    # 3. Modify one file: only that file is parsed and merged
+    time.sleep(0.01)
+    bug1.title = "First Bug Updated Title"
+    exporter.export_individual_bug(bug1, feedback_dir)
+
+    stats3 = exporter.scan_and_sync_feedback_dir(feedback_dir, db, store)
+    assert stats3["scanned"] == 2
+    assert stats3["merged"] == 1
+    assert stats3["renamed"] == 0
+
+    bug1_updated = db.get_bug("BUG-001")
+    assert bug1_updated is not None
+    assert bug1_updated.title == "First Bug Updated Title"
+
+
+def test_export_markdown_elides_unchanged_write(tmp_path: Path) -> None:
+    """Verify export_markdown does not rewrite BUGS.md if content is unchanged."""
+    exporter = MarkdownBugExporter(tmp_path)
+    output_path = tmp_path / "BUGS.md"
+    db = BugDatabaseModel(bugs=[])
+
+    # First export creates the file
+    exporter.export_markdown(db, output_path)
+    assert output_path.exists()
+    mtime1 = output_path.stat().st_mtime_ns
+
+    # Small delay to ensure timestamp resolution
+    time.sleep(0.01)
+
+    # Second export with identical content must not rewrite file
+    exporter.export_markdown(db, output_path)
+    mtime2 = output_path.stat().st_mtime_ns
+    assert mtime1 == mtime2, "export_markdown must elide rewriting identical BUGS.md content"

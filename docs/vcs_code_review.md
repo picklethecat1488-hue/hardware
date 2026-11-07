@@ -15,6 +15,7 @@ Guidelines for Quake VCS dashboard, Jinja2 templating, code review persistence, 
 
 ## 3. Structured Bug Tracking & Git LFS Attachments
 * **Defect Lifecycle**: Defects, routing anomalies, and visual flaws must be tracked systematically using the Dashboard CLI (`tools/dashboard.py`) and persisted in SQLite (`build/bugs.sqlite`, `SQLiteBugStore`), synchronized automatically to `feedback/BUGS.md`, individual issue files (`feedback/BUG_<id>.md`), and `build/bugs_state.json`.
+* **Verification Checklist Mandate on Resolution**: When transitioning any defect to `RESOLVED`, the author MUST update the defect's review tasks and functional checklist (`review_tasks`) with concise verification steps and executable demonstration commands that verify the change from a user-experience perspective (e.g. `python tools/view.py ...`, host CLI commands, or UI inspection using `python tools/dashboard.py add-task --id <ID> --title "<Step>" --command "<cmd>"`). Do NOT use `pytest` commands as review verification tasks, as automated test suites already run during pre-commit checks and CI; verification commands should demonstrate the actual user experience change or visual fix to allow peer reviewers to independently verify the fix prior to acceptance (`accept-bug`).
 * **Git LFS Attachments**: All bug report attachments (`build/attachments/` and `feedback/attachments/`) are tracked in **GitHub LFS** and considered public to the repository; never attach sensitive credentials, secret tokens, private keys, or proprietary secrets.
 * **Unresolved Bug Persistence Mandate**: If a bug or defect cannot be fully resolved in the current turn or session (due to missing datasheets, ambiguous specifications, external blockers, or incomplete verification), update the bug entry in SQLite and markdown files (via `python tools/dashboard.py`) with all investigation notes, reproduction steps, and blocking details, leaving its status as `OPEN`. NEVER mark an unresolved or partially completed bug as resolved, closed, or silently drop it from tracking.
 
@@ -22,3 +23,13 @@ Guidelines for Quake VCS dashboard, Jinja2 templating, code review persistence, 
 * **DAG Tree Smartlog**: The VCS engine renders smartlog commit graphs and working tree status dynamically.
 * **CLI Parity**: All major VCS operations (syncing, committing, amending, diff viewing) are supported via both web workstation APIs and CLI subcommands (`python tools/dashboard.py sync`, `python tools/dashboard.py commit`).
 * **Commit Author & Privacy Redaction**: Personal usernames, personal email addresses, and author identities (such as user nicknames and personal email domains) MUST be automatically elided and sanitized in the VCS engine (`GitEngine`), smartlog DAG models, commit info summaries, API responses, and web workstation UI templates (`code_review.html.j2`, `diff_view.html.j2`) into generic labels (`User`, `user@workspace`). Never leak the user's real or personal names in commit logs, smartlog displays, code review sessions, or git-tracked documentation.
+
+## 5. Bidirectional Dashboard & Script Cross-Patching Mandate
+* **Automatic Cross-Repository Synchronization**: Any bug fix, feature enhancement, styling update, or refactoring applied to developer scripts, tooling, or dashboard components in one repository (`firmware` or `hardware`) that is applicable to the other repository MUST be automatically cross-patched and mirrored into that repository, and vice versa.
+* **Synchronized Subsystems**: This includes, but is not limited to:
+  - Remote cloud runner and lifecycle orchestration (`tools/anvil`, `tools/vast_manager.py`, `~/.anvil.env`, `~/.anvil.lock`).
+  - VCS web workstation and dashboard backends (`tools/dashboard.py`, `provider/vcs/git_engine.py`, `provider/worm_report/`, `provider/bug_report/`).
+  - Shared workstation templates (`diff_view.html.j2`, `diff_component.html.j2`, `code_review.html.j2`, `worm_report.html.j2`, `bug_report.html.j2`).
+  - Smartlog DAG tree rendering, commit selection, node highlighting, and author identity sanitization.
+* **Zero Disparity**: Never allow dashboard bug fixes or tooling improvements (such as node highlighting, reverse-proxying, detached branch persistence, or SSH port handling) to remain isolated in one repository when the other repository shares the same architecture or template.
+

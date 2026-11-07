@@ -1,0 +1,459 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Unified Cloud Server (Anvil / Vast.ai) Execution and Synchronization Runner
+# Supports:
+#   - Automated Vast.ai VM provisioning and release
+#   - Remote dependency bootstrapping (compiler toolchains, Rust, Miniforge, CUDA)
+#   - Activity lock tracking (~/.anvil.lock) and Close of Business (COB) auto-release
+#   - Shared ~/.anvil.env instance configuration across all workspaces
+#   - Dynamic /workspace/<repo> fallback to $HOME/<repo>
+#   - Reverse proxy host CLI commands (port 8899)
+#   - Multi-repo support: firmware, hardware, and SSD
+# ==============================================================================
+
+set -e
+
+# 1. Resolve Local Repository Root and Project Name
+if git rev-parse --is-inside-work-tree &>/dev/null; then
+    REPO_DIR="$(git rev-parse --show-toplevel)"
+else
+    REPO_DIR="$(pwd)"
+fi
+REPO_NAME="$(basename "${REPO_DIR}")"
+
+# 2. Source Configuration Files (Global ~/.anvil.env with Local .anvil.env override)
+GLOBAL_ENV_FILE="${HOME}/.anvil.env"
+LOCAL_ENV_FILE="${REPO_DIR}/.anvil.env"
+
+# Preserve environment variables explicitly passed by caller
+CALLER_REMOTE_HOST="${REMOTE_HOST:-}"
+CALLER_REMOTE_PORT="${REMOTE_PORT:-}"
+CALLER_REMOTE_USER="${REMOTE_USER:-}"
+CALLER_REMOTE_DIR="${REMOTE_DIR:-}"
+
+if [ -f "${GLOBAL_ENV_FILE}" ]; then
+    # shellcheck disable=SC1090
+    source "${GLOBAL_ENV_FILE}"
+fi
+if [ -f "${LOCAL_ENV_FILE}" ]; then
+    # shellcheck disable=SC1090
+    source "${LOCAL_ENV_FILE}"
+fi
+
+# Restore caller overrides if explicitly supplied
+[ -n "${CALLER_REMOTE_HOST}" ] && REMOTE_HOST="${CALLER_REMOTE_HOST}"
+[ -n "${CALLER_REMOTE_PORT}" ] && REMOTE_PORT="${CALLER_REMOTE_PORT}"
+[ -n "${CALLER_REMOTE_USER}" ] && REMOTE_USER="${CALLER_REMOTE_USER}"
+[ -n "${CALLER_REMOTE_DIR}" ] && REMOTE_DIR="${CALLER_REMOTE_DIR}"
+
+# 3. Connection Parameters
+REMOTE_HOST="${REMOTE_HOST:-anvil}"
+REMOTE_PORT="${REMOTE_PORT:-}"
+REMOTE_USER="${REMOTE_USER:-root}"
+REMOTE_KEY="${REMOTE_KEY:-}"
+REMOTE_DIR="${REMOTE_DIR:-}"
+MIN_TOPS="${MIN_TOPS:-${ANVIL_MIN_TOPS:-50.0}}"
+MAX_COST="${MAX_COST:-${ANVIL_MAX_COST:-${MAX_DPH:-${ANVIL_MAX_DPH:-1.50}}}}"
+
+# SSH & Rsync Options
+SSH_BASE_OPTS="-o ServerAliveInterval=30 -o ServerAliveCountMax=120 -o TCPKeepAlive=yes -o StrictHostKeyChecking=accept-new"
+
+SSH_PORT_OPT=""
+if [ -n "${REMOTE_PORT}" ]; then
+    SSH_PORT_OPT="-p ${REMOTE_PORT}"
+fi
+
+SSH_KEY_OPT=""
+if [ -n "${REMOTE_KEY}" ] && [ -f "${REMOTE_KEY}" ]; then
+    SSH_KEY_OPT="-i ${REMOTE_KEY}"
+fi
+
+SSH_TARGET="${REMOTE_HOST}"
+if [ -n "${REMOTE_USER}" ] && [[ "${REMOTE_HOST}" != *"@"* ]]; then
+    SSH_TARGET="${REMOTE_USER}@${REMOTE_HOST}"
+fi
+
+SSH_OPTS="${SSH_BASE_OPTS} ${SSH_PORT_OPT} ${SSH_KEY_OPT}"
+RSYNC_SSH="ssh ${SSH_OPTS}"
+
+# 4. Remote Execution Paths
+DEFAULT_REMOTE_ENV="base"
+if [ "${REPO_NAME}" = "firmware" ]; then
+    DEFAULT_REMOTE_ENV="firmware-env"
+elif [ "${REPO_NAME}" = "hardware" ]; then
+    DEFAULT_REMOTE_ENV="cq"
+elif [ "${REPO_NAME}" = "ssd" ] || [ "${REPO_NAME}" = "SSD" ] || [ "${REPO_NAME}" = "predict" ] || [ "${REPO_NAME}" = "stalking" ]; then
+    DEFAULT_REMOTE_ENV="predict-env"
+fi
+
+REMOTE_CONDA="source \$(if [ -f /workspace/miniforge3/etc/profile.d/conda.sh ]; then echo /workspace/miniforge3/etc/profile.d/conda.sh; elif [ -f /home/ubuntu/miniforge3/etc/profile.d/conda.sh ]; then echo /home/ubuntu/miniforge3/etc/profile.d/conda.sh; else echo \$HOME/miniforge3/etc/profile.d/conda.sh; fi 2>/dev/null) 2>/dev/null && ENV_NAME=\$(conda env list 2>/dev/null | grep -E '^${DEFAULT_REMOTE_ENV} ' | awk '{print \$1}' | head -n 1 || (conda env list 2>/dev/null | grep -E '^firmware-env |^cq |^predict-env |^stalking-env ' | awk '{print \$1}' | head -n 1) || echo 'base') && conda run -n \$ENV_NAME --no-capture-output"
+REMOTE_CARGO_PATH="export PATH=\"/workspace/miniforge3/bin:\$HOME/.cargo/bin:/root/.cargo/bin:/home/ubuntu/.cargo/bin:\$PATH\" && export OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 OMP_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 PYTEST_XDIST_AUTO_NUM_WORKERS=8 XLA_FLAGS=\"--xla_cpu_multi_thread_eigen=false\""
+
+# 5. Helper Functions
+run_vast_manager() {
+    local mgr_path=""
+    if [ -f "${REPO_DIR}/tools/vast_manager.py" ]; then
+        mgr_path="${REPO_DIR}/tools/vast_manager.py"
+    elif [ -f "${REPO_DIR}/bin/vast_manager.py" ]; then
+        mgr_path="${REPO_DIR}/bin/vast_manager.py"
+    elif [ -f "${HOME}/.local/share/anvil/vast_manager.py" ]; then
+        mgr_path="${HOME}/.local/share/anvil/vast_manager.py"
+    fi
+
+    if [ -z "${mgr_path}" ]; then
+        echo "❌ vast_manager.py not found in repo or ~/.local/share/anvil/" >&2
+        return 1
+    fi
+
+    if command -v python3 &>/dev/null; then
+        python3 "${mgr_path}" "$@"
+    else
+        python "${mgr_path}" "$@"
+    fi
+}
+
+acquire_lock() {
+    run_vast_manager lock --pid $$ --repo "${REPO_NAME}" "$@" 2>/dev/null || true
+}
+
+release_lock() {
+    run_vast_manager unlock --pid $$ 2>/dev/null || true
+}
+
+resolve_remote_dir() {
+    if [ -z "${REMOTE_DIR}" ]; then
+        REMOTE_DIR=$(ssh ${SSH_OPTS} "${SSH_TARGET}" "if [ -d /workspace ]; then echo /workspace/${REPO_NAME}; else echo \$HOME/${REPO_NAME}; fi" 2>/dev/null || echo "/workspace/${REPO_NAME}")
+    fi
+}
+
+sync_code() {
+    resolve_remote_dir
+    echo "📦 Syncing repository to ${SSH_TARGET}:${REMOTE_DIR}..."
+    ssh ${SSH_OPTS} "${SSH_TARGET}" "mkdir -p ${REMOTE_DIR}"
+    rsync -az --delete -e "${RSYNC_SSH}" \
+        --exclude '.git' \
+        --exclude '/target' \
+        --exclude '/build' \
+        --exclude '/build_temp' \
+        --exclude '/build_test_tmp' \
+        --exclude '/tmp' \
+        --exclude '__pycache__' \
+        --exclude '*.pyc' \
+        --exclude '.pytest_cache' \
+        --exclude '.ruff_cache' \
+        --exclude '.mypy_cache' \
+        --exclude '.venv' \
+        --exclude 'venv' \
+        --exclude '*.rrd' \
+        --exclude '*.mp4' \
+        --exclude '*.MOV' \
+        --exclude '*.mov' \
+        --exclude '.anvil.env*' \
+        --exclude '.anvil.lock*' \
+        "${REPO_DIR}/" "${SSH_TARGET}:${REMOTE_DIR}/"
+    if [ -f "${REPO_DIR}/target/host_session.json" ]; then
+        ssh ${SSH_OPTS} "${SSH_TARGET}" "mkdir -p ${REMOTE_DIR}/target" 2>/dev/null || true
+        rsync -az -e "${RSYNC_SSH}" "${REPO_DIR}/target/host_session.json" "${SSH_TARGET}:${REMOTE_DIR}/target/host_session.json" 2>/dev/null || true
+    fi
+}
+
+pull_file() {
+    resolve_remote_dir
+    local remote_path="$1"
+    local local_dest="${2:-$1}"
+    local local_dir
+    local_dir="$(dirname "${REPO_DIR}/${local_dest}")"
+    mkdir -p "${local_dir}"
+    if ssh ${SSH_OPTS} "${SSH_TARGET}" "[ -e '${REMOTE_DIR}/${remote_path}' ]" 2>/dev/null; then
+        echo "📥 Downloading ${SSH_TARGET}:${REMOTE_DIR}/${remote_path} -> ${REPO_DIR}/${local_dest}..."
+        rsync -avz -e "${RSYNC_SSH}" "${SSH_TARGET}:${REMOTE_DIR}/${remote_path}" "${REPO_DIR}/${local_dest}"
+        echo "✅ Download complete."
+    else
+        echo "⚠️ Remote path ${remote_path} was not found on ${SSH_TARGET}."
+    fi
+}
+
+pull_recordings() {
+    resolve_remote_dir
+    local target_dir="${1:-recordings}"
+    mkdir -p "${REPO_DIR}/${target_dir}"
+    echo "📥 Syncing all preview artifacts and recordings from ${SSH_TARGET}:${REMOTE_DIR}/${target_dir}/..."
+    rsync -avz -e "${RSYNC_SSH}" "${SSH_TARGET}:${REMOTE_DIR}/${target_dir}/" "${REPO_DIR}/${target_dir}/"
+    echo "✅ Recordings synced."
+}
+
+pull_stages() {
+    resolve_remote_dir
+    local target_dir="${1:-recordings}"
+    mkdir -p "${REPO_DIR}/${target_dir}"
+    echo "📥 Syncing all staged .rrd recordings from ${SSH_TARGET}:${REMOTE_DIR}/${target_dir}/..."
+    rsync -avz -e "${RSYNC_SSH}" --include='*.rrd' --include='*/' --exclude='*' "${SSH_TARGET}:${REMOTE_DIR}/${target_dir}/" "${REPO_DIR}/${target_dir}/"
+    echo "✅ Staged recordings synced."
+}
+
+auto_download_simulate() {
+    for arg in "$@"; do
+        local file_path="${arg#*=}"
+        if [[ "$file_path" == *.rrd ]] || [[ "$file_path" == *.mp4 ]]; then
+            echo "📥 Auto-downloading generated artifact: ${file_path}..."
+            pull_file "${file_path}"
+        fi
+    done
+}
+
+kill_remote_pytest() {
+    echo "🛑 Terminating preceding pytest runs on ${SSH_TARGET}..."
+    ssh ${SSH_OPTS} "${SSH_TARGET}" "pkill -9 -f 'pytest|execnet|readline' 2>/dev/null || true" 2>/dev/null || true
+}
+
+kill_remote_verify() {
+    echo "🛑 Terminating preceding verification runs on ${SSH_TARGET}..."
+    ssh ${SSH_OPTS} "${SSH_TARGET}" "pkill -9 -f 'verify.sh|validate_all.py|cargo-nextest|cargo test|pytest' 2>/dev/null || true" 2>/dev/null || true
+}
+
+kill_remote_daemon() {
+    echo "🛑 Terminating daemon and simulation processes on ${SSH_TARGET}..."
+    ssh ${SSH_OPTS} "${SSH_TARGET}" "pkill -9 -f 'host.py|dashboard.py|motor_stress.py|daemon.py|view.py|smoke.py' 2>/dev/null || true" 2>/dev/null || true
+}
+
+bootstrap_remote() {
+    local target="${1:-${REPO_NAME}}"
+    echo "🚀 Bootstrapping remote environment on ${SSH_TARGET} (Target: ${target})..."
+    local max_attempts=5
+    local attempt=1
+    while [ "${attempt}" -le "${max_attempts}" ]; do
+        if run_vast_manager bootstrap-script --target "${target}" | ssh ${SSH_OPTS} "${SSH_TARGET}" "bash -s"; then
+            echo "✅ Bootstrap complete on ${SSH_TARGET}."
+            return 0
+        fi
+        if [ "${attempt}" -lt "${max_attempts}" ]; then
+            echo "⚠️ SSH connection to ${SSH_TARGET} not ready yet (attempt ${attempt}/${max_attempts}); retrying in 3s..."
+            sleep 3
+        fi
+        attempt=$((attempt + 1))
+    done
+    echo "❌ Failed to bootstrap remote environment on ${SSH_TARGET} after ${max_attempts} attempts." >&2
+    return 1
+}
+
+# 6. CLI Subcommand Dispatch
+case "$1" in
+    provision)
+        shift
+        run_vast_manager provision "$@"
+        if [[ "$*" != *"--no-bootstrap"* ]]; then
+            # Reload freshly written ~/.anvil.env
+            if [ -f "${GLOBAL_ENV_FILE}" ]; then
+                # shellcheck disable=SC1090
+                source "${GLOBAL_ENV_FILE}"
+            fi
+            SSH_PORT_OPT=""
+            [ -n "${REMOTE_PORT}" ] && SSH_PORT_OPT="-p ${REMOTE_PORT}"
+            SSH_TARGET="${REMOTE_HOST}"
+            [ -n "${REMOTE_USER}" ] && [[ "${REMOTE_HOST}" != *"@"* ]] && SSH_TARGET="${REMOTE_USER}@${REMOTE_HOST}"
+            SSH_OPTS="${SSH_BASE_OPTS} ${SSH_PORT_OPT} ${SSH_KEY_OPT}"
+            RSYNC_SSH="ssh ${SSH_OPTS}"
+            bootstrap_remote "${REPO_NAME}"
+        fi
+        ;;
+    bootstrap|setup)
+        shift
+        bootstrap_remote "${1:-${REPO_NAME}}"
+        ;;
+    release|destroy)
+        shift
+        run_vast_manager release "$@"
+        ;;
+    reboot|restart)
+        shift
+        run_vast_manager reboot "$@"
+        ;;
+    auto-release|cob)
+        shift
+        run_vast_manager auto-release "$@"
+        ;;
+    status|info)
+        shift
+        run_vast_manager status "$@"
+        ;;
+    sync|push)
+        acquire_lock "$@"
+        trap release_lock EXIT INT TERM
+        sync_code
+        echo "✅ Sync complete."
+        ;;
+    pull|fetch|get|download)
+        shift
+        if [ $# -eq 0 ]; then
+            echo "Usage: tools/anvil pull <remote_path> [local_dest]"
+            exit 1
+        fi
+        pull_file "$1" "$2"
+        ;;
+    recordings|previews)
+        shift
+        pull_recordings "$1"
+        ;;
+    stages|checkpoints)
+        shift
+        pull_stages "$1"
+        ;;
+    combine|merge)
+        shift
+        echo "✨ Combining staged RRD recordings..."
+        python -c "
+import sys, os, glob
+sys.path.insert(0, os.path.abspath('.'))
+from provider.utils import merge_rrd_recordings
+
+args = sys.argv[1:]
+out = 'recordings/sim_combined.rrd'
+inputs = []
+if '-o' in args:
+    idx = args.index('-o')
+    out = args[idx + 1]
+    inputs = args[:idx] + args[idx + 2:]
+else:
+    inputs = args
+
+if not inputs:
+    inputs = sorted(glob.glob('recordings/sim_*.rrd'))
+
+inputs = [f for f in inputs if os.path.abspath(f) != os.path.abspath(out)]
+if not inputs:
+    print('No input RRD files found to combine.')
+    sys.exit(1)
+
+merge_rrd_recordings(inputs, out)
+print(f'✅ Successfully merged {len(inputs)} recording(s) into {out}')
+" "$@"
+        ;;
+    kill|stop)
+        kill_remote_pytest
+        kill_remote_verify
+        kill_remote_daemon
+        echo "✅ Remote processes cleaned up on ${SSH_TARGET}."
+        ;;
+    pytest)
+        shift
+        acquire_lock "pytest $*"
+        trap 'kill_remote_pytest; release_lock' EXIT INT TERM
+        kill_remote_pytest
+        sync_code
+        echo "🧪 Running pytest on ${SSH_TARGET}..."
+        if [ $# -gt 0 ]; then
+            cmd_args=$(printf ' %q' "$@")
+        else
+            cmd_args=""
+        fi
+        worker_opt=""
+        if [[ "$*" != *"-n "* ]] && [[ "$*" != *"--numprocesses"* ]]; then
+            worker_opt=" -n 8"
+        fi
+        ssh ${SSH_OPTS} "${SSH_TARGET}" "cd ${REMOTE_DIR} && ${REMOTE_CARGO_PATH} && ${REMOTE_CONDA} taskset -c 0-7 pytest${worker_opt}${cmd_args}"
+        ;;
+    verify)
+        shift
+        acquire_lock "verify $*"
+        trap 'kill_remote_verify; release_lock' EXIT INT TERM
+        kill_remote_verify
+        sync_code
+        echo "🔍 Running pre-commit verification on ${SSH_TARGET}..."
+        ssh ${SSH_OPTS} "${SSH_TARGET}" "cd ${REMOTE_DIR} && ${REMOTE_CARGO_PATH} && taskset -c 0-7 ./tools/verify.sh $*"
+        ;;
+    cargo)
+        shift
+        acquire_lock "cargo $*"
+        trap release_lock EXIT INT TERM
+        sync_code
+        echo "🦀 Running cargo on ${SSH_TARGET}: cargo $*"
+        ssh ${SSH_OPTS} "${SSH_TARGET}" "cd ${REMOTE_DIR} && ${REMOTE_CARGO_PATH} && cargo $*"
+        ;;
+    cli)
+        shift
+        if [ $# -eq 0 ]; then
+            echo "Usage: tools/anvil cli <command...>"
+            exit 1
+        fi
+        acquire_lock "cli $*"
+        trap release_lock EXIT INT TERM
+        sync_code
+        echo "🔌 Reverse proxying host CLI to local daemon (127.0.0.1:8899) and executing on ${SSH_TARGET}..."
+        cmd_args=$(printf ' %q' "$@")
+        ssh ${SSH_OPTS} -R 8899:127.0.0.1:8899 "${SSH_TARGET}" "cd ${REMOTE_DIR} && ${REMOTE_CARGO_PATH} && ${REMOTE_CONDA} python tools/host.py cli${cmd_args}"
+        ;;
+    host)
+        shift
+        if [ $# -eq 0 ]; then
+            echo "Usage: tools/anvil host <subcommand...> [args...]"
+            exit 1
+        fi
+        acquire_lock "host $*"
+        trap release_lock EXIT INT TERM
+        sync_code
+        echo "🔌 Reverse proxying host command to local daemon (127.0.0.1:8899) and executing on ${SSH_TARGET}..."
+        cmd_args=$(printf ' %q' "$@")
+        ssh ${SSH_OPTS} -R 8899:127.0.0.1:8899 "${SSH_TARGET}" "cd ${REMOTE_DIR} && ${REMOTE_CARGO_PATH} && ${REMOTE_CONDA} python tools/host.py${cmd_args}"
+        ;;
+    simulate)
+        shift
+        acquire_lock "simulate $*"
+        trap 'kill_remote_daemon; release_lock' EXIT INT TERM
+        kill_remote_daemon
+        sync_code
+        echo "🌊 Running simulation on ${SSH_TARGET}..."
+        ssh ${SSH_OPTS} "${SSH_TARGET}" "cd ${REMOTE_DIR} && ${REMOTE_CONDA} python tools/view.py $*"
+        auto_download_simulate "$@"
+        ;;
+    smoke)
+        shift
+        acquire_lock "smoke $*"
+        trap 'kill_remote_daemon; release_lock' EXIT INT TERM
+        kill_remote_daemon
+        sync_code
+        echo "🚀 Running smoke test suite on ${SSH_TARGET}..."
+        ssh ${SSH_OPTS} "${SSH_TARGET}" "cd ${REMOTE_DIR} && ${REMOTE_CONDA} pytest -n 0 tools/smoke.py"
+        ;;
+    run|exec)
+        shift
+        acquire_lock "run $*"
+        trap release_lock EXIT INT TERM
+        sync_code
+        echo "⚡ Executing command on ${SSH_TARGET}: $*"
+        ssh ${SSH_OPTS} "${SSH_TARGET}" "cd ${REMOTE_DIR} && ${REMOTE_CARGO_PATH} && ${REMOTE_CONDA} $*"
+        ;;
+    *)
+        if [ $# -eq 0 ]; then
+            cat <<EOF
+Usage: tools/anvil <command> [args...]
+
+Instance Lifecycle Subcommands:
+  provision [--image ubuntu:22.04] [--disk 40] [--min-tops 50] [--max-cost 1.50]  Provision new Vast.ai instance and write ~/.anvil.env
+  bootstrap [all|firmware|hardware|ssd]          Install compilers, Rust, Miniforge, and Conda on remote VM
+  release [id]                                   Destroy rented instance and clear ~/.anvil.env
+  auto-release [--force]                         Check ~/.anvil.lock and release if idle or past COB
+  status [--json]                                Display current rented instance, host, port, and lock state
+
+Workspace Execution Subcommands:
+  sync                                           Sync local workspace to cloud container
+  pull <remote_path> [local_dest]                Download files/directories from cloud container
+  recordings [dir]                               Download preview artifacts and recordings
+  pytest [args...]                               Sync and run pytest in remote conda environment
+  verify [args...]                               Sync and run pre-commit verification on cloud container
+  cargo [args...]                                Sync and run cargo on cloud container (firmware)
+  cli <command...>                               Reverse proxy host CLI to local daemon (port 8899)
+  host <subcmd...>                               Reverse proxy host command to local daemon (port 8899)
+  simulate [args...]                             Run simulation on remote GPU and auto-download results
+  smoke                                          Run integration smoke test suite
+  run <command...>                               Sync and run arbitrary shell command on cloud container
+  stop / kill                                    Terminate remote running test and simulation processes
+EOF
+            exit 1
+        fi
+        acquire_lock "$*"
+        trap release_lock EXIT INT TERM
+        sync_code
+        echo "⚡ Executing command on ${SSH_TARGET}: $*"
+        ssh ${SSH_OPTS} "${SSH_TARGET}" "cd ${REMOTE_DIR} && ${REMOTE_CARGO_PATH} && ${REMOTE_CONDA} $*"
+        ;;
+esac

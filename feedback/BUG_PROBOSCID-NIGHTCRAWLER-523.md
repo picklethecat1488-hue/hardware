@@ -2,12 +2,13 @@
 
 - **UUID**: `5908e663-093a-415d-903a-0140e610a6d9`
 - **ID**: `BUG-PROBOSCID-NIGHTCRAWLER-523`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `PCB`
 - **Component**: `cat_fountain`
 - **Created**: `2026-10-11 00:15:58 UTC`
 - **Resolved**: `2026-10-11 00:35:15 UTC`
+- **Accepted**: `2026-10-11 00:35:15 UTC`
 
 #### Description
 

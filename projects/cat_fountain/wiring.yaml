@@ -232,9 +232,8 @@ components:
   - name: motor_driver
     package: board
     position: [50.0, 15.0, 23.0]
-    rotation: [0.0, 0.0, 0.0]
-    dimensions: [25.4, 20.3, 1.6]
-    mounting_holes: [22.86, 17.78]
+    rotation: [0.0, 0.0, 90.0]
+    dimensions: [20.32, 15.24, 1.6]
     label:
       text: "TMC6300"
       position: [15.0, 0.0, 0.0]
@@ -429,6 +428,26 @@ components:
         side: left
       - name: "OUT"
         label: "OUT"
+        side: right
+
+  - name: swd_adapter
+    package: board
+    position: [-50.0, -45.0, 23.0]
+    rotation: [0.0, 0.0, 90.0]
+    dimensions: [19.1, 13.7, 1.6]
+    label:
+      text: "SWD"
+      position: [12.0, 0.0, 0.0]
+      align: [min, center]
+    pins:
+      - name: "SWDIO"
+        label: "SWDIO"
+        side: right
+      - name: "GND"
+        label: "GND"
+        side: right
+      - name: "SWCLK"
+        label: "SWCLK"
         side: right
 
 nets:

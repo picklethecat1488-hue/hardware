@@ -2,12 +2,13 @@
 
 - **UUID**: `de47601c-3520-4c46-aab0-5ac7598e5967`
 - **ID**: `BUG-WRITHING-VERMIS-367`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `flex_tail`
 - **Created**: `2026-10-14 17:03:15 UTC`
 - **Resolved**: `2026-10-14 17:16:03 UTC`
+- **Accepted**: `2026-10-14 17:16:03 UTC`
 
 #### Description
 

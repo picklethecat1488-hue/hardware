@@ -16,6 +16,17 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
   <link rel="shortcut icon" href="/static/favicon.ico">
   <link rel="stylesheet" href="/static/common.css">
+  <script>
+    if (window.top && window.top !== window) {
+      window.top.location.href = window.location.href;
+    }
+    if (window.self !== window.top) {
+      document.documentElement.classList.add("in-iframe");
+      window.addEventListener("DOMContentLoaded", () => {
+        if (document.body) document.body.classList.add("in-iframe");
+      });
+    }
+  </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/monokai-sublime.min.css">
   <script src="/static/highlight.min.js"></script>
   <script>
@@ -72,6 +83,18 @@
       overflow: hidden;
       border: 2px solid var(--quake-border-mid);
       box-shadow: inset 0 0 0 1px rgba(255, 184, 0, 0.2), 0 0 10px rgba(200, 122, 50, 0.1);
+    }
+
+    html.in-iframe,
+    html.in-iframe body,
+    body.in-iframe {
+      border: none !important;
+      box-shadow: none !important;
+    }
+    html.in-iframe .window-resize-gripper,
+    body.in-iframe .window-resize-gripper,
+    .in-iframe .window-resize-gripper {
+      display: none !important;
     }
 
     /* Window Resize Gripper (WORM-027) */
@@ -1090,7 +1113,7 @@
       <!-- UI Scale Selector (8715cab2) -->
       <div style="display:flex;align-items:center;gap:4px;border-left:1px solid var(--quake-border-mid);padding-left:6px;">
         <span style="font-size:8px;color:var(--quake-text-dim);">SCALE:</span>
-        <select id="uiScaleSelect" class="quake-select" onchange="onUiScaleChange(this.value)" title="UI Scale (Shortcuts: Cmd/Ctrl +/- or 0 to reset)" style="padding: 2px 4px; font-size: 9px; height: 22px;">
+        <select id="uiScaleSelect" class="quake-select" onchange="onUiScaleChange(this.value)" title="UI Scale (Shortcuts: Cmd/Ctrl +/- or 0 to reset)" style="padding: 2px 4px; font-size: 8.5px; height: 22px;">
           <option value="75%">75%</option>
           <option value="80%">80%</option>
           <option value="90%">90%</option>
@@ -1149,7 +1172,7 @@
 
       <div class="column-scroll hide-merged" id="smartlogList">
         <!-- Working Tree Node -->
-        <div class="smartlog-node {% if session.active_commit == 'working' %}active{% endif %}" id="node-working" onclick="selectCommit('working')">
+        <div class="smartlog-node {% if session.active_commit == 'working' %}active{% endif %}" id="node-working" data-hash="working" onclick="selectCommit('working', event)">
           <div class="node-header-row">
             <span class="node-graph-art">@</span>
             <span class="node-sha" style="color:var(--quake-cyan);">WORKING TREE</span>
@@ -1418,6 +1441,33 @@
     </div>
   </div>
 
+  <!-- ACTION PROGRESS MODAL (BUG-327) -->
+  <div id="actionProgressModalOverlay" class="quake-modal-overlay" style="display: none; z-index: 2000;">
+    <div class="quake-modal" style="width: 480px; max-width: 90vw; padding: 20px 24px; text-align: left;">
+      <div class="quake-modal-header" style="padding: 0 0 12px 0; margin-bottom: 12px; border-bottom: 1px solid var(--quake-border-mid); background: transparent;">
+        <div style="font-size: 11px; font-weight: bold; color: var(--quake-gold); letter-spacing: 1px; display: flex; align-items: center; gap: 8px;">
+          <span id="actionProgressIcon">⚡</span>
+          <span id="actionProgressTitle">PROCESSING ACTION</span>
+        </div>
+      </div>
+
+      <div style="font-size: 9px; color: var(--quake-text-muted); margin-bottom: 12px; line-height: 1.4;" id="actionProgressDescription">
+        Executing requested operation...
+      </div>
+
+      <!-- Progress bar -->
+      <div style="background: var(--quake-bg-dark); border: 1px solid var(--quake-border-light); border-radius: 3px; height: 16px; position: relative; overflow: hidden; margin-bottom: 12px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.6);">
+        <div id="actionProgressBar" style="width: 15%; height: 100%; background: linear-gradient(90deg, #ffaa00, #ff8800); transition: width 0.3s ease; box-shadow: 0 0 10px rgba(255,170,0,0.5);"></div>
+        <div id="actionProgressPercent" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #fff; text-shadow: 0 1px 2px #000;">15%</div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9px; color: var(--quake-copper); font-family: var(--font-mono); font-weight: bold;">
+        <span id="actionProgressStatus">Working...</span>
+        <span id="actionProgressElapsed" style="color: var(--quake-text-dim);">0.0s</span>
+      </div>
+    </div>
+  </div>
+
   <!-- COMMIT / AMEND MODAL (BUG-185) -->
   <div id="commitModalOverlay" class="quake-modal-overlay" onclick="if(event.target===this) closeCommitModal()">
     <div class="quake-modal">
@@ -1509,6 +1559,7 @@
   {% include "diff_component.html.j2" %}
 
   <script>
+    window.name = "{{ session.repo_name or 'hardware' }}_vcs_diff_viewer";
     // State Model
     const state = {
       repoName: "{{ session.repo_name or 'hardware' }}",
@@ -1717,16 +1768,45 @@
 
       // Update active classes
       document.querySelectorAll(".smartlog-node").forEach(el => el.classList.remove("active"));
-      const activeEl = commitHash === "working"
-        ? document.getElementById("node-working")
-        : document.getElementById("node-" + commitHash.slice(0, 7));
-      if (activeEl) activeEl.classList.add("active");
+      let activeEl = null;
+      if (commitHash === "working") {
+        activeEl = document.getElementById("node-working") || document.querySelector('.smartlog-node[data-hash="working"]');
+      } else {
+        if (event && event.currentTarget && event.currentTarget.classList && event.currentTarget.classList.contains("smartlog-node")) {
+          activeEl = event.currentTarget;
+        } else if (event && event.target && event.target.closest) {
+          activeEl = event.target.closest(".smartlog-node");
+        }
+        if (!activeEl) {
+          activeEl = document.querySelector(`.smartlog-node[data-hash="${commitHash}"]`);
+        }
+        if (!activeEl) {
+          activeEl = document.querySelector(`.smartlog-node[data-hash^="${commitHash}"]`);
+        }
+        if (!activeEl) {
+          activeEl = document.getElementById("node-" + commitHash);
+        }
+      }
+      if (activeEl) {
+        activeEl.classList.add("active");
+        if (activeEl.dataset && activeEl.dataset.hash && activeEl.dataset.hash !== "working") {
+          state.activeCommit = activeEl.dataset.hash;
+        }
+      }
 
       // Toggle commit box
       const commitArea = document.getElementById("workingTreeCommitArea");
-      commitArea.style.display = commitHash === "working" ? "flex" : "none";
+      if (commitArea) {
+        commitArea.style.display = commitHash === "working" ? "flex" : "none";
+      }
 
-      document.getElementById("filesHeaderTitle").textContent = commitHash === "working" ? "Working Tree Files" : `Files (${commitHash.slice(0, 7)})`;
+      const shortSha = activeEl && activeEl.querySelector(".node-sha")
+        ? activeEl.querySelector(".node-sha").textContent.trim()
+        : (commitHash.length > 8 ? commitHash.slice(0, 8) : commitHash);
+      const filesTitle = document.getElementById("filesHeaderTitle");
+      if (filesTitle) {
+        filesTitle.textContent = commitHash === "working" ? "Working Tree Files" : `Files (${shortSha})`;
+      }
 
       await loadFilesForActiveCommit();
     }
@@ -1760,7 +1840,7 @@
 
     function startAutoSync() {
       if (autoSyncTimer) clearInterval(autoSyncTimer);
-      autoSyncTimer = setInterval(syncWorkingAndCommitsSilently, 2500);
+      autoSyncTimer = setInterval(syncWorkingAndCommitsSilently, 10000);
       document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "visible") {
           syncWorkingAndCommitsSilently();
@@ -1834,7 +1914,7 @@
 
       let html = `
         <!-- Working Tree Node -->
-        <div class="smartlog-node ${state.activeCommit === 'working' ? 'active' : ''}" id="node-working" onclick="selectCommit('working')">
+        <div class="smartlog-node ${state.activeCommit === 'working' ? 'active' : ''}" id="node-working" data-hash="working" onclick="selectCommit('working', event)">
           <div class="node-header-row">
             <span class="node-graph-art">@</span>
             <span class="node-sha" style="color:var(--quake-cyan);">WORKING TREE</span>
@@ -1848,7 +1928,7 @@
         const isHead = node.is_head ? "head-node" : "";
         const isAncestorTop = node.is_ancestor_top ? "ancestor-top-node" : "";
         const hasPr = node.pr_number ? "has-pr" : "";
-        const isActive = state.activeCommit === node.commit_hash ? "active" : "";
+        const isActive = (state.activeCommit === node.commit_hash || (state.activeCommit && state.activeCommit !== "working" && node.commit_hash.startsWith(state.activeCommit))) ? "active" : "";
         const isMerged = (node.is_merged_into_tracking || node.is_merged) ? "merged-commit" : "";
         const isChecked = state.selectedCommits && state.selectedCommits.includes(node.commit_hash);
         const isSelected = isChecked ? "selected" : "";
@@ -2189,7 +2269,7 @@
 
       // Auto-select first file if none selected
       if (!state.activeFile) {
-        const first = conflicts[0]?.path || lfs[0]?.path || staged[0]?.path || unstaged[0]?.path || untracked[0]?.path || feedback[0]?.path;
+        const first = conflicts[0]?.path || staged[0]?.path || unstaged[0]?.path || untracked[0]?.path || lfs[0]?.path || feedback[0]?.path;
         if (first) selectFile(first);
       }
     }
@@ -2269,7 +2349,7 @@
 
       // Auto select first file
       if (!state.activeFile) {
-        const first = lfs[0]?.path || regular[0]?.path || feedback[0]?.path;
+        const first = regular[0]?.path || lfs[0]?.path || feedback[0]?.path;
         if (first) selectFile(first);
       }
     }
@@ -2682,6 +2762,81 @@
       }
     }
 
+    // Action Progress Modal Management (BUG-327)
+    let actionProgressTimer = null;
+    let actionProgressInterval = null;
+
+    async function runWithActionModal(options, asyncFn) {
+      const thresholdMs = (options && options.delayMs !== undefined) ? options.delayMs : 1000;
+      const overlay = document.getElementById("actionProgressModalOverlay");
+      const titleEl = document.getElementById("actionProgressTitle");
+      const descEl = document.getElementById("actionProgressDescription");
+      const statusEl = document.getElementById("actionProgressStatus");
+      const elapsedEl = document.getElementById("actionProgressElapsed");
+      const barEl = document.getElementById("actionProgressBar");
+      const percentEl = document.getElementById("actionProgressPercent");
+      const iconEl = document.getElementById("actionProgressIcon");
+
+      let isModalVisible = false;
+      const startTime = Date.now();
+      let progress = 15;
+
+      if (actionProgressTimer) {
+        clearTimeout(actionProgressTimer);
+        actionProgressTimer = null;
+      }
+      if (actionProgressInterval) {
+        clearInterval(actionProgressInterval);
+        actionProgressInterval = null;
+      }
+
+      actionProgressTimer = setTimeout(() => {
+        if (!overlay) return;
+        isModalVisible = true;
+        if (titleEl) titleEl.textContent = (options && options.title) || "PROCESSING ACTION";
+        if (descEl) descEl.textContent = (options && options.description) || "Please wait while the operation completes...";
+        if (statusEl) statusEl.textContent = (options && options.stepText) || "Working...";
+        if (iconEl && options && options.icon) iconEl.textContent = options.icon;
+        if (barEl) barEl.style.width = "20%";
+        if (percentEl) percentEl.textContent = "20%";
+        if (elapsedEl) elapsedEl.textContent = ((Date.now() - startTime) / 1000).toFixed(1) + "s";
+        overlay.style.display = "flex";
+
+        actionProgressInterval = setInterval(() => {
+          const elapsedSec = ((Date.now() - startTime) / 1000).toFixed(1);
+          if (elapsedEl) elapsedEl.textContent = `${elapsedSec}s`;
+          if (progress < 90) {
+            progress += Math.floor(Math.random() * 6) + 2;
+            if (progress > 90) progress = 90;
+            if (barEl) barEl.style.width = `${progress}%`;
+            if (percentEl) percentEl.textContent = `${progress}%`;
+          }
+        }, 200);
+      }, thresholdMs);
+
+      try {
+        const result = await asyncFn();
+        return result;
+      } finally {
+        if (actionProgressTimer) {
+          clearTimeout(actionProgressTimer);
+          actionProgressTimer = null;
+        }
+        if (actionProgressInterval) {
+          clearInterval(actionProgressInterval);
+          actionProgressInterval = null;
+        }
+        if (isModalVisible && overlay) {
+          if (barEl) barEl.style.width = "100%";
+          if (percentEl) percentEl.textContent = "100%";
+          if (statusEl) statusEl.textContent = "Complete!";
+          setTimeout(() => {
+            overlay.style.display = "none";
+          }, 250);
+        }
+      }
+    }
+
     async function submitCommitModal() {
       const msg = document.getElementById("modalCommitMessage").value.trim();
       if (!msg) {
@@ -2695,22 +2850,29 @@
       }
 
       const endpoint = state.isAmendMode ? "/api/amend" : "/api/commit";
-      try {
-        const resp = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: msg, files: selectedFiles })
-        });
-        const res = await resp.json();
-        if (res.error) showToast("Commit failed: " + res.error);
-        else {
-          showToast((state.isAmendMode ? "Amended " : "Committed ") + res.commit_hash.slice(0, 7));
-          closeCommitModal();
-          setTimeout(() => location.reload(), 500);
+      await runWithActionModal({
+        title: state.isAmendMode ? "AMENDING COMMIT" : "CREATING COMMIT",
+        description: state.isAmendMode ? "Amending current HEAD commit with selected changes..." : "Creating new commit with selected staged changes...",
+        stepText: state.isAmendMode ? "Amending commit..." : "Writing commit tree...",
+        icon: "📦"
+      }, async () => {
+        try {
+          const resp = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: msg, files: selectedFiles })
+          });
+          const res = await resp.json();
+          if (res.error) showToast("Commit failed: " + res.error);
+          else {
+            showToast((state.isAmendMode ? "Amended " : "Committed ") + res.commit_hash.slice(0, 7));
+            closeCommitModal();
+            setTimeout(() => location.reload(), 500);
+          }
+        } catch (err) {
+          showToast("Commit failed: " + err);
         }
-      } catch (err) {
-        showToast("Commit failed: " + err);
-      }
+      });
     }
 
     // Merge Conflicts
@@ -2735,19 +2897,26 @@
     // HUD Actions: Sync, Branch, Goto
     async function onSyncClicked() {
       const spinner = document.getElementById("syncSpinner");
-      spinner.style.display = "inline";
+      if (spinner) spinner.style.display = "inline";
       showToast("Syncing repository from remote...");
 
-      try {
-        const resp = await fetch("/api/sync", { method: "POST" });
-        const res = await resp.json();
-        spinner.style.display = "none";
-        showToast(res.message || "Sync completed.");
-        setTimeout(() => location.reload(), 1000);
-      } catch (err) {
-        spinner.style.display = "none";
-        showToast("Sync failed: " + err);
-      }
+      await runWithActionModal({
+        title: "SYNCHRONIZING REPOSITORY",
+        description: "Pulling latest changes from remote and synchronizing review branches...",
+        stepText: "Connecting to remote...",
+        icon: "🔄"
+      }, async () => {
+        try {
+          const resp = await fetch("/api/sync", { method: "POST" });
+          const res = await resp.json();
+          if (spinner) spinner.style.display = "none";
+          showToast(res.message || "Sync completed.");
+          setTimeout(() => location.reload(), 1000);
+        } catch (err) {
+          if (spinner) spinner.style.display = "none";
+          showToast("Sync failed: " + err);
+        }
+      });
     }
 
     async function onRebaseClicked() {
@@ -2755,24 +2924,31 @@
       if (spinner) spinner.style.display = "inline";
       showToast("Rebasing onto ancestor branch...");
 
-      try {
-        const resp = await fetch("/api/rebase", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({})
-        });
-        const res = await resp.json();
-        if (spinner) spinner.style.display = "none";
-        if (res.status === "ok") {
-          showToast(res.message || "Rebase completed.");
-          setTimeout(() => location.reload(), 1000);
-        } else {
-          showToast("Rebase failed: " + (res.message || "Unknown error"), 5000);
+      await runWithActionModal({
+        title: "REBASING COMMITS",
+        description: "Rebasing local commits onto target ancestor branch...",
+        stepText: "Rebasing branch...",
+        icon: "⎇"
+      }, async () => {
+        try {
+          const resp = await fetch("/api/rebase", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({})
+          });
+          const res = await resp.json();
+          if (spinner) spinner.style.display = "none";
+          if (res.status === "ok") {
+            showToast(res.message || "Rebase completed.");
+            setTimeout(() => location.reload(), 1000);
+          } else {
+            showToast("Rebase failed: " + (res.message || "Unknown error"), 5000);
+          }
+        } catch (err) {
+          if (spinner) spinner.style.display = "none";
+          showToast("Rebase failed: " + err, 5000);
         }
-      } catch (err) {
-        if (spinner) spinner.style.display = "none";
-        showToast("Rebase failed: " + err, 5000);
-      }
+      });
     }
 
     // Branch Selection & Formatting (BUG-197, BUG-221)
@@ -3523,11 +3699,19 @@
       }
       const filesTitle = document.getElementById("filesHeaderTitle");
       if (filesTitle) {
-        filesTitle.textContent = state.activeCommit === "working" ? "Working Tree Files" : `Files (${state.activeCommit.slice(0, 7)})`;
+        const initialActiveNode = document.querySelector(".smartlog-node.active .node-sha");
+        const initialSha = initialActiveNode ? initialActiveNode.textContent.trim() : (state.activeCommit.length > 8 ? state.activeCommit.slice(0, 8) : state.activeCommit);
+        filesTitle.textContent = state.activeCommit === "working" ? "Working Tree Files" : `Files (${initialSha})`;
       }
 
       loadFilesForActiveCommit();
       startAutoSync();
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlCommit = urlParams.get("commit") || urlParams.get("goto");
+      if (urlCommit && urlCommit !== state.activeCommit) {
+        selectCommit(urlCommit);
+      }
     }
 
     if (document.readyState === "loading") {

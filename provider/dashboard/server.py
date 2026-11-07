@@ -15,6 +15,7 @@ from pathlib import Path
 import re
 import socket
 import sqlite3
+import subprocess
 import sys
 from typing import Any, Dict, List, Optional
 import urllib.parse
@@ -28,6 +29,8 @@ from model.bug_report import (
     BugReportModel,
     BugSeverity,
     BugStatus,
+    ReviewTaskModel,
+    ReviewTaskStatus,
 )
 from model.code_review import CommentModel, ReviewSessionModel, ReviewSeverity, ReviewStatus
 from model.vcs import (
@@ -39,7 +42,7 @@ from model.vcs import (
     MergeConflictFileModel,
     WorkingTreeFileModel,
 )
-from provider.bug_report.server import BugReportServer
+from provider.bug_report.server import BugReportServer, MAX_ATTACHMENT_SIZE_BYTES
 from provider.code_review.server import ReviewServer
 from provider.sanitizer import get_author_blacklist
 from provider.vcs.git_engine import GitEngine, extract_line_snippet, get_git_root
@@ -158,7 +161,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             case "/eel.js":
                 self._handle_serve_eel_js()
             case "/" | "/index.html":
-                self._handle_serve_diff_ui()
+                self._handle_serve_diff_ui(query)
             case "/review" | "/review/":
                 self._handle_serve_review_ui(query)
             case "/bugs" | "/bugs/":
@@ -311,21 +314,37 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         path = parsed.path
 
         content_len = int(self.headers.get("Content-Length", 0))
-        body = self.rfile.read(content_len).decode("utf-8") if content_len > 0 else "{}"
+        if content_len >= MAX_ATTACHMENT_SIZE_BYTES:
+            self.send_error(413, "Payload Too Large: Request exceeds maximum allowed size of 2 GB (GitHub LFS limit)")
+            return
+
         try:
+            body = self.rfile.read(content_len).decode("utf-8") if content_len > 0 else "{}"
             data = json.loads(body) if body else {}
+        except (MemoryError, OverflowError):
+            self.send_error(413, "Payload Too Large: Insufficient memory to process request payload")
+            return
         except json.JSONDecodeError:
             self._send_json({"error": "Invalid JSON body"}, status=400)
             return
 
         match path:
             case "/api/sync":
-                res = self.server.git_engine.sync_repo()
+                feedback_res = {}
                 try:
                     feedback_res = self.server.sync_feedback()
-                    res["feedback"] = feedback_res
+                except Exception as e:
+                    feedback_res = {"error": str(e)}
+
+                res = self.server.git_engine.sync_repo(push=True)
+                res["feedback"] = feedback_res
+
+                # Re-sync feedback if remote detached branch introduced new/updated markdown files
+                try:
+                    self.server.sync_feedback()
                 except Exception:
                     pass
+
                 self._send_json(res)
             case "/api/rebase":
                 upstream = data.get("upstream") if isinstance(data, dict) else None
@@ -503,8 +522,24 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 self._handle_commit_update(data)
             case "/api/bugs" | "/api/bug/save":
                 self._handle_save_bug(data)
+            case "/api/bugs/status" | "/api/bug/status":
+                self._handle_update_status(data)
+            case "/api/bugs/accept" | "/api/bug/accept":
+                self._handle_accept_bug(data)
+            case "/api/bugs/reject" | "/api/bug/reject":
+                self._handle_reject_bug(data)
+            case "/api/bugs/attach_commit" | "/api/bug/attach_commit":
+                self._handle_attach_commit(data)
+            case "/api/bugs/add_task" | "/api/bug/add_task":
+                self._handle_add_task(data)
+            case "/api/bugs/update_task" | "/api/bug/update_task":
+                self._handle_update_task(data)
+            case "/api/bugs/run_command" | "/api/bug/run_command":
+                self._handle_run_command(data)
             case "/api/bugs/delete":
                 self._handle_delete_bug(data)
+            case "/api/bugs/migrate_legacy" | "/api/bug/migrate_legacy":
+                self._handle_migrate_legacy(data)
             case "/api/upload":
                 self._handle_file_upload(data)
             case "/api/exit":
@@ -538,7 +573,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             case _:
                 self.send_error(404, "Endpoint not found")
 
-    def _handle_serve_diff_ui(self) -> None:
+    def _handle_serve_diff_ui(self, query: Optional[Dict[str, List[str]]] = None) -> None:
         """Render and return Jinja2 VCS diff view dashboard template."""
         templates_dir = Path(__file__).resolve().parent.parent / "templates"
         env = jinja2.Environment(
@@ -549,10 +584,14 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         )
         template = env.get_template("diff_view.html.j2")
         session = self.server.build_session()
+        commit_param = ""
+        if query:
+            commit_param = query.get("commit", [""])[0] or query.get("goto", [""])[0]
+        active_commit = commit_param or self.server.active_commit
         html_out = template.render(
             session=session,
             active_branch=self.server.active_branch,
-            active_commit=self.server.active_commit,
+            active_commit=active_commit,
         )
         self._send_html(html_out)
 
@@ -686,15 +725,19 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         mime_type, _ = mimetypes.guess_type(str(file_target))
         if not mime_type:
             mime_type = "application/octet-stream"
-        content = file_target.read_bytes()
+        file_size = file_target.stat().st_size
         try:
             self.send_response(200)
             self.send_header("Content-Type", mime_type)
-            self.send_header("Content-Length", str(len(content)))
+            self.send_header("Content-Length", str(file_size))
             self.send_header("Connection", "close")
             self.end_headers()
-            self.wfile.write(content)
+            with open(file_target, "rb") as f:
+                while chunk := f.read(64 * 1024):
+                    self.wfile.write(chunk)
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
+        finally:
             self.close_connection = True
 
     def _handle_add_comment(self, data: Dict[str, Any]) -> None:
@@ -911,6 +954,217 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         self.server.bug_server.save_and_sync()
         self._send_json({"status": "deleted", "id": bug_id})
 
+    def _handle_update_status(self, data: Dict[str, Any]) -> None:
+        """Update lifecycle status and resolution notes for a bug."""
+        bug_id = data.get("id") or data.get("bug_id")
+        new_status_str = data.get("status")
+        notes = data.get("resolution_notes")
+
+        bug = self.server.bug_server.database.get_bug(bug_id) if bug_id else None
+        if not bug:
+            self._send_json({"error": f"Bug {bug_id} not found"}, status=404)
+            return
+
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        if new_status_str and new_status_str in [s.value for s in BugStatus]:
+            bug.status = BugStatus(new_status_str)
+            if bug.status in (BugStatus.RESOLVED, BugStatus.CLOSED):
+                bug.resolved_at = now_str
+            else:
+                bug.resolved_at = None
+
+        if notes is not None:
+            bug.resolution_notes = notes
+
+        bug.updated_at = now_str
+        self.server.bug_server.save_and_sync(dirty_bug_ids=[bug.id])
+        self._send_json(bug.model_dump(mode="json"))
+
+    def _handle_accept_bug(self, data: Dict[str, Any]) -> None:
+        """Handle accepting a resolved bug and transitioning directly to CLOSED."""
+        bug_id = data.get("id") or data.get("bug_id")
+        notes = data.get("notes", "").strip()
+        bug = self.server.bug_server.database.get_bug(bug_id) if bug_id else None
+        if not bug:
+            self._send_json({"error": f"Bug {bug_id} not found"}, status=404)
+            return
+
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        bug.status = BugStatus.CLOSED
+        bug.accepted_at = now_str
+        if notes:
+            if bug.resolution_notes:
+                bug.resolution_notes += f"\n\n**Acceptance Note**: {notes}"
+            else:
+                bug.resolution_notes = f"**Acceptance Note**: {notes}"
+        bug.updated_at = now_str
+        self.server.bug_server.save_and_sync(dirty_bug_ids=[bug.id])
+        self._send_json({"status": "ok", "bug": bug.model_dump(mode="json")})
+
+    def _handle_reject_bug(self, data: Dict[str, Any]) -> None:
+        """Handle rejecting a resolved bug and transitioning directly back to OPEN."""
+        bug_id = data.get("id") or data.get("bug_id")
+        notes = data.get("notes", "").strip()
+        bug = self.server.bug_server.database.get_bug(bug_id) if bug_id else None
+        if not bug:
+            self._send_json({"error": f"Bug {bug_id} not found"}, status=404)
+            return
+
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        bug.status = BugStatus.OPEN
+        bug.resolved_at = None
+        bug.rejected_at = now_str
+        bug.rejection_notes = notes
+        bug.updated_at = now_str
+        self.server.bug_server.save_and_sync(dirty_bug_ids=[bug.id])
+        self._send_json({"status": "ok", "bug": bug.model_dump(mode="json")})
+
+    def _handle_migrate_legacy(self, data: Dict[str, Any]) -> None:
+        """Handle migrating legacy resolved bugs to CLOSED status."""
+        before_ts = data.get("before", "2026-11-05 14:00:00 UTC")
+        migrate_all = bool(data.get("all", False))
+        exclude_raw = data.get("exclude", [])
+        exclude_ids = set(exclude_raw if isinstance(exclude_raw, list) else str(exclude_raw).split(","))
+        dry_run = bool(data.get("dry_run", False))
+
+        candidates = []
+        for b in self.server.bug_server.database.bugs:
+            if b.status == BugStatus.RESOLVED and not b.accepted_at:
+                if b.id.upper() in {x.upper().strip() for x in exclude_ids if x.strip()}:
+                    continue
+                if not migrate_all and before_ts:
+                    check_ts = b.resolved_at or b.updated_at or b.created_at
+                    if check_ts and check_ts > before_ts:
+                        continue
+                candidates.append(b)
+
+        if dry_run:
+            self._send_json(
+                {
+                    "status": "ok",
+                    "dry_run": True,
+                    "count": len(candidates),
+                    "migrated_ids": [b.id for b in candidates],
+                }
+            )
+            return
+
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        migrated_ids = []
+        for b in candidates:
+            b.status = BugStatus.CLOSED
+            b.accepted_at = b.resolved_at or b.updated_at or b.created_at or now_str
+            b.updated_at = now_str
+            migrated_ids.append(b.id)
+
+        if migrated_ids:
+            self.server.bug_server.save_and_sync(dirty_bug_ids=migrated_ids)
+
+        self._send_json(
+            {
+                "status": "ok",
+                "dry_run": False,
+                "count": len(migrated_ids),
+                "migrated_ids": migrated_ids,
+            }
+        )
+
+    def _handle_attach_commit(self, data: Dict[str, Any]) -> None:
+        """Attach a commit hash to a bug report."""
+        bug_id = data.get("id") or data.get("bug_id")
+        commit_id = data.get("commit_id", "").strip()
+        bug = self.server.bug_server.database.get_bug(bug_id) if bug_id else None
+        if not bug:
+            self._send_json({"error": f"Bug {bug_id} not found"}, status=404)
+            return
+        if not commit_id:
+            self._send_json({"error": "Missing commit_id"}, status=400)
+            return
+
+        if commit_id not in bug.commit_ids:
+            bug.commit_ids.append(commit_id)
+
+        bug.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        self.server.bug_server.save_and_sync(dirty_bug_ids=[bug.id])
+        self._send_json({"status": "ok", "bug": bug.model_dump(mode="json")})
+
+    def _handle_add_task(self, data: Dict[str, Any]) -> None:
+        """Add a review task to a bug report."""
+        bug_id = data.get("id") or data.get("bug_id")
+        title = data.get("title", "").strip()
+        cmd = data.get("command", "").strip()
+        bug = self.server.bug_server.database.get_bug(bug_id) if bug_id else None
+        if not bug:
+            self._send_json({"error": f"Bug {bug_id} not found"}, status=404)
+            return
+        if not title:
+            self._send_json({"error": "Missing task title"}, status=400)
+            return
+
+        task = ReviewTaskModel(title=title, command=cmd)
+        bug.review_tasks.append(task)
+        bug.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        self.server.bug_server.save_and_sync(dirty_bug_ids=[bug.id])
+        self._send_json({"status": "ok", "task": task.model_dump(mode="json"), "bug": bug.model_dump(mode="json")})
+
+    def _handle_update_task(self, data: Dict[str, Any]) -> None:
+        """Update review task status or notes."""
+        bug_id = data.get("id") or data.get("bug_id")
+        task_id = data.get("task_id")
+        new_status = data.get("status")
+        notes = data.get("notes")
+        bug = self.server.bug_server.database.get_bug(bug_id) if bug_id else None
+        if not bug:
+            self._send_json({"error": f"Bug {bug_id} not found"}, status=404)
+            return
+
+        target_task = None
+        for t in bug.review_tasks:
+            if t.id == task_id:
+                target_task = t
+                break
+
+        if not target_task:
+            self._send_json({"error": f"Task {task_id} not found"}, status=404)
+            return
+
+        if new_status:
+            try:
+                target_task.status = ReviewTaskStatus(str(new_status).upper())
+            except ValueError:
+                target_task.status = ReviewTaskStatus.PENDING
+        if notes is not None:
+            target_task.notes = str(notes)
+
+        bug.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        self.server.bug_server.save_and_sync(dirty_bug_ids=[bug.id])
+        self._send_json(
+            {"status": "ok", "task": target_task.model_dump(mode="json"), "bug": bug.model_dump(mode="json")}
+        )
+
+    def _handle_run_command(self, data: Dict[str, Any]) -> None:
+        """Execute a review command and return output."""
+        cmd = data.get("command", "").strip()
+        if not cmd:
+            self._send_json({"error": "Empty command"}, status=400)
+            return
+
+        proc = subprocess.run(
+            cmd,
+            shell=True,
+            cwd=str(self.server.repo_root),
+            capture_output=True,
+            text=True,
+        )
+        self._send_json(
+            {
+                "status": "ok" if proc.returncode == 0 else "error",
+                "exit_code": proc.returncode,
+                "stdout": proc.stdout,
+                "stderr": proc.stderr,
+            }
+        )
+
     def _handle_file_upload(self, data: Dict[str, Any]) -> None:
         """Save base64 encoded file upload to attachments directory."""
         filename = data.get("filename", f"attachment_{uuid.uuid4().hex[:8]}.txt")
@@ -939,15 +1193,47 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             filename = f"{stem}_{counter}{suffix}"
             dest_path = dest_dir / filename
 
-        if b64_content:
-            file_bytes = base64.b64decode(b64_content)
-            dest_path.write_bytes(file_bytes)
-        elif text_content:
-            file_bytes = text_content.encode("utf-8")
-            dest_path.write_bytes(file_bytes)
-        else:
-            file_bytes = b""
-            dest_path.write_bytes(file_bytes)
+        if b64_content and (len(b64_content) * 3) // 4 >= MAX_ATTACHMENT_SIZE_BYTES:
+            self._send_json(
+                {"error": "Payload Too Large: Attachment exceeds 2 GB limit (GitHub LFS limit)"},
+                status=413,
+            )
+            return
+        if text_content and len(text_content.encode("utf-8")) >= MAX_ATTACHMENT_SIZE_BYTES:
+            self._send_json(
+                {"error": "Payload Too Large: Attachment exceeds 2 GB limit (GitHub LFS limit)"},
+                status=413,
+            )
+            return
+
+        try:
+            if b64_content:
+                file_bytes = base64.b64decode(b64_content)
+                if len(file_bytes) >= MAX_ATTACHMENT_SIZE_BYTES:
+                    self._send_json(
+                        {"error": "Payload Too Large: Attachment exceeds 2 GB limit (GitHub LFS limit)"},
+                        status=413,
+                    )
+                    return
+                dest_path.write_bytes(file_bytes)
+            elif text_content:
+                file_bytes = text_content.encode("utf-8")
+                if len(file_bytes) >= MAX_ATTACHMENT_SIZE_BYTES:
+                    self._send_json(
+                        {"error": "Payload Too Large: Attachment exceeds 2 GB limit (GitHub LFS limit)"},
+                        status=413,
+                    )
+                    return
+                dest_path.write_bytes(file_bytes)
+            else:
+                file_bytes = b""
+                dest_path.write_bytes(file_bytes)
+        except (MemoryError, OverflowError):
+            self._send_json(
+                {"error": "Payload Too Large: Insufficient memory to decode attachment payload"},
+                status=413,
+            )
+            return
 
         rel_path = (
             dest_path.relative_to(self.server.repo_root)

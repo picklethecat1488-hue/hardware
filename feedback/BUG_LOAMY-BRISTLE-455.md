@@ -2,12 +2,13 @@
 
 - **UUID**: `09c3136e-35c6-442e-9708-46ac711fa0ed`
 - **ID**: `BUG-LOAMY-BRISTLE-455`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `sanitizer`
 - **Created**: `2026-10-15 00:37:10 UTC`
 - **Resolved**: `2026-10-15 00:37:11 UTC`
+- **Accepted**: `2026-10-15 00:37:11 UTC`
 
 #### Description
 

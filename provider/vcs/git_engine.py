@@ -97,9 +97,11 @@ def is_file_ignored(file_path: str) -> bool:
     Returns:
         True if file is in IGNORED_REVIEW_FILES, in feedback/ directory, or matches ignored patterns.
     """
-    clean = file_path.replace("\\", "/").strip().lstrip("./")
+    clean = file_path.strip().strip('"').strip("'").replace("\\", "/").strip().lstrip("./")
     p = Path(clean)
     if "feedback" in p.parts:
+        return True
+    if "attachments" in p.parts:
         return True
     if p.name in IGNORED_REVIEW_FILES or clean in IGNORED_REVIEW_FILES:
         return True
@@ -171,6 +173,7 @@ class GitEngine:
         self._commit_diff_cache: Dict[str, Tuple[int, int, int, bool]] = {}
         self._commit_stat_cache: Dict[str, Tuple[int, int, int, List[str]]] = {}
         self._bug_tag_cache: Dict[str, Dict[str, str]] = {}
+        self._file_diff_cache: Dict[Tuple[str, str], FileDiffModel] = {}
 
     def get_head_commit(self) -> str:
         """Retrieve the commit hash of HEAD in the repository.
@@ -289,11 +292,14 @@ class GitEngine:
         except RuntimeError:
             return False
 
-    def sync_repo(self) -> Dict[str, Any]:
-        """Synchronize repository with remotes by running git fetch.
+    def sync_repo(self, push: bool = True) -> Dict[str, Any]:
+        """Synchronize repository with remotes, reconciling and pushing feedback/attachments.
+
+        Args:
+            push: If True, pushes detached branch (and active branch if tracking upstream) to remote.
 
         Returns:
-            Dictionary with status, message, and updated refs count.
+            Dictionary with status, message, and synchronization details.
         """
         try:
             out = run_git_command(["fetch", "--all", "--prune"], cwd=self.repo_root)
@@ -305,9 +311,31 @@ class GitEngine:
                         break
                     except RuntimeError:
                         pass
+            self.clear_diff_cache()
+
+            detached_res = {}
+            try:
+                from provider.bug_report.detached_branch import DetachedBranchBugStore
+
+                detached_res = DetachedBranchBugStore(self.repo_root).sync_branch(push=push)
+            except Exception as e:
+                detached_res = {"status": "error", "message": str(e)}
+
+            staged_files: List[str] = []
+            try:
+                staged_files = self.stage_feedback_files()
+            except Exception:
+                pass
+
+            detached_pushed = detached_res.get("pushed", False)
+            push_info = " Feedback and attachments pushed." if detached_pushed else ""
+            msg = f"{out.strip() or 'Repository synchronized.'}{push_info}".strip()
+
             return {
                 "status": "ok",
-                "message": out.strip() or "Repository successfully fetched and synchronized.",
+                "message": msg,
+                "detached": detached_res,
+                "staged_feedback": staged_files,
             }
         except RuntimeError as err:
             return {
@@ -354,6 +382,7 @@ class GitEngine:
 
         try:
             out = run_git_command(["rebase", target], cwd=self.repo_root)
+            self.clear_diff_cache()
             if "origin/main" in target:
                 try:
                     run_git_command(["branch", "-f", "main", "refs/remotes/origin/main"], cwd=self.repo_root)
@@ -525,6 +554,9 @@ class GitEngine:
             )
         except ValueError:
             rel_path = str(p)
+
+        if is_file_ignored(rel_path):
+            return curr_user
 
         try:
             status_out = run_git_command(["status", "--porcelain", "--", rel_path], cwd=self.repo_root).strip()
@@ -1184,8 +1216,12 @@ class GitEngine:
             if " -> " in file_path:
                 file_path = file_path.split(" -> ")[1].strip()
 
-            clean_path = file_path.replace("\\", "/").strip().lstrip("./")
-            is_feedback = clean_path.startswith("feedback/") or clean_path in IGNORED_REVIEW_FILES
+            clean_path = file_path.strip().strip('"').strip("'").replace("\\", "/").strip().lstrip("./")
+            is_feedback = (
+                clean_path.startswith("feedback/")
+                or clean_path in IGNORED_REVIEW_FILES
+                or "attachments" in Path(clean_path).parts
+            )
             is_untracked = idx_status == "?" and work_status == "?"
             is_conflicted = (idx_status, work_status) in [
                 ("U", "U"),
@@ -1581,6 +1617,10 @@ class GitEngine:
 
     def get_file_diff(self, commit: str, file_path: str, staged_only: bool = False) -> FileDiffModel:
         """Construct comprehensive diff model including hunks and side-by-side rows."""
+        cache_key = (commit, file_path)
+        if commit != "working" and cache_key in self._file_diff_cache:
+            return self._file_diff_cache[cache_key]
+
         binary_exts = {
             ".png",
             ".jpg",
@@ -1626,7 +1666,7 @@ class GitEngine:
         new_content = ""
 
         if is_binary:
-            return FileDiffModel(
+            diff_model = FileDiffModel(
                 file_path=file_path,
                 old_path=file_path,
                 new_path=file_path,
@@ -1642,6 +1682,9 @@ class GitEngine:
                 new_content="",
                 raw_diff=f"Binary files a/{file_path} and b/{file_path} differ",
             )
+            if commit != "working":
+                self._file_diff_cache[cache_key] = diff_model
+            return diff_model
 
         if commit == "working":
             old_content = self.get_file_content("working", file_path, parent=True)
@@ -1683,7 +1726,7 @@ class GitEngine:
         elif old_content and not new_content:
             status = "D"
 
-        return FileDiffModel(
+        diff_model = FileDiffModel(
             file_path=file_path,
             old_path=file_path,
             new_path=file_path,
@@ -1699,6 +1742,16 @@ class GitEngine:
             new_content=new_content,
             raw_diff=raw_diff,
         )
+        if commit != "working":
+            self._file_diff_cache[cache_key] = diff_model
+        return diff_model
+
+    def clear_diff_cache(self) -> None:
+        """Clear all in-memory cached commit summaries and file diff models."""
+        self._commit_diff_cache.clear()
+        self._commit_stat_cache.clear()
+        self._bug_tag_cache.clear()
+        self._file_diff_cache.clear()
 
     def _parse_diff_hunks(self, raw_diff: str) -> List[DiffHunk]:
         """Parse raw unified diff text into structured DiffHunk instances."""
@@ -1846,11 +1899,75 @@ class GitEngine:
 
     def stage_file(self, file_path: str) -> None:
         """Stage file modifications or untracked file into git index."""
-        run_git_command(["add", "--", file_path], cwd=self.repo_root)
+        try:
+            run_git_command(["add", "--", file_path], cwd=self.repo_root)
+        except RuntimeError as e:
+            if "ignored by one of your .gitignore files" in str(e):
+                run_git_command(["add", "-f", "--", file_path], cwd=self.repo_root)
+            else:
+                raise
 
     def unstage_file(self, file_path: str) -> None:
         """Remove file changes from git index while preserving working tree changes."""
         run_git_command(["reset", "HEAD", "--", file_path], cwd=self.repo_root)
+
+    def stage_feedback_files(self) -> List[str]:
+        """Stage all individual feedback markdown files while explicitly excluding index files.
+
+        Tracks and stages:
+            - feedback/WORM_*.md (or feedback/BUG_*.md)
+            - feedback/CR_*.md
+
+        Explicitly excludes from staging to prevent merge collisions:
+            - WORMS.md, BUGS.md, CR.md
+            - feedback/WORMS.md, feedback/BUGS.md, feedback/CR.md
+            - attachments/ and feedback/attachments/
+
+        Returns:
+            List of relative file paths that were staged.
+        """
+        feedback_dir = self.repo_root / "feedback"
+        if not feedback_dir.is_dir():
+            return []
+
+        # Find all individual WORM_*.md, BUG_*.md, and CR_*.md files
+        files_to_stage: List[str] = []
+        for p in feedback_dir.glob("*.md"):
+            name = p.name
+            # Explicitly exclude aggregated index files
+            if name in ("WORMS.md", "BUGS.md", "CR.md"):
+                continue
+            if name.startswith("WORM_") or name.startswith("BUG_") or name.startswith("CR_"):
+                files_to_stage.append(f"feedback/{name}")
+
+        staged: List[str] = []
+        if files_to_stage:
+            # Batch add in chunks of 50 to avoid shell argument length limits
+            chunk_size = 50
+            for i in range(0, len(files_to_stage), chunk_size):
+                chunk = files_to_stage[i : i + chunk_size]
+                try:
+                    run_git_command(["add", "-f", "--"] + chunk, cwd=self.repo_root)
+                    staged.extend(chunk)
+                except Exception:
+                    pass
+
+        # Ensure index files are un-staged if they were inadvertently staged
+        index_candidates = [
+            "WORMS.md",
+            "BUGS.md",
+            "CR.md",
+            "feedback/WORMS.md",
+            "feedback/BUGS.md",
+            "feedback/CR.md",
+        ]
+        for idx in index_candidates:
+            try:
+                run_git_command(["reset", "HEAD", "--", idx], cwd=self.repo_root)
+            except Exception:
+                pass
+
+        return staged
 
     def get_head_commit_message(self) -> str:
         """Retrieve full commit message (subject and body) of HEAD commit.
@@ -2003,7 +2120,13 @@ class GitEngine:
                 pass
             self._ensure_lfs_tracking_for_attachments(file_paths)
             for fp in file_paths:
-                run_git_command(["add", "--", fp], cwd=self.repo_root)
+                try:
+                    run_git_command(["add", "--", fp], cwd=self.repo_root)
+                except RuntimeError as e:
+                    if "ignored by one of your .gitignore files" in str(e):
+                        run_git_command(["add", "-f", "--", fp], cwd=self.repo_root)
+                    else:
+                        raise
         else:
             self._ensure_lfs_tracking_for_attachments(None)
 
@@ -2026,6 +2149,7 @@ class GitEngine:
             except OSError:
                 pass
 
+        self.clear_diff_cache()
         return head_commit
 
     # Commit manipulation: split and combine
@@ -2042,12 +2166,14 @@ class GitEngine:
         head = self.get_head_commit()
         if commit_hash in [head, "HEAD"] or head.startswith(commit_hash):
             run_git_command(["reset", "HEAD~1"], cwd=self.repo_root)
+            self.clear_diff_cache()
             return {
                 "status": "ok",
                 "message": "Commit reset to working tree. You can now selectively stage and commit parts.",
             }
         # If not HEAD, create branch or perform mixed reset
         run_git_command(["reset", "--mixed", f"{commit_hash}~1"], cwd=self.repo_root)
+        self.clear_diff_cache()
         return {
             "status": "ok",
             "message": f"Reset to parent of {commit_hash[:8]}. Changes are now in working tree.",
@@ -2069,6 +2195,7 @@ class GitEngine:
         count = len(commit_hashes)
         run_git_command(["reset", "--soft", f"HEAD~{count}"], cwd=self.repo_root)
         run_git_command(["commit", "-m", message], cwd=self.repo_root)
+        self.clear_diff_cache()
         return self.get_head_commit()
 
     # Merge conflict inspection and resolution

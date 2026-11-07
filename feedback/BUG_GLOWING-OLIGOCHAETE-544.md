@@ -2,12 +2,13 @@
 
 - **UUID**: `60a5da6f-9268-43dd-9cce-873124a43f70`
 - **ID**: `BUG-GLOWING-OLIGOCHAETE-544`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-10-12 17:19:42 UTC`
 - **Resolved**: `2026-10-12 17:26:06 UTC`
+- **Accepted**: `2026-10-12 17:26:06 UTC`
 
 #### Description
 

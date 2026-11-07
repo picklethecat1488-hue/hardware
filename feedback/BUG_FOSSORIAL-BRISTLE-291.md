@@ -2,12 +2,13 @@
 
 - **UUID**: `7edf7011-55ec-4e80-ac60-eb39ab7bdb30`
 - **ID**: `BUG-FOSSORIAL-BRISTLE-291`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `CRITICAL`
 - **Category**: `PCB`
 - **Component**: `cat_fountain`
 - **Created**: `2026-10-10 23:13:31 UTC`
 - **Resolved**: `2026-10-10 23:47:06 UTC`
+- **Accepted**: `2026-10-10 23:47:06 UTC`
 
 #### Description
 

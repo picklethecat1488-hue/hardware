@@ -16,6 +16,14 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
   <link rel="shortcut icon" href="/static/favicon.ico">
   <link rel="stylesheet" href="/static/common.css">
+  <script>
+    if (window.self !== window.top) {
+      document.documentElement.classList.add("in-iframe");
+      window.addEventListener("DOMContentLoaded", () => {
+        if (document.body) document.body.classList.add("in-iframe");
+      });
+    }
+  </script>
   <style>
     html { font-size: 80%; }
     /* =========================================================
@@ -70,6 +78,18 @@
       box-shadow: inset 0 0 0 1px rgba(255, 184, 0, 0.2), 0 0 10px rgba(200, 122, 50, 0.1);
     }
 
+    html.in-iframe,
+    html.in-iframe body,
+    body.in-iframe {
+      border: none !important;
+      box-shadow: none !important;
+    }
+    html.in-iframe .window-resize-gripper,
+    body.in-iframe .window-resize-gripper,
+    .in-iframe .window-resize-gripper {
+      display: none !important;
+    }
+
     /* Window Resize Gripper (WORM-027) */
     .window-resize-gripper {
       position: fixed;
@@ -116,6 +136,46 @@
       border: 2px solid var(--quake-border-mid);
       box-shadow: inset 1px 1px 0px var(--quake-border-light), inset -1px -1px 0px var(--quake-border-dark), 0 6px 18px rgba(0,0,0,0.85);
       border-radius: 4px;
+    }
+
+    /* Quake Modal Dialog */
+    .quake-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(2px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+    }
+    .quake-modal {
+      background: var(--quake-panel);
+      border: 2px solid var(--quake-border-light);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.9), inset 1px 1px 0 var(--quake-border-light);
+      border-radius: 4px;
+      width: 620px;
+      max-width: 90vw;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .quake-modal-header {
+      background: var(--quake-header-bg);
+      border-bottom: 2px solid var(--quake-border-mid);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--quake-gold);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
 
     /* Quake Buttons */
@@ -260,7 +320,7 @@
       height: 300px;
     }
     .attachment-lfs-notice {
-      font-size: 9px;
+      font-size: 8px;
       color: var(--quake-text-muted);
       background: rgba(0, 0, 0, 0.4);
       border: 1px solid var(--quake-border-mid);
@@ -493,7 +553,7 @@
       border-radius: 4px;
       padding: 22px 18px;
       text-align: center;
-      font-size: 11.5px;
+      font-size: 9px;
       color: var(--quake-text-muted);
       cursor: pointer;
       transition: all 0.2s ease;
@@ -616,7 +676,7 @@
       <!-- UI Scale Selector (8715cab2) -->
       <div style="display:flex;align-items:center;gap:4px;margin-right:4px;">
         <span style="font-size:8px;color:var(--quake-text-dim);">SCALE:</span>
-        <select id="uiScaleSelect" class="quake-select" onchange="onUiScaleChange(this.value)" title="UI Scale (Shortcuts: Cmd/Ctrl +/- or 0 to reset)" style="padding: 2px 4px; font-size: 9px; height: 22px;">
+        <select id="uiScaleSelect" class="quake-select" onchange="onUiScaleChange(this.value)" title="UI Scale (Shortcuts: Cmd/Ctrl +/- or 0 to reset)" style="padding: 2px 4px; font-size: 8.5px; height: 22px;">
           <option value="75%">75%</option>
           <option value="80%">80%</option>
           <option value="90%">90%</option>
@@ -626,6 +686,7 @@
           <option value="150%">150%</option>
         </select>
       </div>
+      <span class="quake-badge" style="background:#1b120c; border:1px solid var(--quake-gold); color:var(--quake-gold); font-size:9.5px; padding:3px 8px;">Branch: <strong>bugs</strong></span>
       <button class="quake-btn quake-btn-default" onclick="syncFeedback()">🔄 Sync Feedback</button>
       <button class="quake-btn quake-btn-default" onclick="newBug()">+ New Bug</button>
       <button class="quake-btn quake-btn-gold" id="btn-save-exit" onclick="saveAndExit()">💾 Save and Exit</button>
@@ -642,6 +703,33 @@
         <div id="loading-progress-bar" style="background:var(--quake-gold); width:30%; height:100%; transition:width 0.3s ease;"></div>
       </div>
       <div id="loading-step-text" style="color:var(--quake-text-muted); font-size:9px;">Scanning feedback/ directory for BUG_*.md files...</div>
+    </div>
+  </div>
+
+  <!-- Action Progress Modal (BUG-327) -->
+  <div id="actionProgressModalOverlay" class="quake-modal-overlay" style="display: none; z-index: 99999;">
+    <div class="quake-modal" style="width: 480px; max-width: 90vw; padding: 20px 24px; text-align: left;">
+      <div class="quake-modal-header" style="padding: 0 0 12px 0; margin-bottom: 12px; border-bottom: 1px solid var(--quake-border-mid); display: flex; align-items: center; justify-content: space-between; background: transparent;">
+        <div style="font-size: 11px; font-weight: bold; color: var(--quake-gold); letter-spacing: 1px; display: flex; align-items: center; gap: 8px;">
+          <span id="actionProgressIcon">⚡</span>
+          <span id="actionProgressTitle">PROCESSING ACTION</span>
+        </div>
+      </div>
+
+      <div style="font-size: 9px; color: var(--quake-text-muted); margin-bottom: 12px; line-height: 1.4;" id="actionProgressDescription">
+        Executing requested operation...
+      </div>
+
+      <!-- Progress bar -->
+      <div style="background: var(--quake-bg-dark, #120c08); border: 1px solid var(--quake-border-light, #5a381e); border-radius: 3px; height: 16px; position: relative; overflow: hidden; margin-bottom: 12px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.6);">
+        <div id="actionProgressBar" style="width: 15%; height: 100%; background: linear-gradient(90deg, #ffaa00, #ff8800); transition: width 0.3s ease; box-shadow: 0 0 10px rgba(255,170,0,0.5);"></div>
+        <div id="actionProgressPercent" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #fff; text-shadow: 0 1px 2px #000;">15%</div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9px; color: var(--quake-copper, #c47c38); font-family: var(--font-mono, monospace); font-weight: bold;">
+        <span id="actionProgressStatus">Working...</span>
+        <span id="actionProgressElapsed" style="color: var(--quake-text-dim, #7a6a58);">0.0s</span>
+      </div>
     </div>
   </div>
 
@@ -694,6 +782,42 @@
 
     <!-- Content Area -->
     <div class="content-area">
+      <!-- Functional Review Action Banner -->
+      <div id="review-action-banner" class="form-section quake-card review-banner" style="display:none; border:2px solid var(--quake-gold); background:rgba(218,165,32,0.12); margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <div>
+            <div style="font-size:12px; font-weight:700; color:var(--quake-gold); letter-spacing:1px; display:flex; align-items:center; gap:8px;">
+              <span>⚡ FUNCTIONAL REVIEW REQUIRED</span>
+              <span style="font-size:9.5px; background:var(--quake-gold); color:#000; padding:2px 6px; border-radius:2px; font-weight:800;">AWAITING EVALUATION</span>
+            </div>
+            <div style="font-size:11px; color:#ddd; margin-top:4px;">
+              Verify functionality, run demo commands below, and inspect visual previews before accepting fix.
+            </div>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button class="quake-btn quake-btn-green" style="font-weight:700; padding:6px 16px; font-size:10px;" onclick="acceptActiveBug()">✔ ACCEPT FIX</button>
+            <button class="quake-btn quake-btn-red" style="font-weight:700; padding:6px 16px; font-size:10px;" onclick="rejectActiveBug()">✖ REJECT FIX</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rejection Feedback Card -->
+      <div id="rejection-feedback-card" class="form-section quake-card rejection-banner" style="display:none; border:2px solid #ff4444; background:rgba(255,68,68,0.12); margin-bottom:12px;">
+        <div class="section-title" style="color:#ff6666;">
+          <span>⚠ REJECTION FEEDBACK - FIX REJECTED BY REVIEWER</span>
+        </div>
+        <div id="rejection-feedback-text" style="color:#fff; font-size:11px; white-space:pre-wrap; line-height:1.5;"></div>
+      </div>
+
+      <!-- Accepted Fix Card -->
+      <div id="accepted-feedback-card" class="form-section quake-card accepted-banner" style="display:none; border:2px solid var(--quake-green); background:rgba(34,197,94,0.12); margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <div class="section-title" style="color:var(--quake-green); margin-bottom:0;">
+            <span>✔ FIX FUNCTIONALLY REVIEWED &amp; ACCEPTED</span>
+          </div>
+          <span id="accepted-timestamp-display" style="font-size:9.5px; background:var(--quake-green); color:#000; padding:2px 6px; border-radius:2px; font-weight:800;">CLOSED</span>
+        </div>
+      </div>
       <!-- Bug Identity Section -->
       <div class="form-section quake-card">
         <div class="section-title">
@@ -826,6 +950,31 @@
           <textarea id="bug-resolution" placeholder="Document root cause, code changes made, and test regression verifications..."></textarea>
         </div>
       </div>
+
+      <!-- Attached Commits Section -->
+      <div class="form-section quake-card" id="attached-commits-section">
+        <div class="section-title">
+          <span>Attached Commits</span>
+        </div>
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+          <input type="text" id="input-attach-commit" placeholder="Git commit SHA (e.g. 7f3b89a)..." style="flex:1;">
+          <button class="quake-btn quake-btn-default" onclick="attachCommitToActiveBug()">+ Attach Commit</button>
+        </div>
+        <div id="attached-commits-list" class="commits-list" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+      </div>
+
+      <!-- Functional Review Checklist & Demo Commands -->
+      <div class="form-section quake-card" id="review-tasks-section">
+        <div class="section-title">
+          <span>Review Tasks & Functional Checklist</span>
+        </div>
+        <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+          <input type="text" id="input-task-title" placeholder="Task title / verification requirement..." style="flex:2; min-width:200px;">
+          <input type="text" id="input-task-command" placeholder="Demo command (e.g. python tools/view.py cat_fountain:pcb)..." style="flex:3; min-width:250px; font-family:var(--font-mono);">
+          <button class="quake-btn quake-btn-default" onclick="addTaskToActiveBug()">+ Add Task</button>
+        </div>
+        <div id="review-tasks-list" class="tasks-list"></div>
+      </div>
     </div>
   </div>
 
@@ -841,6 +990,93 @@
 
     const severityOrder = { "CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3 };
     const statusOrder = { "OPEN": 0, "IN_PROGRESS": 1, "PLANNED": 2, "RESOLVED": 3, "CLOSED": 4 };
+
+    // Action Progress Modal Management (BUG-327)
+    let actionProgressDepth = 0;
+    let actionProgressTimer = null;
+    let actionProgressInterval = null;
+
+    async function runWithActionModal(options, asyncFn) {
+      if (actionProgressDepth > 0) {
+        actionProgressDepth++;
+        try {
+          return await asyncFn();
+        } finally {
+          actionProgressDepth--;
+        }
+      }
+
+      actionProgressDepth = 1;
+      const thresholdMs = (options && options.delayMs !== undefined) ? options.delayMs : 1000;
+      const overlay = document.getElementById("actionProgressModalOverlay");
+      const titleEl = document.getElementById("actionProgressTitle");
+      const descEl = document.getElementById("actionProgressDescription");
+      const statusEl = document.getElementById("actionProgressStatus");
+      const elapsedEl = document.getElementById("actionProgressElapsed");
+      const barEl = document.getElementById("actionProgressBar");
+      const percentEl = document.getElementById("actionProgressPercent");
+      const iconEl = document.getElementById("actionProgressIcon");
+
+      let isModalVisible = false;
+      const startTime = Date.now();
+      let progress = 15;
+
+      if (actionProgressTimer) {
+        clearTimeout(actionProgressTimer);
+        actionProgressTimer = null;
+      }
+      if (actionProgressInterval) {
+        clearInterval(actionProgressInterval);
+        actionProgressInterval = null;
+      }
+
+      actionProgressTimer = setTimeout(() => {
+        if (!overlay) return;
+        isModalVisible = true;
+        if (titleEl) titleEl.textContent = (options && options.title) || "PROCESSING ACTION";
+        if (descEl) descEl.textContent = (options && options.description) || "Please wait while the operation completes...";
+        if (statusEl) statusEl.textContent = (options && options.stepText) || "Working...";
+        if (iconEl && options && options.icon) iconEl.textContent = options.icon;
+        if (barEl) barEl.style.width = "20%";
+        if (percentEl) percentEl.textContent = "20%";
+        if (elapsedEl) elapsedEl.textContent = ((Date.now() - startTime) / 1000).toFixed(1) + "s";
+        overlay.style.display = "flex";
+
+        actionProgressInterval = setInterval(() => {
+          const elapsedSec = ((Date.now() - startTime) / 1000).toFixed(1);
+          if (elapsedEl) elapsedEl.textContent = `${elapsedSec}s`;
+          if (progress < 90) {
+            progress += Math.floor(Math.random() * 6) + 2;
+            if (progress > 90) progress = 90;
+            if (barEl) barEl.style.width = `${progress}%`;
+            if (percentEl) percentEl.textContent = `${progress}%`;
+          }
+        }, 200);
+      }, thresholdMs);
+
+      try {
+        const result = await asyncFn();
+        return result;
+      } finally {
+        actionProgressDepth--;
+        if (actionProgressTimer) {
+          clearTimeout(actionProgressTimer);
+          actionProgressTimer = null;
+        }
+        if (actionProgressInterval) {
+          clearInterval(actionProgressInterval);
+          actionProgressInterval = null;
+        }
+        if (isModalVisible && overlay) {
+          if (barEl) barEl.style.width = "100%";
+          if (percentEl) percentEl.textContent = "100%";
+          if (statusEl) statusEl.textContent = "Complete!";
+          setTimeout(() => {
+            overlay.style.display = "none";
+          }, 250);
+        }
+      }
+    }
 
     function init() {
       initUiScale();
@@ -990,10 +1226,9 @@
       const searchInput = document.getElementById("search-input");
       const query = (searchInput ? searchInput.value || "" : "").toLowerCase();
       let list = (db.bugs || []).filter(bug => {
-        const isResolved = (bug.status === "RESOLVED" || bug.status === "CLOSED");
-        if (currentFilter === "open" && (isResolved || bug.status === "PLANNED")) return false;
+        if (currentFilter === "open" && (bug.status === "CLOSED" || bug.status === "PLANNED")) return false;
         if (currentFilter === "planned" && bug.status !== "PLANNED") return false;
-        if (currentFilter === "resolved" && !isResolved) return false;
+        if (currentFilter === "resolved" && (bug.status !== "RESOLVED" && bug.status !== "CLOSED")) return false;
         if (currentCategoryFilter && currentCategoryFilter !== "ALL" && bug.category !== currentCategoryFilter) return false;
         if (currentSeverityFilter && currentSeverityFilter !== "ALL" && bug.severity !== currentSeverityFilter) return false;
         if (query && !bug.title.toLowerCase().includes(query) && !bug.id.toLowerCase().includes(query) && !(bug.component || "").toLowerCase().includes(query)) {
@@ -1005,25 +1240,47 @@
       list.sort((a, b) => {
         switch (currentBugSort) {
           case "id_asc": {
+            const timeA = a.created_at ? (Date.parse(a.created_at.replace(" UTC", "Z")) || a.created_at) : "";
+            const timeB = b.created_at ? (Date.parse(b.created_at.replace(" UTC", "Z")) || b.created_at) : "";
+            if (timeA && timeB && timeA !== timeB) {
+              return timeA < timeB ? -1 : 1;
+            }
+            if (timeA && !timeB) return -1;
+            if (!timeA && timeB) return 1;
             const numA = parseInt((a.id || "").replace(/\D/g, ""), 10) || 0;
             const numB = parseInt((b.id || "").replace(/\D/g, ""), 10) || 0;
-            return numA - numB;
+            if (numA !== numB) return numA - numB;
+            return (a.id || "").localeCompare(b.id || "");
           }
           case "id_desc": {
+            const timeA = a.created_at ? (Date.parse(a.created_at.replace(" UTC", "Z")) || a.created_at) : "";
+            const timeB = b.created_at ? (Date.parse(b.created_at.replace(" UTC", "Z")) || b.created_at) : "";
+            if (timeA && timeB && timeA !== timeB) {
+              return timeA > timeB ? -1 : 1;
+            }
+            if (timeA && !timeB) return -1;
+            if (!timeA && timeB) return 1;
             const numA = parseInt((a.id || "").replace(/\D/g, ""), 10) || 0;
             const numB = parseInt((b.id || "").replace(/\D/g, ""), 10) || 0;
-            return numB - numA;
+            if (numA !== numB) return numB - numA;
+            return (b.id || "").localeCompare(a.id || "");
           }
           case "severity": {
             const rankA = severityOrder[a.severity] !== undefined ? severityOrder[a.severity] : 99;
             const rankB = severityOrder[b.severity] !== undefined ? severityOrder[b.severity] : 99;
             if (rankA !== rankB) return rankA - rankB;
+            const timeA = a.created_at ? (Date.parse(a.created_at.replace(" UTC", "Z")) || a.created_at) : "";
+            const timeB = b.created_at ? (Date.parse(b.created_at.replace(" UTC", "Z")) || b.created_at) : "";
+            if (timeA && timeB && timeA !== timeB) return timeA > timeB ? -1 : 1;
             return (b.id || "").localeCompare(a.id || "");
           }
           case "status": {
             const rankA = statusOrder[a.status] !== undefined ? statusOrder[a.status] : 99;
             const rankB = statusOrder[b.status] !== undefined ? statusOrder[b.status] : 99;
             if (rankA !== rankB) return rankA - rankB;
+            const timeA = a.created_at ? (Date.parse(a.created_at.replace(" UTC", "Z")) || a.created_at) : "";
+            const timeB = b.created_at ? (Date.parse(b.created_at.replace(" UTC", "Z")) || b.created_at) : "";
+            if (timeA && timeB && timeA !== timeB) return timeA > timeB ? -1 : 1;
             return (b.id || "").localeCompare(a.id || "");
           }
           case "component": {
@@ -1061,7 +1318,11 @@
         else if (bug.severity === "LOW") sevBadgeClass = "quake-badge quake-badge-muted";
 
         let stBadgeClass = "quake-badge quake-badge-amber";
-        if (bug.status === "RESOLVED" || bug.status === "CLOSED") {
+        let stDisplay = bug.status;
+        if (bug.status === "RESOLVED") {
+          stBadgeClass = "quake-badge quake-badge-gold";
+          stDisplay = "AWAITING REVIEW";
+        } else if (bug.status === "CLOSED") {
           stBadgeClass = "quake-badge quake-badge-green";
         } else if (bug.status === "PLANNED") {
           stBadgeClass = "quake-badge quake-badge-muted";
@@ -1071,7 +1332,7 @@
           <div class="bug-item-top">
             <span class="bug-id">${bug.id} <button class="copy-icon-btn copy-badge-btn" onclick="event.stopPropagation(); copyText('${bug.id}')" title="Copy Bug ID ${bug.id}">📋</button></span>
             <span class="${sevBadgeClass}">${bug.severity}</span>
-            <span class="${stBadgeClass}">${bug.status}</span>
+            <span class="${stBadgeClass}">${stDisplay}</span>
           </div>
           <div class="bug-item-title">${bug.title || "Untitled Bug"}</div>
         `;
@@ -1094,6 +1355,39 @@
       if (bugIdDisp) bugIdDisp.textContent = `[${bug.id}]`;
       if (btnCopyActiveBug) btnCopyActiveBug.style.display = "inline-flex";
 
+      // Functional Review Action Banner
+      const reviewBanner = document.getElementById("review-action-banner");
+      if (reviewBanner) {
+        reviewBanner.style.display = (bug.status === "RESOLVED") ? "block" : "none";
+      }
+
+      // Rejection Feedback Alert
+      const rejCard = document.getElementById("rejection-feedback-card");
+      const rejText = document.getElementById("rejection-feedback-text");
+      if (rejCard && rejText) {
+        if (bug.rejection_notes && bug.rejection_notes.trim()) {
+          rejCard.style.display = "block";
+          const rejTime = bug.rejected_at ? `[${bug.rejected_at}]\n` : "";
+          rejText.textContent = `${rejTime}${bug.rejection_notes}`;
+        } else {
+          rejCard.style.display = "none";
+        }
+      }
+
+      // Accepted Feedback Alert
+      const accCard = document.getElementById("accepted-feedback-card");
+      const accTime = document.getElementById("accepted-timestamp-display");
+      if (accCard) {
+        if (bug.status === "CLOSED") {
+          accCard.style.display = "block";
+          if (accTime) {
+            accTime.textContent = bug.accepted_at ? `ACCEPTED ${bug.accepted_at}` : "CLOSED";
+          }
+        } else {
+          accCard.style.display = "none";
+        }
+      }
+
       document.getElementById("bug-title").value = bug.title || "";
       document.getElementById("bug-severity").value = bug.severity || "MEDIUM";
       document.getElementById("bug-status").value = bug.status || "OPEN";
@@ -1107,7 +1401,276 @@
       document.getElementById("bug-resolution").value = bug.resolution_notes || "";
 
       renderAttachments(bug.attachments || []);
+      renderAttachedCommits(bug.commit_ids || []);
+      renderReviewTasks(bug.review_tasks || []);
       autoResizeAllTextareas();
+    }
+
+    async function acceptActiveBug() {
+      if (!activeBugId) return;
+      return await runWithActionModal({
+        title: "ACCEPTING BUG REPORT",
+        description: `Marking bug ${activeBugId} as verified / closed...`,
+        stepText: `Accepting ${activeBugId}...`,
+        icon: "✓"
+      }, async () => {
+        try {
+          await saveActiveBug();
+          const res = await fetch("/api/bugs/accept", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: activeBugId, notes: "" })
+          });
+          const data = await res.json();
+          if (data.status === "ok") {
+            const bug = db.bugs.find(b => b.id === activeBugId);
+            if (bug) {
+              bug.status = "CLOSED";
+              bug.accepted_at = data.bug.accepted_at;
+              if (data.bug.resolution_notes) bug.resolution_notes = data.bug.resolution_notes;
+            }
+            loadActiveBug();
+            renderBugList();
+            updateMetrics();
+            showToast(`Bug [${activeBugId}] accepted and closed.`);
+          } else {
+            showToast(data.error || "Failed to accept bug");
+          }
+        } catch (err) {
+          showToast("Error accepting bug: " + err);
+        }
+      });
+    }
+
+    async function rejectActiveBug() {
+      if (!activeBugId) return;
+      return await runWithActionModal({
+        title: "REJECTING BUG REPORT",
+        description: `Reopening bug ${activeBugId} and saving review notes...`,
+        stepText: `Rejecting ${activeBugId}...`,
+        icon: "✕"
+      }, async () => {
+        try {
+          const currentNotes = document.getElementById("bug-resolution") ? document.getElementById("bug-resolution").value.trim() : "";
+          await saveActiveBug();
+          const res = await fetch("/api/bugs/reject", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: activeBugId, notes: currentNotes })
+          });
+          const data = await res.json();
+          if (data.status === "ok") {
+            const bug = db.bugs.find(b => b.id === activeBugId);
+            if (bug) {
+              bug.status = "OPEN";
+              bug.rejected_at = data.bug.rejected_at;
+              bug.rejection_notes = data.bug.rejection_notes;
+            }
+            loadActiveBug();
+            renderBugList();
+            updateMetrics();
+            showToast(`Bug [${activeBugId}] rejected and reopened.`);
+          } else {
+            showToast(data.error || "Failed to reject bug");
+          }
+        } catch (err) {
+          showToast("Error rejecting bug: " + err);
+        }
+      });
+    }
+
+    async function attachCommitToActiveBug() {
+      if (!activeBugId) return;
+      const input = document.getElementById("input-attach-commit");
+      const commitSha = (input ? input.value : "").trim();
+      if (!commitSha) {
+        showToast("Please enter a commit SHA");
+        return;
+      }
+      return await runWithActionModal({
+        title: "ATTACHING COMMIT",
+        description: `Linking commit ${commitSha} to ${activeBugId}...`,
+        stepText: "Updating bug commit linkages...",
+        icon: "🔗"
+      }, async () => {
+        try {
+          const res = await fetch("/api/bugs/attach_commit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: activeBugId, commit_id: commitSha })
+          });
+          const data = await res.json();
+          if (data.status === "ok") {
+            const bug = db.bugs.find(b => b.id === activeBugId);
+            if (bug) bug.commit_ids = data.bug.commit_ids || [];
+            input.value = "";
+            renderAttachedCommits(bug.commit_ids || []);
+            showToast(`Attached commit ${commitSha}`);
+          } else {
+            showToast(data.error || "Failed to attach commit");
+          }
+        } catch (err) {
+          showToast("Error attaching commit: " + err);
+        }
+      });
+    }
+
+    function renderAttachedCommits(commitIds) {
+      const container = document.getElementById("attached-commits-list");
+      if (!container) return;
+      container.innerHTML = "";
+      if (!commitIds || !commitIds.length) {
+        container.innerHTML = '<span style="font-size:10px; color:var(--quake-text-dim);">No commits attached yet.</span>';
+        return;
+      }
+      commitIds.forEach(cid => {
+        const chip = document.createElement("div");
+        chip.style.cssText = "display:inline-flex; align-items:center; gap:6px; background:#1b120c; border:1px solid var(--quake-gold); border-radius:3px; padding:4px 8px; font-family:var(--font-mono); font-size:10px;";
+        const bugParam = activeBugId ? `&bug_id=${encodeURIComponent(activeBugId)}` : "";
+        const crUrl = `/review?revisions=${encodeURIComponent(cid)}&from=bugs${bugParam}`;
+        chip.innerHTML = `
+          <a href="${crUrl}" onclick="openCommitInCodeReview(event, '${cid}')" style="color:var(--quake-gold); text-decoration:none; font-weight:700; cursor:pointer;" title="Review commit ${cid.slice(0, 10)} in Code Review">🔍 ${cid.slice(0, 10)}</a>
+          <button class="copy-icon-btn copy-badge-btn" onclick="copyText('${cid}')" title="Copy commit SHA">📋</button>
+        `;
+        container.appendChild(chip);
+      });
+    }
+
+    async function openCommitInCodeReview(event, commitHash) {
+      if (event) {
+        if (event.metaKey || event.ctrlKey || event.shiftKey) return;
+        event.preventDefault();
+      }
+      if (!commitHash) return;
+      const bugParam = activeBugId ? `&bug_id=${encodeURIComponent(activeBugId)}` : "";
+      const targetUrl = `/review?revisions=${encodeURIComponent(commitHash)}&from=bugs${bugParam}`;
+      const targetName = "hardware_code_review";
+
+      try {
+        await fetch("/api/open_code_review", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ commits: [commitHash] })
+        });
+      } catch (err) {}
+
+      if (window.parent && window.parent !== window && typeof window.parent.openWorkstationModal === "function") {
+        window.parent.openWorkstationModal(targetUrl, targetName);
+      } else {
+        window.location.href = targetUrl;
+      }
+    }
+
+    async function addTaskToActiveBug() {
+      if (!activeBugId) return;
+      const titleInput = document.getElementById("input-task-title");
+      const cmdInput = document.getElementById("input-task-command");
+      const title = (titleInput ? titleInput.value : "").trim();
+      const cmd = (cmdInput ? cmdInput.value : "").trim();
+      if (!title) {
+        showToast("Task title is required");
+        return;
+      }
+      try {
+        const res = await fetch("/api/bugs/add_task", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: activeBugId, title: title, command: cmd })
+        });
+        const data = await res.json();
+        if (data.status === "ok") {
+          const bug = db.bugs.find(b => b.id === activeBugId);
+          if (bug) bug.review_tasks = data.bug.review_tasks || [];
+          if (titleInput) titleInput.value = "";
+          if (cmdInput) cmdInput.value = "";
+          renderReviewTasks(bug.review_tasks || []);
+          showToast("Task added.");
+        } else {
+          showToast(data.error || "Failed to add task");
+        }
+      } catch (err) {
+        showToast("Error adding task: " + err);
+      }
+    }
+
+    async function toggleTaskStatus(taskId, currentStatus) {
+      if (!activeBugId) return;
+      const newStatus = (currentStatus === "COMPLETED") ? "PENDING" : "COMPLETED";
+      try {
+        const res = await fetch("/api/bugs/update_task", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: activeBugId, task_id: taskId, status: newStatus })
+        });
+        const data = await res.json();
+        if (data.status === "ok") {
+          const bug = db.bugs.find(b => b.id === activeBugId);
+          if (bug) bug.review_tasks = data.bug.review_tasks || [];
+          renderReviewTasks(bug.review_tasks || []);
+        }
+      } catch (err) {
+        showToast("Error updating task: " + err);
+      }
+    }
+
+    async function runTaskCommand(taskId, command) {
+      const outBox = document.getElementById(`task-output-${taskId}`);
+      if (outBox) {
+        outBox.style.display = "block";
+        outBox.textContent = "▶ Executing command...";
+      }
+      try {
+        const res = await fetch("/api/bugs/run_command", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: activeBugId, command: command })
+        });
+        const data = await res.json();
+        if (outBox) {
+          const text = (data.stdout || "") + (data.stderr ? "\n[STDERR]\n" + data.stderr : "");
+          outBox.textContent = `[Exit Code ${data.exit_code}]\n` + (text || "(No output)");
+        }
+        if (data.status === "ok") {
+          showToast("Command succeeded.");
+        } else {
+          showToast("Command completed with error.");
+        }
+      } catch (err) {
+        if (outBox) outBox.textContent = "Error executing command: " + err;
+        showToast("Execution failed: " + err);
+      }
+    }
+
+    function renderReviewTasks(tasks) {
+      const container = document.getElementById("review-tasks-list");
+      if (!container) return;
+      container.innerHTML = "";
+      if (!tasks || !tasks.length) {
+        container.innerHTML = '<span style="font-size:10px; color:var(--quake-text-dim);">No review tasks defined yet.</span>';
+        return;
+      }
+      tasks.forEach(task => {
+        const isDone = task.status === "COMPLETED";
+        const item = document.createElement("div");
+        item.style.cssText = "background:#120a05; border:1px solid #331f0f; border-radius:3px; padding:8px 10px; margin-bottom:8px;";
+        const cmdPart = task.command ? `
+          <div style="display:flex; align-items:center; gap:8px; margin-top:6px; background:#000; border:1px solid #222; border-radius:2px; padding:4px 8px;">
+            <code style="font-family:var(--font-mono); font-size:10px; color:var(--quake-gold); flex:1; overflow-x:auto;">${task.command}</code>
+            <button class="quake-btn quake-btn-default" style="font-size:9px; padding:2px 8px;" onclick="copyText('${task.command.replace(/'/g, "\\'")}')">Copy</button>
+            <button class="quake-btn quake-btn-green" style="font-size:9px; padding:2px 8px;" onclick="runTaskCommand('${task.id}', '${task.command.replace(/'/g, "\\'")}')">▶ Run Demo</button>
+          </div>
+          <pre id="task-output-${task.id}" style="display:none; margin-top:6px; background:#080503; border:1px solid #331f0f; padding:6px; font-family:var(--font-mono); font-size:9.5px; color:#ccc; max-height:160px; overflow-y:auto; white-space:pre-wrap;"></pre>
+        ` : '';
+        item.innerHTML = `
+          <div style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" ${isDone ? "checked" : ""} onchange="toggleTaskStatus('${task.id}', '${task.status}')" style="cursor:pointer; width:14px; height:14px;">
+            <span style="font-size:11px; font-weight:600; color:${isDone ? "var(--quake-text-dim)" : "#fff"}; text-decoration:${isDone ? "line-through" : "none"}; flex:1;">${task.title}</span>
+            <span class="quake-badge ${isDone ? "quake-badge-green" : (task.status === "FAILED" ? "quake-badge-red" : "quake-badge-muted")}">${task.status}</span>
+          </div>
+          ${cmdPart}
+        `;
+        container.appendChild(item);
+      });
     }
 
 
@@ -1191,6 +1754,10 @@
         // Fallback to locally calculated generateNextBugId
       }
 
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      const nowStr = `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}-${pad(now.getUTCDate())} ${pad(now.getUTCHours())}:${pad(now.getUTCMinutes())}:${pad(now.getUTCSeconds())} UTC`;
+
       const bug = {
         id: newId,
         title: "New Bug Report",
@@ -1204,6 +1771,7 @@
         actual_behavior: "",
         logs: "",
         attachments: [],
+        created_at: nowStr,
         resolution_notes: ""
       };
       db.bugs.unshift(bug);
@@ -1218,45 +1786,59 @@
       const bug = db.bugs.find(b => b.id === activeBugId);
       if (!bug) return;
 
-      bug.title = document.getElementById("bug-title").value;
-      bug.severity = document.getElementById("bug-severity").value;
-      bug.status = document.getElementById("bug-status").value;
-      bug.category = document.getElementById("bug-category").value;
-      bug.component = document.getElementById("bug-component").value;
-      bug.description = document.getElementById("bug-description").value;
-      bug.reproduction_steps = document.getElementById("bug-steps").value.split("\n").filter(s => s.trim());
-      bug.expected_behavior = document.getElementById("bug-expected").value;
-      bug.actual_behavior = document.getElementById("bug-actual").value;
-      bug.logs = document.getElementById("bug-logs").value;
-      bug.resolution_notes = document.getElementById("bug-resolution").value;
+      return await runWithActionModal({
+        title: "SAVING BUG REPORT",
+        description: `Persisting bug ${bug.id} changes and synchronizing markdown files...`,
+        stepText: `Saving ${bug.id}...`,
+        icon: "💾"
+      }, async () => {
+        bug.title = document.getElementById("bug-title").value;
+        bug.severity = document.getElementById("bug-severity").value;
+        bug.status = document.getElementById("bug-status").value;
+        bug.category = document.getElementById("bug-category").value;
+        bug.component = document.getElementById("bug-component").value;
+        bug.description = document.getElementById("bug-description").value;
+        bug.reproduction_steps = document.getElementById("bug-steps").value.split("\n").filter(s => s.trim());
+        bug.expected_behavior = document.getElementById("bug-expected").value;
+        bug.actual_behavior = document.getElementById("bug-actual").value;
+        bug.logs = document.getElementById("bug-logs").value;
+        bug.resolution_notes = document.getElementById("bug-resolution").value;
 
-      const res = await fetch("/api/bugs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(bug)
+        const res = await fetch("/api/bugs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(bug)
+        });
+        const saved = await res.json();
+        updateMetrics();
+        renderBugList();
+        updateComponentDatalist();
+        showToast("Saved bug " + saved.id + " & synced BUGS.md");
+        return saved;
       });
-      const saved = await res.json();
-      updateMetrics();
-      renderBugList();
-      updateComponentDatalist();
-      showToast("Saved bug " + saved.id + " & synced BUGS.md");
-      return saved;
     }
 
     async function deleteActiveBug() {
       if (!confirm("Are you sure you want to delete this bug report?")) return;
-      await fetch("/api/bugs/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: activeBugId })
+      return await runWithActionModal({
+        title: "DELETING BUG REPORT",
+        description: `Deleting ${activeBugId} and removing associated entries...`,
+        stepText: `Deleting ${activeBugId}...`,
+        icon: "🗑️"
+      }, async () => {
+        await fetch("/api/bugs/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: activeBugId })
+        });
+        db.bugs = db.bugs.filter(b => b.id !== activeBugId);
+        activeBugId = db.bugs.length > 0 ? db.bugs[0].id : null;
+        updateMetrics();
+        renderBugList();
+        updateComponentDatalist();
+        loadActiveBug();
+        showToast("Deleted bug & updated BUGS.md");
       });
-      db.bugs = db.bugs.filter(b => b.id !== activeBugId);
-      activeBugId = db.bugs.length > 0 ? db.bugs[0].id : null;
-      updateMetrics();
-      renderBugList();
-      updateComponentDatalist();
-      loadActiveBug();
-      showToast("Deleted bug & updated BUGS.md");
     }
 
     function returnToDashboard(e) {
@@ -1271,7 +1853,11 @@
         window.opener.focus();
         window.close();
       } else {
-        window.location.href = "/";
+        if (window.top && window.top !== window) {
+          window.top.location.href = "/";
+        } else {
+          window.location.href = "/";
+        }
       }
       try {
         window.parent.postMessage({ action: "close_workstation", type: "close_modal" }, "*");
@@ -1511,10 +2097,16 @@
       }
     }
 
+    const MAX_ATTACHMENT_SIZE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GiB (GitHub LFS maximum file limit)
+
     function handleFileUpload(files, isPaste = false) {
       if (!files || files.length === 0) return;
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
+        if (f.size >= MAX_ATTACHMENT_SIZE_BYTES) {
+          showToast(`Error: ${f.name} exceeds maximum allowed size of 2 GB (GitHub LFS limit).`, 5000);
+          continue;
+        }
         const reader = new FileReader();
         reader.onload = () => {
           const b64 = reader.result.split(",")[1];
@@ -1541,6 +2133,10 @@
     }
 
     function uploadBlob(blob, filename, fileType) {
+      if (blob.size >= MAX_ATTACHMENT_SIZE_BYTES) {
+        showToast("Error: Attachment exceeds maximum allowed size of 2 GB (GitHub LFS limit).", 5000);
+        return;
+      }
       const reader = new FileReader();
       reader.onload = () => {
         const b64 = reader.result.split(",")[1];
@@ -1555,6 +2151,10 @@
     }
 
     function uploadTextDocument(text, filename) {
+      if (text.length >= MAX_ATTACHMENT_SIZE_BYTES) {
+        showToast("Error: Document exceeds maximum allowed size of 2 GB.", 5000);
+        return;
+      }
       uploadPayload({
         filename: filename,
         file_type: "document",
@@ -1567,47 +2167,66 @@
       if (activeBugId && !payload.bug_id) {
         payload.bug_id = activeBugId;
       }
-      showToast("Uploading " + payload.filename + "...");
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+      return await runWithActionModal({
+        title: "UPLOADING ATTACHMENT",
+        description: `Uploading ${payload.filename || "file"} and saving to repository...`,
+        stepText: "Uploading file data...",
+        icon: "📎"
+      }, async () => {
+        showToast("Uploading " + payload.filename + "...");
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (res.status === 413) {
+          const errData = await res.json().catch(() => ({}));
+          showToast(errData.error || "Attachment exceeds maximum allowed size of 2 GB (GitHub LFS limit).", 5000);
+          return;
+        }
+        if (!res.ok) {
+          showToast("Failed to upload attachment: HTTP " + res.status);
+          return;
+        }
+        const att = await res.json();
+        const bug = db.bugs.find(b => b.id === activeBugId);
+        if (bug) {
+          if (!bug.attachments) bug.attachments = [];
+          bug.attachments.push(att);
+          renderAttachments(bug.attachments);
+          await saveActiveBug();
+          showToast("Attached " + att.filename);
+        }
       });
-      const att = await res.json();
-      const bug = db.bugs.find(b => b.id === activeBugId);
-      if (bug) {
-        if (!bug.attachments) bug.attachments = [];
-        bug.attachments.push(att);
-        renderAttachments(bug.attachments);
-        saveActiveBug();
-        showToast("Attached " + att.filename);
-      }
     }
 
     async function syncFeedback() {
-      const modal = document.getElementById("feedback-loading-modal");
-      if (modal) modal.style.display = "flex";
-      try {
-        const res = await fetch("/api/sync_feedback", { method: "POST" });
-        const data = await res.json();
-        if (data.status === "ok") {
-          const stats = data.stats || {};
-          showToast(`Feedback synced: ${stats.imported || 0} imported, ${stats.renamed || 0} renamed, ${stats.total || 0} total bugs.`);
-          const dbRes = await fetch("/api/database");
-          if (dbRes.ok) {
-            db = await dbRes.json();
-            updateMetrics();
-            renderBugList();
-            loadActiveBug();
+      await runWithActionModal({
+        title: "MERGING AGENT FEEDBACK",
+        description: "Merging stored agent feedback from feedback/ directory into SQLite database...",
+        stepText: "Scanning feedback/ directory for BUG_*.md files...",
+        icon: "🔄"
+      }, async () => {
+        try {
+          const res = await fetch("/api/sync_feedback", { method: "POST" });
+          const data = await res.json();
+          if (data.status === "ok") {
+            const stats = data.stats || {};
+            showToast(`Feedback synced: ${stats.imported || 0} imported, ${stats.renamed || 0} renamed, ${stats.total || 0} total bugs.`);
+            const dbRes = await fetch("/api/database");
+            if (dbRes.ok) {
+              db = await dbRes.json();
+              updateMetrics();
+              renderBugList();
+              loadActiveBug();
+            }
+          } else {
+            showToast("Sync failed: " + (data.message || "Unknown error"));
           }
-        } else {
-          showToast("Sync failed: " + (data.message || "Unknown error"));
+        } catch (err) {
+          showToast("Error syncing feedback: " + err.message);
         }
-      } catch (err) {
-        showToast("Error syncing feedback: " + err.message);
-      } finally {
-        if (modal) modal.style.display = "none";
-      }
+      });
     }
 
     function toggleExpandPanel(btn) {

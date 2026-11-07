@@ -5,6 +5,7 @@ into a clean GitHub-flavored Markdown document (build/BUGS.md) with overview met
 action checklists, and embedded references.
 """
 
+from collections.abc import Collection
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -19,6 +20,8 @@ from model.bug_report import (
     BugReportModel,
     BugSeverity,
     BugStatus,
+    ReviewTaskModel,
+    ReviewTaskStatus,
 )
 from provider.sanitizer import elide_personal_info
 
@@ -33,6 +36,17 @@ class MarkdownBugExporter:
             repo_root: Base path of repository for file links.
         """
         self.repo_root = repo_root
+        self._file_mtimes: Dict[str, float] = {}
+
+    @staticmethod
+    def _is_content_unchanged(disk_content: str, new_content: str) -> bool:
+        """Check if bug markdown content is unchanged, ignoring volatile Report Date."""
+        if disk_content == new_content:
+            return True
+        date_pattern = r"\|\s*\*\*Report Date\*\*\s*\|\s*`[^`]*`\s*\|"
+        disk_normalized = re.sub(date_pattern, "", disk_content).strip()
+        new_normalized = re.sub(date_pattern, "", new_content).strip()
+        return disk_normalized == new_normalized
 
     def export_markdown(
         self,
@@ -40,6 +54,7 @@ class MarkdownBugExporter:
         output_path: Path,
         store: Optional[Any] = None,
         feedback_dir: Optional[Path] = None,
+        dirty_bug_ids: Optional[Collection[str]] = None,
     ) -> Path:
         """Generate and save BUGS.md markdown document and individual BUG_<id>.md files.
 
@@ -48,6 +63,8 @@ class MarkdownBugExporter:
             output_path: Destination path for BUGS.md file.
             store: Optional SQLiteBugStore to synchronize duplicate ID updates.
             feedback_dir: Optional destination directory for individual BUG_<id>.md files.
+            dirty_bug_ids: Optional collection of bug IDs that were modified. If provided,
+                only individual files for these bugs are updated.
 
         Returns:
             Resolved Path where markdown was saved.
@@ -69,13 +86,27 @@ class MarkdownBugExporter:
             store.resolve_duplicate_ids()
 
         md_text = elide_personal_info(self.render_markdown(database))
-        output_path.write_text(md_text, encoding="utf-8")
+        if not output_path.exists():
+            output_path.write_text(md_text, encoding="utf-8")
+        else:
+            try:
+                disk_content = output_path.read_text(encoding="utf-8")
+                if not self._is_content_unchanged(disk_content, md_text):
+                    output_path.write_text(md_text, encoding="utf-8")
+            except OSError:
+                output_path.write_text(md_text, encoding="utf-8")
 
         # Export individual BUG_<id>.md files into feedback/ (or custom feedback_dir)
         target_feedback_dir = feedback_dir or (
             output_path.parent if output_path.parent.name != "build" else (self.repo_root / "feedback")
         )
-        self.export_all_individual_bugs(database, target_feedback_dir)
+        if dirty_bug_ids is not None:
+            dirty_set = set(dirty_bug_ids)
+            for bug in database.bugs:
+                if bug.id in dirty_set:
+                    self.export_individual_bug(bug, target_feedback_dir)
+        else:
+            self.export_all_individual_bugs(database, target_feedback_dir)
 
         return output_path
 
@@ -203,6 +234,10 @@ class MarkdownBugExporter:
                 lines.append(f"- **Created**: `{b.created_at}`")
             if b.resolved_at:
                 lines.append(f"- **Resolved**: `{b.resolved_at}`")
+            if b.accepted_at:
+                lines.append(f"- **Accepted**: `{b.accepted_at}`")
+            if b.rejected_at:
+                lines.append(f"- **Rejected**: `{b.rejected_at}`")
             lines.append("")
 
             if b.description.strip():
@@ -264,12 +299,33 @@ class MarkdownBugExporter:
                     )
                 lines.append("")
 
+            if b.commit_ids:
+                lines.extend(["#### Attached Commits", ""] + [f"- `{c}`" for c in b.commit_ids] + [""])
+
+            if b.review_tasks:
+                lines.extend(["#### Review Tasks & Functional Checklist", ""])
+                for t in b.review_tasks:
+                    chk = "x" if t.status == "COMPLETED" else " "
+                    cmd_part = f" | `{t.command}`" if t.command else ""
+                    lines.append(f"- [{chk}] <!-- task:{t.id} --> {t.title}{cmd_part}")
+                lines.append("")
+
             if b.resolution_notes.strip():
                 lines.extend(
                     [
                         "#### Resolution Notes",
                         "",
                         b.resolution_notes.strip(),
+                        "",
+                    ]
+                )
+
+            if b.rejection_notes and b.rejection_notes.strip():
+                lines.extend(
+                    [
+                        "#### Rejection Feedback",
+                        "",
+                        b.rejection_notes.strip(),
                         "",
                     ]
                 )
@@ -307,8 +363,8 @@ class MarkdownBugExporter:
         try:
             data = json.loads(state_path.read_text(encoding="utf-8"))
             return BugDatabaseModel.model_validate(data)
-        except Exception:
-            return None
+        except Exception as err:
+            raise ValueError(f"Failed to parse bug markdown file {file_path}: {err}") from err
 
     def parse_markdown(self, markdown_path: Path) -> Optional[BugDatabaseModel]:
         """Parse an existing BUGS.md file into a BugDatabaseModel.
@@ -324,8 +380,8 @@ class MarkdownBugExporter:
         try:
             content = markdown_path.read_text(encoding="utf-8")
             return self.parse_markdown_text(content)
-        except Exception:
-            return None
+        except Exception as err:
+            raise ValueError(f"Failed to parse bug markdown file {file_path}: {err}") from err
 
     def parse_markdown_text(self, content: str) -> BugDatabaseModel:
         """Parse raw BUGS.md text content into a BugDatabaseModel.
@@ -419,6 +475,16 @@ class MarkdownBugExporter:
             if m_resolved:
                 resolved_val = m_resolved.group(1).strip()
 
+            accepted_val = None
+            m_accepted = re.search(r"-\s+\*\*Accepted\*\*:\s*`?([^\n`*]+)`?", sec_clean)
+            if m_accepted:
+                accepted_val = m_accepted.group(1).strip()
+
+            rejected_val = None
+            m_rejected = re.search(r"-\s+\*\*Rejected\*\*:\s*`?([^\n`*]+)`?", sec_clean)
+            if m_rejected:
+                rejected_val = m_rejected.group(1).strip()
+
             # Parse subsections: ####
             subsections = re.split(r"\n(?=####\s+)", sec_clean)
             desc = ""
@@ -427,6 +493,9 @@ class MarkdownBugExporter:
             actual = ""
             logs = ""
             res_notes = ""
+            rej_notes = ""
+            commit_ids: List[str] = []
+            review_tasks: List[ReviewTaskModel] = []
             attachments: List[BugAttachmentModel] = []
 
             for sub in subsections:
@@ -451,6 +520,39 @@ class MarkdownBugExporter:
                                 steps.append(step_m.group(1).strip())
                             elif step_line.strip().startswith("-"):
                                 steps.append(step_line.strip().lstrip("-").strip())
+                    case "attached commits":
+                        for c_line in sub_body.splitlines():
+                            c_m = re.search(r"`([0-9a-fA-F]+)`", c_line)
+                            if c_m:
+                                commit_ids.append(c_m.group(1).strip())
+                            elif c_line.strip().startswith("-"):
+                                commit_ids.append(c_line.strip().lstrip("-").strip())
+                    case "review tasks & functional checklist" | "review tasks" | "functional checklist":
+                        for t_line in sub_body.splitlines():
+                            t_m = re.match(
+                                r"^-\s+\[([ xX])\]\s*(?:<!--\s*task:([a-zA-Z0-9_-]+)\s*-->\s*)?(.*?)$", t_line.strip()
+                            )
+                            if t_m:
+                                is_done = t_m.group(1).lower() == "x"
+                                t_id = t_m.group(2)
+                                rest = t_m.group(3).strip()
+                                cmd = ""
+                                if "|" in rest:
+                                    parts = rest.split("|", 1)
+                                    title_part = parts[0].strip()
+                                    cmd_raw = parts[1].strip()
+                                    cmd_m = re.search(r"`([^`]+)`", cmd_raw)
+                                    cmd = cmd_m.group(1).strip() if cmd_m else cmd_raw
+                                else:
+                                    title_part = rest
+                                task_kwargs = {
+                                    "title": title_part,
+                                    "command": cmd,
+                                    "status": ReviewTaskStatus.COMPLETED if is_done else ReviewTaskStatus.PENDING,
+                                }
+                                if t_id:
+                                    task_kwargs["id"] = t_id
+                                review_tasks.append(ReviewTaskModel(**task_kwargs))
                     case "expected behavior":
                         expected = sub_body
                     case "actual behavior":
@@ -466,6 +568,8 @@ class MarkdownBugExporter:
                         logs = cleaned_logs.strip()
                     case "resolution notes" | "resolution":
                         res_notes = sub_body
+                    case "rejection feedback" | "rejection notes":
+                        rej_notes = sub_body
                     case "attachments & references":
                         for att_line in sub_body.splitlines():
                             att_m = re.match(
@@ -504,7 +608,12 @@ class MarkdownBugExporter:
                 actual_behavior=actual,
                 logs=logs,
                 attachments=attachments,
+                commit_ids=commit_ids,
+                review_tasks=review_tasks,
                 resolution_notes=res_notes,
+                rejection_notes=rej_notes,
+                accepted_at=accepted_val,
+                rejected_at=rejected_val,
             )
             db.add_or_update(bug)
 
@@ -513,28 +622,70 @@ class MarkdownBugExporter:
     def merge_databases(self, base_db: BugDatabaseModel, md_db: BugDatabaseModel) -> BugDatabaseModel:
         """Merge markdown database changes into base database using Read-Modify-Write rules.
 
+        Matches bugs primarily by unique UUID. If an incoming bug shares an ID with an existing
+        bug but has a different UUID, collision mitigation generates a new unique ID for the incoming
+        bug so neither bug's content or state is clobbered.
+
         Args:
             base_db: Current base database model (e.g. from SQLite).
             md_db: Database model parsed from BUGS.md.
 
         Returns:
-            Updated base_db with all merged changes.
+            Updated base_db with all merged changes and disambiguated bugs.
         """
-        existing_map = {b.id: b for b in base_db.bugs}
+        existing_by_uuid = {b.uuid: b for b in base_db.bugs if b.uuid}
+        existing_by_id = {b.id: b for b in base_db.bugs}
+        all_ids = {b.id for b in base_db.bugs} | {b.id for b in md_db.bugs}
 
         for md_bug in md_db.bugs:
-            if md_bug.id not in existing_map:
-                # Newly added bug in BUGS.md
+            existing = None
+            is_collision = False
+
+            if md_bug.uuid and md_bug.uuid in existing_by_uuid:
+                existing = existing_by_uuid[md_bug.uuid]
+            elif md_bug.id in existing_by_id:
+                cand = existing_by_id[md_bug.id]
+                if not md_bug.uuid and not cand.uuid and md_bug.title == cand.title:
+                    existing = cand
+                else:
+                    is_collision = True
+
+            if is_collision:
+                # Mitigate collision: assign new unique ID
+                new_id = base_db.generate_bug_id(existing_ids=all_ids)
+                all_ids.add(new_id)
+                md_bug.id = new_id
+                if not md_bug.uuid:
+                    md_bug.uuid = str(uuid_pkg.uuid4())
                 base_db.bugs.append(md_bug)
-                existing_map[md_bug.id] = md_bug
+                existing_by_uuid[md_bug.uuid] = md_bug
+                existing_by_id[new_id] = md_bug
+                continue
+
+            if existing is None:
+                # Newly added bug in BUGS.md
+                if not md_bug.uuid:
+                    md_bug.uuid = str(uuid_pkg.uuid4())
+                base_db.bugs.append(md_bug)
+                existing_by_uuid[md_bug.uuid] = md_bug
+                existing_by_id[md_bug.id] = md_bug
             else:
-                existing = existing_map[md_bug.id]
+                # Existing bug matched by UUID or legacy title match
+                if md_bug.id != existing.id:
+                    if md_bug.id not in existing_by_id or existing_by_id[md_bug.id] is existing:
+                        existing_by_id.pop(existing.id, None)
+                        existing.id = md_bug.id
+                        existing_by_id[existing.id] = existing
                 # Status update: protect resolved/closed bugs from being regressed to OPEN by stale markdown without notes
                 if (
                     existing.status in (BugStatus.RESOLVED, BugStatus.CLOSED)
                     and md_bug.status == BugStatus.OPEN
+                    and not (md_bug.rejection_notes and md_bug.rejection_notes.strip())
                     and not md_bug.resolution_notes.strip()
                 ):
+                    pass
+                elif existing.status == BugStatus.CLOSED and md_bug.status == BugStatus.RESOLVED:
+                    # Bug was already accepted/closed in database; protect from stale markdown without acceptance
                     pass
                 elif md_bug.status != existing.status:
                     existing.status = md_bug.status
@@ -545,6 +696,12 @@ class MarkdownBugExporter:
                             )
                     else:
                         existing.resolved_at = None
+
+                # Acceptance and Rejection timestamps
+                if md_bug.accepted_at and md_bug.accepted_at != existing.accepted_at:
+                    existing.accepted_at = md_bug.accepted_at
+                if md_bug.rejected_at and md_bug.rejected_at != existing.rejected_at:
+                    existing.rejected_at = md_bug.rejected_at
 
                 # Non-empty title / severity / category / component updates
                 if md_bug.title and md_bug.title != existing.title:
@@ -590,6 +747,41 @@ class MarkdownBugExporter:
                         existing.attachments.append(att)
                         existing_paths.add(att.file_path)
 
+                # Commit IDs: merge unique
+                for cid in md_bug.commit_ids:
+                    if cid not in existing.commit_ids:
+                        existing.commit_ids.append(cid)
+
+                # Review tasks: merge preserving IDs
+                if md_bug.review_tasks:
+                    existing_by_id = {t.id: t for t in existing.review_tasks}
+                    existing_by_title = {t.title: t for t in existing.review_tasks}
+                    merged_tasks = []
+                    for t in md_bug.review_tasks:
+                        if t.id in existing_by_id:
+                            orig = existing_by_id[t.id]
+                            t.notes = t.notes or orig.notes
+                            merged_tasks.append(t)
+                        elif t.title in existing_by_title:
+                            orig = existing_by_title[t.title]
+                            t.id = orig.id
+                            t.notes = t.notes or orig.notes
+                            merged_tasks.append(t)
+                        else:
+                            merged_tasks.append(t)
+                    existing.review_tasks = merged_tasks
+
+                # Rejection notes
+                if (
+                    md_bug.rejection_notes
+                    and md_bug.rejection_notes.strip()
+                    and (
+                        not existing.rejection_notes
+                        or md_bug.rejection_notes.strip() != existing.rejection_notes.strip()
+                    )
+                ):
+                    existing.rejection_notes = md_bug.rejection_notes
+
         return base_db
 
     def render_bug_markdown(self, bug: BugReportModel) -> str:
@@ -621,6 +813,10 @@ class MarkdownBugExporter:
             lines.append(f"- **Created**: `{bug.created_at}`")
         if bug.resolved_at:
             lines.append(f"- **Resolved**: `{bug.resolved_at}`")
+        if bug.accepted_at:
+            lines.append(f"- **Accepted**: `{bug.accepted_at}`")
+        if bug.rejected_at:
+            lines.append(f"- **Rejected**: `{bug.rejected_at}`")
         lines.append("")
 
         if bug.description.strip():
@@ -661,8 +857,22 @@ class MarkdownBugExporter:
                 )
             lines.append("")
 
+        if bug.commit_ids:
+            lines.extend(["#### Attached Commits", ""] + [f"- `{c}`" for c in bug.commit_ids] + [""])
+
+        if bug.review_tasks:
+            lines.extend(["#### Review Tasks & Functional Checklist", ""])
+            for t in bug.review_tasks:
+                chk = "x" if t.status == "COMPLETED" else " "
+                cmd_part = f" | `{t.command}`" if t.command else ""
+                lines.append(f"- [{chk}] <!-- task:{t.id} --> {t.title}{cmd_part}")
+            lines.append("")
+
         if bug.resolution_notes.strip():
             lines.extend(["#### Resolution Notes", "", bug.resolution_notes.strip(), ""])
+
+        if bug.rejection_notes and bug.rejection_notes.strip():
+            lines.extend(["#### Rejection Feedback", "", bug.rejection_notes.strip(), ""])
 
         return elide_personal_info("\n".join(lines).strip() + "\n")
 
@@ -677,8 +887,9 @@ class MarkdownBugExporter:
             Path to written markdown file.
         """
         feedback_dir.mkdir(parents=True, exist_ok=True)
-        clean_id = bug.id.removeprefix("BUG-").removeprefix("BUG_")
-        target_file = feedback_dir / f"BUG_{clean_id}.md"
+        prefix = "WORM" if bug.id.startswith("WORM-") else "BUG"
+        clean_id = bug.id.removeprefix("BUG-").removeprefix("BUG_").removeprefix("WORM-").removeprefix("WORM_")
+        target_file = feedback_dir / f"{prefix}_{clean_id}.md"
         content = elide_personal_info(self.render_bug_markdown(bug))
         if target_file.exists():
             try:
@@ -688,6 +899,7 @@ class MarkdownBugExporter:
                 # Protect resolved bug file on disk from being overwritten by un-noted OPEN bug
                 if (
                     bug.status == BugStatus.OPEN
+                    and not bug.rejection_notes
                     and not bug.resolution_notes.strip()
                     and "- **Status**: `RESOLVED`" in disk_content
                 ):
@@ -729,16 +941,17 @@ class MarkdownBugExporter:
             m_header = re.search(
                 r"^#\s+(?:[^\n\[]*?)?`\[((?:BUG|WORM)-[^\]]+|[^\]]+)\]`\s*(.*?)$", content, re.MULTILINE
             )
-            m_fn = re.match(r"^(?:BUG|WORM)[_-](.+)\.md$", file_path.name, re.IGNORECASE)
+            m_fn = re.match(r"^(BUG|WORM)[_-](.+)\.md$", file_path.name, re.IGNORECASE)
             fn_id = ""
             if m_fn:
-                fn_part = m_fn.group(1)
+                prefix = m_fn.group(1).upper()
+                fn_part = m_fn.group(2)
                 if fn_part.isdigit():
-                    fn_id = f"BUG-{int(fn_part):03d}"
+                    fn_id = f"{prefix}-{int(fn_part):03d}"
                 elif fn_part.startswith("BUG-") or fn_part.startswith("WORM-"):
                     fn_id = fn_part
                 else:
-                    fn_id = f"BUG-{fn_part}"
+                    fn_id = f"{prefix}-{fn_part}"
 
             bug_id = fn_id
             bug_title = ""
@@ -746,7 +959,7 @@ class MarkdownBugExporter:
                 bug_id = m_header.group(1).strip()
                 bug_title = m_header.group(2).strip()
 
-            if fn_id and (not bug_id or not bug_id.startswith("BUG-")):
+            if fn_id and (not bug_id or not (bug_id.startswith("BUG-") or bug_id.startswith("WORM-"))):
                 bug_id = fn_id
 
             m_id = re.search(r"-\s+\*\*ID\*\*:\s*`?([^\n`*]+)`?", content)
@@ -798,6 +1011,16 @@ class MarkdownBugExporter:
             if m_resolved:
                 resolved_val = m_resolved.group(1).strip()
 
+            accepted_val = None
+            m_accepted = re.search(r"-\s+\*\*Accepted\*\*:\s*`?([^\n`*]+)`?", content)
+            if m_accepted:
+                accepted_val = m_accepted.group(1).strip()
+
+            rejected_val = None
+            m_rejected = re.search(r"-\s+\*\*Rejected\*\*:\s*`?([^\n`*]+)`?", content)
+            if m_rejected:
+                rejected_val = m_rejected.group(1).strip()
+
             subsections = re.split(r"\n(?=####\s+)", content)
             desc = ""
             steps: List[str] = []
@@ -805,6 +1028,9 @@ class MarkdownBugExporter:
             actual = ""
             logs = ""
             res_notes = ""
+            rej_notes = ""
+            commit_ids: List[str] = []
+            review_tasks: List[ReviewTaskModel] = []
             attachments: List[BugAttachmentModel] = []
 
             for sub in subsections:
@@ -825,6 +1051,39 @@ class MarkdownBugExporter:
                                 steps.append(step_m.group(1).strip())
                             elif step_line.strip().startswith("-"):
                                 steps.append(step_line.strip().lstrip("-").strip())
+                    case "attached commits":
+                        for c_line in sub_body.splitlines():
+                            c_m = re.search(r"`([0-9a-fA-F]+)`", c_line)
+                            if c_m:
+                                commit_ids.append(c_m.group(1).strip())
+                            elif c_line.strip().startswith("-"):
+                                commit_ids.append(c_line.strip().lstrip("-").strip())
+                    case "review tasks & functional checklist" | "review tasks" | "functional checklist":
+                        for t_line in sub_body.splitlines():
+                            t_m = re.match(
+                                r"^-\s+\[([ xX])\]\s*(?:<!--\s*task:([a-zA-Z0-9_-]+)\s*-->\s*)?(.*?)$", t_line.strip()
+                            )
+                            if t_m:
+                                is_done = t_m.group(1).lower() == "x"
+                                t_id = t_m.group(2)
+                                rest = t_m.group(3).strip()
+                                cmd = ""
+                                if "|" in rest:
+                                    parts = rest.split("|", 1)
+                                    title_part = parts[0].strip()
+                                    cmd_raw = parts[1].strip()
+                                    cmd_m = re.search(r"`([^`]+)`", cmd_raw)
+                                    cmd = cmd_m.group(1).strip() if cmd_m else cmd_raw
+                                else:
+                                    title_part = rest
+                                task_kwargs = {
+                                    "title": title_part,
+                                    "command": cmd,
+                                    "status": ReviewTaskStatus.COMPLETED if is_done else ReviewTaskStatus.PENDING,
+                                }
+                                if t_id:
+                                    task_kwargs["id"] = t_id
+                                review_tasks.append(ReviewTaskModel(**task_kwargs))
                     case "behavior comparison":
                         exp_m = re.search(r"-\s+\*\*Expected\*\*:\s*(.*?)$", sub_body, re.MULTILINE)
                         act_m = re.search(r"-\s+\*\*Actual\*\*:\s*(.*?)$", sub_body, re.MULTILINE)
@@ -847,6 +1106,8 @@ class MarkdownBugExporter:
                         logs = cleaned.strip()
                     case "resolution notes" | "resolution":
                         res_notes = sub_body
+                    case "rejection feedback" | "rejection notes":
+                        rej_notes = sub_body
                     case "attachments & references":
                         for att_line in sub_body.splitlines():
                             att_m = re.match(
@@ -881,10 +1142,15 @@ class MarkdownBugExporter:
                 actual_behavior=actual,
                 logs=logs,
                 attachments=attachments,
+                commit_ids=commit_ids,
+                review_tasks=review_tasks,
                 resolution_notes=res_notes,
+                rejection_notes=rej_notes,
+                accepted_at=accepted_val,
+                rejected_at=rejected_val,
             )
-        except Exception:
-            return None
+        except Exception as err:
+            raise ValueError(f"Failed to parse bug markdown file {file_path}: {err}") from err
 
     def scan_and_sync_feedback_dir(
         self,
@@ -909,23 +1175,63 @@ class MarkdownBugExporter:
         renamed = 0
         merged = 0
 
-        for bug_file in sorted(feedback_dir.glob("BUG_*.md")):
+        # Load cached modification times from SQLite store or in-memory cache
+        known_mtimes: Dict[str, float] = {}
+        if store and hasattr(store, "get_file_mtimes"):
+            known_mtimes = store.get_file_mtimes()
+        if not known_mtimes and hasattr(self, "_file_mtimes"):
+            known_mtimes = dict(self._file_mtimes)
+
+        # Build in-memory lookup map of existing bugs in database by canonical and raw ID
+        existing_by_id: Dict[str, BugReportModel] = {}
+        for b in database.bugs:
+            existing_by_id[b.id] = b
+            num_clean = re.sub(r"^(?:WORM|BUG)[-_]", "", b.id, flags=re.IGNORECASE)
+            existing_by_id[f"WORM-{num_clean}"] = b
+            existing_by_id[f"BUG-{num_clean}"] = b
+            if num_clean.isdigit():
+                norm = f"{int(num_clean):03d}"
+                existing_by_id[f"WORM-{norm}"] = b
+                existing_by_id[f"BUG-{norm}"] = b
+
+        updated_mtimes: Dict[str, float] = {}
+
+        bug_files = sorted(set(list(feedback_dir.glob("BUG_*.md")) + list(feedback_dir.glob("WORM_*.md"))))
+        for bug_file in bug_files:
             scanned += 1
+            file_name = bug_file.name
+
+            # Determine ID implied by filename
+            m_fn = re.match(r"^(BUG|WORM)[_-](.+)\.md$", file_name, re.IGNORECASE)
+            expected_id_from_fn = ""
+            if m_fn:
+                fn_prefix = m_fn.group(1).upper()
+                raw_part = m_fn.group(2)
+                if raw_part.isdigit():
+                    expected_id_from_fn = f"{fn_prefix}-{int(raw_part):03d}"
+                elif raw_part.startswith(f"{fn_prefix}-"):
+                    expected_id_from_fn = raw_part
+                else:
+                    expected_id_from_fn = f"{fn_prefix}-{raw_part}"
+
+            try:
+                curr_mtime = bug_file.stat().st_mtime
+            except OSError:
+                curr_mtime = 0.0
+
+            # Incremental sync: If file mtime matches cached mtime and bug is already loaded in database, skip re-parsing!
+            if (
+                file_name in known_mtimes
+                and abs(known_mtimes[file_name] - curr_mtime) < 1e-4
+                and expected_id_from_fn in existing_by_id
+            ):
+                continue
+
             md_bug = self.parse_individual_bug_file(bug_file)
             if not md_bug:
                 continue
 
-            # Determine ID implied by filename
-            m_fn = re.match(r"^BUG[_-](.+)\.md$", bug_file.name, re.IGNORECASE)
-            expected_id_from_fn = ""
-            if m_fn:
-                raw_part = m_fn.group(1)
-                if raw_part.isdigit():
-                    expected_id_from_fn = f"BUG-{int(raw_part):03d}"
-                elif raw_part.startswith("BUG-"):
-                    expected_id_from_fn = raw_part
-                else:
-                    expected_id_from_fn = f"BUG-{raw_part}"
+            updated_mtimes[file_name] = curr_mtime
 
             # Check if this bug already exists by UUID
             existing_by_uuid = database.get_bug_by_uuid(md_bug.uuid)
@@ -940,8 +1246,12 @@ class MarkdownBugExporter:
                 if (
                     existing_by_uuid.status in (BugStatus.RESOLVED, BugStatus.CLOSED)
                     and md_bug.status == BugStatus.OPEN
+                    and not (md_bug.rejection_notes and md_bug.rejection_notes.strip())
                     and not md_bug.resolution_notes.strip()
                 ):
+                    pass
+                elif existing_by_uuid.status == BugStatus.CLOSED and md_bug.status == BugStatus.RESOLVED:
+                    # Bug was already accepted/closed in database; do not regress to RESOLVED from stale markdown
                     pass
                 else:
                     database.add_or_update(md_bug)
@@ -950,10 +1260,25 @@ class MarkdownBugExporter:
             else:
                 if expected_id_from_fn:
                     md_bug.id = expected_id_from_fn
+                # Check collision with existing bug ID
+                cand = database.get_bug(md_bug.id)
+                if cand and (not md_bug.uuid or cand.uuid != md_bug.uuid):
+                    # Duplicate ID collision detected: mitigate by reassigning unique ID
+                    new_id = database.generate_bug_id(existing_ids={b.id for b in database.bugs})
+                    md_bug.id = new_id
+                    if not md_bug.uuid:
+                        md_bug.uuid = str(uuid_pkg.uuid4())
+                    self.export_individual_bug(md_bug, feedback_dir)
                 database.add_or_update(md_bug)
                 merged += 1
 
         if store and hasattr(store, "save_database") and (merged > 0 or renamed > 0):
             store.save_database(database)
+
+        if updated_mtimes:
+            if store and hasattr(store, "update_file_mtimes"):
+                store.update_file_mtimes(updated_mtimes)
+            if hasattr(self, "_file_mtimes"):
+                self._file_mtimes.update(updated_mtimes)
 
         return {"merged": merged, "renamed": renamed, "scanned": scanned}

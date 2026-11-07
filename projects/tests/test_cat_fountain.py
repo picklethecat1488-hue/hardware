@@ -34,7 +34,7 @@ class TestCatFountainProvider:
             "led_cover": {"material": "utr8100"},
             "drive_hub": {"material": "petg"},
             "pump_cover": {"material": "utr8100"},
-            "motor_clip": {"material": "petg"},
+            "motor_hub": {"material": "petg"},
         }
         with patch("provider.provider.load_manifest", return_value=mock_manifest):
             yield CatFountainProvider()
@@ -51,25 +51,50 @@ class TestCatFountainProvider:
         assert "bottom_cover" in provider.part
         assert "lid" in provider.part
         assert "led_cover" in provider.part
+        assert "drive_hub" in provider.part
+        assert "motor_hub" in provider.part
+        assert "motor_clip" not in provider.part
 
-    def test_motor_clip_r_shape_relief(self, provider):
-        """Verify motor clip R-shape connector relief geometry without building full bowl (BUG-TRANSLUCENT-LARVA-792)."""
-        clip = provider.build_motor_clip("motor_clip")
-        assert clip.part.volume > 0.0
-        assert clip.part.is_valid()
+    def test_regression_bug_lustrous_cocoon_669_simplified_motor_base(self, provider):
+        """Verify BUG-LUSTROUS-COCOON-669: Motor base design is circle unioned with rectangle for hall sensor, with 3 holes."""
+        hub = provider.build_motor_hub("motor_hub")
+        assert hub.part.volume > 0.0
+        assert hub.part.is_valid()
 
-        clip_h = provider.settings.motor_clip_thickness
-        # Relieved arm must be open at Y = -10.0 to allow connector rotation
-        assert not clip.part.is_inside((-6.0, -10.0, clip_h * 0.5))
-        # Guide stub near handle must remain solid for slide-in slot alignment
-        assert clip.part.is_inside((-6.0, -20.0, clip_h * 0.5))
-        # Opposite continuous arm must remain solid
-        assert clip.part.is_inside((6.0, -10.0, clip_h * 0.5))
-        # Support web connecting stub to continuous arm must be solid below the support curve
-        assert clip.part.is_inside((0.0, -18.0, clip_h * 0.5))
-        assert clip.part.is_inside((0.0, -14.5, clip_h * 0.5))
-        # Wire channel above support web must remain open
-        assert not clip.part.is_inside((0.0, -5.0, clip_h * 0.5))
+        clip_h = provider.settings.motor_hub_thickness
+        r_bcd = provider.settings.motor_mount_bolt_circle_radius
+        collar_r = provider.settings.motor_hub_socket_radius - provider.settings.motor_hub_collar_clearance
+
+        # 1. Circle base is solid, no complicated south handle or arm
+        assert hub.part.is_inside((0, -collar_r * 0.5, clip_h * 0.5)), "Circular base must be solid"
+        assert not hub.part.is_inside((0, -25.0, clip_h * 0.5)), "No extended South arm / handle"
+
+        # 2. Rectangular tongue for Hall sensor mount is solid
+        assert hub.part.is_inside((0, 15.0, clip_h * 0.5)), "Hall sensor rectangular mount must be solid"
+
+        # 3. Central shaft clearance hole is open
+        assert not hub.part.is_inside((0, 0, clip_h * 0.5)), "Central shaft hole must be open"
+
+        # 4. Exactly 3 mounting holes on bottom
+        for angle in [90.0, 210.0, 330.0]:
+            rad = math.radians(angle)
+            hx = r_bcd * math.cos(rad)
+            hy = r_bcd * math.sin(rad)
+            assert not hub.part.is_inside((hx, hy, clip_h * 0.5)), f"Mounting hole at {angle}° must be open"
+            assert hub.part.is_inside((hx + 2.0, hy, clip_h * 0.5)), f"Surrounding base at {angle}° must be solid"
+
+        # 5. Bowl socket keyway slot cuts cleanly through socket wall with zero thin slivers at inner curved corners
+        bowl = provider.build_bowl("bowl")
+        assert bowl.part.is_valid()
+        floor_z = provider.settings.floor_z
+        t = provider.settings.bowl_thickness
+        z = floor_z - t - 5.0
+        # Points inside keyway opening at Y = 16.8 (where curved inner wall was previously leaving thin slivers) must be open
+        assert not bowl.part.is_inside((7.5, 16.8, z)), "Right corner of keyway slot must not have thin sliver wall"
+        assert not bowl.part.is_inside((-7.5, 16.8, z)), "Left corner of keyway slot must not have thin sliver wall"
+        # Socket wall outside the keyway width (X = 8.5) must remain solid
+        assert bowl.part.is_inside((8.5, 16.8, z)), "Socket wall outside keyway must remain solid"
+        assert bowl.part.is_inside((-8.5, 16.8, z)), "Socket wall outside keyway must remain solid"
 
     @pytest.mark.slow
     def test_build_part_geometry(self, provider):
@@ -227,6 +252,30 @@ class TestCatFountainProvider:
         assert "bottom_cover" in room
         assert "lid" in room
 
+        # Verify footprints/PCBs are placed in DEFAULT mode for visual inspection
+        expected_footprints = [
+            "battery_pcb",
+            "charger_pcb",
+            "pico_pcb",
+            "fuel_gauge_pcb",
+            "current_monitor_pcb",
+            "motor_driver_pcb",
+            "motor_pcb",
+            "sensor_pcb_east",
+            "sensor_pcb_north",
+            "sensor_pcb_west",
+            "speed_sensor_pcb",
+            "swd_adapter_pcb",
+        ]
+        for fp_name in expected_footprints:
+            assert fp_name in room, f"Expected footprint '{fp_name}' in room for visual inspection"
+
+        # Verify dummy footprints are omitted in SIMULATE mode
+        sim_room = Room()
+        provider.build_product(sim_room, Mode.SIMULATE)
+        for fp_name in expected_footprints:
+            assert fp_name not in sim_room, f"Footprint '{fp_name}' must not be present in SIMULATE mode"
+
         # Verify attributes on bowl
         bowl_shape = room["bowl"][0]
         assert bowl_shape.urdf_label == "bowl"
@@ -250,7 +299,8 @@ class TestCatFountainProvider:
         assert provider.settings.bowl_radius == 100.0
         assert provider.settings.tube_radius == 8.0
         assert provider.settings.impeller_radius == 9.0
-        assert provider.settings.impeller_blades == 6
+        assert provider.settings.impeller_blades == 3
+        assert provider.settings.impeller_shaft_radius == 1.0
         assert provider.settings.petg_boundary_friction == 0.20
         assert provider.settings.petg_contact_angle == 75.0
 
@@ -906,9 +956,9 @@ class TestCatFountainProvider:
     @pytest.mark.slow
     def test_assembly_and_fitment_tolerances(self, provider):
         """Verify assembly clearances: clip fits through bottom cover, and drive hub fits in recess."""
-        # 1. Verify that the bottom cover's opening width is larger than the motor clip width.
-        # This ensures the fork can actually be slid in from the side.
-        assert provider.settings.bottom_cover_opening_width > provider.settings.motor_clip_width
+        # 1. Verify that the bottom cover's opening width is larger than the motor hub mount plate width.
+        # This ensures the assembly can actually be accessed from the side.
+        assert provider.settings.bottom_cover_opening_width > provider.settings.motor_hub_width
 
         # 2. Verify that the drive hub outer radius is smaller than the bowl's drive hub recess radius.
         # This ensures the drive hub can be physically inserted into the recess on the motor shaft.
@@ -990,7 +1040,7 @@ class TestCatFountainProvider:
 
     @pytest.mark.slow
     def test_drive_hub_standoff_thrust_ring(self, provider):
-        """Verify that the drive hub has an integral outer perimeter standoff thrust ring for anti-wobble stability."""
+        """Verify that the drive hub has a centered thrust collar around shaft collar and outer ring is removed."""
         hub = provider.build_drive_hub("drive_hub")
         solid = hub.part
 
@@ -999,13 +1049,17 @@ class TestCatFountainProvider:
         standoff_h = provider.settings.drive_hub_standoff_height
         assert standoff_h > 0.0, "Expected positive standoff height"
 
-        # Point inside the outer perimeter standoff ring (R = hub_r - 0.7mm) at Z = hub_h + standoff_h / 2.0 must be solid
+        # Point at the outer perimeter (R = hub_r - 0.7mm) at Z = hub_h + standoff_h / 2.0 must NOT be solid (outer ring removed)
         test_r = hub_r - 0.7
         z_mid = hub_h + standoff_h / 2.0
-        assert solid.is_inside((test_r, 0.0, z_mid)), "Outer perimeter standoff ring is missing or hollow!"
+        assert not solid.is_inside((test_r, 0.0, z_mid)), "Outer perimeter standoff ring must be removed!"
+
+        # Point inside the centered thrust collar around the 1.5mm motor shaft collar (R <= 1.5mm) must be solid
+        r_collar = (provider.settings.drive_hub_shaft_radius + provider.settings.drive_hub_thrust_collar_radius) / 2.0
+        assert solid.is_inside((r_collar, 0.0, z_mid)), "Centered thrust collar is missing or hollow!"
 
         # Point inside the recessed magnet region (R = 9.0mm) at Z = hub_h + standoff_h / 2.0 must be empty space (recessed)
-        assert not solid.is_inside((9.0, 0.0, z_mid)), "Magnet pocket region is not recessed below outer standoff ring!"
+        assert not solid.is_inside((9.0, 0.0, z_mid)), "Magnet pocket region is not recessed below thrust collar!"
 
         # Central shaft hole at Z = hub_h + standoff_h / 2.0 must be open
         assert not solid.is_inside((0.0, 0.0, z_mid)), "Shaft hole is blocked!"
@@ -1015,31 +1069,45 @@ class TestCatFountainProvider:
 
     @pytest.mark.slow
     def test_impeller_geometry_and_elevation(self, provider):
-        """Verify that the impeller has the updated base height and continuous blade root geometry."""
+        """Verify that the impeller has the 3-bladed convex hull base, low-friction pin bore, and continuous blades."""
+        import math
+
         impeller = provider.build_impeller("impeller")
         solid = impeller.part
 
         base_h = provider.settings.impeller_base_height
         pin_r = provider.settings.impeller_shaft_radius
         pin_clearance = provider.settings.impeller_shaft_clearance
+        sleeve_r = provider.settings.impeller_sleeve_radius
         assert base_h >= 6.0, f"Expected impeller base height >= 6.0mm, got {base_h}"
+        assert pin_r == 1.0, f"Expected low-friction shaft radius 1.0mm, got {pin_r}"
+        assert provider.settings.impeller_blades == 3, "Expected 3-bladed impeller configuration"
 
-        # Point inside base disk at Z = base_h / 2.0 (outside magnet pockets) must be solid
-        test_r = (pin_r + 1.0 + 4.5) / 2.0
-        z_mid = base_h / 2.0
-        assert solid.is_inside((test_r, 0.0, z_mid)), "Impeller base disk is missing or hollow!"
+        # 1. Point inside magnet lobe at Z = 4.5 (above 3.2mm magnet pocket, along X-axis lobe) must be solid
+        assert solid.is_inside((6.0, 0.0, 4.5)), "Impeller magnet lobe body is missing or hollow!"
 
-        # Central pin hole must be open throughout
-        assert not solid.is_inside((0.0, 0.0, z_mid)), "Pin hole is blocked!"
-        assert not solid.is_inside((pin_r, 0.0, z_mid)), "Pin hole has insufficient clearance!"
+        # 2. Point in the valley between lobes (60 deg, R = 9.0mm) must be hollow/open (convex hull profile)
+        valley_x = 9.0 * math.cos(math.radians(60))
+        valley_y = 9.0 * math.sin(math.radians(60))
+        assert not solid.is_inside((valley_x, valley_y, 4.5)), (
+            "Impeller base should be a 3-lobed convex hull, not a full disk!"
+        )
 
-        # Blades start directly at the central hub sleeve (R = 4.5mm) with zero gap
-        sleeve_r = 4.5
+        # 3. Central pin hole must be open throughout
+        assert not solid.is_inside((0.0, 0.0, base_h / 2.0)), "Pin hole is blocked!"
+        assert not solid.is_inside((pin_r, 0.0, base_h / 2.0)), "Pin hole has insufficient clearance!"
+
+        # 4. Blades start directly at the central hub sleeve (sleeve_r = 2.75mm) with zero gap
         blade_mid_z = base_h + 2.0
         blade_root_point = (sleeve_r + 0.5, 0.0, blade_mid_z)
         assert solid.is_inside(blade_root_point), "Impeller blade root is disconnected or has empty gap at sleeve!"
 
-        # Ensure single contiguous solid
+        # Ensure blade corners at sleeve junction have zero micro-gaps (BUG-FLITTING-LOCUST-977)
+        assert solid.is_inside((2.70, 0.55, blade_mid_z)), "Micro-gap detected at positive blade corner junction!"
+        assert solid.is_inside((2.70, -0.55, blade_mid_z)), "Micro-gap detected at negative blade corner junction!"
+        assert solid.is_inside((2.68, 0.55, blade_mid_z)), "Micro-gap detected at sleeve cylinder perimeter!"
+
+        # 5. Ensure single contiguous solid
         assert len(solid.solids()) == 1, "Impeller is split into disconnected parts!"
 
     @pytest.mark.slow
@@ -1576,6 +1644,86 @@ class TestCatFountainProvider:
         south_y = tube_y - tube_r - 1.0
         assert solid.is_inside((0.0, south_y, z_mid)), f"Pump cover South cradle wall is broken at Y = {south_y}!"
 
+    @pytest.mark.slow
+    def test_regression_bug_speckled_roach_49_pump_cover_snap_fit(self, provider):
+        """Verify that pump cover downward lip features an annular snap ridge and casing recess has a matching groove.
+
+        BUG-SPECKLED-ROACH-49: Ensures pump cover snaps securely into the casing recess on the bowl and cannot move
+        freely up and down the tube/shaft.
+        """
+        from build123d import Location
+
+        bowl = provider.build_bowl("bowl")
+        cover = provider.build_pump_cover("pump_cover")
+        bowl_part = bowl.part
+        cover_part = cover.part
+        assert bowl_part is not None and cover_part is not None
+
+        floor_z = provider.settings.floor_z
+        hub_r = provider.settings.impeller_radius + provider.settings.magnet_radius + 1.0
+        impeller_r = hub_r + 4.0
+        chamber_r = impeller_r + provider.settings.pump_casing_clearance
+        snap_r = chamber_r + 1.0
+        z_offset = provider.settings.pump_cover_snap_z_offset
+        mount_depth = provider.settings.pump_cover_mount_depth
+        assert mount_depth >= 2.0, f"Expected mount depth >= 2.0mm for epoxy clearance, got {mount_depth}"
+        assert z_offset >= 1.2, f"Expected annular ring Z offset >= 1.2mm for epoxy clearance, got {z_offset}"
+
+        # 1. Pump cover downward lip has an annular snap ridge protruding beyond snap_r
+        ridge_outer_r = (
+            snap_r + provider.settings.pump_cover_snap_ridge_offset + provider.settings.pump_cover_snap_ridge_minor
+        )
+        assert ridge_outer_r > snap_r, "Snap ridge must extend beyond casing recess radius to snap in"
+        test_ridge_pt = (ridge_outer_r - 0.05, 0.0, -z_offset)
+        assert cover_part.is_inside(test_ridge_pt), (
+            f"Pump cover downward lip is missing annular snap ridge at {test_ridge_pt}!"
+        )
+
+        # 2. Bowl casing recess has a matching snap groove at the same relative Z
+        groove_z = floor_z + 10.0 - z_offset
+        test_groove_pt = (snap_r + 0.2, 0.0, groove_z)
+        assert not bowl_part.is_inside(test_groove_pt), (
+            f"Bowl casing recess is missing annular snap groove at {test_groove_pt}!"
+        )
+
+        # 3. Assembled configuration must have zero CAD collision between ridge and groove
+        seat_loc = Location((0, 0, floor_z + 10.0))
+        cover_placed = cover_part.located(seat_loc)
+        intersection = bowl_part.intersect(cover_placed)
+        vol = sum(s.volume for s in intersection.solids()) if intersection else 0.0
+        assert vol < 0.2, f"Interference detected between bowl and snapped pump cover: {vol:.4f} mm3"
+
+    @pytest.mark.slow
+    def test_regression_bug_glowing_wasp_133_snap_ring_refactoring(self, provider):
+        """Verify that snap ring and pocket tool geometry routines are cleanly abstracted and parameterized.
+
+        BUG-GLOWING-WASP-133: Replaces repeated ad-hoc snap ring and pocket tool patterns with reusable helpers
+        and parameterized config settings.
+        """
+        from projects.cat_fountain.provider import make_filleted_pocket_tool, make_snap_ring
+
+        # 1. Test make_snap_ring
+        ring = make_snap_ring(outer_radius=20.0, inner_radius=18.0, height=1.0, fillet_radius=0.3)
+        assert ring is not None and ring.volume > 0.0
+        assert ring.is_inside((19.0, 0.0, 0.5))
+        assert not ring.is_inside((17.0, 0.0, 0.5))
+        assert not ring.is_inside((21.0, 0.0, 0.5))
+
+        # 2. Test make_filleted_pocket_tool
+        tool = make_filleted_pocket_tool(radius=80.0, height=6.0, fillet_radius=1.5)
+        assert tool is not None and tool.volume > 0.0
+        assert tool.is_inside((0.0, 0.0, 3.0))
+
+        # 3. Verify that bottom cover, lid, and motor hub build cleanly with refactored helpers
+        bottom_cover = provider.build_bottom_cover("bottom_cover")
+        assert bottom_cover.part is not None and bottom_cover.part.volume > 0.0
+
+        lid = provider.build_lid("lid")
+        assert lid.part is not None and lid.part.volume > 0.0
+
+        motor_hub = provider.build_motor_hub("motor_hub")
+        assert motor_hub.part is not None and motor_hub.part.volume > 0.0
+
     def test_compute_flow_metrics_upper_reservoir_retention(self, provider):
         """Verify that fluid particles filling the reservoir up to the lid shelf are counted in pool_volume.
 
@@ -1620,12 +1768,12 @@ class TestCatFountainProvider:
             "Motor pocket at radius 7.8mm is solid: motor diameter 15.2mm (radius 7.6mm) will rub or not fit!"
         )
 
-        # 2. Verify motor clip mounting and anti-rotation features
-        clip = provider.build_motor_clip("motor_clip")
-        assert clip.part.volume > 0.0
-        assert clip.part.is_valid()
+        # 2. Verify motor hub mounting and anti-rotation features
+        hub = provider.build_motor_hub("motor_hub")
+        assert hub.part.volume > 0.0
+        assert hub.part.is_valid()
 
-        clip_h = provider.settings.motor_clip_thickness
+        clip_h = provider.settings.motor_hub_thickness
         r_bcd = provider.settings.motor_mount_bolt_circle_radius
         assert r_bcd == 3.3, f"Expected BCD radius 3.3mm for BetaFPV 1102, got {r_bcd}"
 
@@ -1634,35 +1782,35 @@ class TestCatFountainProvider:
             rad = math.radians(angle)
             hx = r_bcd * math.cos(rad)
             hy = r_bcd * math.sin(rad)
-            assert not clip.part.is_inside((hx, hy, clip_h * 0.5)), (
+            assert not hub.part.is_inside((hx, hy, clip_h * 0.5)), (
                 f"Mount screw hole at ({hx:.2f}, {hy:.2f}) is blocked!"
             )
 
         # Center shaft / bearing clearance hole must be open
-        assert not clip.part.is_inside((0.0, 0.0, clip_h * 0.5)), "Central shaft clearance hole is blocked!"
+        assert not hub.part.is_inside((0.0, 0.0, clip_h * 0.5)), "Central shaft clearance hole is blocked!"
 
         # Solid plate area outside shaft hole supporting motor base
-        assert clip.part.is_inside((3.5, 0.0, clip_h * 0.5)), (
-            "Motor clip is hollowed out around motor base: expected solid plastic to mount and secure motor!"
+        assert hub.part.is_inside((3.5, 0.0, clip_h * 0.5)), (
+            "Motor hub bracket is hollowed out around motor base: expected solid plastic to mount and secure motor!"
         )
 
         # Wire relief channel extending South along -Y
-        assert not clip.part.is_inside((0.0, -10.0, clip_h - 0.2)), (
+        assert not hub.part.is_inside((0.0, -10.0, clip_h - 0.2)), (
             "Wire relief channel at Y = -10.0 is blocked: 3-wire motor cable would be pinched!"
         )
 
         # Dedicated R-shape side relief for 1102 motor connector rotation (BUG-TRANSLUCENT-LARVA-792)
         # Relieved arm must be open to allow connector rotation
-        assert not clip.part.is_inside((-6.0, -10.0, clip_h * 0.5)), (
-            "Motor clip side relief cutout at (-6.0, -10.0) is blocked: connector cannot rotate into position!"
+        assert not hub.part.is_inside((-6.0, -10.0, clip_h * 0.5)), (
+            "Motor hub side relief cutout at (-6.0, -10.0) is blocked: connector cannot rotate into position!"
         )
         # Guide stub near handle must remain solid for slide-in slot alignment
-        assert clip.part.is_inside((-6.0, -20.0, clip_h * 0.5)), (
-            "Motor clip guide stub at (-6.0, -20.0) is missing: clip cannot align in bowl slide slot!"
+        assert hub.part.is_inside((-6.0, -20.0, clip_h * 0.5)), (
+            "Motor hub guide stub at (-6.0, -20.0) is missing: hub cannot align in bowl slide slot!"
         )
         # Opposite continuous arm must remain solid
-        assert clip.part.is_inside((6.0, -10.0, clip_h * 0.5)), (
-            "Motor clip continuous arm at (6.0, -10.0) is missing: structural integrity lost!"
+        assert hub.part.is_inside((6.0, -10.0, clip_h * 0.5)), (
+            "Motor hub continuous arm at (6.0, -10.0) is missing: structural integrity lost!"
         )
 
     def test_regression_bug_hairy_wasp_932_tmc6300_6pwm_wiring_and_no_sense_pin(self, provider):
@@ -1746,3 +1894,791 @@ class TestCatFountainProvider:
         assert "VCP Charge Pump Reservoir Capacitor Wiring" not in doc_text, (
             "Wiring guide must not specify external VCP capacitor wiring"
         )
+
+    def test_regression_bug_pollen_backswimmer_846_tmc6300_clip_mount_dimensions_and_text(self, provider):
+        """Verify BUG-POLLEN-BACKSWIMMER-846: TMC6300 clip-on mount matches 0.80x0.60 in (20.32x15.24mm) PDF dimensions."""
+        from pathlib import Path
+        from model.wiring import Wiring
+
+        # 1. Check measurements for TMC6300 clip mount (exact 0.80" x 0.60" board dimensions from PDF)
+        assert provider.settings.motor_driver_spacing_x == 20.32, (
+            f"Expected motor_driver_spacing_x to be 20.32mm (0.80 in length), got {provider.settings.motor_driver_spacing_x}"
+        )
+        assert provider.settings.motor_driver_spacing_y == 15.24, (
+            f"Expected motor_driver_spacing_y to be 15.24mm (0.60 in width), got {provider.settings.motor_driver_spacing_y}"
+        )
+
+        # 2. Check wiring.yaml footprint dimensions, rotation, and absence of screw mounting holes
+        yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
+        wiring = Wiring(yaml_path)
+        driver = next(f for f in wiring.footprints if f.name == "motor_driver")
+        assert tuple(driver.dimensions) == (20.32, 15.24, 1.6), (
+            f"Expected TMC6300 board dimensions [20.32, 15.24, 1.6], got {driver.dimensions}"
+        )
+        assert tuple(driver.rotation) == (0.0, 0.0, 90.0), (
+            f"Expected TMC6300 rotation [0.0, 0.0, 90.0] for clip socket alignment, got {driver.rotation}"
+        )
+        assert driver.mounting_holes is None, (
+            "SparkFun TMC6300 breakout has no screw mounting holes per official dimensions PDF"
+        )
+
+        # 3. Verify bowl CAD geometry: clip tracks fit 20.32x15.24mm board and TMC6300 text is on positive Y (opposite CURRENT)
+        bowl = provider.build_bowl("bowl")
+        assert bowl.part.volume > 0.0
+        assert bowl.part.is_valid()
+
+        # Center of TMC6300 is (50.0, 15.0)
+        # With span 15.24mm (along X) and slide length 20.32mm (along Y), guide tracks are around X = 50 +/- 8.12
+        # Inside the track body at X = 50 + (15.24/2 + 0.5) should be solid plastic:
+        t = provider.settings.bowl_thickness
+        floor_z = provider.settings.floor_z
+        track_z = floor_z - t - (provider.settings.motor_driver_standoff_height + 1.0)
+        tmc_span = provider.settings.motor_driver_spacing_y
+        tmc_slide = provider.settings.motor_driver_spacing_x
+        assert bowl.part.is_inside((50.0 + tmc_span / 2.0 + 0.5, 15.0, track_z)), (
+            "TMC6300 clip guide track should be positioned for 15.24mm board width"
+        )
+
+        # "CURRENT" text is at (50.0, -2.5). "TMC6300" text should be moved to opposite side (Y = 15 + 7.5 + 5 = 27.5),
+        # not adjacent to CURRENT at Y = 15 - 12.5 = 2.5.
+        text_z = floor_z - t + 0.5
+        sample_dxs = [-8.0, -6.0, -4.0, -2.0, 0.0, 2.0, 4.0, 6.0, 8.0]
+        sample_dys = [-0.5, 0.0, 0.5]
+
+        # At old location (Y = 2.5), bowl floor must be solid plastic (no engraved text cutout)
+        assert all(bowl.part.is_inside((50.0 + dx, 2.5 + dy, text_z)) for dx in sample_dxs for dy in sample_dys), (
+            "TMC6300 text must not be engraved on the negative Y side (adjacent to CURRENT text)"
+        )
+
+        # At new location (Y = 15.0 + tmc_slide / 2.0 + 5.0), engraved text strokes cut into bowl floor
+        text_y = 15.0 + tmc_slide / 2.0 + 5.0
+        assert any(
+            not bowl.part.is_inside((50.0 + dx, text_y + dy, text_z)) for dx in sample_dxs for dy in sample_dys
+        ), "TMC6300 text must be engraved on the positive Y side opposite CURRENT text"
+
+    def test_regression_bug_swarming_cicada_917_clip_in_mounts(self, provider):
+        """Verify BUG-SWARMING-CICADA-917: Replace motor room mount holes with press-fit clip mounts except charger."""
+        # 1. Config properties exist
+        assert hasattr(provider.settings, "pcb_mounting_post_diameter")
+        assert hasattr(provider.settings, "pcb_mounting_post_height")
+        assert hasattr(provider.settings, "hall_sensor_spacing_x")
+        assert hasattr(provider.settings, "hall_sensor_spacing_y")
+
+        bowl = provider.build_bowl("bowl")
+        assert bowl.part.volume > 0.0
+        assert bowl.part.is_valid()
+
+        t = provider.settings.bowl_thickness
+        floor_z = provider.settings.floor_z
+        sh = provider.settings.pico_standoff_height
+        post_z = floor_z - t - sh - 1.0  # Middle of press-fit post shaft
+        boss_z = floor_z - t - (sh * 0.5)  # Inside the standoff boss body
+
+        # 2. Charger retains screw mount holes: at hole center inside boss, geometry is hollow (hole)
+        cx, cy = 0.0, -79.0
+        ch_dx = provider.settings.charger_spacing_x / 2.0
+        ch_dy = provider.settings.charger_spacing_y / 2.0
+        assert not bowl.part.is_inside((cx + ch_dx, cy + ch_dy, boss_z)), (
+            "Charger standoff should retain blind screw hole"
+        )
+
+        # 3. Pico W uses press-fit clip mounts: at post location, post shaft is solid plastic
+        px, py = -50.0, 0.0
+        pico_dx = provider.settings.pico_spacing_x / 2.0
+        pico_dy = provider.settings.pico_spacing_y / 2.0
+        assert bowl.part.is_inside((px - pico_dx, py - pico_dy, post_z)), (
+            "Pico W standoff should feature solid press-fit post shaft instead of screw hole"
+        )
+        assert bowl.part.is_inside((px - pico_dx, py - pico_dy, boss_z)), (
+            "Pico W boss must be solid plastic (no blind screw hole)"
+        )
+
+        # 4. Current monitor uses press-fit clip mounts with posts at {1, 3} (nearest to "CURRENT" text)
+        ix, iy = 50.0, -15.0
+        ina_dx = provider.settings.current_monitor_spacing_x / 2.0
+        ina_dy = provider.settings.current_monitor_spacing_y / 2.0
+        # Post points at {1, 3} (nearest to text at +dy) have press-fit posts
+        assert bowl.part.is_inside((ix - ina_dx, iy + ina_dy, post_z)), (
+            "Current monitor mount point 1 must have press-fit post"
+        )
+        assert bowl.part.is_inside((ix + ina_dx, iy + ina_dy, post_z)), (
+            "Current monitor mount point 3 must have press-fit post"
+        )
+        # Boss-only points at {0, 2} have no post
+        assert not bowl.part.is_inside((ix - ina_dx, iy - ina_dy, post_z)), (
+            "Current monitor mount point 0 should have NO post (boss only)"
+        )
+        assert bowl.part.is_inside((ix - ina_dx, iy - ina_dy, boss_z)), (
+            "Current monitor mount point 0 must have solid boss pad"
+        )
+        assert not bowl.part.is_inside((ix + ina_dx, iy - ina_dy, post_z)), (
+            "Current monitor mount point 2 should have NO post (boss only)"
+        )
+        assert bowl.part.is_inside((ix + ina_dx, iy - ina_dy, boss_z)), (
+            "Current monitor mount point 2 must have solid boss pad"
+        )
+
+        # 5. Fuel gauge has 2 posts at {1, 3} (nearest to "FUEL" text) and 2 bosses at {0, 2}
+        fx, fy = 50.0, -45.0
+        fuel_dx = provider.settings.fuel_gauge_spacing_x / 2.0
+        fuel_dy = provider.settings.fuel_gauge_spacing_y / 2.0
+        # Post points at {1, 3} (nearest to text at +dy) have press-fit posts
+        assert bowl.part.is_inside((fx - fuel_dx, fy + fuel_dy, post_z)), (
+            "Fuel gauge mount point 1 must have press-fit post"
+        )
+        assert bowl.part.is_inside((fx + fuel_dx, fy + fuel_dy, post_z)), (
+            "Fuel gauge mount point 3 must have press-fit post"
+        )
+        # Boss-only points at {0, 2} have no post
+        assert not bowl.part.is_inside((fx - fuel_dx, fy - fuel_dy, post_z)), (
+            "Fuel gauge mount point 0 should have NO post (boss only)"
+        )
+        assert bowl.part.is_inside((fx - fuel_dx, fy - fuel_dy, boss_z)), (
+            "Fuel gauge mount point 0 must have solid boss pad"
+        )
+        assert not bowl.part.is_inside((fx + fuel_dx, fy - fuel_dy, post_z)), (
+            "Fuel gauge mount point 2 should have NO post (boss only)"
+        )
+        assert bowl.part.is_inside((fx + fuel_dx, fy - fuel_dy, boss_z)), (
+            "Fuel gauge mount point 2 must have solid boss pad"
+        )
+
+        # 6. Legacy Hall sensor board mount on bowl ceiling is removed (moved directly to motor_hub)
+        hx, hy = 0.0, 40.0
+        hall_dx = provider.settings.hall_sensor_spacing_x / 2.0
+        hall_dy = provider.settings.hall_sensor_spacing_y / 2.0
+        assert not bowl.part.is_inside((hx - hall_dx, hy - hall_dy, post_z)), (
+            "Legacy Hall sensor mount point on ceiling should be removed"
+        )
+        assert not bowl.part.is_inside((hx - hall_dx, hy + hall_dy, boss_z)), (
+            "Legacy Hall sensor boss pad on ceiling should be removed"
+        )
+
+    def test_regression_bug_pincered_caddisfly_769_swd_clip_mount(self, provider):
+        """Verify BUG-PINCERED-CADDISFLY-769: Add clip-on mount for Treedix JTAG/SWD breakout adapter."""
+        from pathlib import Path
+        from model.wiring import Wiring
+
+        # 1. Config properties exist for SWD breakout board
+        assert hasattr(provider.settings, "swd_board_length"), "swd_board_length property missing"
+        assert hasattr(provider.settings, "swd_board_width"), "swd_board_width property missing"
+        assert provider.settings.swd_board_length == 19.1
+        assert provider.settings.swd_board_width == 13.7
+
+        # 2. Footprint in wiring.yaml
+        yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
+        wiring = Wiring(yaml_path)
+        swd_fp = next((f for f in wiring.footprints if f.name == "swd_adapter"), None)
+        assert swd_fp is not None, "swd_adapter footprint must exist in wiring.yaml"
+        assert tuple(swd_fp.dimensions) == (19.1, 13.7, 1.6)
+        assert tuple(swd_fp.rotation) == (0.0, 0.0, 90.0), (
+            f"Expected SWD adapter rotation [0.0, 0.0, 90.0] for clip socket alignment, got {swd_fp.rotation}"
+        )
+
+        # 3. Bowl CAD model contains clip guide for SWD board
+        bowl = provider.build_bowl("bowl")
+        assert bowl.part.volume > 0.0
+        assert bowl.part.is_valid()
+
+        t = provider.settings.bowl_thickness
+        floor_z = provider.settings.floor_z
+        sh = provider.settings.swd_board_standoff_height
+        track_z = floor_z - t - (sh + 1.0)
+
+        # SWD is centered at (-50.0, -45.0) with clip spacing swd_board_width (13.7mm)
+        # Guide track wall is positioned at X = -50.0 + (13.7 / 2.0 + 1.5) = -41.65
+        track_x = -50.0 + (provider.settings.swd_board_width / 2.0 + 1.5)
+        assert bowl.part.is_inside((track_x, -45.0, track_z)), (
+            f"SWD clip guide track should be present at ({track_x}, -45.0)"
+        )
+
+    def test_regression_bug_springing_mosquito_703_proximity_sensor_inner_wall_extension(self, provider):
+        """Verify BUG-SPRINGING-MOSQUITO-703 & BUG-SPECKLED-ROVEBEETLE-352: Sensor shield is an extruded hollow rectangle without inner lip or tails."""
+        from build123d import Location
+
+        assert hasattr(provider.settings, "proximity_sensor_inner_wall_extension"), (
+            "proximity_sensor_inner_wall_extension setting missing"
+        )
+        assert provider.settings.proximity_sensor_inner_wall_extension == 3.0
+
+        bowl = provider.build_bowl("bowl")
+        assert bowl.part.volume > 0.0
+        assert bowl.part.is_valid()
+
+        r = provider.settings.bowl_radius
+        t = provider.settings.bowl_thickness
+
+        base_loc = Location((r - t / 2.0 - 3.0, 0, 16.0), (0, -30, 0))
+
+        # Optical aperture must be completely open without inner lip (BUG-SPECKLED-ROVEBEETLE-352)
+        pt_center_loc = base_loc * Location((-5.0, 0, -2.0))
+        assert not bowl.part.is_inside(
+            (pt_center_loc.position.X, pt_center_loc.position.Y, pt_center_loc.position.Z)
+        ), "Sensor aperture center must remain open"
+
+        pt_lip_loc = base_loc * Location((-5.0, 0, 3.5))
+        assert not bowl.part.is_inside((pt_lip_loc.position.X, pt_lip_loc.position.Y, pt_lip_loc.position.Z)), (
+            "Inner bowl wall must not have an inner lip protruding into sensor aperture"
+        )
+
+        # Extruded hollow rectangle shield enclosing walls (top, bottom, left, right)
+        pt_top_loc = base_loc * Location((-4.0, 0, 6.0))
+        assert bowl.part.is_inside((pt_top_loc.position.X, pt_top_loc.position.Y, pt_top_loc.position.Z)), (
+            "Top enclosing wall of sensor shield must be solid"
+        )
+
+        pt_bot_loc = base_loc * Location((-4.0, 0, -10.0))
+        assert bowl.part.is_inside((pt_bot_loc.position.X, pt_bot_loc.position.Y, pt_bot_loc.position.Z)), (
+            "Bottom enclosing wall of sensor shield must be solid"
+        )
+
+        pt_left_loc = base_loc * Location((-4.0, 7.0, -2.0))
+        assert bowl.part.is_inside((pt_left_loc.position.X, pt_left_loc.position.Y, pt_left_loc.position.Z)), (
+            "Left enclosing sidewall of sensor shield must be solid"
+        )
+
+        pt_right_loc = base_loc * Location((-4.0, -7.0, -2.0))
+        assert bowl.part.is_inside((pt_right_loc.position.X, pt_right_loc.position.Y, pt_right_loc.position.Z)), (
+            "Right enclosing sidewall of sensor shield must be solid"
+        )
+
+        # No protruding tails beyond top of extruded hollow rectangle
+        pt_tail_loc = base_loc * Location((-4.0, 0, 8.0))
+        assert not bowl.part.is_inside((pt_tail_loc.position.X, pt_tail_loc.position.Y, pt_tail_loc.position.Z)), (
+            "Sensor shield must not have protruding tails beyond rectangular profile"
+        )
+
+        # Press-fit mounting posts on ToF sensor standoffs (Finding 5)
+        shaft_h = provider.settings.pcb_mounting_post_height - provider.settings.pcb_mounting_post_flare_height
+        tof_sp_x = provider.settings.proximity_sensor_spacing_x
+        tof_sp_y = provider.settings.proximity_sensor_spacing_y
+        for dy in [-tof_sp_x / 2.0, tof_sp_x / 2.0]:
+            for dz in [-tof_sp_y / 2.0, tof_sp_y / 2.0]:
+                pt_post_loc = Location((r - t / 2.0 - 3.0, 0, 16.0), (0, -30, 0)) * Location(
+                    (-6.0 - shaft_h / 2.0, dy, dz)
+                )
+                pt_post = (pt_post_loc.position.X, pt_post_loc.position.Y, pt_post_loc.position.Z)
+                assert bowl.part.is_inside(pt_post), (
+                    f"ToF sensor mount at dy={dy}, dz={dz} must have a solid press-fit post"
+                )
+
+    def test_regression_bug_stinging_lacewing_799_holeless_pcb_snap_socket(self, provider):
+        """Verify BUG-STINGING-LACEWING-799: Hole-less PCB mount (TMC6300) uses axial snap-socket frame instead of slide rails."""
+        bowl = provider.build_bowl("bowl")
+        assert bowl.part.volume > 0.0
+        assert bowl.part.is_valid()
+
+        floor_z = provider.settings.floor_z
+        t = provider.settings.bowl_thickness
+        ceiling_z = floor_z - t
+
+        # TMC6300 center and dimensions
+        cx = 50.0
+        cy = 15.0
+        span = provider.settings.motor_driver_spacing_y  # 15.24 along X
+        slide = provider.settings.motor_driver_spacing_x  # 20.32 along Y
+        sh = provider.settings.motor_driver_standoff_height  # 4.0
+
+        # 1. Outer socket frame walls must be solid (no micro-gaps)
+        pt_wall_x = (cx + span / 2.0 + 1.0, cy, ceiling_z - (sh + 0.5))
+        assert bowl.part.is_inside(pt_wall_x), "TMC6300 snap socket X frame wall must be solid"
+
+        pt_wall_y = (cx, cy + slide / 2.0 + 1.0, ceiling_z - (sh + 0.5))
+        assert bowl.part.is_inside(pt_wall_y), "TMC6300 snap socket Y frame wall must be solid"
+
+        # 2. Central cavity through standoff height must be open for component clearance and airflow
+        pt_center_air = (cx, cy, ceiling_z - sh / 2.0)
+        assert not bowl.part.is_inside(pt_center_air), "TMC6300 central cavity must be hollow for component airflow"
+
+        # 3. Axial insertion path from bottom must be open (does not require sliding from -Y where CURRENT sensor sits)
+        pt_bottom_entry = (cx, cy, ceiling_z - (sh + 1.0))
+        assert not bowl.part.is_inside(pt_bottom_entry), "TMC6300 snap socket must be open axially from below"
+
+    def test_regression_bug_vibrant_woodborer_940_motor_hub_assembly(self, provider):
+        """Verify BUG-VIBRANT-WOODBORER-940: Motor hub assembly combining motor, clip, hub, and Hall sensor."""
+        from build123d import Part
+
+        # 1. Centered thrust bearing (R <= 1.5mm)
+        assert hasattr(provider.settings, "drive_hub_thrust_collar_radius"), (
+            "drive_hub_thrust_collar_radius setting missing"
+        )
+        assert provider.settings.drive_hub_thrust_collar_radius <= 1.5, (
+            "Thrust collar radius must be <= 1.5mm to reduce friction torque by >90%"
+        )
+
+        hub = provider.build_drive_hub("drive_hub")
+        assert hub.part.volume > 0.0
+        assert hub.part.is_valid()
+
+        hub_r = provider.settings.impeller_radius + provider.settings.magnet_radius + 1.6
+        hub_h = provider.settings.magnet_thickness + provider.settings.magnet_clearance + 0.8
+        standoff_h = provider.settings.drive_hub_standoff_height
+        z_mid = hub_h + standoff_h / 2.0
+
+        # Outer perimeter standoff ring at R = hub_r - 0.7 must be removed (not solid)
+        test_r_outer = hub_r - 0.7
+        assert not hub.part.is_inside((test_r_outer, 0.0, z_mid)), (
+            "Outer perimeter standoff ring at R = 15.6mm must be removed"
+        )
+
+        # Central thrust collar around 1.5mm motor shaft collar at R <= 1.5mm must be solid
+        r_collar = (provider.settings.drive_hub_shaft_radius + provider.settings.drive_hub_thrust_collar_radius) / 2.0
+        assert hub.part.is_inside((r_collar, 0.0, z_mid)), (
+            "Central thrust collar directly around 1.5mm motor shaft collar must be solid"
+        )
+
+        # 2. Optimized magnetic coupling axial air gap (2.0 - 2.5mm)
+        assert 2.0 <= provider.settings.pump_well_wall <= 2.5, (
+            "Axial air gap (pump_well_wall) must be increased to 2.0 - 2.5mm"
+        )
+
+        # 3. Speed sensor pocket directly aligns with drive hub magnet pitch circle
+        bowl = provider.build_bowl("bowl")
+        assert bowl.part.volume > 0.0
+        floor_z = provider.settings.floor_z
+        ring_r = provider.settings.magnet_ring_radius
+
+        # Point at the magnet pitch circle inside the speed sensor pocket (Z = floor_z - 10.0, Y = ring_r)
+        # must be open (subtracted) so the bent A3144 Hall sensor receives pulses directly from the magnets
+        pt_sensor_pitch = (0.0, ring_r, floor_z - 10.0)
+        assert not bowl.part.is_inside(pt_sensor_pitch), (
+            f"Speed sensor pocket must align directly with magnet pitch circle at Y = {ring_r}"
+        )
+
+        # 4. Motor hub assembly unit replaces motor_clip while drive_hub remains separate drive unit
+        assert "motor_hub" in provider.part, "motor_hub target missing from provider.part"
+        assert "motor_clip" not in provider.part, "motor_clip must be replaced by motor_hub in provider.part"
+        assert "drive_hub" in provider.part, "drive_hub must remain as the separate rotating drive unit"
+        assert hasattr(provider, "build_motor_hub"), "build_motor_hub method missing"
+
+        motor_hub = provider.build_motor_hub("motor_hub")
+        assert motor_hub.part.volume > 0.0
+        assert motor_hub.part.is_valid()
+        assert isinstance(motor_hub.part, Part)
+
+        # 5. Integrated Hall sensor module mount directly on motor_hub (2 front press-fit mounting points)
+        sh = provider.settings.hall_sensor_standoff_height
+        clip_h = provider.settings.motor_hub_thickness
+        boss_z = clip_h + sh * 0.5
+        post_z = clip_h + sh + 1.0
+        hall_front_y = provider.settings.speed_sensor_pocket_y
+        hall_dx = provider.settings.hall_sensor_spacing_x / 2.0
+        # Both front mounting points (-hall_dx, hall_front_y) and (+hall_dx, hall_front_y) have press-fit posts and boss pads
+        for hx in [-hall_dx, hall_dx]:
+            assert motor_hub.part.is_inside((hx, hall_front_y, boss_z)), (
+                f"Hall sensor mount on motor_hub at X={hx}: must have solid boss pad"
+            )
+            assert motor_hub.part.is_inside((hx, hall_front_y, post_z)), (
+                f"Hall sensor mount on motor_hub at X={hx}: must have press-fit post"
+            )
+
+        # 6. Bowl base features groove-style cylindrical mounting socket for motor hub assembly
+        pump_well_wall = provider.settings.pump_well_wall
+        ceiling_z = floor_z - pump_well_wall
+        standoff_h = provider.settings.drive_hub_standoff_height
+        hub_h = provider.settings.magnet_thickness + provider.settings.magnet_clearance + 0.8
+        mount_seat_z = ceiling_z - standoff_h - hub_h - 0.5 - 9.3 - clip_h
+
+        socket_in_r = provider.settings.motor_hub_socket_radius
+        socket_wall = provider.settings.motor_hub_socket_wall
+        socket_out_r = socket_in_r + socket_wall
+        r_socket_wall = (socket_in_r + socket_out_r) / 2.0
+
+        # Bowl socket wall is solid
+        assert bowl.part.is_inside((r_socket_wall, 0.0, mount_seat_z + 3.0)), (
+            "Bowl mounting socket wall for motor_hub groove-style retention must be solid"
+        )
+        # Socket interior bore is open for drive hub and motor assembly
+        assert not bowl.part.is_inside((0.0, 0.0, mount_seat_z + 3.0)), (
+            "Interior bore of bowl motor hub socket must be open"
+        )
+        # Internal annular snap groove is present in socket inner wall
+        assert not bowl.part.is_inside((socket_in_r + 0.3, 0.0, mount_seat_z + clip_h + 2.0)), (
+            "Internal annular snap groove in bowl socket wall must be open"
+        )
+        # Keyway slot at +Y in socket wall is open for Hall sensor arm and wiring
+        assert not bowl.part.is_inside((0.0, r_socket_wall, mount_seat_z + 1.0)), (
+            "Keyway slot at +Y in socket wall must be open for Hall sensor platform"
+        )
+        # Socket wall at -Y is solid (latent slide clearance cut removed per BUG-LUSTROUS-COCOON-669)
+        assert bowl.part.is_inside((0.0, -r_socket_wall, mount_seat_z + 1.0)), (
+            "Socket wall at -Y must be solid with latent slide cut removed"
+        )
+        # Bowl floor above Hall sensor mount is solid (extra box cut removed per BUG-LUSTROUS-COCOON-669)
+        t = provider.settings.bowl_thickness
+        assert bowl.part.is_inside((0.0, r_socket_wall, floor_z - t + 1.0)), (
+            "Bowl floor above hall sensor mount must be solid (no extra box cut)"
+        )
+
+        # Motor hub features matching circular cylindrical snap collar with annular snap ridge
+        collar_r = socket_in_r - provider.settings.motor_hub_collar_clearance
+        r_collar_wall = (collar_r + 13.5) / 2.0
+        assert motor_hub.part.is_inside((r_collar_wall, 0.0, clip_h + 3.0)), (
+            "Motor hub circular mounting collar wall must be solid"
+        )
+        assert not motor_hub.part.is_inside((0.0, 0.0, clip_h + 3.0)), (
+            "Motor hub central bore must be open for motor shaft clearance"
+        )
+        assert motor_hub.part.is_inside((collar_r + 0.3, 0.0, clip_h + 2.0)), (
+            "Motor hub collar must feature an external annular snap ridge to engage socket groove"
+        )
+        # Verify Hall sensor clearance opening at +Y and solid collar wall at -Y (BUG-CRIMSON-MAYFLY-874)
+        assert not motor_hub.part.is_inside((0.0, r_collar_wall, clip_h + 3.0)), (
+            "Collar wall at +Y must be open for Hall sensor clearance"
+        )
+        assert not motor_hub.part.is_inside((5.0, r_collar_wall, clip_h + 3.0)), (
+            "Collar wall at +Y must have wide clearance opening for Hall sensor board"
+        )
+        assert not motor_hub.part.is_inside((-5.0, r_collar_wall, clip_h + 3.0)), (
+            "Collar wall at +Y must have wide clearance opening for Hall sensor board"
+        )
+        assert motor_hub.part.is_inside((0.0, -r_collar_wall, clip_h + 3.0)), (
+            "Collar wall at -Y must be solid with no unexpected second opening"
+        )
+
+        # 7. TMC6300 hole-less PCB snap socket features outer frame walls and internal snap groove retention (BUG-STINGING-LACEWING-799)
+        t = provider.settings.bowl_thickness
+        tmc_x, tmc_y = 50.0, 15.0
+        tmc_span = provider.settings.motor_driver_spacing_y
+        tmc_slide = provider.settings.motor_driver_spacing_x
+        tmc_sh = provider.settings.motor_driver_standoff_height
+        half_span = tmc_span / 2.0
+        half_slide = tmc_slide / 2.0
+        # Positive back stop wall at +Y is solid
+        assert bowl.part.is_inside((tmc_x + half_span + 0.5, tmc_y + half_slide + 1.0, floor_z - t - tmc_sh - 1.0)), (
+            "TMC6300 snap socket must feature a solid positive back stop wall"
+        )
+        # Front frame wall at -Y is solid (BUG-STINGING-LACEWING-799 full frame)
+        assert bowl.part.is_inside((tmc_x, tmc_y - half_slide - 1.0, floor_z - t - tmc_sh - 1.0)), (
+            "TMC6300 snap socket must feature a solid front frame wall"
+        )
+
+    def test_regression_bug_thoracic_harvestman_529_drive_hub_grooves_and_hull(self, provider):
+        """Verify BUG-THORACIC-HARVESTMAN-529: Drive hub has triangular motor strut grooves and 3-lobed convex hull body."""
+        # 1. Config properties exist
+        assert hasattr(provider.settings, "drive_hub_min_wall")
+        assert hasattr(provider.settings, "drive_hub_strut_groove_width")
+        assert hasattr(provider.settings, "drive_hub_strut_groove_depth")
+        assert hasattr(provider.settings, "drive_hub_strut_groove_length")
+        assert provider.settings.drive_hub_min_wall >= 1.5, "Minimum wall thickness must be >= 1.5mm"
+
+        hub = provider.build_drive_hub("drive_hub")
+        assert hub.part.volume > 0.0
+        assert hub.part.is_valid()
+        solid = hub.part
+
+        ring_r = provider.settings.magnet_ring_radius
+        hub_h = provider.settings.magnet_thickness + provider.settings.magnet_clearance + 0.8
+        mr = provider.settings.magnet_radius + provider.settings.magnet_clearance
+        groove_d = provider.settings.drive_hub_strut_groove_depth
+
+        # 2. Central shaft hole is open
+        assert not solid.is_inside((0.0, 0.0, 0.5)), "Central shaft hole must be open"
+
+        # 3. 3-lobed convex hull shape: solid at magnet lobes, hollow between lobes
+        for angle in [0, 120, 240]:
+            rad = math.radians(angle)
+            # Lobe tip around magnet is solid
+            tip_r = ring_r + mr + 0.5  # ~12.6mm
+            assert solid.is_inside((tip_r * math.cos(rad), tip_r * math.sin(rad), hub_h * 0.5)), (
+                f"Magnet lobe at {angle}° must be solid at r={tip_r}"
+            )
+
+        # Region between lobes (e.g. at 60°, 180°, 300° at r=10.0mm) is hollow
+        for angle in [60, 180, 300]:
+            rad = math.radians(angle)
+            assert not solid.is_inside((10.0 * math.cos(rad), 10.0 * math.sin(rad), hub_h * 0.5)), (
+                f"Region between lobes at {angle}° must be hollowed out (convex hull per-lobe design)"
+            )
+
+        # 4. Triangular strut grooves on the bottom (Z < groove_d)
+        for angle in [0, 120, 240]:
+            rad = math.radians(angle)
+            # Center of groove is open (subtracted)
+            gx = 3.5 * math.cos(rad)
+            gy = 3.5 * math.sin(rad)
+            assert not solid.is_inside((gx, gy, groove_d * 0.5)), (
+                f"Motor strut groove at {angle}° must be open on bottom"
+            )
+            # Lateral wall around groove is solid (>= 1.5mm wall)
+            # Tangent offset of 2.0mm from groove centerline
+            wx = gx - 2.0 * math.sin(rad)
+            wy = gy + 2.0 * math.cos(rad)
+            assert solid.is_inside((wx, wy, groove_d * 0.5)), (
+                f"Lateral wall beside groove at {angle}° must be solid with >=1.5mm wall"
+            )
+
+    def test_regression_bug_fierce_longhorn_849_pcb_snap_socket_overlap(self):
+        """Guard against regression for BUG-FIERCE-LONGHORN-849.
+
+        Verify positive snap ring overlap holding hole-less PCBs (SWD adapter and TMC6300)
+        in place on the cat fountain bowl base.
+        The cutout surrounding the boards must have width and height equal to
+        board dimensions minus a small margin (0.1mm - 0.5mm), creating positive retaining
+        lips below and ceiling stop shelves above the PCB seating groove.
+        """
+        provider = CatFountainProvider()
+        margin = provider.settings.pcb_snap_socket_cutout_margin
+        assert 0.1 <= margin <= 0.5, f"pcb_snap_socket_cutout_margin {margin} must be in [0.1, 0.5] mm"
+
+        bowl = provider.build_bowl("bowl")
+        solid = bowl.part
+        base_z = provider.settings.floor_z - provider.settings.bowl_thickness
+
+        # 1. SWD adapter at (-50.0, -45.0)
+        # Dimensions are rotated 90 deg: span (X) = swd_board_width (13.7), slide (Y) = swd_board_length (19.1)
+        # standoff_h = 2.0, pcb_t = 1.6
+        # Shelf is at Z = base_z - 1.0 (36.0)
+        # Groove is at Z = base_z - 2.8 (34.2)
+        # Retaining lip is at Z = base_z - 3.8 (33.2)
+        cx, cy = -50.0, -45.0
+        swd_span = provider.settings.swd_board_width
+        swd_slide = provider.settings.swd_board_length
+
+        # Inside the seating groove (Z = base_z - 2.8): the board slot is hollow
+        assert not solid.is_inside((cx + swd_span / 2.0 - 0.1, cy, base_z - 2.8)), (
+            "PCB groove must be open for board width"
+        )
+        assert not solid.is_inside((cx, cy + swd_slide / 2.0 - 0.1, base_z - 2.8)), (
+            "PCB groove must be open for board length"
+        )
+
+        # At the ceiling stop shelf (Z = base_z - 1.0 outside tool opening): positive overlap of (margin/2 = 0.2mm)
+        # Point just inside board edge (swd_span/2 - 0.1) outside tool hole should be inside solid stop shelf
+        assert solid.is_inside((cx + swd_span / 2.0 - 0.1, cy + 5.0, base_z - 1.0)), (
+            "Top stop shelf must overlap SWD PCB edge"
+        )
+        assert solid.is_inside((cx + 4.0, cy + swd_slide / 2.0 - 0.1, base_z - 1.0)), (
+            "Top stop shelf must overlap SWD PCB edge"
+        )
+
+        # At the bottom retaining lip (Z = base_z - 3.8): positive overlap of (margin/2 = 0.2mm)
+        # Point just inside board edge (swd_span/2 - 0.1) should be inside solid retaining lip
+        assert solid.is_inside((cx + swd_span / 2.0 - 0.1, cy, base_z - 3.8)), (
+            "Bottom retaining lip must overlap SWD PCB edge"
+        )
+        assert solid.is_inside((cx, cy + swd_slide / 2.0 - 0.1, base_z - 3.8)), (
+            "Bottom retaining lip must overlap SWD PCB edge"
+        )
+
+        # 2. TMC6300 motor driver at (50.0, 15.0)
+        # Rotated 90 deg: span (X) = spacing_y (15.24), slide (Y) = spacing_x (20.32)
+        # standoff_h = 4.0, pcb_t = 1.6
+        # Shelf is at Z = base_z - 2.0 (35.0)
+        # Groove is at Z = base_z - 4.8 (32.2)
+        # Retaining lip is at Z = base_z - 5.8 (31.2)
+        mcx, mcy = 50.0, 15.0
+        tmc_span = provider.settings.motor_driver_spacing_y
+        tmc_slide = provider.settings.motor_driver_spacing_x
+
+        # Inside the seating groove (Z = base_z - 4.8): open
+        assert not solid.is_inside((mcx + tmc_span / 2.0 - 0.1, mcy, base_z - 4.8)), (
+            "PCB groove must be open for TMC6300 width"
+        )
+        assert not solid.is_inside((mcx, mcy + tmc_slide / 2.0 - 0.1, base_z - 4.8)), (
+            "PCB groove must be open for TMC6300 length"
+        )
+
+        # At the ceiling stop shelf (Z = base_z - 2.0 outside tool opening): positive overlap
+        assert solid.is_inside((mcx + tmc_span / 2.0 - 0.1, mcy + 5.0, base_z - 2.0)), (
+            "Top stop shelf must overlap TMC6300 PCB edge"
+        )
+        assert solid.is_inside((mcx + 4.0, mcy + tmc_slide / 2.0 - 0.1, base_z - 2.0)), (
+            "Top stop shelf must overlap TMC6300 PCB edge"
+        )
+
+        # At the bottom retaining lip (Z = base_z - 5.8): positive overlap
+        assert solid.is_inside((mcx + tmc_span / 2.0 - 0.1, mcy, base_z - 5.8)), (
+            "Bottom retaining lip must overlap TMC6300 PCB edge"
+        )
+        assert solid.is_inside((mcx, mcy + tmc_slide / 2.0 - 0.1, base_z - 5.8)), (
+            "Bottom retaining lip must overlap TMC6300 PCB edge"
+        )
+
+        # 3. Tool removal openings on each wall beneath the PCB (BUG-FIERCE-LONGHORN-849)
+        # Apertures must penetrate through the walls into the standoff space beneath the board
+        assert provider.settings.pcb_snap_socket_tool_hole_width >= 4.0
+        assert provider.settings.pcb_snap_socket_tool_hole_height >= 1.5
+
+        tool_h = provider.settings.pcb_snap_socket_tool_hole_height
+        wall_t = 2.0
+        opening_z = base_z - tool_h / 2.0
+
+        # Check through-openings on all 4 walls of TMC6300 socket
+        assert not solid.is_inside((mcx + tmc_span / 2.0 + wall_t / 2.0, mcy, opening_z)), (
+            "+X wall tool hole must penetrate outer wall"
+        )
+        assert not solid.is_inside((mcx - tmc_span / 2.0 - wall_t / 2.0, mcy, opening_z)), (
+            "-X wall tool hole must penetrate outer wall"
+        )
+        assert not solid.is_inside((mcx, mcy + tmc_slide / 2.0 + wall_t / 2.0, opening_z)), (
+            "+Y wall tool hole must penetrate outer wall"
+        )
+        assert not solid.is_inside((mcx, mcy - tmc_slide / 2.0 - wall_t / 2.0, opening_z)), (
+            "-Y wall tool hole must penetrate outer wall"
+        )
+
+        # Check through-openings on all 4 walls of SWD socket
+        assert not solid.is_inside((cx + swd_span / 2.0 + wall_t / 2.0, cy, opening_z)), (
+            "+X wall tool hole on SWD must penetrate outer wall"
+        )
+        assert not solid.is_inside((cx - swd_span / 2.0 - wall_t / 2.0, cy, opening_z)), (
+            "-X wall tool hole on SWD must penetrate outer wall"
+        )
+        assert not solid.is_inside((cx, cy + swd_slide / 2.0 + wall_t / 2.0, opening_z)), (
+            "+Y wall tool hole on SWD must penetrate outer wall"
+        )
+        assert not solid.is_inside((cx, cy - swd_slide / 2.0 - wall_t / 2.0, opening_z)), (
+            "-Y wall tool hole on SWD must penetrate outer wall"
+        )
+
+        # Verify corner posts remain solid for structural rigidity
+        assert solid.is_inside(
+            (mcx + tmc_span / 2.0 + wall_t / 2.0, mcy + tmc_slide / 2.0 + wall_t / 2.0, opening_z)
+        ), "TMC6300 corner post must remain solid"
+        assert solid.is_inside((cx + swd_span / 2.0 + wall_t / 2.0, cy + swd_slide / 2.0 + wall_t / 2.0, opening_z)), (
+            "SWD corner post must remain solid"
+        )
+
+    @pytest.mark.slow
+    def test_regression_bug_flitting_locust_977_impeller_blade_micro_gaps(self, provider):
+        """Verify that impeller blades extend into the central sleeve without micro-gaps (BUG-FLITTING-LOCUST-977).
+
+        Asserts:
+        1. Blade overlap parameter is positive and properly defined in settings.
+        2. Corner points along the blade sides at the cylindrical sleeve seam are solid.
+        3. All 3 blades have contiguous, gap-free intersections with the central sleeve.
+        4. Central guide post bore remains completely clear and unobstructed.
+        """
+        import math
+
+        impeller = provider.build_impeller("impeller")
+        solid = impeller.part
+        assert solid.is_valid and solid.volume > 0.0
+
+        overlap = provider.settings.impeller_blade_overlap
+        assert overlap >= 0.5, f"Expected blade overlap >= 0.5mm, got {overlap}"
+
+        sleeve_r = provider.settings.impeller_sleeve_radius
+        base_h = provider.settings.impeller_base_height
+        blade_z = base_h + 2.0
+        num_blades = provider.settings.impeller_blades
+        blade_half_w = 0.55  # Just inside the 1.2mm blade width (+-0.6mm)
+
+        for i in range(num_blades):
+            angle_deg = i * (360.0 / num_blades)
+            angle_rad = math.radians(angle_deg)
+            cos_a = math.cos(angle_rad)
+            sin_a = math.sin(angle_rad)
+
+            for offset_y in [-blade_half_w, blade_half_w]:
+                # Test corner point right at the sleeve seam (r = sleeve_r - 0.05)
+                # Local coords: x = sleeve_r - 0.05, y = offset_y
+                local_x = sleeve_r - 0.05
+                local_y = offset_y
+                gx = local_x * cos_a - local_y * sin_a
+                gy = local_x * sin_a + local_y * cos_a
+                assert solid.is_inside((gx, gy, blade_z)), (
+                    f"Blade {i} has micro-gap at sleeve seam ({gx:.3f}, {gy:.3f}, {blade_z})!"
+                )
+
+        # Pin bore must remain hollow
+        assert not solid.is_inside((0.0, 0.0, blade_z)), "Central bore obstructed at blade height!"
+        pin_clearance_r = provider.settings.impeller_shaft_radius + provider.settings.impeller_shaft_clearance - 0.05
+        assert not solid.is_inside((pin_clearance_r, 0.0, blade_z)), "Central bore clearance obstructed!"
+
+    def test_regression_bug_crimson_mayfly_874_hall_sensor_clearance(self, provider):
+        """Verify that drive/motor hub has wide clearance for Hall sensor board and no opposite opening (BUG-CRIMSON-MAYFLY-874).
+
+        Asserts:
+        1. Hall sensor clearance width is parameterized and >= 16.0mm.
+        2. Motor hub collar wall at North (+Y) is completely open across the sensor platform width.
+        3. Motor hub collar wall at South (-Y) is continuous and solid with no unexpected slit.
+        """
+        motor_hub = provider.build_motor_hub("motor_hub")
+        solid = motor_hub.part
+        assert solid.is_valid and solid.volume > 0.0
+
+        hall_clearance_w = provider.settings.hall_sensor_clearance_width
+        assert hall_clearance_w >= 16.0, f"Expected Hall sensor clearance width >= 16.0mm, got {hall_clearance_w}"
+
+        clip_h = provider.settings.motor_hub_thickness
+        socket_in_r = provider.settings.motor_hub_socket_radius
+        collar_r = socket_in_r - provider.settings.motor_hub_collar_clearance
+        r_collar_wall = (collar_r + 13.5) / 2.0
+        test_z = clip_h + 3.0
+
+        # Across the opening width (|X| < hall_clearance_w / 2 - 0.5), +Y wall is open
+        for test_x in [-7.0, -5.0, 0.0, 5.0, 7.0]:
+            assert not solid.is_inside((test_x, r_collar_wall, test_z)), (
+                f"Collar wall at +Y (X={test_x}) must be open for Hall sensor module clearance"
+            )
+
+        # Opposite opening at -Y is eliminated: entire South collar wall is solid
+        for test_x in [-7.0, -5.0, 0.0, 5.0, 7.0]:
+            assert solid.is_inside((test_x, -r_collar_wall, test_z)), (
+                f"Collar wall at -Y (X={test_x}) must be solid (no unexpected second opening)"
+            )
+
+    @pytest.mark.slow
+    def test_regression_bug_leaping_locust_56_pump_cover_annular_ring_lower_z(self, provider):
+        """Verify that pump cover mount and annular snap ring are moved lower (-Z) for epoxy clearance (BUG-LEAPING-LOCUST-56).
+
+        Asserts:
+        1. Pump cover mount depth is parameterized and >= 2.0mm.
+        2. Pump cover annular ring Z offset is parameterized and >= 1.2mm (lower -Z into casing).
+        3. Pump cover downward lip reaches down to -mount_depth with solid entry.
+        4. Bowl casing snap recess reaches down to floor_z + 10.0 - mount_depth.
+        5. Annular snap ridge on pump cover and groove in bowl align with zero interference when assembled.
+        """
+        from build123d import Location
+
+        bowl = provider.build_bowl("bowl")
+        cover = provider.build_pump_cover("pump_cover")
+        bowl_part = bowl.part
+        cover_part = cover.part
+        assert bowl_part is not None and cover_part is not None
+
+        mount_depth = provider.settings.pump_cover_mount_depth
+        snap_z_offset = provider.settings.pump_cover_snap_z_offset
+        assert mount_depth >= 2.0, f"Expected mount depth >= 2.0mm, got {mount_depth}"
+        assert snap_z_offset >= 1.2, f"Expected snap ring offset >= 1.2mm, got {snap_z_offset}"
+
+        floor_z = provider.settings.floor_z
+        hub_r = provider.settings.impeller_radius + provider.settings.magnet_radius + 1.0
+        chamber_r = hub_r + 4.0 + provider.settings.pump_casing_clearance
+        snap_r = chamber_r + 1.0
+        snap_clearance = provider.settings.pump_cover_snap_clearance
+        cover_r = snap_r - snap_clearance
+
+        # Downward lip extends down below Z = -1.5 (specifically down to -mount_depth + 0.5)
+        assert cover_part.is_inside((cover_r - 0.5, 0.0, -mount_depth + 0.5)), (
+            "Downward lip must extend into lower -Z region for deep mount engagement"
+        )
+
+        # Bowl casing recess extends down to floor_z + 10.0 - mount_depth + 0.5
+        recess_low_z = floor_z + 10.0 - mount_depth + 0.5
+        assert not bowl_part.is_inside((snap_r - 0.2, 0.0, recess_low_z)), (
+            "Bowl casing recess must extend down into lower -Z region"
+        )
+
+        # Snap ridge on pump cover is at lower -Z: Z = -snap_z_offset
+        ridge_outer_r = (
+            snap_r + provider.settings.pump_cover_snap_ridge_offset + provider.settings.pump_cover_snap_ridge_minor
+        )
+        assert cover_part.is_inside((ridge_outer_r - 0.05, 0.0, -snap_z_offset)), (
+            f"Pump cover snap ridge must be located at lower Z = -{snap_z_offset}"
+        )
+
+        # Matching groove in bowl is at lower -Z: Z = floor_z + 10.0 - snap_z_offset
+        groove_low_z = floor_z + 10.0 - snap_z_offset
+        assert not bowl_part.is_inside((snap_r + 0.2, 0.0, groove_low_z)), (
+            f"Bowl casing groove must be located at lower Z = {groove_low_z}"
+        )
+
+        # Assembled configuration has zero interference
+        seat_loc = Location((0, 0, floor_z + 10.0))
+        cover_placed = cover_part.located(seat_loc)
+        intersection = bowl_part.intersect(cover_placed)
+        vol = sum(s.volume for s in intersection.solids()) if intersection else 0.0
+        assert vol < 0.2, f"Interference detected between bowl and snapped pump cover: {vol:.4f} mm3"

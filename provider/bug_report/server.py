@@ -6,10 +6,12 @@ and automated Markdown persistence (build/BUGS.md).
 """
 
 import base64
+from collections.abc import Collection
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
+import subprocess
 import sys
 import threading
 from typing import Any, Dict, List, Optional
@@ -25,9 +27,13 @@ from model.bug_report import (
     BugReportModel,
     BugSeverity,
     BugStatus,
+    ReviewTaskModel,
+    ReviewTaskStatus,
 )
 from provider.bug_report.markdown_exporter import MarkdownBugExporter
 from provider.bug_report.sqlite_store import SQLiteBugStore
+
+MAX_ATTACHMENT_SIZE_BYTES: int = 2 * 1024 * 1024 * 1024  # 2 GiB (GitHub LFS maximum file limit)
 
 
 class BugReportRequestHandler(BaseHTTPRequestHandler):
@@ -114,9 +120,16 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
         path = parsed.path
 
         length = int(self.headers.get("Content-Length", 0))
-        body = self.rfile.read(length).decode("utf-8") if length > 0 else "{}"
+        if length >= MAX_ATTACHMENT_SIZE_BYTES:
+            self.send_error(413, "Payload Too Large: Request exceeds maximum allowed size of 2 GB (GitHub LFS limit)")
+            return
+
         try:
+            body = self.rfile.read(length).decode("utf-8") if length > 0 else "{}"
             data = json.loads(body)
+        except (MemoryError, OverflowError):
+            self.send_error(413, "Payload Too Large: Insufficient memory to process request payload")
+            return
         except json.JSONDecodeError:
             data = {}
 
@@ -125,8 +138,22 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
                 self._handle_save_bug(data)
             case "/api/bugs/status":
                 self._handle_update_status(data)
+            case "/api/bugs/accept":
+                self._handle_accept_bug(data)
+            case "/api/bugs/reject":
+                self._handle_reject_bug(data)
+            case "/api/bugs/attach_commit":
+                self._handle_attach_commit(data)
+            case "/api/bugs/add_task":
+                self._handle_add_task(data)
+            case "/api/bugs/update_task":
+                self._handle_update_task(data)
+            case "/api/bugs/run_command":
+                self._handle_run_command(data)
             case "/api/bugs/delete":
                 self._handle_delete_bug(data)
+            case "/api/bugs/migrate_legacy":
+                self._handle_migrate_legacy(data)
             case "/api/upload":
                 self._handle_file_upload(data)
             case "/api/export":
@@ -187,7 +214,7 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
                 self.send_error(404, f"Attachment '{rel_name}' not found")
                 return
 
-        content = file_path.read_bytes()
+        file_size = file_path.stat().st_size
         suffix = file_path.suffix.lower()
         content_type = {
             ".png": "image/png",
@@ -209,10 +236,12 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
         try:
             self.send_response(200)
             self.send_header("Content-Type", content_type)
-            self.send_header("Content-Length", str(len(content)))
+            self.send_header("Content-Length", str(file_size))
             self.send_header("Connection", "close")
             self.end_headers()
-            self.wfile.write(content)
+            with open(file_path, "rb") as f:
+                while chunk := f.read(64 * 1024):
+                    self.wfile.write(chunk)
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             self.close_connection = True
         finally:
@@ -274,7 +303,7 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
         )
 
         self.server.database.add_or_update(bug)
-        self.server.save_and_sync()
+        self.server.save_and_sync(dirty_bug_ids=[bug.id])
         self._send_json(bug.model_dump(mode="json"))
 
     def _handle_update_status(self, data: Dict[str, Any]) -> None:
@@ -300,8 +329,193 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
             bug.resolution_notes = notes
 
         bug.updated_at = now_str
-        self.server.save_and_sync()
+        self.server.save_and_sync(dirty_bug_ids=[bug.id])
         self._send_json(bug.model_dump(mode="json"))
+
+    def _handle_accept_bug(self, data: Dict[str, Any]) -> None:
+        """Handle accepting a resolved bug and transitioning directly to CLOSED."""
+        bug_id = data.get("id")
+        notes = data.get("notes", "").strip()
+        bug = self.server.database.get_bug(bug_id) if bug_id else None
+        if not bug:
+            self._send_json({"error": f"Bug {bug_id} not found"}, status=404)
+            return
+
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        bug.status = BugStatus.CLOSED
+        bug.accepted_at = now_str
+        if notes:
+            if bug.resolution_notes:
+                bug.resolution_notes += f"\n\n**Acceptance Note**: {notes}"
+            else:
+                bug.resolution_notes = f"**Acceptance Note**: {notes}"
+        bug.updated_at = now_str
+        self.server.save_and_sync(dirty_bug_ids=[bug.id])
+        self._send_json({"status": "ok", "bug": bug.model_dump(mode="json")})
+
+    def _handle_reject_bug(self, data: Dict[str, Any]) -> None:
+        """Handle rejecting a resolved bug and transitioning directly back to OPEN."""
+        bug_id = data.get("id")
+        notes = data.get("notes", "").strip()
+        bug = self.server.database.get_bug(bug_id) if bug_id else None
+        if not bug:
+            self._send_json({"error": f"Bug {bug_id} not found"}, status=404)
+            return
+
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        bug.status = BugStatus.OPEN
+        bug.resolved_at = None
+        bug.rejected_at = now_str
+        bug.rejection_notes = notes
+        bug.updated_at = now_str
+        self.server.save_and_sync(dirty_bug_ids=[bug.id])
+        self._send_json({"status": "ok", "bug": bug.model_dump(mode="json")})
+
+    def _handle_migrate_legacy(self, data: Dict[str, Any]) -> None:
+        """Handle migrating legacy resolved bugs to CLOSED status."""
+        before_ts = data.get("before", "2026-11-05 14:00:00 UTC")
+        migrate_all = bool(data.get("all", False))
+        exclude_raw = data.get("exclude", [])
+        exclude_ids = set(exclude_raw if isinstance(exclude_raw, list) else str(exclude_raw).split(","))
+        dry_run = bool(data.get("dry_run", False))
+
+        candidates = []
+        for b in self.server.database.bugs:
+            if b.status == BugStatus.RESOLVED and not b.accepted_at:
+                if b.id.upper() in {x.upper().strip() for x in exclude_ids if x.strip()}:
+                    continue
+                if not migrate_all and before_ts:
+                    check_ts = b.resolved_at or b.updated_at or b.created_at
+                    if check_ts and check_ts > before_ts:
+                        continue
+                candidates.append(b)
+
+        if dry_run:
+            self._send_json(
+                {
+                    "status": "ok",
+                    "dry_run": True,
+                    "count": len(candidates),
+                    "migrated_ids": [b.id for b in candidates],
+                }
+            )
+            return
+
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        migrated_ids = []
+        for b in candidates:
+            b.status = BugStatus.CLOSED
+            b.accepted_at = b.resolved_at or b.updated_at or b.created_at or now_str
+            b.updated_at = now_str
+            migrated_ids.append(b.id)
+
+        if migrated_ids:
+            self.server.save_and_sync(dirty_bug_ids=migrated_ids)
+
+        self._send_json(
+            {
+                "status": "ok",
+                "dry_run": False,
+                "count": len(migrated_ids),
+                "migrated_ids": migrated_ids,
+            }
+        )
+
+    def _handle_attach_commit(self, data: Dict[str, Any]) -> None:
+        """Attach a commit hash to a bug report."""
+        bug_id = data.get("id")
+        commit_id = data.get("commit_id", "").strip()
+        bug = self.server.database.get_bug(bug_id) if bug_id else None
+        if not bug:
+            self._send_json({"error": f"Bug {bug_id} not found"}, status=404)
+            return
+        if not commit_id:
+            self._send_json({"error": "Missing commit_id"}, status=400)
+            return
+
+        if commit_id not in bug.commit_ids:
+            bug.commit_ids.append(commit_id)
+
+        bug.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        self.server.save_and_sync(dirty_bug_ids=[bug.id])
+        self._send_json({"status": "ok", "bug": bug.model_dump(mode="json")})
+
+    def _handle_add_task(self, data: Dict[str, Any]) -> None:
+        """Add a review task to a bug report."""
+        bug_id = data.get("id")
+        title = data.get("title", "").strip()
+        cmd = data.get("command", "").strip()
+        bug = self.server.database.get_bug(bug_id) if bug_id else None
+        if not bug:
+            self._send_json({"error": f"Bug {bug_id} not found"}, status=404)
+            return
+        if not title:
+            self._send_json({"error": "Missing task title"}, status=400)
+            return
+
+        task = ReviewTaskModel(title=title, command=cmd)
+        bug.review_tasks.append(task)
+        bug.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        self.server.save_and_sync(dirty_bug_ids=[bug.id])
+        self._send_json({"status": "ok", "task": task.model_dump(mode="json"), "bug": bug.model_dump(mode="json")})
+
+    def _handle_update_task(self, data: Dict[str, Any]) -> None:
+        """Update review task status or notes."""
+        bug_id = data.get("id")
+        task_id = data.get("task_id")
+        new_status = data.get("status")
+        notes = data.get("notes")
+        bug = self.server.database.get_bug(bug_id) if bug_id else None
+        if not bug:
+            self._send_json({"error": f"Bug {bug_id} not found"}, status=404)
+            return
+
+        target_task = None
+        for t in bug.review_tasks:
+            if t.id == task_id:
+                target_task = t
+                break
+
+        if not target_task:
+            self._send_json({"error": f"Task {task_id} not found"}, status=404)
+            return
+
+        if new_status:
+            try:
+                target_task.status = ReviewTaskStatus(str(new_status).upper())
+            except ValueError:
+                target_task.status = ReviewTaskStatus.PENDING
+        if notes is not None:
+            target_task.notes = str(notes)
+
+        bug.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        self.server.save_and_sync(dirty_bug_ids=[bug.id])
+        self._send_json(
+            {"status": "ok", "task": target_task.model_dump(mode="json"), "bug": bug.model_dump(mode="json")}
+        )
+
+    def _handle_run_command(self, data: Dict[str, Any]) -> None:
+        """Execute a review command and return output."""
+        cmd = data.get("command", "").strip()
+        if not cmd:
+            self._send_json({"error": "Empty command"}, status=400)
+            return
+
+        proc = subprocess.run(
+            cmd,
+            shell=True,
+            cwd=str(self.server.repo_root),
+            capture_output=True,
+            text=True,
+        )
+        self._send_json(
+            {
+                "status": "ok" if proc.returncode == 0 else "error",
+                "exit_code": proc.returncode,
+                "stdout": proc.stdout,
+                "stderr": proc.stderr,
+            }
+        )
 
     def _handle_delete_bug(self, data: Dict[str, Any]) -> None:
         """Delete a bug report by ID."""
@@ -337,15 +551,47 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
             filename = f"{stem}_{counter}{suffix}"
             dest_path = dest_dir / filename
 
-        if b64_content:
-            file_bytes = base64.b64decode(b64_content)
-            dest_path.write_bytes(file_bytes)
-        elif text_content:
-            file_bytes = text_content.encode("utf-8")
-            dest_path.write_bytes(file_bytes)
-        else:
-            file_bytes = b""
-            dest_path.write_bytes(file_bytes)
+        if b64_content and (len(b64_content) * 3) // 4 >= MAX_ATTACHMENT_SIZE_BYTES:
+            self._send_json(
+                {"error": "Payload Too Large: Attachment exceeds 2 GB limit (GitHub LFS limit)"},
+                status=413,
+            )
+            return
+        if text_content and len(text_content.encode("utf-8")) >= MAX_ATTACHMENT_SIZE_BYTES:
+            self._send_json(
+                {"error": "Payload Too Large: Attachment exceeds 2 GB limit (GitHub LFS limit)"},
+                status=413,
+            )
+            return
+
+        try:
+            if b64_content:
+                file_bytes = base64.b64decode(b64_content)
+                if len(file_bytes) >= MAX_ATTACHMENT_SIZE_BYTES:
+                    self._send_json(
+                        {"error": "Payload Too Large: Attachment exceeds 2 GB limit (GitHub LFS limit)"},
+                        status=413,
+                    )
+                    return
+                dest_path.write_bytes(file_bytes)
+            elif text_content:
+                file_bytes = text_content.encode("utf-8")
+                if len(file_bytes) >= MAX_ATTACHMENT_SIZE_BYTES:
+                    self._send_json(
+                        {"error": "Payload Too Large: Attachment exceeds 2 GB limit (GitHub LFS limit)"},
+                        status=413,
+                    )
+                    return
+                dest_path.write_bytes(file_bytes)
+            else:
+                file_bytes = b""
+                dest_path.write_bytes(file_bytes)
+        except (MemoryError, OverflowError):
+            self._send_json(
+                {"error": "Payload Too Large: Insufficient memory to decode attachment payload"},
+                status=413,
+            )
+            return
 
         rel_path = (
             dest_path.relative_to(self.server.repo_root)
@@ -512,9 +758,8 @@ class BugReportServer(ThreadingHTTPServer):
         self.db_version: int = 1
         self.database = self._initialize_database()
         self._watcher_stop = threading.Event()
-        self._start_file_watcher()
-
         if bind_and_activate:
+            self._start_file_watcher()
             super().__init__((host, port), BugReportRequestHandler)
             self.actual_port = self.server_address[1]
         else:
@@ -532,7 +777,7 @@ class BugReportServer(ThreadingHTTPServer):
             return 0.0
         try:
             max_mtime = self.feedback_dir.stat().st_mtime
-            for p in self.feedback_dir.glob("BUG_*.md"):
+            for p in list(self.feedback_dir.glob("BUG_*.md")) + list(self.feedback_dir.glob("WORM_*.md")):
                 try:
                     m = p.stat().st_mtime
                     if m > max_mtime:
@@ -589,12 +834,17 @@ class BugReportServer(ThreadingHTTPServer):
             super().server_close()
 
     def _ensure_unique_bug_ids(self, db: BugDatabaseModel) -> None:
-        """Ensure all bug IDs in database are unique, disambiguating any duplicates."""
-        seen: set[str] = set()
+        """Ensure all bug IDs and UUIDs in database are unique, disambiguating any duplicates."""
+        seen_ids: set[str] = set()
+        seen_uuids: set[str] = set()
         for bug in db.bugs:
-            if bug.id in seen:
+            if bug.id in seen_ids:
                 bug.id = db.generate_bug_id()
-            seen.add(bug.id)
+                bug.uuid = str(uuid.uuid4())
+            if bug.uuid in seen_uuids:
+                bug.uuid = str(uuid.uuid4())
+            seen_ids.add(bug.id)
+            seen_uuids.add(bug.uuid)
 
     def _initialize_database(self) -> BugDatabaseModel:
         """Load existing database state from SQLite/JSON and perform R+M+W sync with feedback/ and BUGS.md."""
@@ -610,6 +860,16 @@ class BugReportServer(ThreadingHTTPServer):
                 title="Hardware Bug Tracker",
                 summary="Hardware engineering defects, PCB layout issues, and reproduction tracking.",
             )
+
+        if not self.fresh and not db.bugs:
+            try:
+                from provider.bug_report.detached_branch import DetachedBranchBugStore
+
+                detached_db = DetachedBranchBugStore(self.repo_root).load_database()
+                if detached_db and detached_db.bugs:
+                    db = detached_db
+            except Exception:
+                pass
 
         if not self.fresh and self.markdown_output.exists():
             md_db = self.exporter.parse_markdown(self.markdown_output)
@@ -652,7 +912,7 @@ class BugReportServer(ThreadingHTTPServer):
             self.save_and_sync()
             return stats
 
-    def save_and_sync(self) -> Path:
+    def save_and_sync(self, dirty_bug_ids: Optional[Collection[str]] = None) -> Path:
         """Persist bug database to SQLite, JSON, BUGS.md, and individual BUG_<id>.md files."""
         with self._lock:
             if not self._is_internal_saving and self.feedback_dir.exists():
@@ -663,18 +923,42 @@ class BugReportServer(ThreadingHTTPServer):
             self._is_internal_saving = True
             try:
                 self.database.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-                self.sqlite_store.save_database(self.database)
+                if dirty_bug_ids is not None:
+                    dirty_set = set(dirty_bug_ids)
+                    for bug in self.database.bugs:
+                        if bug.id in dirty_set:
+                            self.sqlite_store.save_bug(bug)
+                    with self.sqlite_store._get_connection() as conn:
+                        conn.execute(
+                            "INSERT INTO metadata (key, value) VALUES ('updated_at', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                            (self.database.updated_at,),
+                        )
+                else:
+                    self.sqlite_store.save_database(self.database)
+
                 self.exporter.export_state_json(self.database, self.state_file)
                 out = self.exporter.export_markdown(
                     self.database,
                     self.markdown_output,
                     store=self.sqlite_store,
                     feedback_dir=self.feedback_dir,
+                    dirty_bug_ids=dirty_bug_ids,
                 )
                 if self.markdown_output.exists():
                     self.markdown_mtime = self.markdown_output.stat().st_mtime
                 self.feedback_mtime = self._get_feedback_dir_mtime()
                 self.db_version += 1
+                try:
+                    from provider.bug_report.detached_branch import DetachedBranchBugStore
+
+                    DetachedBranchBugStore(self.repo_root).commit_database(
+                        self.database,
+                        commit_message=f"Update bug database (v{self.db_version})",
+                        sync_local_disk=False,
+                        dirty_bug_ids=dirty_bug_ids,
+                    )
+                except Exception:
+                    pass
                 return out
             finally:
                 self._is_internal_saving = False

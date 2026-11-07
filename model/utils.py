@@ -96,6 +96,11 @@ def method_cache(func: Callable[..., Any] | None = None, *, maxsize: int = 128, 
     """Create per-instance cache to avoid memory leaks and Pydantic @validate_call conflicts."""
 
     def decorator(f: T) -> T:
+        try:
+            sig: Optional[inspect.Signature] = inspect.signature(f)
+        except (ValueError, TypeError):
+            sig = None
+
         @wraps(f)
         def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
             cache_attr = f"_cache_{f.__name__}"
@@ -108,11 +113,21 @@ def method_cache(func: Callable[..., Any] | None = None, *, maxsize: int = 128, 
 
             lock = getattr(self, lock_attr)
 
+            if sig is not None:
+                try:
+                    bound = sig.bind(self, *args, **kwargs)
+                    bound.apply_defaults()
+                    bound_args = tuple(v for k, v in bound.arguments.items() if k != "self")
+                    key = (_make_hashable(bound_args), ())
+                except TypeError:
+                    key = (_make_hashable(args), _make_hashable(kwargs))
+            else:
+                key = (_make_hashable(args), _make_hashable(kwargs))
+
             with lock:
                 if not hasattr(self, cache_attr):
                     setattr(self, cache_attr, OrderedDict())
                 cache = getattr(self, cache_attr)
-                key = (_make_hashable(args), _make_hashable(kwargs))
                 if key in cache:
                     cache.move_to_end(key)
                     return deep_copy_shape_or_builder(cache[key]) if deepcopy else cache[key]

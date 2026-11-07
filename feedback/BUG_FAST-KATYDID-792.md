@@ -2,12 +2,13 @@
 
 - **UUID**: `8693138a-3edf-46a0-9645-ba2dbe041841`
 - **ID**: `BUG-FAST-KATYDID-792`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-10-16 21:00:50 UTC`
 - **Resolved**: `2026-10-16 21:10:43 UTC`
+- **Accepted**: `2026-10-16 21:10:43 UTC`
 
 #### Description
 

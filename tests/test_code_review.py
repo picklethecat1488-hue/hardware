@@ -1693,3 +1693,33 @@ def test_regression_bug_258_cr_feedback_timestamp_not_modified(tmp_path: Path) -
     after_sync_mtime = out_file.stat().st_mtime_ns
     assert initial_content == after_sync_content
     assert initial_mtime == after_sync_mtime
+
+
+def test_git_engine_file_diff_caching(tmp_path: Path) -> None:
+    """Verify GitEngine caches immutable commit FileDiffModel instances in memory."""
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_dir)
+
+    target_sha = shas[1]
+    target_file = "test_2.txt"
+
+    # Initially cache should be empty
+    assert (target_sha, target_file) not in engine._file_diff_cache
+
+    # First call: populates cache
+    diff1 = engine.get_file_diff(target_sha, target_file)
+    assert (target_sha, target_file) in engine._file_diff_cache
+    assert diff1.file_path == target_file
+
+    # Second call: returns cached instance directly
+    diff2 = engine.get_file_diff(target_sha, target_file)
+    assert diff1 is diff2
+
+    # Working tree changes are NOT cached
+    (repo_dir / "test_2.txt").write_text("modified working content\n", encoding="utf-8")
+    engine.get_file_diff("working", target_file)
+    assert ("working", target_file) not in engine._file_diff_cache
+
+    # clear_diff_cache clears the cache
+    engine.clear_diff_cache()
+    assert (target_sha, target_file) not in engine._file_diff_cache

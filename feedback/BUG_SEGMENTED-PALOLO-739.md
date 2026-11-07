@@ -2,11 +2,12 @@
 
 - **UUID**: `37c38133-836b-4a73-bf34-046b166021e8`
 - **ID**: `BUG-SEGMENTED-PALOLO-739`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-10-11 18:14:05 UTC`
 - **Resolved**: `2026-10-11 18:27:36 UTC`
+- **Accepted**: `2026-10-11 18:27:36 UTC`
 
 #### Description
 

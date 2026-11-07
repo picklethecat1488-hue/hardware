@@ -16,6 +16,14 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
   <link rel="shortcut icon" href="/static/favicon.ico">
   <link rel="stylesheet" href="/static/common.css">
+  <script>
+    if (window.self !== window.top) {
+      document.documentElement.classList.add("in-iframe");
+      window.addEventListener("DOMContentLoaded", () => {
+        if (document.body) document.body.classList.add("in-iframe");
+      });
+    }
+  </script>
   <style>
     html { font-size: 80%; }
     /* =========================================================
@@ -74,6 +82,18 @@
       overflow: hidden;
       border: 2px solid var(--quake-border-mid);
       box-shadow: inset 0 0 0 1px rgba(255, 184, 0, 0.2), 0 0 10px rgba(200, 122, 50, 0.1);
+    }
+
+    html.in-iframe,
+    html.in-iframe body,
+    body.in-iframe {
+      border: none !important;
+      box-shadow: none !important;
+    }
+    html.in-iframe .window-resize-gripper,
+    body.in-iframe .window-resize-gripper,
+    .in-iframe .window-resize-gripper {
+      display: none !important;
     }
 
     /* Window Resize Gripper (WORM-027) */
@@ -1461,7 +1481,7 @@
       <!-- UI Scale Selector (8715cab2) -->
       <div style="display:flex;align-items:center;gap:4px;margin-right:4px;">
         <span style="font-size:8px;color:var(--quake-text-dim);">SCALE:</span>
-        <select id="uiScaleSelect" class="quake-select" onchange="onUiScaleChange(this.value)" title="UI Scale (Shortcuts: Cmd/Ctrl +/- or 0 to reset)" style="padding: 2px 4px; font-size: 9px; height: 22px;">
+        <select id="uiScaleSelect" class="quake-select" onchange="onUiScaleChange(this.value)" title="UI Scale (Shortcuts: Cmd/Ctrl +/- or 0 to reset)" style="padding: 2px 4px; font-size: 8.5px; height: 22px;">
           <option value="75%">75%</option>
           <option value="80%">80%</option>
           <option value="90%">90%</option>
@@ -1471,6 +1491,12 @@
           <option value="150%">150%</option>
         </select>
       </div>
+      <button id="btnBackToBugsHeader" class="quake-btn quake-btn-gold" onclick="returnToBugReport()" title="Return to Bug Report Workstation" style="display:none; align-items:center; gap:4px; font-weight:700;">
+        ◀ Back to Bug Report
+      </button>
+      <button id="btnBugTracker" class="quake-btn quake-btn-default" onclick="openBugTracker()" title="Open Bug Report Tool">
+        <span>🐞 Bug Tracker</span>
+      </button>
       <button id="btnSyncFeedback" class="quake-btn quake-btn-default" onclick="syncFeedback()" title="Synchronize review feedback with feedback/ directory and merge commit feedback">
         🔄 Sync Feedback
       </button>
@@ -1489,6 +1515,9 @@
   <div class="diff-toolbar">
     <div class="diff-toolbar-left">
       <div style="display: flex; gap: 4px; flex-shrink: 0;">
+        <button id="btnBackToBugsToolbar" class="quake-btn quake-btn-gold quake-btn-sm" onclick="returnToBugReport()" title="Return to Bug Report Workstation" style="display:none; align-items:center; gap:4px; font-weight:700;">
+          ◀ Back to Bug Report
+        </button>
         <button id="btnToggleCommits" class="quake-btn quake-btn-default{% if not single_commit %} quake-btn-active{% endif %}" onclick="togglePane('commits')">📜 Stream</button>
         <button id="btnToggleFiles" class="quake-btn quake-btn-default" onclick="togglePane('files')">📁 Files</button>
         <button id="btnFocus" class="quake-btn quake-btn-default" onclick="toggleFocusMode()" title="Focus Mode (Shortcut: \)">⛶ Focus</button>
@@ -1632,7 +1661,7 @@
         ✓ Local review server shut down<br>
         ✓ Terminal session released to shell
       </div>
-      <a href="/" target="hardware_vcs_diff_viewer" onclick="returnToDashboard(event)" class="quake-btn quake-btn-gold" style="padding: 8px 24px; font-size: 10px; text-decoration: none; display: inline-block;">
+      <a href="/" target="_top" onclick="returnToDashboard(event)" class="quake-btn quake-btn-gold" style="padding: 8px 24px; font-size: 10px; text-decoration: none; display: inline-block;">
         ✕ CLOSE WORKSTATION
       </a>
     </div>
@@ -1651,14 +1680,95 @@
       closeWorkstation();
     }
 
+    function returnToBugReport() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const rawBugId = urlParams.get("bug_id");
+      let bugHash = "";
+      if (rawBugId) {
+        const cleanId = rawBugId.toUpperCase().startsWith("BUG-") ? rawBugId.toUpperCase() : `BUG-${rawBugId.toUpperCase()}`;
+        bugHash = `#${cleanId}`;
+      }
+      const targetUrl = `/bugs${bugHash}`;
+      const targetName = `${state.repoName || 'repo'}_bug_tracker`;
+
+      if (window.parent && window.parent !== window && typeof window.parent.openWorkstationModal === "function") {
+        window.parent.openWorkstationModal(targetUrl, targetName);
+      } else if (window.opener && !window.opener.closed) {
+        try {
+          window.opener.location.href = targetUrl;
+          window.opener.focus();
+          window.close();
+          return;
+        } catch (e) {}
+        window.location.href = targetUrl;
+      } else {
+        window.location.href = targetUrl;
+      }
+    }
+
+    async function openBugTracker() {
+      const targetName = `${state.repoName || 'repo'}_bug_tracker`;
+      try {
+        const resp = await fetch("/api/open_bug", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({})
+        });
+        const res = await resp.json();
+        if (window.parent && window.parent !== window && typeof window.parent.openWorkstationModal === "function") {
+          window.parent.openWorkstationModal(res.url, targetName);
+        } else {
+          window.location.href = res.url || "/bugs";
+        }
+      } catch (err) {
+        if (window.parent && window.parent !== window && typeof window.parent.openWorkstationModal === "function") {
+          window.parent.openWorkstationModal("/bugs", targetName);
+        } else {
+          window.location.href = "/bugs";
+        }
+      }
+    }
+
+    function initBugNavigation() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const fromParam = urlParams.get("from");
+      const bugId = urlParams.get("bug_id");
+      const isFromBugs = fromParam === "bugs" || Boolean(bugId) || (document.referrer && document.referrer.includes("/bugs"));
+      if (isFromBugs) {
+        const btnHeader = document.getElementById("btnBackToBugsHeader");
+        const btnToolbar = document.getElementById("btnBackToBugsToolbar");
+        const label = bugId ? `◀ Back to ${bugId.toUpperCase().startsWith("BUG-") ? bugId.toUpperCase() : "BUG-" + bugId.toUpperCase()}` : "◀ Back to Bug Report";
+        if (btnHeader) {
+          btnHeader.style.display = "inline-flex";
+          btnHeader.textContent = label;
+          btnHeader.title = `Return to Bug Report ${bugId || ''}`;
+        }
+        if (btnToolbar) {
+          btnToolbar.style.display = "inline-flex";
+          btnToolbar.textContent = label;
+          btnToolbar.title = `Return to Bug Report ${bugId || ''}`;
+        }
+      }
+    }
+
     function closeWorkstation() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const isFromBugs = urlParams.get("from") === "bugs" || Boolean(urlParams.get("bug_id"));
+      if (isFromBugs) {
+        returnToBugReport();
+        return;
+      }
       if (window.parent && window.parent !== window && typeof window.parent.closeWorkstationModal === "function") {
         window.parent.closeWorkstationModal();
       } else if (window.opener && !window.opener.closed) {
         window.opener.focus();
         window.close();
       } else {
-        window.open("/", "hardware_vcs_diff_viewer");
+        if (window.top && window.top !== window) {
+          window.top.location.href = "/";
+        } else {
+          window.location.href = "/";
+        }
       }
       try {
         window.parent.postMessage({ action: "close_workstation", type: "close_modal" }, "*");
@@ -1923,6 +2033,7 @@
     document.addEventListener("DOMContentLoaded", async () => {
       initUiScale();
       initWordWrap();
+      initBugNavigation();
       await loadSession();
       await loadCommits();
       initPanelResizers();
