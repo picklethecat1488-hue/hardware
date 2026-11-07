@@ -182,12 +182,12 @@ style: |
 
 ### Controlled Impedance Targets
 * **$50\ \Omega$ Single-Ended Microstrip (Layer 1)**:
-  * Trace Width: $0.180\text{ mm}$ ($7.1\text{ mil}$)
+  * Trace Width: $0.120\text{ mm}$ ($4.7\text{ mil}$)
   * Reference: Layer 2 unbroken GND plane ($0.100\text{ mm}$ dielectric height)
   * Tolerance: $\pm 10\%$ ($\pm 5\ \Omega$)
 * **$90\ \Omega$ Differential Pair (USB 2.0 D+/D-)**:
-  * Trace Width: $0.160\text{ mm}$ ($6.3\text{ mil}$)
-  * Pair Spacing: $0.180\text{ mm}$ ($7.1\text{ mil}$)
+  * Trace Width: $0.120\text{ mm}$ ($4.7\text{ mil}$)
+  * Pair Spacing: $0.120\text{ mm}$ ($4.7\text{ mil}$)
   * Reference: Layer 2 GND plane
   * Intra-pair skew constraint: $< 0.15\text{ mm}$ ($< 1.0\text{ ps}$)
 
@@ -212,8 +212,8 @@ style: |
 
 | Net / Bus Class | Topology | Trace Width (mm) | Spacing (mm) | Target Impedance | Tolerance | Ref Layer |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
-| USB 2.0 Differential | Edge-Coupled Microstrip | $0.160$ | $0.180$ | $90\ \Omega\ \text{diff}$ | $\pm 10\%$ | L2 (GND) |
-| FlexSPI Bus | Single-Ended Microstrip | $0.180$ | $0.250$ | $50\ \Omega\ \text{SE}$ | $\pm 10\%$ | L2 (GND) |
+| USB 2.0 Differential | Edge-Coupled Microstrip | $0.120$ | $0.120$ | $90\ \Omega\ \text{diff}$ | $\pm 10\%$ | L2 (GND) |
+| FlexSPI Bus | Single-Ended Microstrip | $0.120$ | $0.120$ | $50\ \Omega\ \text{SE}$ | $\pm 10\%$ | L2 (GND) |
 | General Digital / I2C | Microstrip / Stripline | $0.200$ | $0.200$ | Uncontrolled | - | L2 / L4 |
 | High-Current Power (VBUS/VBAT) | Copper Polygon Pour | $> 0.500$ | $0.250$ | Low DCR ($< 20\text{ m}\Omega$) | - | L4 (PWR) |
 

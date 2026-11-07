@@ -772,7 +772,6 @@ def test_generate_pcb_project_summary_jinja2_templates(tmp_path: Path) -> None:
     assert "CONTROLLED IMPEDANCE" in txt
     assert "50 Ohm" in txt
     assert "90 Ohm" in txt
-    assert "85 Ohm" in txt
     assert "VIPPO" in txt or "Resin" in txt
 
     assert "# PCB Manufacturing & Order Specification: carrier_board" in md

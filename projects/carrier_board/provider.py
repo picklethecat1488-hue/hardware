@@ -976,6 +976,14 @@ class CarrierBoardProvider(Provider):
                 priority=1,
                 clearance_mm=0.25,
             )
+            # BUG-OPEN-003: Inner copper balance plane on In2.Cu to prevent warpage and delamination
+            CopperRegion(
+                net="GND",
+                layer="In2.Cu",
+                outline=polygon,
+                priority=1,
+                clearance_mm=0.25,
+            )
             CopperRegion(
                 net="3V3",
                 layer="In3.Cu",
@@ -1088,17 +1096,17 @@ class CarrierBoardProvider(Provider):
                     "BOTTOM SHIELD / GROUND REF", layer="B.SilkS", font_size=1.0, thickness=0.15, mirror=True
                 )
 
-            # BUG-272: Fabrication notes and controlled impedance specification table on Dwgs.User
+            # BUG-272, BUG-OPEN-003: Fabrication notes and controlled impedance specification table on Dwgs.User
             with Locations((0.0, 42.0)):
                 SilkscreenText(
-                    "FAB NOTES: 6-LAYER TG170 ENIG | SOLDERMASK: MATTE BLACK | SILK: WHITE",
+                    "FAB NOTES: 6-LAYER TG150 ENIG | SOLDERMASK: MATTE BLACK | SILK: WHITE",
                     layer="Dwgs.User",
                     font_size=0.7,
                     thickness=0.1,
                 )
             with Locations((0.0, 40.5)):
                 SilkscreenText(
-                    "IMPEDANCE: 50 OHM SE (L1 W=0.18mm REF L2) | 90 OHM DIFF (L1 W=0.16 S=0.18 REF L2) | 85 OHM DIFF (L1 W=0.18 S=0.15 REF L2)",
+                    "IMPEDANCE: 50 OHM SE (L1 W=0.12mm REF L2) | 90 OHM DIFF (L1 W=0.12 S=0.12 REF L2)",
                     layer="Dwgs.User",
                     font_size=0.55,
                     thickness=0.08,
