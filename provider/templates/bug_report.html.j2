@@ -699,8 +699,9 @@
     <div class="quake-card" style="padding:24px 32px; max-width:480px; width:90%; text-align:center; border:2px solid var(--quake-gold);">
       <h3 style="color:var(--quake-gold); margin-bottom:12px; font-size:13px;">🔄 MERGING AGENT FEEDBACK</h3>
       <p id="loading-status-text" style="color:var(--quake-text-light); font-size:10px; margin-bottom:16px;">Merging stored agent feedback from feedback/ directory into SQLite database...</p>
-      <div style="background:#120c08; border:1px solid #5a381e; border-radius:4px; height:12px; overflow:hidden; margin-bottom:12px;">
-        <div id="loading-progress-bar" style="background:var(--quake-gold); width:30%; height:100%; transition:width 0.3s ease;"></div>
+      <div style="background:#120c08; border:1px solid #5a381e; border-radius:4px; height:14px; position:relative; overflow:hidden; margin-bottom:12px;">
+        <div id="loading-progress-bar" style="background:linear-gradient(90deg, #ffaa00, #ff8800); width:15%; height:100%; transition:width 0.1s ease; box-shadow:0 0 10px rgba(255,170,0,0.5);"></div>
+        <div id="loading-progress-percent" style="position:absolute; top:0; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; font-size:8px; font-weight:bold; color:#fff; text-shadow:0 1px 2px #000;">15%</div>
       </div>
       <div id="loading-step-text" style="color:var(--quake-text-muted); font-size:9px;">Scanning feedback/ directory for BUG_*.md files...</div>
     </div>
@@ -991,6 +992,69 @@
     const severityOrder = { "CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3 };
     const statusOrder = { "OPEN": 0, "IN_PROGRESS": 1, "PLANNED": 2, "RESOLVED": 3, "CLOSED": 4 };
 
+    // Feedback Loading Modal Management
+    let feedbackLoadingInterval = null;
+    function showFeedbackLoading(title, description, stepText) {
+      const modal = document.getElementById("feedback-loading-modal");
+      if (!modal) return;
+      const titleEl = modal.querySelector("h3");
+      const descEl = document.getElementById("loading-status-text");
+      const stepEl = document.getElementById("loading-step-text");
+      const barEl = document.getElementById("loading-progress-bar");
+      const pctEl = document.getElementById("loading-progress-percent");
+
+      if (titleEl && title) titleEl.textContent = title;
+      if (descEl && description) descEl.textContent = description;
+      if (stepEl && stepText) stepEl.textContent = stepText;
+
+      let progress = 14;
+      const startTime = Date.now();
+      if (feedbackLoadingInterval) clearInterval(feedbackLoadingInterval);
+
+      modal.style.display = "flex";
+      feedbackLoadingInterval = setInterval(() => {
+        const elapsedSec = (Date.now() - startTime) / 1000;
+        if (progress < 94) {
+          if (elapsedSec < 0.8) {
+            progress = 14 + (elapsedSec / 0.8) * 26;
+          } else if (elapsedSec < 2.5) {
+            progress = 40 + ((elapsedSec - 0.8) / 1.7) * 32;
+          } else if (elapsedSec < 6.0) {
+            progress = 72 + ((elapsedSec - 2.5) / 3.5) * 18;
+          } else {
+            progress += (96 - progress) * 0.015;
+          }
+        }
+        const pct = Math.min(96, Math.floor(progress));
+        if (barEl) barEl.style.width = `${pct}%`;
+        if (pctEl) pctEl.textContent = `${pct}%`;
+        if (stepEl) {
+          if (pct < 35) stepEl.textContent = "Scanning feedback/ directory for BUG_*.md files...";
+          else if (pct < 65) stepEl.textContent = "Parsing issue metadata and verification checklists...";
+          else if (pct < 85) stepEl.textContent = "Reconciling SQLite database store and feedback worktree...";
+          else stepEl.textContent = "Finalizing synchronized records...";
+        }
+      }, 50);
+    }
+
+    function hideFeedbackLoading() {
+      const modal = document.getElementById("feedback-loading-modal");
+      if (feedbackLoadingInterval) {
+        clearInterval(feedbackLoadingInterval);
+        feedbackLoadingInterval = null;
+      }
+      if (!modal) return;
+      const barEl = document.getElementById("loading-progress-bar");
+      const pctEl = document.getElementById("loading-progress-percent");
+      const stepEl = document.getElementById("loading-step-text");
+      if (barEl) barEl.style.width = "100%";
+      if (pctEl) pctEl.textContent = "100%";
+      if (stepEl) stepEl.textContent = "✓ Synchronized!";
+      setTimeout(() => {
+        modal.style.display = "none";
+      }, 250);
+    }
+
     // Action Progress Modal Management (BUG-327)
     let actionProgressDepth = 0;
     let actionProgressTimer = null;
@@ -1019,7 +1083,7 @@
 
       let isModalVisible = false;
       const startTime = Date.now();
-      let progress = 15;
+      let progress = 14;
 
       if (actionProgressTimer) {
         clearTimeout(actionProgressTimer);
@@ -1030,28 +1094,70 @@
         actionProgressInterval = null;
       }
 
+      const getStageMessage = (pct) => {
+        if (options && options.stages && Array.isArray(options.stages)) {
+          for (const s of options.stages) {
+            if (pct <= s.at) return s.text;
+          }
+          return options.stages[options.stages.length - 1].text;
+        }
+
+        const titleUpper = ((options && options.title) || "").toUpperCase();
+        if (titleUpper.includes("SYNC") || titleUpper.includes("MERG")) {
+          if (pct < 30) return "Scanning feedback/ directory for issue markdown files...";
+          if (pct < 60) return "Parsing report fields, review tasks, and attachments...";
+          if (pct < 85) return "Reconciling SQLite database store and feedback worktree...";
+          return "Updating active bug views...";
+        } else if (titleUpper.includes("SAVE") || titleUpper.includes("PERSIST")) {
+          if (pct < 30) return "Validating issue schema and task invariants...";
+          if (pct < 65) return "Writing changes to SQLite store and feedback worktree...";
+          if (pct < 88) return "Regenerating markdown export reports...";
+          return "Finalizing persistent state...";
+        } else if (titleUpper.includes("DELETE") || titleUpper.includes("REJECT") || titleUpper.includes("ACCEPT")) {
+          if (pct < 40) return "Updating issue lifecycle status...";
+          if (pct < 80) return "Synchronizing changes across database...";
+          return "Refreshing workspace view...";
+        }
+
+        if (pct < 30) return (options && options.stepText) || "Initializing operation...";
+        if (pct < 60) return "Executing operation...";
+        if (pct < 85) return "Reconciling data models...";
+        return "Finalizing updates...";
+      };
+
       actionProgressTimer = setTimeout(() => {
         if (!overlay) return;
         isModalVisible = true;
         if (titleEl) titleEl.textContent = (options && options.title) || "PROCESSING ACTION";
         if (descEl) descEl.textContent = (options && options.description) || "Please wait while the operation completes...";
-        if (statusEl) statusEl.textContent = (options && options.stepText) || "Working...";
+        if (statusEl) statusEl.textContent = (options && options.stepText) || getStageMessage(progress);
         if (iconEl && options && options.icon) iconEl.textContent = options.icon;
-        if (barEl) barEl.style.width = "20%";
-        if (percentEl) percentEl.textContent = "20%";
-        if (elapsedEl) elapsedEl.textContent = ((Date.now() - startTime) / 1000).toFixed(1) + "s";
+        if (barEl) barEl.style.width = "14%";
+        if (percentEl) percentEl.textContent = "14%";
+        if (elapsedEl) elapsedEl.textContent = "0.0s";
         overlay.style.display = "flex";
 
         actionProgressInterval = setInterval(() => {
-          const elapsedSec = ((Date.now() - startTime) / 1000).toFixed(1);
-          if (elapsedEl) elapsedEl.textContent = `${elapsedSec}s`;
-          if (progress < 90) {
-            progress += Math.floor(Math.random() * 6) + 2;
-            if (progress > 90) progress = 90;
-            if (barEl) barEl.style.width = `${progress}%`;
-            if (percentEl) percentEl.textContent = `${progress}%`;
+          const elapsedSec = (Date.now() - startTime) / 1000;
+          if (elapsedEl) elapsedEl.textContent = `${elapsedSec.toFixed(1)}s`;
+
+          // Continuous asymptotic progression
+          if (progress < 94) {
+            if (elapsedSec < 1.0) {
+              progress = 14 + (elapsedSec / 1.0) * 26; // 14% to 40%
+            } else if (elapsedSec < 3.0) {
+              progress = 40 + ((elapsedSec - 1.0) / 2.0) * 32; // 40% to 72%
+            } else if (elapsedSec < 7.0) {
+              progress = 72 + ((elapsedSec - 3.0) / 4.0) * 18; // 72% to 90%
+            } else {
+              progress += (96 - progress) * 0.015; // Asymptotic up to 96%
+            }
           }
-        }, 200);
+          const pct = Math.min(96, Math.floor(progress));
+          if (barEl) barEl.style.width = `${pct}%`;
+          if (percentEl) percentEl.textContent = `${pct}%`;
+          if (statusEl) statusEl.textContent = getStageMessage(pct);
+        }, 50);
       }, thresholdMs);
 
       try {
@@ -1070,7 +1176,8 @@
         if (isModalVisible && overlay) {
           if (barEl) barEl.style.width = "100%";
           if (percentEl) percentEl.textContent = "100%";
-          if (statusEl) statusEl.textContent = "Complete!";
+          const totalElapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+          if (statusEl) statusEl.textContent = `✓ Complete in ${totalElapsed}s`;
           setTimeout(() => {
             overlay.style.display = "none";
           }, 250);

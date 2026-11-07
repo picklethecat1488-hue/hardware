@@ -1301,6 +1301,11 @@ class MarkdownBugExporter:
                     if not md_bug.uuid:
                         md_bug.uuid = str(uuid_pkg.uuid4())
                     self.export_individual_bug(md_bug, feedback_dir)
+                    if bug_file.exists():
+                        try:
+                            bug_file.unlink()
+                        except OSError:
+                            pass
                 database.add_or_update(md_bug)
                 merged += 1
 
