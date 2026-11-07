@@ -1,25 +1,3 @@
-** Drc report for flex_tail.kicad_pcb **
-** Created on 2026-09-28T11:57:59 **
-** Report includes: Errors, Warnings, Exclusions **
-
-** Found 0 DRC violations **
-
-** Found 0 unconnected pads **
-
-** Found 0 Footprint errors **
-
-** Ignored checks **
-    - Track has unconnected end
-    - Drilled hole too close to other hole
-    - Footprint has no courtyard defined
-    - Track endpoint not centered on via
-    - Tuning profile track geometries
-    - Footprint doesn't match symbol's footprint filters
-    - Silkscreen clearance
-    - Silkscreen clipped by solder mask
-    - Silkscreen clipped by board edge
-    - Text height out of range
-    - Footprint component type doesn't match footprint pads
-    - Footprint not found in libraries
-
-** End of Report **
+version https://git-lfs.github.com/spec/v1
+oid sha256:0df8fa7c4662071c09697bdd3a9653853b483aab5ab447751e84b2c11208238e
+size 755
