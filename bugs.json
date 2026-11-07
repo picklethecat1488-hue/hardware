@@ -8757,7 +8757,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-6",
           "filename": "carrier_board_bom_rev2.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
@@ -8766,7 +8766,7 @@
           "created_at": ""
         },
         {
-          "id": "att-2",
+          "id": "att-7",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx",
@@ -8775,7 +8775,7 @@
           "created_at": ""
         },
         {
-          "id": "att-3",
+          "id": "att-8",
           "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
           "file_type": "reference",
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
@@ -9339,7 +9339,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-2",
           "filename": "screenshot_paste_1793924149979_7f535.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png",
@@ -9348,7 +9348,7 @@
           "created_at": ""
         },
         {
-          "id": "att-2",
+          "id": "att-3",
           "filename": "screenshot_paste_1793890911006_wvg54.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png",
@@ -9530,7 +9530,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-2",
           "filename": "screenshot_paste_1793947358948_g28nw.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-FIERCE-LONGHORN-849/screenshot_paste_1793947358948_g28nw.png",
@@ -9727,7 +9727,7 @@
       "id": "BUG-FLITTING-LOCUST-977",
       "uuid": "1618734f-1a48-4cb3-af0b-3658beb2d978",
       "title": "Micro gapes in impeller",
-      "status": "OPEN",
+      "status": "RESOLVED",
       "severity": "MEDIUM",
       "category": "CAD",
       "component": "cat_fountain",
@@ -9751,9 +9751,9 @@
       "review_tasks": [],
       "created_at": "2026-11-07 00:15:58 UTC",
       "updated_at": "2026-11-07 00:19:31 UTC",
-      "resolved_at": null,
-      "resolution_notes": "",
-      "rejection_notes": null,
+      "resolved_at": "2026-11-07 00:30:37 UTC",
+      "resolution_notes": "Extended impeller blades 1.0mm into central sleeve cylinder, eliminating micro-gaps at blade corner junctions while preserving guide pin clearance",
+      "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
     },
@@ -9772,22 +9772,22 @@
       "logs": "",
       "attachments": [
         {
-          "id": "f3258a84",
+          "id": "att-1",
           "filename": "screenshot_paste_1794011081865_vz46w.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-CRIMSON-MAYFLY-874/screenshot_paste_1794011081865_vz46w.png",
-          "size_bytes": 162613,
+          "size_bytes": 0,
           "description": "Pasted screenshot screenshot_paste_1794011081865_vz46w.png",
-          "created_at": "2026-11-07 00:24:41 UTC"
+          "created_at": ""
         }
       ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-07 00:23:00 UTC",
-      "updated_at": "2026-11-07 00:28:06 UTC",
+      "updated_at": "",
       "resolved_at": null,
       "resolution_notes": "",
-      "rejection_notes": null,
+      "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
     },
@@ -9808,13 +9808,13 @@
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-07 00:27:53 UTC",
-      "updated_at": "2026-11-07 00:27:53 UTC",
+      "updated_at": "",
       "resolved_at": null,
       "resolution_notes": "",
-      "rejection_notes": null,
+      "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-07 00:28:06 UTC"
+  "updated_at": "2026-11-07 00:30:37 UTC"
 }

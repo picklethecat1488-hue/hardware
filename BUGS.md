@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-07 00:28:11 UTC` |
+| **Report Date** | `2026-11-07 00:30:38 UTC` |
 | **Total Issues** | `323` |
-| **Open Issues** | `3` |
-| **Resolved / Closed** | `320 (99%)` |
+| **Open Issues** | `2` |
+| **Resolved / Closed** | `321 (99%)` |
 
 ## Issues by Severity
 
@@ -352,7 +352,7 @@
 - [x] **`[MEDIUM]`** [#BUG-BRISTLY-CENTIPEDE-327](#bug-bristly-centipede-327): Add modal progress UIs for repo and bug actions `[dashboard]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-LUSTROUS-HORSEFLY-593](#bug-lustrous-horsefly-593): Rename GEMINI.md to AGENTS.md (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-DIURNAL-ANT-667](#bug-diurnal-ant-667): Opening commits in bug report workstation-broken `[dashboard]` (`CLOSED`)
-- [ ] **`[MEDIUM]`** [#BUG-FLITTING-LOCUST-977](#bug-flitting-locust-977): Micro gapes in impeller `[cat_fountain]` (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-FLITTING-LOCUST-977](#bug-flitting-locust-977): Micro gapes in impeller `[cat_fountain]` (`RESOLVED`)
 - [ ] **`[MEDIUM]`** [#BUG-CRIMSON-MAYFLY-874](#bug-crimson-mayfly-874): Drive hub-insufficient clearance for hall sensor board (`OPEN`)
 - [ ] **`[MEDIUM]`** [#BUG-LEAPING-LOCUST-56](#bug-leaping-locust-56): New Bug Report (`OPEN`)
 
@@ -28492,14 +28492,15 @@ Attached commits in Bug Report now navigate directly to Code Review for that com
 
 ---
 
-### <a id="bug-flitting-locust-977"></a> 🔴 `[BUG-FLITTING-LOCUST-977]` Micro gapes in impeller
+### <a id="bug-flitting-locust-977"></a> 🟢 `[BUG-FLITTING-LOCUST-977]` Micro gapes in impeller
 
 - **UUID**: `1618734f-1a48-4cb3-af0b-3658beb2d978`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-07 00:15:58 UTC`
+- **Resolved**: `2026-11-07 00:30:37 UTC`
 
 #### Description
 
@@ -28510,6 +28511,10 @@ There are micro gaps between the impeller blades and central shaft, we should pa
 | Type | Filename | Description |
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1794010762260_ohrw4.png](attachments/BUG-FLITTING-LOCUST-977/screenshot_paste_1794010762260_ohrw4.png) | Pasted screenshot screenshot_paste_1794010762260_ohrw4.png |
+
+#### Resolution Notes
+
+Extended impeller blades 1.0mm into central sleeve cylinder, eliminating micro-gaps at blade corner junctions while preserving guide pin clearance
 
 ---
 
