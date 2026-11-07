@@ -17,6 +17,10 @@ The inner annular ring for the pump cover may have insufficient clearance to fit
 
 - `c5e17c62ec7760b87ec631fa762a939765866323`
 
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:58dbe53a --> Inspect 3D CAD view of cat_fountain product assembly to verify lower -Z pump cover mount and annular snap ring engagement | `python tools/view.py cat_fountain/product:view`
+
 #### Resolution Notes
 
 Moved pump cover mount recess depth to 2.5mm and annular snap ridge/groove Z offset to 1.5mm lower (-Z) to provide generous epoxy clearance
