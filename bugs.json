@@ -9760,8 +9760,8 @@
         }
       ],
       "created_at": "2026-11-07 00:15:58 UTC",
-      "updated_at": "",
-      "resolved_at": "2026-11-07 00:30:37 UTC",
+      "updated_at": "2026-11-07 01:23:53 UTC",
+      "resolved_at": "2026-11-07 01:23:53 UTC",
       "resolution_notes": "Extended impeller blades 1.0mm into central sleeve cylinder, eliminating micro-gaps at blade corner junctions while preserving guide pin clearance",
       "rejection_notes": "",
       "accepted_at": null,
@@ -9846,5 +9846,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-07 01:23:50 UTC"
+  "updated_at": "2026-11-07 01:23:53 UTC"
 }
