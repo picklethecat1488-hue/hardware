@@ -159,15 +159,52 @@ class DetachedBranchBugStore:
         return None
 
     def load_database(self) -> Optional[BugDatabaseModel]:
-        """Load BugDatabaseModel from the detached branch bugs.json state file.
+        """Load BugDatabaseModel from the individual BUG_*.md files on the detached branch.
 
-        Attempts to read bugs.json from the local detached ref, then falls back
-        to the remote tracking ref.
+        Attempts to read individual feedback/ markdown files from the local detached ref,
+        then falls back to the remote tracking ref.
 
         Returns:
-            BugDatabaseModel if successfully read and validated, else None.
+            BugDatabaseModel if successfully read, else None.
         """
+        prefix = "BUG" if self.branch_name == "bugs" else "WORM"
         for target_ref in [self.ref_name, self.remote_ref_name]:
+            try:
+                proc = subprocess.run(
+                    ["git", "ls-tree", "-r", "--name-only", target_ref, "feedback/"],
+                    cwd=str(self.repo_root),
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if proc.returncode == 0 and proc.stdout.strip():
+                    bugs: List[BugReportModel] = []
+                    for line in proc.stdout.splitlines():
+                        path_str = line.strip()
+                        file_name = Path(path_str).name
+                        if not file_name.startswith(f"{prefix}_") or not file_name.endswith(".md"):
+                            continue
+                        show_proc = subprocess.run(
+                            ["git", "show", f"{target_ref}:{path_str}"],
+                            cwd=str(self.repo_root),
+                            capture_output=True,
+                            text=True,
+                            check=False,
+                        )
+                        if show_proc.returncode == 0 and show_proc.stdout.strip():
+                            bug = self.exporter.parse_bug_markdown_content(
+                                show_proc.stdout,
+                                default_filename=file_name,
+                            )
+                            if bug:
+                                bugs.append(bug)
+                    if bugs:
+                        bugs.sort(key=lambda b: (b.created_at, b.id))
+                        return BugDatabaseModel(bugs=bugs)
+            except Exception:
+                continue
+
+            # Fallback for historical commits before state json removal
             try:
                 proc = subprocess.run(
                     ["git", "show", f"{target_ref}:{self.branch_name}.json"],
@@ -192,7 +229,7 @@ class DetachedBranchBugStore:
         sync_local_disk: bool = False,
         dirty_bug_ids: Optional[Collection[str]] = None,
     ) -> Optional[str]:
-        """Write bugs.json, BUGS.md, and individual BUG_*.md files to the detached branch.
+        """Write individual BUG_*.md files to the detached branch.
 
         Args:
             database: Bug database model containing all bugs to store.
@@ -268,13 +305,8 @@ class DetachedBranchBugStore:
                         current_index[parts[3]] = parts[1]
 
             target_files: Dict[str, bytes] = {}
-            # 1. Store bugs.json
-            target_files[f"{self.branch_name}.json"] = database.model_dump_json(indent=2).encode("utf-8")
 
-            # 2. Store BUGS.md
-            target_files[f"{self.branch_name.upper()}.md"] = self.exporter.render_markdown(database).encode("utf-8")
-
-            # 3. Store individual BUG_<id>.md files in feedback/
+            # Store individual BUG_<id>.md files in feedback/
             prefix = "WORM" if self.branch_name == "worms" else "BUG"
             if parents and parents[0] and dirty_bug_ids is not None:
                 dirty_set = set(dirty_bug_ids)
@@ -293,16 +325,19 @@ class DetachedBranchBugStore:
                     )
                     target_files[f"feedback/{prefix}_{clean_id}.md"] = bug_md
 
-            # 4. Include existing CR_*.md or review files if available
+            # Include existing CR_*.md review files if available (excluding CR.md)
             if not (parents and parents[0] and dirty_bug_ids is not None):
                 if feedback_path.exists() and feedback_path.is_dir():
-                    cr_candidates = list(feedback_path.glob("CR_*.md")) + [feedback_path / "CR.md"]
+                    cr_candidates = [
+                        cr_file
+                        for cr_file in feedback_path.glob("CR_*.md")
+                        if cr_file.is_file() and cr_file.name != "CR.md"
+                    ]
                     for cr_file in cr_candidates:
-                        if cr_file.is_file():
-                            try:
-                                target_files[f"feedback/{cr_file.name}"] = cr_file.read_bytes()
-                            except OSError:
-                                continue
+                        try:
+                            target_files[f"feedback/{cr_file.name}"] = cr_file.read_bytes()
+                        except OSError:
+                            continue
 
             # 5. Include attachments from attachments/ and feedback/attachments/
             target_disk_files: Dict[str, Path] = {}
@@ -341,6 +376,27 @@ class DetachedBranchBugStore:
                     index_updates.append(f"{FILE_MODE_STANDARD} {sha} 0\t{fn}\n")
 
             if current_index:
+                # Explicitly untrack and prune all aggregated index and state files
+                forbidden_candidates = {
+                    f"{self.branch_name}.json",
+                    f"{self.branch_name.upper()}.json",
+                    f"{self.branch_name.upper()}.md",
+                    f"{self.branch_name}.md",
+                    "WORMS.md",
+                    "worms.json",
+                    "WORMS.json",
+                    "BUGS.md",
+                    "bugs.json",
+                    "BUGS.json",
+                    "CR.md",
+                    "feedback/WORMS.md",
+                    "feedback/BUGS.md",
+                    "feedback/CR.md",
+                }
+                for forbidden in forbidden_candidates:
+                    if forbidden in current_index:
+                        index_updates.append(f"0 0000000000000000000000000000000000000000 0\t{forbidden}\n")
+
                 valid_bug_paths = {
                     f"feedback/{prefix}_{b.id.removeprefix('BUG-').removeprefix('BUG_').removeprefix('WORM-').removeprefix('WORM_')}.md"
                     for b in database.bugs
@@ -348,9 +404,6 @@ class DetachedBranchBugStore:
                 for p in current_index:
                     if dirty_bug_ids is None and p.startswith(f"feedback/{prefix}_") and p not in valid_bug_paths:
                         index_updates.append(f"0 0000000000000000000000000000000000000000 0\t{p}\n")
-                    elif p.startswith("attachments/") or p.startswith("feedback/attachments/"):
-                        if not (self.repo_root / p).is_file():
-                            index_updates.append(f"0 0000000000000000000000000000000000000000 0\t{p}\n")
 
             if index_updates:
                 subprocess.run(
@@ -511,8 +564,19 @@ class DetachedBranchBugStore:
         restored: List[Path] = []
         for line in tree_proc.stdout.splitlines():
             path_str = line.strip()
-            # Explicitly exclude aggregated index files to prevent workspace conflicts
-            if path_str in ("WORMS.md", "BUGS.md", "CR.md", "feedback/WORMS.md", "feedback/BUGS.md", "feedback/CR.md"):
+            # Explicitly exclude aggregated index and state files to prevent workspace conflicts
+            if path_str in (
+                "WORMS.md",
+                "BUGS.md",
+                "CR.md",
+                "worms.json",
+                "WORMS.json",
+                "bugs.json",
+                "BUGS.json",
+                "feedback/WORMS.md",
+                "feedback/BUGS.md",
+                "feedback/CR.md",
+            ):
                 continue
             if not path_str.startswith("feedback/"):
                 continue
@@ -533,8 +597,15 @@ class DetachedBranchBugStore:
             except (subprocess.CalledProcessError, OSError):
                 pass
 
-        # Ensure index files never linger in feedback directory
+        # Ensure index and state files never linger on disk
         for unwanted in (
+            self.repo_root / "WORMS.md",
+            self.repo_root / "BUGS.md",
+            self.repo_root / "CR.md",
+            self.repo_root / "worms.json",
+            self.repo_root / "WORMS.json",
+            self.repo_root / "bugs.json",
+            self.repo_root / "BUGS.json",
             self.repo_root / "feedback" / "WORMS.md",
             self.repo_root / "feedback" / "BUGS.md",
             self.repo_root / "feedback" / "CR.md",
