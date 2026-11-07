@@ -19,6 +19,10 @@ There are micro gaps between the impeller blades and central shaft, we should pa
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1794010762260_ohrw4.png](attachments/BUG-FLITTING-LOCUST-977/screenshot_paste_1794010762260_ohrw4.png) | Pasted screenshot screenshot_paste_1794010762260_ohrw4.png |
 
+#### Attached Commits
+
+- `b2815fdce8ff602a0775696e6ff55eb72550d8ec`
+
 #### Resolution Notes
 
 Extended impeller blades 1.0mm into central sleeve cylinder, eliminating micro-gaps at blade corner junctions while preserving guide pin clearance
