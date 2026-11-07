@@ -213,7 +213,7 @@ kill_remote_verify() {
 
 kill_remote_daemon() {
     echo "🛑 Terminating daemon and simulation processes on ${SSH_TARGET}..."
-    ssh ${SSH_OPTS} "${SSH_TARGET}" "pkill -9 -f 'host.py|dashboard.py|motor_stress.py|daemon.py|view.py|smoke.py' 2>/dev/null || true" 2>/dev/null || true
+    ssh ${SSH_OPTS} "${SSH_TARGET}" "pkill -9 -f 'host.py|forge.py|motor_stress.py|daemon.py|view.py|smoke.py' 2>/dev/null || true" 2>/dev/null || true
 }
 
 bootstrap_remote() {

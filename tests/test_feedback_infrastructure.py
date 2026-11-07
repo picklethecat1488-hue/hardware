@@ -296,7 +296,7 @@ def test_code_review_no_feedback_leaves_no_markdown_files(tmp_path: Path) -> Non
     other_comment = CommentModel(
         id="c1",
         uuid=str(uuid.uuid4()),
-        file_path="src/dashboard.py",
+        file_path="tools/forge.py",
         start_line=10,
         end_line=10,
         severity=ReviewSeverity.MUST_FIX,

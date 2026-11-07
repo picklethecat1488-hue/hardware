@@ -23,7 +23,7 @@ from provider.bug_report.markdown_exporter import MarkdownBugExporter
 from provider.bug_report.server import BugReportServer
 from provider.bug_report.sqlite_store import SQLiteBugStore
 from provider.dashboard.server import DashboardServer
-from tools.dashboard import main as dashboard_main
+from tools.forge import main as dashboard_main
 
 
 def create_test_git_repo(path: Path) -> Path:
