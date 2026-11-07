@@ -2319,6 +2319,19 @@ class TestCatFountainProvider:
         assert motor_hub.part.is_inside((collar_r + 0.3, 0.0, clip_h + 2.0)), (
             "Motor hub collar must feature an external annular snap ridge to engage socket groove"
         )
+        # Verify Hall sensor clearance opening at +Y and solid collar wall at -Y (BUG-CRIMSON-MAYFLY-874)
+        assert not motor_hub.part.is_inside((0.0, r_collar_wall, clip_h + 3.0)), (
+            "Collar wall at +Y must be open for Hall sensor clearance"
+        )
+        assert not motor_hub.part.is_inside((5.0, r_collar_wall, clip_h + 3.0)), (
+            "Collar wall at +Y must have wide clearance opening for Hall sensor board"
+        )
+        assert not motor_hub.part.is_inside((-5.0, r_collar_wall, clip_h + 3.0)), (
+            "Collar wall at +Y must have wide clearance opening for Hall sensor board"
+        )
+        assert motor_hub.part.is_inside((0.0, -r_collar_wall, clip_h + 3.0)), (
+            "Collar wall at -Y must be solid with no unexpected second opening"
+        )
 
         # 7. TMC6300 hole-less PCB snap socket features outer frame walls and internal snap groove retention (BUG-STINGING-LACEWING-799)
         t = provider.settings.bowl_thickness
@@ -2570,3 +2583,36 @@ class TestCatFountainProvider:
         assert not solid.is_inside((0.0, 0.0, blade_z)), "Central bore obstructed at blade height!"
         pin_clearance_r = provider.settings.impeller_shaft_radius + provider.settings.impeller_shaft_clearance - 0.05
         assert not solid.is_inside((pin_clearance_r, 0.0, blade_z)), "Central bore clearance obstructed!"
+
+    def test_regression_bug_crimson_mayfly_874_hall_sensor_clearance(self, provider):
+        """Verify that drive/motor hub has wide clearance for Hall sensor board and no opposite opening (BUG-CRIMSON-MAYFLY-874).
+
+        Asserts:
+        1. Hall sensor clearance width is parameterized and >= 16.0mm.
+        2. Motor hub collar wall at North (+Y) is completely open across the sensor platform width.
+        3. Motor hub collar wall at South (-Y) is continuous and solid with no unexpected slit.
+        """
+        motor_hub = provider.build_motor_hub("motor_hub")
+        solid = motor_hub.part
+        assert solid.is_valid and solid.volume > 0.0
+
+        hall_clearance_w = provider.settings.hall_sensor_clearance_width
+        assert hall_clearance_w >= 16.0, f"Expected Hall sensor clearance width >= 16.0mm, got {hall_clearance_w}"
+
+        clip_h = provider.settings.motor_hub_thickness
+        socket_in_r = provider.settings.motor_hub_socket_radius
+        collar_r = socket_in_r - provider.settings.motor_hub_collar_clearance
+        r_collar_wall = (collar_r + 13.5) / 2.0
+        test_z = clip_h + 3.0
+
+        # Across the opening width (|X| < hall_clearance_w / 2 - 0.5), +Y wall is open
+        for test_x in [-7.0, -5.0, 0.0, 5.0, 7.0]:
+            assert not solid.is_inside((test_x, r_collar_wall, test_z)), (
+                f"Collar wall at +Y (X={test_x}) must be open for Hall sensor module clearance"
+            )
+
+        # Opposite opening at -Y is eliminated: entire South collar wall is solid
+        for test_x in [-7.0, -5.0, 0.0, 5.0, 7.0]:
+            assert solid.is_inside((test_x, -r_collar_wall, test_z)), (
+                f"Collar wall at -Y (X={test_x}) must be solid (no unexpected second opening)"
+            )

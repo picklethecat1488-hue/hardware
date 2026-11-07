@@ -454,6 +454,11 @@ class CatFountainConfig(BaseModel):
         """Return standoff height for the Hall sensor board."""
         return float(self._raw_data.get("hall_sensor_standoff_height", 4.0))
 
+    @cached_property
+    def hall_sensor_clearance_width(self) -> float:
+        """Return the clearance opening width for the Hall sensor board."""
+        return float(self._raw_data.get("hall_sensor_clearance_width", 0.0))
+
     # SWD Breakout Board (Treedix JTAG/SWD Adapter)
     @cached_property
     def swd_board_length(self) -> float:

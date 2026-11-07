@@ -175,6 +175,7 @@ motor_driver_standoff_height: 4.0
 hall_sensor_spacing_x: 10.0
 hall_sensor_spacing_y: 20.0
 hall_sensor_standoff_height: 4.0
+hall_sensor_clearance_width: 16.0
 
 # SWD Breakout Board (Treedix JTAG/SWD Adapter)
 swd_board_length: 19.1
