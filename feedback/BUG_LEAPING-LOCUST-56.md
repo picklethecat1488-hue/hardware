@@ -2,12 +2,13 @@
 
 - **UUID**: `2c95825d-9a2a-4977-a1ed-8d6df2694fb3`
 - **ID**: `BUG-LEAPING-LOCUST-56`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-07 00:27:53 UTC`
-- **Resolved**: `2026-11-07 00:39:02 UTC`
+- **Resolved**: `2026-11-07 01:23:40 UTC`
+- **Accepted**: `2026-11-07 01:23:43 UTC`
 
 #### Description
 
