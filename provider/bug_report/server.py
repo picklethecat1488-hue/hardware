@@ -10,10 +10,12 @@ from collections.abc import Collection
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
 import threading
+import time
 from typing import Any, Dict, List, Optional
 import urllib.parse
 import uuid
@@ -61,7 +63,6 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         """Route GET requests for UI dashboard and data query endpoints."""
-        self.server.check_file_watch()
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
@@ -77,6 +78,11 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
         if path.startswith("/attachments/") or path.startswith("/build/attachments/"):
             self._handle_serve_attachment(path)
             return
+
+        now = time.time()
+        if now - getattr(self.server, "_last_watch_check", 0.0) >= 2.0:
+            self.server._last_watch_check = now
+            self.server.check_file_watch()
 
         match path:
             case "/":
@@ -115,7 +121,10 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         """Route POST requests for bug creation, updates, uploads, and export."""
-        self.server.check_file_watch()
+        now = time.time()
+        if now - getattr(self.server, "_last_watch_check", 0.0) >= 2.0:
+            self.server._last_watch_check = now
+            self.server.check_file_watch()
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
 
@@ -735,13 +744,24 @@ class BugReportServer(ThreadingHTTPServer):
         self.host = host
         self.port = port
         self.repo_root = repo_root or Path.cwd()
-        self.markdown_output = markdown_output or (self.repo_root / "build" / "BUGS.md")
-        if feedback_dir is not None:
-            self.feedback_dir = feedback_dir
-        elif markdown_output is not None and markdown_output.parent.name != "build":
-            self.feedback_dir = markdown_output.parent
+        if sqlite_file is not None and sqlite_file.parent.name not in ("build", "target"):
+            self.markdown_output = markdown_output or (sqlite_file.parent / "BUGS.md")
+            self.state_file = state_file or (sqlite_file.parent / "bugs_state.json")
+            self.feedback_dir = feedback_dir or (sqlite_file.parent / "feedback")
         else:
-            self.feedback_dir = self.repo_root / "feedback"
+            self.markdown_output = markdown_output or (self.repo_root / "build" / "BUGS.md")
+            self.state_file = state_file or (self.repo_root / "build" / "bugs_state.json")
+            if feedback_dir is not None:
+                self.feedback_dir = feedback_dir
+            elif markdown_output is not None and markdown_output.parent.name not in ("build", "target"):
+                self.feedback_dir = markdown_output.parent
+            else:
+                self.feedback_dir = self.repo_root / "feedback"
+        if self.feedback_dir != self.repo_root / "feedback":
+            try:
+                self.feedback_dir.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                pass
         self.state_file = state_file or (self.repo_root / "build" / "bugs_state.json")
         self.sqlite_file = sqlite_file or (self.repo_root / "build" / "bugs.sqlite")
         self.attachments_dir = attachments_dir or (self.repo_root / "attachments")
@@ -772,18 +792,20 @@ class BugReportServer(ThreadingHTTPServer):
         return sock, addr
 
     def _get_feedback_dir_mtime(self) -> float:
-        """Compute maximum mtime across feedback_dir and all BUG_*.md files within it."""
+        """Compute maximum mtime across feedback_dir and all BUG_*.md / WORM_*.md files within it."""
         if not self.feedback_dir.exists():
             return 0.0
         try:
             max_mtime = self.feedback_dir.stat().st_mtime
-            for p in list(self.feedback_dir.glob("BUG_*.md")) + list(self.feedback_dir.glob("WORM_*.md")):
-                try:
-                    m = p.stat().st_mtime
-                    if m > max_mtime:
-                        max_mtime = m
-                except OSError:
-                    pass
+            with os.scandir(self.feedback_dir) as it:
+                for entry in it:
+                    if entry.is_file() and (entry.name.startswith(("BUG_", "WORM_")) and entry.name.endswith(".md")):
+                        try:
+                            m = entry.stat().st_mtime
+                            if m > max_mtime:
+                                max_mtime = m
+                        except OSError:
+                            pass
             return max_mtime
         except OSError:
             return 0.0
@@ -861,7 +883,17 @@ class BugReportServer(ThreadingHTTPServer):
                 summary="Hardware engineering defects, PCB layout issues, and reproduction tracking.",
             )
 
-        if not self.fresh and not db.bugs:
+        ws_root = self.repo_root.resolve()
+        try:
+            from provider.vcs.git_engine import get_git_root
+
+            ws_root = get_git_root().resolve()
+        except Exception:
+            pass
+        is_workspace = self.repo_root.resolve() == ws_root
+        skip_detached = is_workspace and (self.sqlite_file.parent.name not in ("build", "target"))
+
+        if not self.fresh and not db.bugs and not skip_detached and (self.repo_root / ".git").exists():
             try:
                 from provider.bug_report.detached_branch import DetachedBranchBugStore
 
@@ -870,12 +902,6 @@ class BugReportServer(ThreadingHTTPServer):
                     db = detached_db
             except Exception:
                 pass
-
-        if not self.fresh and self.markdown_output.exists():
-            md_db = self.exporter.parse_markdown(self.markdown_output)
-            if md_db and md_db.bugs:
-                db = self.exporter.merge_databases(db, md_db)
-            self.markdown_mtime = self.markdown_output.stat().st_mtime
 
         if not self.fresh and self.feedback_dir.exists():
             self.exporter.scan_and_sync_feedback_dir(self.feedback_dir, db, self.sqlite_store)
@@ -909,7 +935,10 @@ class BugReportServer(ThreadingHTTPServer):
                 if md_db and md_db.bugs:
                     self.database = self.exporter.merge_databases(self.database, md_db)
             stats = self.exporter.scan_and_sync_feedback_dir(self.feedback_dir, self.database, self.sqlite_store)
-            self.save_and_sync()
+            if stats.get("merged", 0) > 0 or stats.get("renamed", 0) > 0:
+                self.save_and_sync()
+            else:
+                self.feedback_mtime = self._get_feedback_dir_mtime()
             return stats
 
     def save_and_sync(self, dirty_bug_ids: Optional[Collection[str]] = None) -> Path:
@@ -946,20 +975,57 @@ class BugReportServer(ThreadingHTTPServer):
                 )
                 if self.markdown_output.exists():
                     self.markdown_mtime = self.markdown_output.stat().st_mtime
-                self.feedback_mtime = self._get_feedback_dir_mtime()
                 self.db_version += 1
+                ws_root = self.repo_root.resolve()
                 try:
-                    from provider.bug_report.detached_branch import DetachedBranchBugStore
+                    from provider.vcs.git_engine import get_git_root
 
-                    DetachedBranchBugStore(self.repo_root).commit_database(
-                        self.database,
-                        commit_message=f"Update bug database (v{self.db_version})",
-                        sync_local_disk=False,
-                        dirty_bug_ids=dirty_bug_ids,
-                    )
+                    ws_root = get_git_root().resolve()
                 except Exception:
                     pass
+                is_workspace = self.repo_root.resolve() == ws_root
+                skip_detached = is_workspace and (self.sqlite_file.parent.name not in ("build", "target"))
+
+                if not skip_detached and not self.fresh and (self.repo_root / ".git").exists():
+                    try:
+                        from provider.bug_report.detached_branch import DetachedBranchBugStore
+
+                        DetachedBranchBugStore(self.repo_root).commit_database(
+                            self.database,
+                            commit_message=f"Update bug database (v{self.db_version})",
+                            sync_local_disk=False,
+                            dirty_bug_ids=dirty_bug_ids,
+                        )
+                    except Exception:
+                        pass
+                # Update feedback_mtime after commit_database completes so it reflects post-commit disk state
+                self.feedback_mtime = self._get_feedback_dir_mtime()
                 return out
+            finally:
+                self._is_internal_saving = False
+
+    def save_bug(self, bug: BugReportModel) -> None:
+        """Save a single bug and sync to stores."""
+        with self._lock:
+            self.database.add_or_update(bug)
+            self.save_and_sync(dirty_bug_ids=[bug.id])
+
+    def delete_bug(self, bug_id: str) -> bool:
+        """Delete a bug from all stores."""
+        with self._lock:
+            self._is_internal_saving = True
+            try:
+                deleted = self.sqlite_store.delete_bug(bug_id)
+                self.database.bugs = [b for b in self.database.bugs if b.id != bug_id]
+                self.exporter.export_state_json(self.database, self.state_file)
+                self.exporter.export_markdown(self.database, self.markdown_output, feedback_dir=self.feedback_dir)
+                md_path = self.feedback_dir / f"{bug_id.replace('-', '_')}.md"
+                if md_path.exists():
+                    try:
+                        md_path.unlink()
+                    except OSError:
+                        pass
+                return deleted
             finally:
                 self._is_internal_saving = False
 

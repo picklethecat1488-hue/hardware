@@ -461,6 +461,8 @@ class GitEngine:
         self._commit_stat_cache: Dict[str, Tuple[int, int, int, List[str]]] = {}
         self._bug_tag_cache: Dict[str, Dict[str, str]] = {}
         self._file_diff_cache: Dict[Tuple[str, str], FileDiffModel] = {}
+        self._commit_files_cache: Dict[Tuple[str, bool], List[Dict[str, Any]]] = {}
+        self._remote_pr_cache: Optional[Set[int]] = None
 
     def get_head_commit(self) -> str:
         """Retrieve the commit hash of HEAD in the repository.
@@ -688,6 +690,7 @@ class GitEngine:
                     except RuntimeError:
                         pass
             self.clear_diff_cache()
+            self.get_remote_pr_numbers(force_refresh=True)
 
             detached_res = self.sync_feedback_worktree(push=push)
             detached_pushed = detached_res.get("pushed", False)
@@ -1309,25 +1312,41 @@ class GitEngine:
         base = self.get_repo_web_url() or f"https://github.com/workspace/{self.repo_root.name}"
         return f"{base}/pull/{pr_number}"
 
-    def get_remote_pr_numbers(self) -> Set[int]:
+    def get_remote_pr_numbers(self, force_refresh: bool = False) -> Set[int]:
         """Fetch set of valid pull request numbers existing on remote GitHub repository.
 
-        Cached on the instance to avoid repeatedly invoking ls-remote.
+        Cached on the instance to avoid repeatedly invoking ls-remote over the network.
+        Uses local remote-tracking references by default to prevent blocking network latency.
         """
-        if hasattr(self, "_remote_pr_cache") and self._remote_pr_cache is not None:
+        if not force_refresh and hasattr(self, "_remote_pr_cache") and self._remote_pr_cache is not None:
             return self._remote_pr_cache
 
         prs: Set[int] = set()
-        web_url = self.get_repo_web_url()
-        if web_url:
-            try:
-                output = run_git_command(["ls-remote", "origin", "refs/pull/*/head"], cwd=self.repo_root)
-                for line in output.splitlines():
-                    m = re.search(r"refs/pull/(\d+)/head", line)
-                    if m:
-                        prs.add(int(m.group(1)))
-            except RuntimeError:
-                pass
+
+        # Check local remote-tracking references first (0ms network latency)
+        try:
+            output = run_git_command(
+                ["for-each-ref", "--format=%(refname)", "refs/remotes/origin"],
+                cwd=self.repo_root,
+            )
+            for line in output.splitlines():
+                m = re.search(r"refs/remotes/origin/(?:pr|pull)[/-]?(\d+)", line)
+                if m:
+                    prs.add(int(m.group(1)))
+        except RuntimeError:
+            pass
+
+        if force_refresh:
+            web_url = self.get_repo_web_url()
+            if web_url:
+                try:
+                    output = run_git_command(["ls-remote", "origin", "refs/pull/*/head"], cwd=self.repo_root)
+                    for line in output.splitlines():
+                        m = re.search(r"refs/pull/(\d+)/head", line)
+                        if m:
+                            prs.add(int(m.group(1)))
+                except RuntimeError:
+                    pass
 
         self._remote_pr_cache = prs
         return prs
@@ -1490,7 +1509,7 @@ class GitEngine:
         if commit_hash in self._commit_diff_cache:
             return self._commit_diff_cache[commit_hash]
 
-        cmd = ["diff-tree", "--no-commit-id", "--numstat", "-r", commit_hash]
+        cmd = ["diff-tree", "--no-commit-id", "--numstat", "-r", "--root", commit_hash]
         try:
             output = run_git_command(cmd, cwd=self.repo_root)
         except RuntimeError:
@@ -1786,7 +1805,7 @@ class GitEngine:
         if commit_hash in self._commit_stat_cache:
             return self._commit_stat_cache[commit_hash]
 
-        cmd = ["diff-tree", "--no-commit-id", "--numstat", "-r", commit_hash]
+        cmd = ["diff-tree", "--no-commit-id", "--numstat", "-r", "--root", commit_hash]
         try:
             output = run_git_command(cmd, cwd=self.repo_root)
         except RuntimeError:
@@ -1819,13 +1838,17 @@ class GitEngine:
         if commit == "working":
             return self._get_working_tree_files_simple(include_feedback=include_feedback)
 
-        cmd_status = ["diff-tree", "--no-commit-id", "--name-status", "-r", commit]
+        cache_key = (commit, include_feedback)
+        if cache_key in self._commit_files_cache:
+            return self._commit_files_cache[cache_key]
+
+        cmd_status = ["diff-tree", "--no-commit-id", "--name-status", "-r", "--root", commit]
         try:
             status_out = run_git_command(cmd_status, cwd=self.repo_root)
         except RuntimeError:
             return []
 
-        cmd_numstat = ["diff-tree", "--no-commit-id", "--numstat", "-r", commit]
+        cmd_numstat = ["diff-tree", "--no-commit-id", "--numstat", "-r", "--root", commit]
         try:
             numstat_out = run_git_command(cmd_numstat, cwd=self.repo_root)
         except RuntimeError:
@@ -1867,6 +1890,7 @@ class GitEngine:
         for f in files:
             clean = f["path"].replace("\\", "/").strip().lstrip("./")
             f["is_lfs"] = f["path"] in lfs_set or clean in lfs_set or clean.startswith("attachments/")
+        self._commit_files_cache[cache_key] = files
         return files
 
     def _get_working_tree_files_simple(self, include_feedback: bool = False) -> List[Dict[str, Any]]:
@@ -2109,11 +2133,13 @@ class GitEngine:
         return diff_model
 
     def clear_diff_cache(self) -> None:
-        """Clear all in-memory cached commit summaries and file diff models."""
+        """Clear all in-memory cached commit summaries, file lists, and diff models."""
         self._commit_diff_cache.clear()
         self._commit_stat_cache.clear()
         self._bug_tag_cache.clear()
         self._file_diff_cache.clear()
+        self._commit_files_cache.clear()
+        self._remote_pr_cache = None
 
     def _parse_diff_hunks(self, raw_diff: str) -> List[DiffHunk]:
         """Parse raw unified diff text into structured DiffHunk instances."""
@@ -2533,6 +2559,7 @@ class GitEngine:
         if commit_hash in [head, "HEAD"] or head.startswith(commit_hash):
             run_git_command(["reset", "HEAD~1"], cwd=self.repo_root)
             self.clear_diff_cache()
+            self.get_remote_pr_numbers(force_refresh=True)
             return {
                 "status": "ok",
                 "message": "Commit reset to working tree. You can now selectively stage and commit parts.",

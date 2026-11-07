@@ -282,6 +282,7 @@ def get_personal_identifiers() -> Tuple[Set[str], Set[str], Set[str]]:
     return all_names, all_emails, all_handles
 
 
+@lru_cache(maxsize=1)
 def get_usernames_to_redact() -> Set[str]:
     """Discover local username candidates and known user identifiers to redact."""
     names, _, handles = get_personal_identifiers()
@@ -289,12 +290,14 @@ def get_usernames_to_redact() -> Set[str]:
     return {n for n in combined if len(n) >= 3 and " " not in n and n.lower() not in RESERVED_IDENTIFIERS}
 
 
+@lru_cache(maxsize=1)
 def get_author_blacklist() -> List[str]:
     """Retrieve list of personal names and handles to map to 'User'."""
     names, _, handles = get_personal_identifiers()
     return sorted({x for x in (names | handles) if len(x) >= 3 and x.lower() not in RESERVED_IDENTIFIERS})
 
 
+@lru_cache(maxsize=1)
 def get_email_blacklist() -> List[str]:
     """Retrieve list of personal emails and handles to map to 'user@workspace'."""
     _, emails, handles = get_personal_identifiers()

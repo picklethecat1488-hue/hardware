@@ -8,6 +8,7 @@ and automated Markdown persistence.
 from datetime import datetime, timezone
 import json
 import mimetypes
+import os
 from pathlib import Path
 import threading
 import time
@@ -46,7 +47,6 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         """Route GET requests for UI dashboard and data query endpoints."""
-        self.server.check_file_watch()
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
@@ -58,6 +58,11 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
         if path in ("/favicon.ico", "/favicon.svg"):
             self._handle_serve_static("/static/favicon.svg")
             return
+
+        now = time.time()
+        if now - getattr(self.server, "_last_watch_check", 0.0) >= 2.0:
+            self.server._last_watch_check = now
+            self.server.check_file_watch()
 
         match path:
             case "/":
@@ -407,10 +412,17 @@ class ReviewServer(ThreadingHTTPServer):
         self.markdown_output = markdown_output or (self.repo_root / "build" / "CR.md")
         if feedback_dir is not None:
             self.feedback_dir = feedback_dir
-        elif markdown_output is not None and markdown_output.parent.name != "build":
+        elif markdown_output is not None and markdown_output.parent.name not in ("build", "target"):
             self.feedback_dir = markdown_output.parent
+        elif sqlite_file is not None and sqlite_file.parent.name not in ("build", "target"):
+            self.feedback_dir = sqlite_file.parent / "feedback"
         else:
             self.feedback_dir = self.repo_root / "feedback"
+        if self.feedback_dir != self.repo_root / "feedback":
+            try:
+                self.feedback_dir.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                pass
         self.state_file = state_file or (self.repo_root / "build" / "cr_feedback.json")
         if sqlite_file is not None:
             self.sqlite_file = sqlite_file
@@ -517,13 +529,15 @@ class ReviewServer(ThreadingHTTPServer):
             return 0.0
         try:
             max_mtime = self.feedback_dir.stat().st_mtime
-            for f in self.feedback_dir.glob("CR*.md"):
-                try:
-                    mtime = f.stat().st_mtime
-                    if mtime > max_mtime:
-                        max_mtime = mtime
-                except OSError:
-                    pass
+            with os.scandir(self.feedback_dir) as it:
+                for entry in it:
+                    if entry.is_file() and entry.name.startswith("CR") and entry.name.endswith(".md"):
+                        try:
+                            mtime = entry.stat().st_mtime
+                            if mtime > max_mtime:
+                                max_mtime = mtime
+                        except OSError:
+                            pass
             return max_mtime
         except OSError:
             return 0.0
