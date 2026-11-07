@@ -271,12 +271,16 @@ class CatFountainProvider(Provider):
                 Cylinder(
                     radius=chamber_r, height=10.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
                 )
-                # Snap fit recess for pump cover at the top rim
-                with Locations((0, 0, 8.5)):
+                # Snap fit recess for pump cover at the top rim (BUG-LEAPING-LOCUST-56)
+                mount_depth = self.settings.pump_cover_mount_depth or 1.5
+                with Locations((0, 0, 10.0 - mount_depth)):
                     Cylinder(
-                        radius=snap_r, height=1.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
+                        radius=snap_r,
+                        height=mount_depth,
+                        align=(Align.CENTER, Align.CENTER, Align.MIN),
+                        mode=Mode.SUBTRACT,
                     )
-                # Internal annular snap-fit groove in casing recess wall (BUG-SPECKLED-ROACH-49)
+                # Internal annular snap-fit groove in casing recess wall (BUG-SPECKLED-ROACH-49, BUG-LEAPING-LOCUST-56)
                 with Locations((0, 0, 10.0 - self.settings.pump_cover_snap_z_offset)):
                     Torus(
                         major_radius=snap_r,
@@ -1418,12 +1422,13 @@ class CatFountainProvider(Provider):
             # 1. Main casing cap over impeller volute (Z = 0 at casing top rim)
             with Locations((0, 0, 0)):
                 Cylinder(radius=casing_r, height=cover_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
-                # Downward lip entering casing snap recess (Z = -1.5 to 0) with tapered entry chamfer
-                with Locations((0, 0, -1.5)):
+                mount_depth = self.settings.pump_cover_mount_depth or 1.5
+                # Downward lip entering casing snap recess (Z = -mount_depth to 0) with tapered entry chamfer (BUG-LEAPING-LOCUST-56)
+                with Locations((0, 0, -mount_depth)):
                     Cone(
                         bottom_radius=cover_r - 0.3,
                         top_radius=cover_r,
-                        height=1.5,
+                        height=mount_depth,
                         align=(Align.CENTER, Align.CENTER, Align.MIN),
                     )
                 # Annular snap-fit ridge on downward lip to lock tightly into casing recess (BUG-SPECKLED-ROACH-49)
@@ -1470,7 +1475,7 @@ class CatFountainProvider(Provider):
                     )
 
             # 6. Subtract internal impeller / guide post clearance cavity inside casing cap
-            with Locations((0, 0, -1.5)):
+            with Locations((0, 0, -mount_depth)):
                 Cylinder(
                     radius=lip_in_r,
                     height=cover_h,
