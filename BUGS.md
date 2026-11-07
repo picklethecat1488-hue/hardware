@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-07 00:15:37 UTC` |
-| **Total Issues** | `320` |
-| **Open Issues** | `0` |
-| **Resolved / Closed** | `320 (100%)` |
+| **Report Date** | `2026-11-07 00:15:59 UTC` |
+| **Total Issues** | `321` |
+| **Open Issues** | `1` |
+| **Resolved / Closed** | `320 (99%)` |
 
 ## Issues by Severity
 
@@ -17,14 +17,14 @@
 | :--- | :---: | :--- |
 | **`[CRITICAL]`** | 20 | System crashes, build failures, blockages, or electrical shorts. |
 | **`[HIGH]`** | 31 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
-| **`[MEDIUM]`** | 240 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
+| **`[MEDIUM]`** | 241 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
 | **`[LOW]`** | 29 | Minor aesthetic imperfections or documentation notes. |
 
 ## Issues by Category
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 170 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`PCB`** | 171 | Schematics, routing, footprints, nets, DRC, silkscreen. |
 | **`CAD`** | 39 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 11 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
 | **`INFRASTRUCTURE`** | 86 | Build tooling, compilers, test runners, headless tools. |
@@ -352,6 +352,7 @@
 - [x] **`[MEDIUM]`** [#BUG-BRISTLY-CENTIPEDE-327](#bug-bristly-centipede-327): Add modal progress UIs for repo and bug actions `[dashboard]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-LUSTROUS-HORSEFLY-593](#bug-lustrous-horsefly-593): Rename GEMINI.md to AGENTS.md (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-DIURNAL-ANT-667](#bug-diurnal-ant-667): Opening commits in bug report workstation-broken `[dashboard]` (`CLOSED`)
+- [ ] **`[MEDIUM]`** [#BUG-FLITTING-LOCUST-977](#bug-flitting-locust-977): New Bug Report (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -28486,5 +28487,15 @@ Opening a commit in the bug report station doesn’t go to the code review windo
 #### Resolution Notes
 
 Attached commits in Bug Report now navigate directly to Code Review for that commit, and Code Review provides toolbar and header buttons to return to the Bug Report workstation
+
+---
+
+### <a id="bug-flitting-locust-977"></a> 🔴 `[BUG-FLITTING-LOCUST-977]` New Bug Report
+
+- **UUID**: `1618734f-1a48-4cb3-af0b-3658beb2d978`
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-11-07 00:15:58 UTC`
 
 ---
