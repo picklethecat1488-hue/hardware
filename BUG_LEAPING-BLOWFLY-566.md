@@ -1,7 +1,7 @@
-# 🟢 `[WORM-CREEPING-LARVA-820]` Regression tests are not useful
+# 🟢 `[BUG-LEAPING-BLOWFLY-566]` Regression tests are not useful
 
-- **UUID**: `c9679ffa-7211-4f3f-bea5-a57be3bc91a4`
-- **ID**: `WORM-CREEPING-LARVA-820`
+- **UUID**: `0a7d78fa-5d94-48df-ac8e-d0b666427acf`
+- **ID**: `BUG-LEAPING-BLOWFLY-566`
 - **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `GENERAL`
