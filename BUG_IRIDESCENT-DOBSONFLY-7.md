@@ -1,6 +1,6 @@
 # 🔴 `[BUG-IRIDESCENT-DOBSONFLY-7]` Open defect
 
-- **UUID**: `84f80073-e37a-412b-ae1e-dd5f16bdd2b9`
+- **UUID**: `e7c5445a-ff66-4ee2-8f24-7cbddb121898`
 - **ID**: `BUG-IRIDESCENT-DOBSONFLY-7`
 - **Status**: `OPEN`
 - **Severity**: `LOW`
