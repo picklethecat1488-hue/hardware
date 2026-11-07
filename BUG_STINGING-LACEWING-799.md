@@ -14,12 +14,6 @@
 
 Giving the TMC6300 mounting system as an example below, there are micro-gaps between the mounting rales, inner shells, and the rail system will not work if a current sensor is already installed. Can we simplify this design, and switch to a snap ring system (assuming the sides of the PCB function as the inner ring) similar to the bowl to lid and bowl to bottom connections? The defects are marked with red.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1793890436150_8301p.png](attachments/BUG-STINGING-LACEWING-799/screenshot_paste_1793890436150_8301p.png) | Pasted screenshot screenshot_paste_1793890436150_8301p.png |
-
 #### Attached Commits
 
 - `57973376`

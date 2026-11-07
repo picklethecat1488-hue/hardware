@@ -14,12 +14,6 @@
 
 Opening a commit in the bug report station doesn’t go to the code review window directly, instead it opens up a website to the toplevel VCS UI with only the working tree selected. Additionally, there is no way to go back to the bug report station when finished reviewing (there is no back button in the toolbar).
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1793985363740_q9986.png](attachments/BUG-DIURNAL-ANT-667/screenshot_paste_1793985363740_q9986.png) | Pasted screenshot screenshot_paste_1793985363740_q9986.png |
-
 #### Attached Commits
 
 - `44ebc5c6`

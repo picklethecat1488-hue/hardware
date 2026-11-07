@@ -14,12 +14,6 @@
 
 Attachment LFS changes show up in the diff view. Can we ensure that attachments are stored in the bug branches (refs/heads/bugs and ref/heads/worms) and migrate existing attachments, if needed?
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1793947517131_gdv1n.png](attachments/BUG-SHINING-SILVERFISH-89/screenshot_paste_1793947517131_gdv1n.png) | Pasted screenshot screenshot_paste_1793947517131_gdv1n.png |
-
 #### Attached Commits
 
 - `67772fbf`
