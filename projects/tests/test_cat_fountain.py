@@ -2701,3 +2701,26 @@ class TestCatFountainProvider:
         # Thrust collar wall around shaft hole must be solid
         r_collar = (provider.settings.drive_hub_shaft_radius + provider.settings.drive_hub_thrust_collar_radius) / 2.0
         assert solid.is_inside((r_collar, 0.0, hub_h + standoff_h * 0.5)), "Thrust collar wall is missing or hollow"
+
+    @pytest.mark.slow
+    def test_regression_bug_winged_instar_825_impeller_boundary_conformance(self, provider):
+        """Verify that the 3-lobed impeller analytical URDF boundary conforms to CAD geometry >= 80%."""
+        from model.boundary_config import ShapeType
+        from provider import Mode as ProviderMode, evaluate_boundary_cad_conformance
+
+        room = Room()
+        provider.build_product(room, mode=ProviderMode.DEFAULT)
+        geom, _ = room["impeller"]
+        cad_solid = getattr(geom, "part", geom)
+        boundaries = getattr(geom, "urdf_boundaries", [])
+        assert len(boundaries) == 1, "Expected single analytical boundary for impeller"
+        b = boundaries[0]
+
+        assert b.shape == ShapeType.IMPELLER
+        assert abs(b.xyz[0]) < 1e-4, f"Impeller rotation center must be at X=0, got {b.xyz[0]}"
+        assert abs(b.xyz[1]) < 1e-4, f"Impeller rotation center must be at Y=0, got {b.xyz[1]}"
+
+        res = evaluate_boundary_cad_conformance(cad_solid, b)
+        assert res.solid_conformance_ratio >= 0.80, (
+            f"Impeller boundary CAD conformance ratio {res.solid_conformance_ratio:.2%} is below 80%"
+        )

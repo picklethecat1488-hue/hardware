@@ -107,13 +107,34 @@ def reconstruct_boundary_cad_solid(b: Any, parent_location: Optional[b3d.Locatio
             shaft_r = (getattr(b, "thickness", 0.0) or 0.0) * 1000.0
             hub_h = h * 0.5 if h > 0.0 else 0.0
             hub_r = max(0.0, r_out - 4.0)
+            magnet_count = int(getattr(b, "magnet_count", 0) or 0)
+            magnet_r = float(getattr(b, "magnet_radius", 0.0) or 0.0)
+            if 0.0 < magnet_r < 0.1:
+                magnet_r *= 1000.0
             with b3d.BuildPart() as p:
-                # Hub body base
-                b3d.Cylinder(
-                    radius=hub_r,
-                    height=hub_h,
-                    align=(b3d.Align.CENTER, b3d.Align.CENTER, b3d.Align.MIN),
-                )
+                # Hub body base (multi-lobed convex hull if magnet_count >= 3, else cylinder)
+                if magnet_count >= 3:
+                    mr = magnet_r if magnet_r > 0.0 else 3.0
+                    lobe_r = mr + 1.5
+                    center_r = 4.0
+                    ring_r = hub_r - lobe_r + 0.5
+                    with b3d.BuildSketch() as sketch:
+                        for i in range(magnet_count):
+                            angle = i * (360.0 / magnet_count)
+                            rad = math.radians(angle)
+                            with b3d.BuildSketch() as arm:
+                                b3d.Circle(radius=center_r)
+                                with b3d.Locations((ring_r * math.cos(rad), ring_r * math.sin(rad))):
+                                    b3d.Circle(radius=lobe_r)
+                                b3d.make_hull()
+                            b3d.add(arm.sketch)
+                    b3d.extrude(amount=hub_h)
+                else:
+                    b3d.Cylinder(
+                        radius=hub_r,
+                        height=hub_h,
+                        align=(b3d.Align.CENTER, b3d.Align.CENTER, b3d.Align.MIN),
+                    )
                 # Central guide post sleeve
                 if shaft_r > 0.0:
                     b3d.Cylinder(
@@ -131,7 +152,7 @@ def reconstruct_boundary_cad_solid(b: Any, parent_location: Optional[b3d.Locatio
                 # Radial blades extending from central sleeve to hub perimeter
                 sleeve_r = shaft_r + 2.0 if shaft_r > 0.0 else 4.5
                 if num_vanes > 0 and vane_t > 0.0 and hub_h < h:
-                    blade_len = max(0.0, hub_r - sleeve_r)
+                    blade_len = max(0.0, ((ring_r + lobe_r) if magnet_count >= 3 else hub_r) - sleeve_r)
                     with b3d.Locations((0, 0, hub_h)):
                         for v_idx in range(num_vanes):
                             v_angle = (360.0 / num_vanes) * v_idx
@@ -365,6 +386,10 @@ def extract_boundary_from_cad(
             else:
                 default_radius = float(max(dx, dy) / 2.0 * 0.001)
                 default_thickness = 0.0
+
+            if shape == ShapeType.IMPELLER:
+                center_x = 0.0
+                center_y = 0.0
 
             z_planar = [
                 float(f.center().Z) * 0.001 for f in plane_faces if hasattr(f, "center") and f.center() is not None
