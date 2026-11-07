@@ -13,6 +13,10 @@
 
 The inner annular ring for the pump cover may have insufficient clearance to fit inside the bowl’s pump cover mount when epoxy is applied. Can we move the annular ring and mount lower (-Z)?
 
+#### Attached Commits
+
+- `c5e17c62ec7760b87ec631fa762a939765866323`
+
 #### Resolution Notes
 
 Moved pump cover mount recess depth to 2.5mm and annular snap ridge/groove Z offset to 1.5mm lower (-Z) to provide generous epoxy clearance
