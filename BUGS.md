@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-07 00:15:59 UTC` |
+| **Report Date** | `2026-11-07 00:19:09 UTC` |
 | **Total Issues** | `321` |
 | **Open Issues** | `1` |
 | **Resolved / Closed** | `320 (99%)` |
@@ -24,8 +24,8 @@
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 171 | Schematics, routing, footprints, nets, DRC, silkscreen. |
-| **`CAD`** | 39 | 3D geometry, step models, enclosures, mechanical assembly. |
+| **`PCB`** | 170 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`CAD`** | 40 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 11 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
 | **`INFRASTRUCTURE`** | 86 | Build tooling, compilers, test runners, headless tools. |
 | **`UI`** | 2 | Web dashboards, CLI viewers, review interfaces. |
@@ -352,7 +352,7 @@
 - [x] **`[MEDIUM]`** [#BUG-BRISTLY-CENTIPEDE-327](#bug-bristly-centipede-327): Add modal progress UIs for repo and bug actions `[dashboard]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-LUSTROUS-HORSEFLY-593](#bug-lustrous-horsefly-593): Rename GEMINI.md to AGENTS.md (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-DIURNAL-ANT-667](#bug-diurnal-ant-667): Opening commits in bug report workstation-broken `[dashboard]` (`CLOSED`)
-- [ ] **`[MEDIUM]`** [#BUG-FLITTING-LOCUST-977](#bug-flitting-locust-977): New Bug Report (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-FLITTING-LOCUST-977](#bug-flitting-locust-977): Micro gapes in impeller `[cat_fountain]` (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -28490,12 +28490,23 @@ Attached commits in Bug Report now navigate directly to Code Review for that com
 
 ---
 
-### <a id="bug-flitting-locust-977"></a> 🔴 `[BUG-FLITTING-LOCUST-977]` New Bug Report
+### <a id="bug-flitting-locust-977"></a> 🔴 `[BUG-FLITTING-LOCUST-977]` Micro gapes in impeller
 
 - **UUID**: `1618734f-1a48-4cb3-af0b-3658beb2d978`
 - **Status**: `OPEN`
 - **Severity**: `MEDIUM`
-- **Category**: `PCB`
+- **Category**: `CAD`
+- **Component**: `cat_fountain`
 - **Created**: `2026-11-07 00:15:58 UTC`
+
+#### Description
+
+There are micro gaps between the impeller blades and central shaft, we should patch these by extending the impeller blades into the central shaft to ensure unioning the two shapes creates a smooth object
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `document` | [clipboard_text_1794010747591.txt](attachments/BUG-FLITTING-LOCUST-977/clipboard_text_1794010747591.txt) | Pasted text document |
 
 ---
