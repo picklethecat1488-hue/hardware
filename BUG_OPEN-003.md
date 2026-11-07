@@ -27,3 +27,7 @@ There are feedbacks on our Gerber’s (see attached), can you please fill out th
 | `screenshot` | [screenshot_paste_1794082565048_ucixy.png](attachments/BUG-OPEN-003/screenshot_paste_1794082565048_ucixy.png) | Pasted screenshot screenshot_paste_1794082565048_ucixy.png |
 | `screenshot` | [screenshot_paste_1794082590749_zorq7.png](attachments/BUG-OPEN-003/screenshot_paste_1794082590749_zorq7.png) | Pasted screenshot screenshot_paste_1794082590749_zorq7.png |
 | `screenshot` | [screenshot_paste_1794082597850_8j2oo.png](attachments/BUG-OPEN-003/screenshot_paste_1794082597850_8j2oo.png) | Pasted screenshot screenshot_paste_1794082597850_8j2oo.png |
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:da9072b2 --> Verify carrier board PCB layout with balanced In2.Cu copper plane and updated silkscreen fab notes | `python tools/view.py carrier_board:pcb`
