@@ -21,12 +21,6 @@ Additionally, there’s latent cuts in the bottom of the bowl from when the driv
 
 Defects circled in red.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1793924149979_7f535.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png) | Pasted screenshot screenshot_paste_1793924149979_7f535.png |
-
 #### Attached Commits
 
 - `7185e819`
