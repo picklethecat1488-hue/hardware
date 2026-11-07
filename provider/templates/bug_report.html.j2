@@ -16,6 +16,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
   <link rel="shortcut icon" href="/static/favicon.ico">
   <link rel="stylesheet" href="/static/common.css">
+  <script src="/static/common.js"></script>
   <script>
     if (window.self !== window.top) {
       document.documentElement.classList.add("in-iframe");
@@ -993,6 +994,7 @@
     const statusOrder = { "OPEN": 0, "IN_PROGRESS": 1, "PLANNED": 2, "RESOLVED": 3, "CLOSED": 4 };
 
     // Feedback Loading Modal Management
+    let feedbackLoadingTracker = null;
     let feedbackLoadingInterval = null;
     function showFeedbackLoading(title, description, stepText) {
       const modal = document.getElementById("feedback-loading-modal");
@@ -1007,41 +1009,40 @@
       if (descEl && description) descEl.textContent = description;
       if (stepEl && stepText) stepEl.textContent = stepText;
 
-      let progress = 14;
-      const startTime = Date.now();
-      if (feedbackLoadingInterval) clearInterval(feedbackLoadingInterval);
-
       modal.style.display = "flex";
-      feedbackLoadingInterval = setInterval(() => {
-        const elapsedSec = (Date.now() - startTime) / 1000;
-        if (progress < 94) {
-          if (elapsedSec < 0.8) {
-            progress = 14 + (elapsedSec / 0.8) * 26;
-          } else if (elapsedSec < 2.5) {
-            progress = 40 + ((elapsedSec - 0.8) / 1.7) * 32;
-          } else if (elapsedSec < 6.0) {
-            progress = 72 + ((elapsedSec - 2.5) / 3.5) * 18;
-          } else {
-            progress += (96 - progress) * 0.015;
-          }
-        }
-        const pct = Math.min(96, Math.floor(progress));
-        if (barEl) barEl.style.width = `${pct}%`;
-        if (pctEl) pctEl.textContent = `${pct}%`;
-        if (stepEl) {
-          if (pct < 35) stepEl.textContent = "Scanning feedback/ directory for BUG_*.md files...";
-          else if (pct < 65) stepEl.textContent = "Parsing issue metadata and verification checklists...";
-          else if (pct < 85) stepEl.textContent = "Reconciling SQLite database store and feedback worktree...";
-          else stepEl.textContent = "Finalizing synchronized records...";
-        }
-      }, 50);
+
+      const stages = [
+        { at: 35, text: "Scanning feedback/ directory for BUG_*.md files..." },
+        { at: 65, text: "Parsing issue metadata and verification checklists..." },
+        { at: 85, text: "Reconciling SQLite database store and feedback worktree..." },
+        { at: 96, text: "Finalizing synchronized records..." },
+      ];
+
+      if (feedbackLoadingTracker) {
+        feedbackLoadingTracker.stop();
+      }
+
+      if (window.Forge && window.Forge.createProgressBar) {
+        feedbackLoadingTracker = window.Forge.createProgressBar({
+          barEl,
+          percentEl: pctEl,
+          statusEl: stepEl,
+          initialProgress: 14,
+          maxProgress: 95,
+          stages,
+        });
+        feedbackLoadingTracker.start();
+      }
     }
 
     function hideFeedbackLoading() {
       const modal = document.getElementById("feedback-loading-modal");
-      if (feedbackLoadingInterval) {
-        clearInterval(feedbackLoadingInterval);
-        feedbackLoadingInterval = null;
+      if (feedbackLoadingTracker) {
+        feedbackLoadingTracker.finish("✓ Synchronized!", () => {
+          if (modal) modal.style.display = "none";
+        }, 250);
+        feedbackLoadingTracker = null;
+        return;
       }
       if (!modal) return;
       const barEl = document.getElementById("loading-progress-bar");
@@ -1061,6 +1062,9 @@
     let actionProgressInterval = null;
 
     async function runWithActionModal(options, asyncFn) {
+      if (window.Forge && window.Forge.performActionWithProgress) {
+        return await window.Forge.performActionWithProgress(asyncFn, options);
+      }
       if (actionProgressDepth > 0) {
         actionProgressDepth++;
         try {
