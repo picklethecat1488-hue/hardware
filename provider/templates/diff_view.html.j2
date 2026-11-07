@@ -16,6 +16,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
   <link rel="shortcut icon" href="/static/favicon.ico">
   <link rel="stylesheet" href="/static/common.css">
+  <script src="/static/common.js"></script>
   <script>
     if (window.top && window.top !== window) {
       window.top.location.href = window.location.href;
@@ -1593,66 +1594,71 @@
       const progressPercent = document.getElementById("syncProgressPercent");
 
       if (modal) modal.style.display = "flex";
-      let progress = 12;
-      const startTime = Date.now();
+
+      const stages = [
+        { at: 30, text: "Scanning feedback/ directory and discovering markdown files..." },
+        { at: 60, text: "Merging feedback markdown records into SQLite store..." },
+        { at: 85, text: "Reconciling review comments and bug tracking tags..." },
+        { at: 96, text: "Building smartlog DAG and computing file changes..." },
+      ];
+
+      const tracker = (window.Forge && window.Forge.createProgressBar) ? window.Forge.createProgressBar({
+        progressBar,
+        percentEl: progressPercent,
+        statusEl: statusText,
+        initialProgress: 12,
+        maxProgress: 95,
+        stages: stages,
+      }) : null;
 
       const updateProgress = () => {
-        const elapsed = (Date.now() - startTime) / 1000;
-        if (progress < 94) {
-          if (elapsed < 0.6) {
-            progress = 12 + (elapsed / 0.6) * 23; // 12% to 35%
-          } else if (elapsed < 2.0) {
-            progress = 35 + ((elapsed - 0.6) / 1.4) * 30; // 35% to 65%
-          } else if (elapsed < 4.5) {
-            progress = 65 + ((elapsed - 2.0) / 2.5) * 22; // 65% to 87%
-          } else {
-            progress += (95 - progress) * 0.02; // Asymptotic up to 95%
-          }
-        }
-        const pct = Math.min(96, Math.floor(progress));
-        if (progressBar) progressBar.style.width = `${pct}%`;
-        if (progressPercent) progressPercent.textContent = `${pct}%`;
-
-        if (statusText) {
-          if (pct < 30) {
-            statusText.textContent = "Scanning feedback/ directory and discovering markdown files...";
-          } else if (pct < 60) {
-            statusText.textContent = "Merging feedback markdown records into SQLite store...";
-          } else if (pct < 85) {
-            statusText.textContent = "Reconciling review comments and bug tracking tags...";
-          } else {
-            statusText.textContent = "Building smartlog DAG and computing file changes...";
-          }
+        if (tracker) {
+          tracker.tick();
         }
       };
 
-      const syncTimer = setInterval(updateProgress, 50);
-      updateProgress();
+      if (tracker) {
+        tracker.start();
+      }
 
       try {
         const resp = await fetch("/api/sync_feedback", { method: "POST" });
         const data = await resp.json();
-        clearInterval(syncTimer);
-
-        if (progressBar) progressBar.style.width = "100%";
-        if (progressPercent) progressPercent.textContent = "100%";
         const bugCount = data.bugs?.total_bugs ?? data.bugs?.bugs_count ?? 0;
         const crCount = data.review?.total_comments ?? 0;
-        if (statusText) statusText.textContent = `✓ Synchronized ${bugCount} bugs and ${crCount} review comments.`;
+        const completionMsg = `✓ Synchronized ${bugCount} bugs and ${crCount} review comments.`;
 
-        setTimeout(() => {
-          if (modal) modal.style.display = "none";
-          if (!INITIAL_SYNC_DONE || isManual) {
-            window.location.reload();
-          }
-        }, 400);
+        if (tracker) {
+          tracker.finish(completionMsg, () => {
+            if (modal) modal.style.display = "none";
+            if (!INITIAL_SYNC_DONE || isManual) {
+              window.location.reload();
+            }
+          }, 400);
+        } else {
+          if (progressBar) progressBar.style.width = "100%";
+          if (progressPercent) progressPercent.textContent = "100%";
+          if (statusText) statusText.textContent = completionMsg;
+          setTimeout(() => {
+            if (modal) modal.style.display = "none";
+            if (!INITIAL_SYNC_DONE || isManual) {
+              window.location.reload();
+            }
+          }, 400);
+        }
       } catch (err) {
-        clearInterval(syncTimer);
         console.error("Sync error:", err);
-        if (statusText) statusText.textContent = "Sync complete with warnings. Continuing...";
-        setTimeout(() => {
-          if (modal) modal.style.display = "none";
-        }, 500);
+        const errMsg = "Sync complete with warnings. Continuing...";
+        if (tracker) {
+          tracker.fail(errMsg, () => {
+            if (modal) modal.style.display = "none";
+          }, 500);
+        } else {
+          if (statusText) statusText.textContent = errMsg;
+          setTimeout(() => {
+            if (modal) modal.style.display = "none";
+          }, 500);
+        }
       }
     }
 
@@ -1678,6 +1684,10 @@
       }
 
       function setupResizer(resizer, targetPane, storageKey, minW, maxW) {
+        if (window.Forge && window.Forge.setupPanelResizer) {
+          window.Forge.setupPanelResizer(resizer, targetPane, storageKey, minW, maxW);
+          return;
+        }
         if (!resizer || !targetPane) return;
         let startX = 0;
         let startWidth = 0;
@@ -2799,6 +2809,9 @@
     let actionProgressInterval = null;
 
     async function runWithActionModal(options, asyncFn) {
+      if (window.Forge && window.Forge.performActionWithProgress) {
+        return await window.Forge.performActionWithProgress(asyncFn, options);
+      }
       if (actionProgressDepth > 0) {
         actionProgressDepth++;
         try {
