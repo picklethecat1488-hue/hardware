@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-07 00:36:04 UTC` |
+| **Report Date** | `2026-11-07 00:39:03 UTC` |
 | **Total Issues** | `323` |
-| **Open Issues** | `1` |
-| **Resolved / Closed** | `322 (99%)` |
+| **Open Issues** | `0` |
+| **Resolved / Closed** | `323 (100%)` |
 
 ## Issues by Severity
 
@@ -354,7 +354,7 @@
 - [x] **`[MEDIUM]`** [#BUG-DIURNAL-ANT-667](#bug-diurnal-ant-667): Opening commits in bug report workstation-broken `[dashboard]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-FLITTING-LOCUST-977](#bug-flitting-locust-977): Micro gapes in impeller `[cat_fountain]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-CRIMSON-MAYFLY-874](#bug-crimson-mayfly-874): Drive hub-insufficient clearance for hall sensor board (`RESOLVED`)
-- [ ] **`[MEDIUM]`** [#BUG-LEAPING-LOCUST-56](#bug-leaping-locust-56): Pump cover annular ring-insufficient clearance `[cat_fountain]` (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-LEAPING-LOCUST-56](#bug-leaping-locust-56): Pump cover annular ring-insufficient clearance `[cat_fountain]` (`RESOLVED`)
 
 ## Detailed Issue Log
 
@@ -27573,14 +27573,14 @@ Pls see attached, we should plan to consign all remaining components to them exc
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
-| `reference` | [digikey_order_2026-10-14.xlsx](attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx) | Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2) |
-| `reference` | [carrier_board_bom_rev3.csv](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv) | CSV export of clean EDA BOM Rev 3 |
+| `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx) | Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16 |
+| `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls) | Legacy Excel 97-2004 format of replied quotation BOM |
 | `reference` | [carrier_board_bom_rev2.csv](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv) | CSV export of clean EDA BOM |
 | `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx) | Uploaded reference questions spreadsheet from PCBWay |
 | `reference` | [carrier_board_bom_rev3.xlsx](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx) | Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM) |
+| `reference` | [digikey_order_2026-10-14.xlsx](attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx) | Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2) |
+| `reference` | [carrier_board_bom_rev3.csv](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv) | CSV export of clean EDA BOM Rev 3 |
 | `reference` | [carrier_board_bom_rev2.xlsx](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx) | Clean EDA export BOM generated directly from updated carrier board model |
-| `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx) | Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16 |
-| `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls) | Legacy Excel 97-2004 format of replied quotation BOM |
 
 #### Resolution Notes
 
@@ -28186,9 +28186,9 @@ Defects circled in red.
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1793890876309_0c9ae.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png) | Pasted screenshot screenshot_paste_1793890876309_0c9ae.png |
 | `screenshot` | [screenshot_paste_1793924149979_7f535.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793924149979_7f535.png) | Pasted screenshot screenshot_paste_1793924149979_7f535.png |
 | `screenshot` | [screenshot_paste_1793890911006_wvg54.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890911006_wvg54.png) | Pasted screenshot screenshot_paste_1793890911006_wvg54.png |
+| `screenshot` | [screenshot_paste_1793890876309_0c9ae.png](attachments/BUG-LUSTROUS-COCOON-669/screenshot_paste_1793890876309_0c9ae.png) | Pasted screenshot screenshot_paste_1793890876309_0c9ae.png |
 
 #### Attached Commits
 
@@ -28549,23 +28549,32 @@ The drive hub has insufficient clearance for the hall sensor board; the opening 
 
 - `b1d14ba5b2740f295c23320db2e2d82bebccd03b`
 
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:10c182f6 --> Inspect 3D CAD view of cat_fountain motor_hub to verify wide Hall sensor collar opening and solid South collar wall | `python tools/view.py cat_fountain/motor_hub:part`
+
 #### Resolution Notes
 
 Widened motor hub collar opening to 16.0mm across Hall sensor tongue and eliminated accidental opposite slit at South wall
 
 ---
 
-### <a id="bug-leaping-locust-56"></a> 🔴 `[BUG-LEAPING-LOCUST-56]` Pump cover annular ring-insufficient clearance
+### <a id="bug-leaping-locust-56"></a> 🟢 `[BUG-LEAPING-LOCUST-56]` Pump cover annular ring-insufficient clearance
 
 - **UUID**: `2c95825d-9a2a-4977-a1ed-8d6df2694fb3`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-07 00:27:53 UTC`
+- **Resolved**: `2026-11-07 00:39:02 UTC`
 
 #### Description
 
 The inner annular ring for the pump cover may have insufficient clearance to fit inside the bowl’s pump cover mount when epoxy is applied. Can we move the annular ring and mount lower (-Z)?
+
+#### Resolution Notes
+
+Moved pump cover mount recess depth to 2.5mm and annular snap ridge/groove Z offset to 1.5mm lower (-Z) to provide generous epoxy clearance
 
 ---
