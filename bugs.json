@@ -9736,11 +9736,21 @@
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "d04a6acc",
+          "filename": "screenshot_paste_1794010762260_ohrw4.png",
+          "file_type": "screenshot",
+          "file_path": "attachments/BUG-FLITTING-LOCUST-977/screenshot_paste_1794010762260_ohrw4.png",
+          "size_bytes": 198966,
+          "description": "Pasted screenshot screenshot_paste_1794010762260_ohrw4.png",
+          "created_at": "2026-11-07 00:19:22 UTC"
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-07 00:15:58 UTC",
-      "updated_at": "2026-11-07 00:19:12 UTC",
+      "updated_at": "2026-11-07 00:19:22 UTC",
       "resolved_at": null,
       "resolution_notes": "",
       "rejection_notes": null,
@@ -9748,5 +9758,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-07 00:19:12 UTC"
+  "updated_at": "2026-11-07 00:19:22 UTC"
 }

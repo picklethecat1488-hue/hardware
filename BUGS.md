@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-07 00:19:14 UTC` |
+| **Report Date** | `2026-11-07 00:19:24 UTC` |
 | **Total Issues** | `321` |
 | **Open Issues** | `1` |
 | **Resolved / Closed** | `320 (99%)` |
@@ -28502,5 +28502,11 @@ Attached commits in Bug Report now navigate directly to Code Review for that com
 #### Description
 
 There are micro gaps between the impeller blades and central shaft, we should patch these by extending the impeller blades into the central shaft to ensure unioning the two shapes creates a smooth object
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [screenshot_paste_1794010762260_ohrw4.png](attachments/BUG-FLITTING-LOCUST-977/screenshot_paste_1794010762260_ohrw4.png) | Pasted screenshot screenshot_paste_1794010762260_ohrw4.png |
 
 ---
