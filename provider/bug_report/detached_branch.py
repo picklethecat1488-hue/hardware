@@ -272,11 +272,13 @@ class DetachedBranchBugStore:
             # 4. Include existing CR_*.md or review files if available
             if not (parents and parents[0] and dirty_bug_ids is not None):
                 if feedback_path.exists() and feedback_path.is_dir():
-                    for cr_file in feedback_path.glob("CR_*.md"):
-                        try:
-                            target_files[f"feedback/{cr_file.name}"] = cr_file.read_bytes()
-                        except OSError:
-                            continue
+                    cr_candidates = list(feedback_path.glob("CR_*.md")) + [feedback_path / "CR.md"]
+                    for cr_file in cr_candidates:
+                        if cr_file.is_file():
+                            try:
+                                target_files[f"feedback/{cr_file.name}"] = cr_file.read_bytes()
+                            except OSError:
+                                continue
 
             # 5. Include attachments from attachments/ and feedback/attachments/
             if dirty_bug_ids is not None:
@@ -345,6 +347,21 @@ class DetachedBranchBugStore:
                 check=True,
             )
             tree_sha = tree_proc.stdout.strip()
+
+            # Elide redundant commit if tree is identical to parent tree
+            if parents and parents[0] and len(parents) == 1:
+                try:
+                    p_tree = subprocess.run(
+                        ["git", "rev-parse", f"{parents[0]}^{{tree}}"],
+                        cwd=str(self.repo_root),
+                        capture_output=True,
+                        text=True,
+                        check=True,
+                    ).stdout.strip()
+                    if tree_sha == p_tree:
+                        return parents[0]
+                except Exception:
+                    pass
 
             # 6. Commit tree object
             clean_message = elide_personal_info(commit_message)
@@ -448,6 +465,48 @@ class DetachedBranchBugStore:
                 pass
         return restored
 
+    def checkout_feedback_files(self) -> List[Path]:
+        """Extract feedback markdown files from detached branch tree to local workspace.
+
+        Returns:
+            List of paths to restored or updated feedback files on disk.
+        """
+        if not self.ref_exists():
+            return []
+        try:
+            tree_proc = subprocess.run(
+                ["git", "ls-tree", "-r", "--name-only", self.ref_name],
+                cwd=str(self.repo_root),
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except (subprocess.CalledProcessError, RuntimeError):
+            return []
+
+        restored: List[Path] = []
+        for line in tree_proc.stdout.splitlines():
+            path_str = line.strip()
+            if not path_str.startswith("feedback/"):
+                continue
+            if path_str.startswith("feedback/attachments/"):
+                continue
+            dest_file = self.repo_root / path_str
+            dest_file.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                raw_bytes = subprocess.run(
+                    ["git", "show", f"{self.ref_name}:{path_str}"],
+                    cwd=str(self.repo_root),
+                    capture_output=True,
+                    check=True,
+                ).stdout
+                if not dest_file.exists() or dest_file.read_bytes() != raw_bytes:
+                    dest_file.write_bytes(raw_bytes)
+                    restored.append(dest_file)
+            except (subprocess.CalledProcessError, OSError):
+                pass
+        return restored
+
     def seed_from_workspace(
         self,
         sqlite_store: Optional[SQLiteBugStore] = None,
@@ -488,15 +547,39 @@ class DetachedBranchBugStore:
             return commit_sha
         return None
 
-    def sync_branch(self) -> Dict[str, Any]:
+    def sync_branch(self, push: bool = True) -> Dict[str, Any]:
         """Reconcile detached bug branch with remote tracking ref.
 
-        Fetches origin/bugs, fast-forwards or merges when needed, and pushes
-        updated commits back to origin.
+        Commits workspace feedback and attachments, fetches origin/bugs, fast-forwards
+        or merges with collision mitigation when needed, and pushes updated commits back to origin.
+
+        Args:
+            push: If True, pushes reconciled branch commits to origin.
 
         Returns:
-            Dictionary with synchronization status, branch, and commit details.
+            Dictionary with synchronization status, branch, commit details, and push status.
         """
+        # 1. Commit local workspace database, feedback markdown, and attachments to detached branch
+        local_db = self.load_database()
+        if not local_db or not local_db.bugs:
+            try:
+                from provider.bug_report.sqlite_store import SQLiteBugStore
+
+                sqlite_path = self.repo_root / "target" / "bugs.sqlite"
+                if not sqlite_path.exists() and (self.repo_root / "build" / "bugs.sqlite").exists():
+                    sqlite_path = self.repo_root / "build" / "bugs.sqlite"
+                if sqlite_path.exists():
+                    local_db = SQLiteBugStore(sqlite_path).load_database()
+            except Exception:
+                pass
+
+        if local_db and local_db.bugs:
+            self.commit_database(
+                local_db,
+                commit_message="Sync local feedback and attachments to detached branch",
+                extra_feedback_dir=self.repo_root / "feedback",
+            )
+
         has_remote = False
         try:
             remotes_proc = subprocess.run(
@@ -555,7 +638,7 @@ class DetachedBranchBugStore:
                     == 0
                 )
                 if not is_remote_ancestor:
-                    # True divergence: merge databases
+                    # True divergence: merge databases with collision mitigation
                     local_db = self.load_database()
                     remote_json_proc = subprocess.run(
                         ["git", "show", f"{remote_commit}:{self.branch_name}.json"],
@@ -569,12 +652,13 @@ class DetachedBranchBugStore:
                         merged_db = self.exporter.merge_databases(local_db, remote_db)
                         local_commit = self.commit_database(
                             merged_db,
-                            commit_message="Merge remote bug database updates",
+                            commit_message="Merge remote bug database updates with collision mitigation",
                             parents=[local_commit, remote_commit],
+                            extra_feedback_dir=self.repo_root / "feedback",
                         )
 
         pushed = False
-        if has_remote and local_commit:
+        if has_remote and local_commit and push:
             push_proc = subprocess.run(
                 ["git", "push", "origin", f"{self.ref_name}:{self.ref_name}"],
                 cwd=str(self.repo_root),
@@ -586,6 +670,7 @@ class DetachedBranchBugStore:
 
         if local_commit:
             self.checkout_attachments()
+            self.checkout_feedback_files()
 
         return {
             "status": "ok",
