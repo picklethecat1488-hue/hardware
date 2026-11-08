@@ -14,15 +14,6 @@
 
 Pls see attached, we should plan to consign all remaining components to them except for the one substitute-
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx) | Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16 |
-| `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx) | Uploaded reference questions spreadsheet from PCBWay |
-| `reference` | [carrier_board_bom_rev3.csv](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv) | CSV export of clean EDA BOM Rev 3 |
-| `reference` | [carrier_board_bom_rev2.xlsx](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx) | Clean EDA export BOM generated directly from updated carrier board model |
-
 #### Resolution Notes
 
 Consigned remaining out-of-stock components (D1, J3, U5, Y1) to PCBWay alongside U1 and U2, confirmed Molex brand for J16 (22-28-4023), generated replied quotation templates (.xlsx/.xls) and clean EDA BOM exports (Rev 2 & Rev 3 .xlsx/.csv), incorporated DigiKey order confirmation (order file `digikey_order_2026-10-14.xlsx` with total value $99.50 across 40 pcs), updated carrier board wiring and exporter manufacturer/through-hole inference, and updated consignment sourcing & shipping guide with exact MPNs, distributor part numbers, packaging requirements, and commercial invoice customs declarations.

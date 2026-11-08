@@ -13,12 +13,6 @@
 
 The drive hub has insufficient clearance for the hall sensor board; the opening is too narrow for the sensor to fit thru. There is also an unexpected second opening opposite the hall sensor. Defects highlighted in red on the attached screenshot, and desired sensor clearance in green.
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1794011081865_vz46w.png](attachments/BUG-CRIMSON-MAYFLY-874/screenshot_paste_1794011081865_vz46w.png) | Pasted screenshot screenshot_paste_1794011081865_vz46w.png |
-
 #### Attached Commits
 
 - `b1d14ba5b2740f295c23320db2e2d82bebccd03b`
