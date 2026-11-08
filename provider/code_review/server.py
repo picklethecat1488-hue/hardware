@@ -410,12 +410,20 @@ class ReviewServer(ThreadingHTTPServer):
         self.exporter = MarkdownReviewExporter(repo_root=self.repo_root)
 
         self.markdown_output = markdown_output or (self.repo_root / "build" / "CR.md")
+        ws_root = self.repo_root.resolve()
+        try:
+            ws_root = get_git_root().resolve()
+        except Exception:
+            pass
+
         if feedback_dir is not None:
             self.feedback_dir = feedback_dir
         elif markdown_output is not None and markdown_output.parent.name not in ("build", "target"):
             self.feedback_dir = markdown_output.parent
         elif sqlite_file is not None and sqlite_file.parent.name not in ("build", "target"):
             self.feedback_dir = sqlite_file.parent / "feedback"
+        elif os.environ.get("FEEDBACK_DIR") and (self.repo_root.resolve() == ws_root):
+            self.feedback_dir = Path(os.environ["FEEDBACK_DIR"]).resolve()
         else:
             self.feedback_dir = self.repo_root / "feedback"
         if self.feedback_dir != self.repo_root / "feedback":
