@@ -3,7 +3,7 @@
 from contextvars import ContextVar, Token
 from typing import Any, List, Optional, Sequence, Tuple, Union
 
-from model.pcb import AssemblyTestStepModel
+from model.pcb import AssemblyTestModel, AssemblyTestStepModel
 from model.wiring import PinRef
 
 _current_test_steps: ContextVar[Optional["BuildTestSteps"]] = ContextVar("_current_test_steps", default=None)
@@ -44,6 +44,11 @@ class BuildAssemblyTestSteps:
         active_pcb = BuildPcb.current()
         if active_pcb is not None:
             active_pcb.test_steps.extend(self.steps)
+            active_pcb.assembly_test = AssemblyTestModel(
+                instructions=list(active_pcb.test_steps),
+                test_fixture=self.test_fixture,
+                pass_criteria=self.pass_criteria,
+            )
 
     @classmethod
     def _get_context(cls) -> Optional["BuildAssemblyTestSteps"]:
@@ -59,6 +64,7 @@ class BuildAssemblyTestSteps:
 
 
 BuildTestSteps = BuildAssemblyTestSteps
+AssemblyTestMetadata = BuildAssemblyTestSteps
 
 
 class TestStep:

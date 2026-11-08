@@ -316,30 +316,13 @@ class Provider:
             return self._wiring
 
         for p_name, part_builder in getattr(self, "part", {}).items():
-            try:
-                part_obj = part_builder(p_name, None, Mode.DEFAULT)
-                w = getattr(part_obj, "wiring", None)
-                if w is not None:
-                    return w
-                if hasattr(part_obj, "part") and getattr(part_obj.part, "wiring", None) is not None:
-                    return part_obj.part.wiring
-            except Exception:
-                pass
+            part_obj = part_builder(p_name, None, Mode.DEFAULT)
+            w = getattr(part_obj, "wiring", None)
+            if w is not None:
+                return w
+            if hasattr(part_obj, "part") and getattr(part_obj.part, "wiring", None) is not None:
+                return part_obj.part.wiring
         return None
-
-    def get_wiring(self, subassembly: Optional[str] = None) -> Optional[Any]:
-        """Return Wiring container for a specific subassembly or the design as a whole."""
-        if subassembly and hasattr(self, "part") and subassembly in self.part:
-            try:
-                part_obj = self.part[subassembly](subassembly, None, Mode.DEFAULT)
-                w = getattr(part_obj, "wiring", None)
-                if w is not None:
-                    return w
-                if hasattr(part_obj, "part") and getattr(part_obj.part, "wiring", None) is not None:
-                    return part_obj.part.wiring
-            except Exception:
-                pass
-        return self.wiring
 
     @property
     def pcb_manifest(self) -> Optional[dict[str, Any]]:
@@ -463,6 +446,7 @@ class Provider:
             combined_symbol_table = dict(primary_cfg.symbol_table)
             combined_traces = list(primary_cfg.traces)
             combined_vias = list(primary_cfg.vias)
+            combined_omitted_silkscreen = list(primary_cfg.omitted_silkscreen_designators)
 
             for p_name, p_cfg in pcb_parts:
                 if p_name != primary_name:
@@ -481,6 +465,9 @@ class Provider:
                     for v in p_cfg.vias:
                         if v not in combined_vias:
                             combined_vias.append(v)
+                    for des in p_cfg.omitted_silkscreen_designators:
+                        if des not in combined_omitted_silkscreen:
+                            combined_omitted_silkscreen.append(des)
                     combined_symbol_table.update(p_cfg.symbol_table)
 
             # Stackup from provider or primary
@@ -544,6 +531,10 @@ class Provider:
             w = self.wiring
             if w and hasattr(w, "symbol_table"):
                 combined_symbol_table.update(w.symbol_table)
+            if w and hasattr(w, "footprints"):
+                for fp in w.footprints:
+                    if getattr(fp, "omit_silkscreen", False) and fp.name not in combined_omitted_silkscreen:
+                        combined_omitted_silkscreen.append(fp.name)
 
             assembly_test = primary_cfg.assembly_test
             if combined_test_steps:
@@ -574,6 +565,7 @@ class Provider:
                     "symbol_table": combined_symbol_table,
                     "test_steps": combined_test_steps,
                     "assembly_test": assembly_test,
+                    "omitted_silkscreen_designators": combined_omitted_silkscreen,
                 }
             )
             self._cached_pcb_config = cfg

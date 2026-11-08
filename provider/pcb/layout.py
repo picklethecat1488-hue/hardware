@@ -253,11 +253,12 @@ class Component(list):
         shape_ref: Optional[str] = None,
         unconnected: bool = False,
         dnp: bool = False,
+        omit_silkscreen: bool = False,
         position: Optional[Tuple[float, float, float]] = None,
         rotation: Optional[Tuple[float, float, float]] = None,
         dimensions: Optional[Tuple[float, float, float]] = None,
-        pins: Optional[Sequence[Dict[str, Any]]] = None,
-        label: Optional[Union[str, LabelModel]] = None,
+        pins: Optional[Union[Sequence[Union[Dict[str, Any], PinModel]], Any]] = None,
+        label: Optional[Union[str, LabelModel, Dict[str, Any]]] = None,
         truth_table: Optional[TruthTableModel] = None,
         slots_per_side: Optional[int] = None,
         joint_ref: Optional[Dict[str, Any]] = None,
@@ -360,13 +361,24 @@ class Component(list):
         # Merge pin definitions
         base_raw_pins = tmpl.get("pins", [])
         if pins is not None and base_raw_pins:
-            overrides = {str(p.get("number") or p.get("name")): p for p in pins}
+            overrides = {}
+            for p in pins:
+                key = str(
+                    getattr(p, "number", None)
+                    or getattr(p, "name", None)
+                    or (p.get("number") or p.get("name") if isinstance(p, dict) else "")
+                )
+                overrides[key] = p
             raw_pins = []
             for bp in base_raw_pins:
                 merged = dict(bp)
                 p_key = str(bp.get("number") or bp.get("name"))
                 if p_key in overrides:
-                    merged.update(overrides[p_key])
+                    ov = overrides[p_key]
+                    if isinstance(ov, PinModel):
+                        merged.update(ov.model_dump(exclude_none=True))
+                    elif isinstance(ov, dict):
+                        merged.update(ov)
                 raw_pins.append(merged)
         elif pins is not None:
             raw_pins = list(pins)
@@ -375,6 +387,9 @@ class Component(list):
 
         parsed_pins: List[PinModel] = []
         for p in raw_pins:
+            if isinstance(p, PinModel):
+                parsed_pins.append(p.model_copy())
+                continue
             p_dict = dict(p)
             if "name" in p_dict:
                 p_dict["name"] = str(p_dict["name"])
@@ -474,6 +489,7 @@ class Component(list):
                 shape_ref=shape_ref,
                 unconnected=unconnected,
                 dnp=dnp,
+                omit_silkscreen=omit_silkscreen,
             )
 
             pin_refs = [

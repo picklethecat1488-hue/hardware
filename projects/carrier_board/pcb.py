@@ -38,8 +38,11 @@ from model.pcb import (
     ViaModel,
     PCBConfig,
     PCBDesignRulesModel,
+    RuleSeverity,
+    RuleSeveritiesModel,
     NetClassModel,
     FlexZoneModel,
+    PCBObstacleModel,
     CapacitiveElectrodeModel,
     SchematicSheetModel,
     AssemblyTestStepModel,
@@ -74,21 +77,12 @@ from provider.pcb import (
     Net,
     BuildTestSteps,
     BuildAssemblyTestSteps,
+    AssemblyTestMetadata,
     TestStep,
     RouteStyle,
+    SchematicMetadata,
+    SchematicSheet,
     PcbMetadata,
-)
-from .metadata import (
-    CARRIER_BOARD_OMITTED_SILKSCREEN,
-    CARRIER_BOARD_OBSTACLES,
-    CARRIER_BOARD_DESIGN_RULES,
-    CARRIER_BOARD_NET_CLASSES,
-    CARRIER_BOARD_FLEX_ZONES,
-    CARRIER_BOARD_SCHEMATIC_SHEETS,
-    CARRIER_BOARD_ASSEMBLY_TEST,
-    CARRIER_BOARD_TEST_STEPS,
-    FLEX_TAIL_CAPACITIVE_SENSORS,
-    FLEX_TAIL_TEST_STEPS,
 )
 
 
@@ -213,24 +207,659 @@ class CarrierBoardPCB:
         inset = self.settings.mounting_hole_inset
 
         pcb_rev = "2.0"
+        rules = PCBDesignRulesModel(
+            min_clearance_mm=0.03,
+            min_fine_pitch_clearance_mm=0.03,
+            fine_pitch_pad_threshold_mm=0.35,
+            min_track_width_mm=0.1,
+            default_track_width_mm=0.12,
+            min_copper_edge_clearance_mm=0.15,
+            min_hole_to_hole_mm=0.03,
+            min_hole_clearance_mm=0.03,
+            min_via_diameter_mm=0.35,
+            default_via_diameter_mm=0.36,
+            default_via_drill_mm=0.16,
+            via_penalty=2.0,
+            pad_to_mask_clearance_mm=0.0,
+            rule_severities=RuleSeveritiesModel(
+                hole_to_hole=RuleSeverity.IGNORE,
+                hole_near_hole=RuleSeverity.IGNORE,
+                lib_footprint_issues=RuleSeverity.IGNORE,
+                text_height=RuleSeverity.IGNORE,
+                silk_overlap=RuleSeverity.IGNORE,
+                silk_over_copper=RuleSeverity.IGNORE,
+                track_dangling=RuleSeverity.IGNORE,
+                silk_edge_clearance=RuleSeverity.IGNORE,
+            ),
+        )
+
+        net_classes = [
+            NetClassModel(
+                name="BTLE_HIGH_SPEED_UART",
+                trace_width_mm=0.12,
+                clearance_mm=0.12,
+                via_dia_mm=0.36,
+                via_drill_mm=0.16,
+                interface_type="uart",
+                description="High-speed 1Mb/s UART interface between U1 MCU and U11 BTLE module",
+                single_nets=["BLE_RX", "BLE_RTS", "BLE_TX", "BLE_CTS"],
+            ),
+            NetClassModel(
+                name="RF_2GHZ",
+                trace_width_mm=0.13,
+                clearance_mm=0.2,
+                via_dia_mm=0.36,
+                via_drill_mm=0.16,
+                interface_type="rf",
+                coplanar_waveguide=True,
+                ground_gap_mm=0.22,
+                keepout_clearance_mm=1.5,
+                single_nets=["RF_ANT_FEED"],
+            ),
+            NetClassModel(
+                name="I2C_BUS",
+                trace_width_mm=0.12,
+                clearance_mm=0.12,
+                via_dia_mm=0.36,
+                via_drill_mm=0.16,
+                interface_type="digital",
+                single_nets=["I2C_SDA", "I2C_SCL"],
+            ),
+            NetClassModel(
+                name="PWR_3V3",
+                trace_width_mm=0.12,
+                clearance_mm=0.2,
+                via_dia_mm=0.36,
+                via_drill_mm=0.16,
+                interface_type="power",
+                single_nets=["3V3"],
+            ),
+        ]
+
+        flex_zones = [
+            FlexZoneModel(
+                name="flex_tail_ribbon",
+                start_x_mm=30.0,
+                length_mm=54.0,
+                substrate_thickness_mm=0.05,
+                coverlay_thickness_mm=0.025,
+                coverlay_color="black",
+                min_bend_radius_mm=3.0,
+                shape_ref="flex_tail",
+            )
+        ]
+
+        obstacles = [
+            PCBObstacleModel(
+                name="U1",
+                shape="box",
+                dimensions_mm=(12.0, 12.0, 2.0),
+                position_mm=(0.0, 0.0, 1.8),
+                description="MCU BGA at center",
+            ),
+            PCBObstacleModel(
+                name="U11",
+                shape="box",
+                dimensions_mm=(10.0, 15.0, 2.23),
+                position_mm=(0.0, -36.0, 1.915),
+                description="BTLE transceiver module with integrated PCB antenna",
+            ),
+            PCBObstacleModel(
+                name="J15",
+                shape="box",
+                dimensions_mm=(6.35, 3.81, 5.0),
+                position_mm=(-14.5, -41.0, 3.3),
+                description="SWD recovery header",
+            ),
+            PCBObstacleModel(
+                name="ble_antenna_keepout",
+                shape="box",
+                dimensions_mm=(16.0, 5.0, 1.6),
+                position_mm=(0.0, -42.0, 0.8),
+                description="RF ground plane keepout for integrated PCB antenna",
+            ),
+            PCBObstacleModel(
+                name="J2",
+                shape="box",
+                dimensions_mm=(25.0, 5.0, 2.0),
+                position_mm=(0.0, 38.0, 1.8),
+                description="Hirose FPC-30P connector",
+            ),
+            PCBObstacleModel(
+                name="J3",
+                shape="box",
+                dimensions_mm=(9.0, 9.0, 4.0),
+                position_mm=(-25.0, 0.0, 2.8),
+                description="USB Type-C receptacle",
+            ),
+            PCBObstacleModel(
+                name="J5",
+                shape="box",
+                dimensions_mm=(6.0, 12.0, 6.0),
+                position_mm=(-21.0, -7.0, 3.8),
+                description="SWD 10-pin micro-header",
+            ),
+            PCBObstacleModel(
+                name="J13",
+                shape="box",
+                dimensions_mm=(6.0, 8.0, 7.0),
+                position_mm=(-23.0, 16.0, 4.3),
+                description="Battery 2-pin JST-PH connector",
+            ),
+            PCBObstacleModel(
+                name="J9",
+                shape="box",
+                dimensions_mm=(6.0, 17.0, 7.0),
+                position_mm=(24.5, -14.0, 4.3),
+                description="Expansion header on right edge",
+            ),
+            PCBObstacleModel(
+                name="J10",
+                shape="box",
+                dimensions_mm=(6.0, 17.0, 7.0),
+                position_mm=(24.5, -31.0, 4.3),
+                description="Expansion header on right edge",
+            ),
+        ]
+
+        omitted_designators = [fp.name for fp in self.wiring.footprints if getattr(fp, "omit_silkscreen", False)]
+
         with BuildPcb(
             name="CarrierBoard",
             shape_ref="carrier_board",
             board_type=BoardType.RIGID,
             revision=pcb_rev,
+            sheet_size="A4",
+            omitted_silkscreen_designators=omitted_designators,
+            design_rules=rules,
+            net_classes=net_classes,
+            flex_zones=flex_zones,
+            obstacles=obstacles,
             stackup=self.stackup(),
         ) as pcb:
-            with PcbMetadata(
-                sheet_size="A4",
-                omitted_silkscreen_designators=CARRIER_BOARD_OMITTED_SILKSCREEN,
-                obstacles=CARRIER_BOARD_OBSTACLES,
-                design_rules=CARRIER_BOARD_DESIGN_RULES,
-                net_classes=CARRIER_BOARD_NET_CLASSES,
-                flex_zones=CARRIER_BOARD_FLEX_ZONES,
-                schematic_sheets=CARRIER_BOARD_SCHEMATIC_SHEETS,
-                assembly_test=CARRIER_BOARD_ASSEMBLY_TEST,
-            ):
-                pass
+            with SchematicMetadata(sheet_size="A4") as sched:
+                SchematicSheet(
+                    title="USB-C Power & Battery Interface",
+                    description="USB-C connector, CC pull-down termination, Li-Ion battery connector, and MAX17048 fuel gauge",
+                    components=["J3", "R3", "R4", "J13", "C13", "U7", "C7", "C16"],
+                    pin_breakouts={
+                        "J3": ["VBUS", "VBUS2", "GND", "GND2", "CC1", "CC2", "SHIELD1", "SHIELD2"],
+                        "J13": ["1", "2"],
+                        "C13": ["1", "2"],
+                        "U7": ["1", "2", "3", "4", "5", "7", "8"],
+                        "R3": ["1", "2"],
+                        "R4": ["1", "2"],
+                        "C7": ["1", "2"],
+                        "C16": ["1", "2"],
+                    },
+                )
+                SchematicSheet(
+                    title="3.3V Power Regulation & Distribution",
+                    description="Low-dropout linear voltage regulator with C8 bulk filtering, and system decoupling",
+                    layout={"cols_per_row": 4, "grid_positions": {"U3": [0, 0], "C8": [0, 1]}},
+                    components=["U3", "C6", "C1", "C2", "C3", "C8"],
+                    pin_breakouts={
+                        "U3": ["1", "2", "3", "4", "5"],
+                        "C8": ["1", "2"],
+                        "C1": ["1", "2"],
+                        "C2": ["1", "2"],
+                        "C3": ["1", "2"],
+                        "C6": ["1", "2"],
+                    },
+                )
+                SchematicSheet(
+                    title="Peripheral Power Regulation & Gating",
+                    description="Dedicated 3.3V peripheral buck regulator (TLV62568) and power gating enable control",
+                    components=["U1", "U10", "D8", "C15"],
+                    pin_sides={
+                        "U1": {"L5": "right"},
+                        "U10": {"3": "left", "1": "left", "2": "left", "5": "right"},
+                        "D8": {"1": "left", "2": "right"},
+                    },
+                    pin_breakouts={"U1": ["L5"], "U10": ["3", "1", "2", "5"], "D8": ["1", "2"], "C15": ["1", "2"]},
+                )
+                SchematicSheet(
+                    title="Microcontroller Core, Clock & Reset",
+                    description="Primary microcontroller core, 24MHz crystal oscillator, power bypass, reset and boot circuitry",
+                    layout={"col_gap": 65.0},
+                    components=["U1", "Y1", "C9", "C10", "R5", "C11", "R6", "C4", "C5"],
+                    pin_sides={
+                        "U1": {"J8": "left", "H8": "left", "F2": "right", "F1": "right", "F3": "left", "C14": "left"},
+                        "Y1": {"1": "left", "3": "left", "2": "right", "4": "right"},
+                    },
+                    pin_breakouts={
+                        "U1": ["J8", "H8", "F2", "F1", "F3", "C14"],
+                        "Y1": ["1", "2", "3", "4"],
+                        "C9": ["1", "2"],
+                        "C10": ["1", "2"],
+                        "R5": ["1", "2"],
+                        "C11": ["1", "2"],
+                        "R6": ["1", "2"],
+                        "C4": ["1", "2"],
+                        "C5": ["1", "2"],
+                    },
+                )
+                SchematicSheet(
+                    title="External Serial NAND Storage Subsystem",
+                    description="Winbond W25N01GV 1Gb SLC serial NAND flash on FlexSPI Port A",
+                    components=["U1", "U8", "C17"],
+                    pin_sides={
+                        "U1": {
+                            "B17": "right",
+                            "D14": "right",
+                            "E14": "right",
+                            "F15": "right",
+                            "F17": "right",
+                            "F16": "right",
+                        },
+                        "U8": {
+                            "1": "left",
+                            "6": "left",
+                            "5": "left",
+                            "2": "left",
+                            "3": "left",
+                            "7": "left",
+                            "8": "right",
+                            "4": "right",
+                        },
+                    },
+                    pin_breakouts={
+                        "U1": ["B17", "D14", "E14", "F15", "F17", "F16"],
+                        "U8": ["1", "6", "5", "2", "3", "7", "8", "4"],
+                        "C17": ["1", "2"],
+                    },
+                )
+                SchematicSheet(
+                    title="Telemetry & Debug Communications",
+                    description="FTDI FT232RNQ high-speed USB-to-UART serial bridge and ARM 10-pin SWD debug micro-header",
+                    components=["U1", "U9", "J5"],
+                    pin_sides={
+                        "U1": {
+                            "B6": "right",
+                            "A6": "right",
+                            "F10": "right",
+                            "E10": "right",
+                            "A17": "right",
+                            "A16": "right",
+                        },
+                        "U9": {
+                            "1": "left",
+                            "5": "left",
+                            "3": "left",
+                            "11": "left",
+                            "4": "right",
+                            "15": "right",
+                            "16": "right",
+                            "18": "right",
+                            "19": "right",
+                            "20": "right",
+                            "21": "right",
+                            "22": "right",
+                            "23": "right",
+                            "25": "right",
+                            "26": "right",
+                            "29": "right",
+                            "7": "right",
+                        },
+                        "J5": {"1": "left", "2": "left", "3": "left", "4": "left", "5": "left"},
+                    },
+                    pin_breakouts={
+                        "U1": ["B6", "A6", "F10", "E10", "A17", "A16"],
+                        "U9": [
+                            "1",
+                            "5",
+                            "3",
+                            "11",
+                            "4",
+                            "15",
+                            "16",
+                            "18",
+                            "19",
+                            "20",
+                            "21",
+                            "22",
+                            "23",
+                            "25",
+                            "26",
+                            "29",
+                            "7",
+                        ],
+                        "J5": ["1", "2", "3", "4", "5"],
+                    },
+                )
+                SchematicSheet(
+                    title="User Interface & Status Indication",
+                    description="TI LP5009 9-channel I2C constant-current LED driver and high-brightness RGB status indicator",
+                    components=["U1", "U6", "D1"],
+                    pin_sides={
+                        "U1": {"A10": "right", "B10": "right"},
+                        "U6": {
+                            "1": "left",
+                            "2": "left",
+                            "5": "left",
+                            "3": "left",
+                            "4": "left",
+                            "15": "left",
+                            "6": "right",
+                            "7": "right",
+                            "8": "right",
+                            "16": "right",
+                        },
+                        "D1": {"1": "left", "2": "left", "3": "left", "4": "left"},
+                    },
+                    pin_breakouts={
+                        "U1": ["A10", "B10"],
+                        "U6": ["1", "2", "5", "3", "4", "15", "6", "7", "8", "16"],
+                        "D1": ["1", "2", "3", "4"],
+                    },
+                )
+                SchematicSheet(
+                    title="Capacitive Sensing & Control (Azoteq IQS7222A)",
+                    description="Azoteq IQS7222A ProxFusion controller, 5-button slider, action button, and proximity sensing flex tail, and I2C bus",
+                    layout={"col_gap": 65.0},
+                    components=["U1", "U2", "J2", "R1", "R2", "C12", "C14"],
+                    pin_sides={
+                        "U1": {"C5": "right", "C6": "right", "C4": "right"},
+                        "U2": {
+                            "SCL": "left",
+                            "SDA": "left",
+                            "RDY": "left",
+                            "VDD": "left",
+                            "MCLR": "left",
+                            "VSS": "left",
+                            "EP": "left",
+                            "CR0": "right",
+                            "CR1": "right",
+                            "CR2": "right",
+                            "CR3": "right",
+                            "CR4": "right",
+                            "CR5": "right",
+                            "CR6": "right",
+                            "CR7": "right",
+                            "CT8": "right",
+                            "OUTA": "right",
+                        },
+                        "J2": {
+                            "CAP_RX0": "left",
+                            "CAP_RX1": "left",
+                            "CAP_RX2": "left",
+                            "CAP_RX3": "left",
+                            "CAP_TX0": "left",
+                            "CAP_TX1": "left",
+                            "CAP_TX2": "left",
+                            "CAP_SHIELD": "left",
+                        },
+                    },
+                    pin_breakouts={
+                        "U1": ["C5", "C6", "C4"],
+                        "U2": [
+                            "SCL",
+                            "SDA",
+                            "RDY",
+                            "VDD",
+                            "MCLR",
+                            "VSS",
+                            "EP",
+                            "CR0",
+                            "CR1",
+                            "CR2",
+                            "CR3",
+                            "CR4",
+                            "CR5",
+                            "CR6",
+                            "CR7",
+                            "CT8",
+                        ],
+                        "J2": [
+                            "CAP_RX0",
+                            "CAP_RX1",
+                            "CAP_RX2",
+                            "CAP_RX3",
+                            "CAP_TX0",
+                            "CAP_TX1",
+                            "CAP_TX2",
+                            "CAP_SHIELD",
+                        ],
+                        "R1": ["1", "2"],
+                        "R2": ["1", "2"],
+                        "C12": ["1", "2"],
+                        "C14": ["1", "2"],
+                    },
+                )
+                SchematicSheet(
+                    title="Audio Subsystem",
+                    description="MAX98357A I2S/PDM digital audio amplifier and piezo speaker",
+                    layout={"cols_per_row": 3, "grid_positions": {"U1": [0, 0], "U4": [0, 1], "U5": [0, 2]}},
+                    components=["U4", "U5", "U1"],
+                    pin_sides={
+                        "U1": {"G2": "right", "H1": "right", "J1": "right", "L4": "right"},
+                        "U4": {
+                            "BCLK": "left",
+                            "DIN": "left",
+                            "LRCLK": "left",
+                            "SD_MODE": "left",
+                            "VDD": "left",
+                            "GND": "left",
+                            "GAIN": "left",
+                            "OUTP": "right",
+                            "OUTN": "right",
+                        },
+                        "U5": {"1": "left", "2": "left"},
+                    },
+                    pin_breakouts={
+                        "U1": ["G2", "H1", "J1", "L4"],
+                        "U4": ["BCLK", "DIN", "LRCLK", "SD_MODE", "VDD", "GND", "GAIN", "OUTP", "OUTN"],
+                        "U5": ["1", "2"],
+                    },
+                )
+                SchematicSheet(
+                    title="High-Speed BTLE UART & Wireless Interface",
+                    description="BTLE transceiver module (U11) with 1Mb/s high-speed UART link, flow control, cap-touch pairing trigger, and integrated PCB antenna",
+                    layout={
+                        "cols_per_row": 3,
+                        "col_gap": 50.0,
+                        "grid_positions": {"U1": [0, 0], "U11": [0, 1], "J16": [0, 2]},
+                    },
+                    components=["U11", "U1", "C18", "C19", "J16"],
+                    pin_sides={
+                        "U1": {"T2": "left", "T1": "left", "T3": "left", "T4": "left"},
+                        "U11": {
+                            "RXD": "left",
+                            "RTS": "left",
+                            "TXD": "left",
+                            "CTS": "left",
+                            "RESET_N": "left",
+                            "GND": "right",
+                            "3V3": "right",
+                            "NFC1": "right",
+                            "NFC2": "right",
+                        },
+                        "C18": {"1": "left", "2": "right"},
+                        "C19": {"1": "left", "2": "right"},
+                        "J16": {"1": "left", "2": "left"},
+                    },
+                    pin_breakouts={
+                        "U11": ["RXD", "RTS", "TXD", "CTS", "RESET_N", "GND", "3V3", "NFC1", "NFC2"],
+                        "C18": ["1", "2"],
+                        "C19": ["1", "2"],
+                        "J16": ["1", "2"],
+                        "U1": ["T2", "T1", "T3", "T4"],
+                    },
+                )
+                SchematicSheet(
+                    title="BTLE Programming & Reset Interface (J15, SW2)",
+                    description="BLE SWD debug/recovery header (J15, DNP) and manual reset push button switch (SW2) for the NINA-B312 BLE module",
+                    layout={
+                        "cols_per_row": 2,
+                        "col_gap": 50.0,
+                        "top_row_y": 110.0,
+                        "grid_positions": {"J15": [0, 0], "SW2": [0, 1]},
+                    },
+                    components=["J15", "SW2"],
+                    pin_sides={
+                        "J15": {"1": "left", "2": "left", "3": "left", "4": "left", "5": "left"},
+                        "SW2": {"1": "left", "2": "right"},
+                    },
+                    pin_breakouts={"J15": ["1", "2", "3", "4", "5"], "SW2": ["1", "2"]},
+                )
+                SchematicSheet(
+                    title="I2C Peripheral Expansion Interface (J6)",
+                    description="Primary I2C peripheral expansion connector (JST-PH-6P)",
+                    components=["U1", "J6"],
+                    pin_sides={
+                        "U1": {"A1": "right", "B1": "right", "B2": "right"},
+                        "J6": {"1": "left", "2": "left", "3": "left", "4": "left", "5": "left", "6": "left"},
+                    },
+                    pin_breakouts={"U1": ["B2", "A1", "B1"], "J6": ["1", "2", "3", "4", "5", "6"]},
+                )
+                SchematicSheet(
+                    title="I3C Primary Controller Expansion Interface (J7)",
+                    description="High-speed I3C0 primary peripheral expansion connector (JST-PH-6P)",
+                    components=["U1", "J7"],
+                    pin_sides={
+                        "U1": {"B8": "right", "A8": "right", "C8": "right"},
+                        "J7": {"1": "left", "2": "left", "3": "left", "4": "left", "5": "left", "6": "left"},
+                    },
+                    pin_breakouts={"U1": ["B8", "A8", "C8"], "J7": ["1", "2", "3", "4", "5", "6"]},
+                )
+                SchematicSheet(
+                    title="I3C Secondary Controller Expansion Interface (J8)",
+                    description="High-speed I3C1 secondary peripheral expansion connector (JST-PH-6P)",
+                    components=["U1", "J8"],
+                    pin_sides={
+                        "U1": {"E4": "right", "F6": "right", "F4": "right"},
+                        "J8": {"1": "left", "2": "left", "3": "left", "4": "left", "5": "left", "6": "left"},
+                    },
+                    pin_breakouts={"U1": ["E4", "F6", "F4"], "J8": ["1", "2", "3", "4", "5", "6"]},
+                )
+                SchematicSheet(
+                    title="SPI Master Expansion Interface (J9)",
+                    description="High-speed SPI peripheral expansion connector (JST-PH-7P)",
+                    components=["U1", "J9"],
+                    pin_sides={
+                        "U1": {"R9": "right", "R8": "right", "T7": "right", "T6": "right", "T8": "right"},
+                        "J9": {
+                            "1": "left",
+                            "2": "left",
+                            "3": "left",
+                            "4": "left",
+                            "5": "left",
+                            "6": "left",
+                            "7": "left",
+                        },
+                    },
+                    pin_breakouts={"U1": ["R9", "R8", "T7", "T6", "T8"], "J9": ["1", "2", "3", "4", "5", "6", "7"]},
+                )
+                SchematicSheet(
+                    title="UART & Control Expansion Interface (J10)",
+                    description="FTDI auxiliary UART and modem control expansion connector (JST-PH-7P)",
+                    components=["U9", "J10"],
+                    pin_sides={
+                        "U9": {"2": "right", "13": "right", "12": "right", "10": "right", "9": "right"},
+                        "J10": {
+                            "1": "right",
+                            "2": "right",
+                            "3": "left",
+                            "4": "left",
+                            "5": "left",
+                            "6": "left",
+                            "7": "left",
+                        },
+                    },
+                    pin_breakouts={"U9": ["2", "13", "12", "10", "9"], "J10": ["2", "1", "3", "4", "5", "6", "7"]},
+                )
+                SchematicSheet(
+                    title="General Purpose I/O Expansion Header",
+                    description="10-pin multipurpose microcontroller GPIO expansion header",
+                    components=["U1", "J14"],
+                    pin_sides={
+                        "U1": {"M8": "left", "N8": "left", "N10": "right", "T10": "right"},
+                        "J14": {
+                            "1": "left",
+                            "2": "left",
+                            "3": "left",
+                            "4": "left",
+                            "5": "left",
+                            "6": "left",
+                            "7": "right",
+                            "8": "right",
+                            "9": "right",
+                            "10": "right",
+                        },
+                    },
+                    pin_breakouts={
+                        "U1": ["M8", "N8", "N10", "T10"],
+                        "J14": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
+                    },
+                )
+                SchematicSheet(
+                    title="Status and Overrides - MCU Reset & Bootloader",
+                    description="Manual reset pushbutton and FTDI hardware programming jumpers",
+                    layout={
+                        "cols_per_row": 3,
+                        "top_row_y": 152.0,
+                        "grid_positions": {"SW1": [0, 0], "JP1": [0, 1], "JP2": [0, 2]},
+                    },
+                    components=["SW1", "JP1", "JP2"],
+                    pin_sides={
+                        "SW1": {"1": "left", "2": "left"},
+                        "JP1": {"1": "left", "2": "left"},
+                        "JP2": {"1": "left", "2": "left"},
+                    },
+                )
+                SchematicSheet(
+                    title="Status and Overrides - Power Isolation & Boot Mode",
+                    description="Boot configuration and USB charger isolation jumpers",
+                    layout={"cols_per_row": 2, "top_row_y": 152.0, "grid_positions": {"JP3": [0, 0], "JP4": [0, 1]}},
+                    components=["JP3", "JP4"],
+                    pin_sides={"JP3": {"1": "left", "2": "left"}, "JP4": {"1": "left", "2": "left"}},
+                )
+                SchematicSheet(
+                    title="Status and Overrides - Primary Power LEDs",
+                    description="Visual rail power indicators and current limiters for VBAT, VBUS, and 3V3",
+                    layout={
+                        "cols_per_row": 3,
+                        "top_row_y": 168.0,
+                        "row_step_y": 54.0,
+                        "grid_positions": {
+                            "D2": [0, 0],
+                            "D3": [0, 1],
+                            "D4": [0, 2],
+                            "R7": [1, 0],
+                            "R8": [1, 1],
+                            "R9": [1, 2],
+                        },
+                    },
+                    components=["D2", "D3", "D4", "R7", "R8", "R9"],
+                    pin_sides={
+                        "D2": {"1": "left", "2": "left"},
+                        "D3": {"1": "left", "2": "left"},
+                        "D4": {"1": "left", "2": "left"},
+                    },
+                )
+                SchematicSheet(
+                    title="Status and Overrides - Peripheral & MCU LEDs",
+                    description="Subsystem activity indicators and current limiters for Audio, Peripherals, and MCU",
+                    layout={
+                        "cols_per_row": 3,
+                        "top_row_y": 168.0,
+                        "row_step_y": 54.0,
+                        "grid_positions": {
+                            "D5": [0, 0],
+                            "D6": [0, 1],
+                            "D7": [0, 2],
+                            "R10": [1, 0],
+                            "R11": [1, 1],
+                            "R12": [1, 2],
+                        },
+                    },
+                    components=["D5", "D6", "D7", "R10", "R11", "R12"],
+                    pin_sides={
+                        "D5": {"1": "left", "2": "left"},
+                        "D6": {"1": "left", "2": "left"},
+                        "D7": {"1": "left", "2": "left"},
+                    },
+                )
 
             # Main board outline block
             b = Box(w, length, thickness)
@@ -272,9 +901,100 @@ class CarrierBoardPCB:
             with BuildVias() as bv:
                 bv.add(self.vias())
 
-            with BuildAssemblyTestSteps(subassembly="carrier_board"):
-                for step in CARRIER_BOARD_TEST_STEPS:
-                    TestStep(**step)
+            with AssemblyTestMetadata(
+                test_fixture="flying_probe", pass_criteria="all_steps_within_tolerance", subassembly="carrier_board"
+            ) as tests:
+                TestStep(
+                    step_id="TEST_CONTINUITY_GND",
+                    description="Verify solid low-impedance ground plane continuity across all copper layers",
+                    test_type="continuity",
+                    net_name="GND",
+                    pad_a_mm=(-18.0, -22.0),
+                    pad_b_mm=(-25.0, -4.2),
+                    nominal=0.05,
+                    tolerance_pct=20.0,
+                    unit="ohm",
+                    stimulus="100mA 4-wire Kelvin DC",
+                    measured=0.048,
+                )
+                TestStep(
+                    step_id="TEST_UART_BLE_SPEED",
+                    description="Measure BTLE high-speed 1Mb/s UART signal integrity on BLE_TX / BLE_RX",
+                    test_type="voltage",
+                    net_name="BLE_UART",
+                    pad_a_mm=(-6.0, -22.0),
+                    pad_b_mm=(-10.0, -22.0),
+                    nominal=3.3,
+                    tolerance_pct=3.0,
+                    unit="V",
+                    stimulus="1Mb/s PRBS UART serial transceiver test",
+                    measured=3.3,
+                )
+                TestStep(
+                    step_id="TEST_RAIL_3V3",
+                    description="Verify regulated system 3.3V power distribution rail",
+                    test_type="voltage",
+                    net_name="3V3",
+                    pad_a_mm=(-10.0, -26.0),
+                    pad_b_mm=(-18.0, -22.0),
+                    nominal=3.3,
+                    tolerance_pct=3.0,
+                    unit="V",
+                    stimulus="DC power rail regulation probe",
+                    measured=3.31,
+                )
+                TestStep(
+                    step_id="TEST_RAIL_VBAT",
+                    description="Verify battery input sensing rail continuity to charger",
+                    test_type="voltage",
+                    net_name="VBAT",
+                    pad_a_mm=(-18.0, -26.0),
+                    pad_b_mm=(-18.0, -22.0),
+                    nominal=3.7,
+                    tolerance_pct=5.0,
+                    unit="V",
+                    stimulus="Battery charge domain sensor",
+                    measured=3.72,
+                )
+                TestStep(
+                    step_id="TEST_IMP_USB_DIFF",
+                    description="Measure USB 2.0 / USB-C differential impedance on DP/DM",
+                    test_type="diff_pair",
+                    net_name="USB_DP_DM",
+                    pad_a_mm=(-25.0, 0.5),
+                    pad_b_mm=(-25.0, -0.5),
+                    nominal=90.0,
+                    tolerance_pct=10.0,
+                    unit="ohm",
+                    stimulus="200ps TDR step differential pulse",
+                    measured=89.8,
+                )
+                TestStep(
+                    step_id="TEST_UART_BLE_FLOW_CTRL",
+                    description="Verify BTLE hardware flow control handshake on BLE_RTS / BLE_CTS",
+                    test_type="voltage",
+                    net_name="BLE_FLOW_CTRL",
+                    pad_a_mm=(-14.0, -22.0),
+                    pad_b_mm=(-2.0, -22.0),
+                    nominal=3.3,
+                    tolerance_pct=3.0,
+                    unit="V",
+                    stimulus="Hardware RTS/CTS assert handshake probe",
+                    measured=3.3,
+                )
+                TestStep(
+                    step_id="TEST_I2C_PULLUPS",
+                    description="Measure I2C SDA/SCL pull-up resistance to 3.3V rail",
+                    test_type="resistance",
+                    net_name="I2C_BUS",
+                    pad_a_mm=(14.0, -4.0),
+                    pad_b_mm=(18.0, -4.0),
+                    nominal=4700.0,
+                    tolerance_pct=5.0,
+                    unit="ohm",
+                    stimulus="1.0V DC precision Ohmmeter",
+                    measured=4705.0,
+                )
 
         return pcb
 
@@ -297,20 +1017,155 @@ class CarrierBoardPCB:
             (-w_tail / 2.0, -l_tail / 2.0 + 7.0),
         ]
 
+        cap_sensors = [
+            CapacitiveElectrodeModel(
+                name="SLIDER_SEGMENT_1",
+                channel_id=0,
+                electrode_type="mutual",
+                shape="interdigital",
+                area_mm=(10.0, 4.5),
+                pitch_mm=1.2,
+                gap_mm=0.3,
+                center_mm=(0.0, -13.0),
+                drive_shield=False,
+                hatch_ground_pour=True,
+                hatch_line_width_mm=0.15,
+                hatch_pitch_mm=0.5,
+                tx_pin="CAP_TX0",
+                rx_pin="CAP_RX0",
+                threshold_raw=2200,
+                shape_ref="flex_tail",
+            ),
+            CapacitiveElectrodeModel(
+                name="SLIDER_SEGMENT_2",
+                channel_id=1,
+                electrode_type="mutual",
+                shape="interdigital",
+                area_mm=(10.0, 4.5),
+                pitch_mm=1.2,
+                gap_mm=0.3,
+                center_mm=(0.0, -8.0),
+                drive_shield=False,
+                hatch_ground_pour=True,
+                hatch_line_width_mm=0.15,
+                hatch_pitch_mm=0.5,
+                tx_pin="CAP_TX0",
+                rx_pin="CAP_RX1",
+                threshold_raw=2200,
+                shape_ref="flex_tail",
+            ),
+            CapacitiveElectrodeModel(
+                name="SLIDER_SEGMENT_3",
+                channel_id=2,
+                electrode_type="mutual",
+                shape="interdigital",
+                area_mm=(10.0, 4.5),
+                pitch_mm=1.2,
+                gap_mm=0.3,
+                center_mm=(0.0, -3.0),
+                drive_shield=False,
+                hatch_ground_pour=True,
+                hatch_line_width_mm=0.15,
+                hatch_pitch_mm=0.5,
+                tx_pin="CAP_TX1",
+                rx_pin="CAP_RX1",
+                threshold_raw=2500,
+                shape_ref="flex_tail",
+            ),
+            CapacitiveElectrodeModel(
+                name="SLIDER_SEGMENT_4",
+                channel_id=3,
+                electrode_type="mutual",
+                shape="interdigital",
+                area_mm=(10.0, 4.5),
+                pitch_mm=1.2,
+                gap_mm=0.3,
+                center_mm=(0.0, 2.0),
+                drive_shield=False,
+                hatch_ground_pour=True,
+                hatch_line_width_mm=0.15,
+                hatch_pitch_mm=0.5,
+                tx_pin="CAP_TX1",
+                rx_pin="CAP_RX2",
+                threshold_raw=2500,
+                shape_ref="flex_tail",
+            ),
+            CapacitiveElectrodeModel(
+                name="SLIDER_SEGMENT_5",
+                channel_id=4,
+                electrode_type="mutual",
+                shape="interdigital",
+                area_mm=(10.0, 4.5),
+                pitch_mm=1.2,
+                gap_mm=0.3,
+                center_mm=(0.0, 7.0),
+                drive_shield=False,
+                hatch_ground_pour=True,
+                hatch_line_width_mm=0.15,
+                hatch_pitch_mm=0.5,
+                tx_pin="CAP_TX2",
+                rx_pin="CAP_RX2",
+                threshold_raw=2800,
+                shape_ref="flex_tail",
+            ),
+            CapacitiveElectrodeModel(
+                name="ACTION_BUTTON",
+                channel_id=5,
+                electrode_type="mutual",
+                shape="interdigital",
+                area_mm=(8.0, 6.0),
+                center_mm=(0.0, 18.0),
+                drive_shield=False,
+                hatch_ground_pour=True,
+                hatch_line_width_mm=0.15,
+                hatch_pitch_mm=0.5,
+                tx_pin="CAP_TX2",
+                rx_pin="CAP_RX2",
+                threshold_raw=2000,
+                shape_ref="flex_tail",
+                pitch_mm=1.2,
+                gap_mm=0.3,
+            ),
+            CapacitiveElectrodeModel(
+                name="PROXIMITY_SENSOR",
+                channel_id=6,
+                electrode_type="self",
+                shape="loop",
+                area_mm=(14.2, 42.0),
+                center_mm=(0.0, 3.5),
+                drive_shield=False,
+                hatch_ground_pour=False,
+                rx_pin="CAP_RX3",
+                threshold_raw=1500,
+                shape_ref="flex_tail",
+            ),
+        ]
+
+        tail_obstacles = [
+            PCBObstacleModel(
+                name="flex_vacuum_plate",
+                shape="box",
+                dimensions_mm=(30.0, 60.0, 4.0),
+                position_mm=(0.0, 0.0, -2.0),
+                description="Flex tail vacuum fixture support plate",
+            ),
+            PCBObstacleModel(
+                name="J4",
+                shape="box",
+                dimensions_mm=(18.0, 5.0, 2.4),
+                position_mm=(0.0, -22.75, 1.2),
+                description="FPC-30P interface connector on flex tail",
+            ),
+        ]
+
         with BuildFlexPCB(
             name="flex_tail",
             flex_type=FlexType.CAPACITIVE,
-            capacitive_sensors=FLEX_TAIL_CAPACITIVE_SENSORS,
+            capacitive_sensors=cap_sensors,
+            obstacles=tail_obstacles,
             outline_polygon=pts,
             coverlay_color="black",
         ) as tail:
-            with PcbMetadata(
-                flex_type=FlexType.CAPACITIVE,
-                coverlay_color="black",
-                capacitive_sensors=FLEX_TAIL_CAPACITIVE_SENSORS,
-            ):
-                pass
-
             # Manifold hull enclosing connector and sensing channels with minimal wasted space
             with BuildSketch() as s:
                 Polygon(*pts)
@@ -369,9 +1224,100 @@ class CarrierBoardPCB:
             with BuildTraces() as bt:
                 bt.add(get_flex_tail_traces())
 
-            with BuildAssemblyTestSteps(subassembly="flex_tail"):
-                for step in FLEX_TAIL_TEST_STEPS:
-                    TestStep(**step)
+            with AssemblyTestMetadata(
+                test_fixture="flying_probe", pass_criteria="all_steps_within_tolerance", subassembly="flex_tail"
+            ) as tests:
+                TestStep(
+                    step_id="TEST_CAP_SENSE_CHAN0",
+                    description="Measure baseline mutual capacitance on liquid level electrode Channel 0",
+                    test_type="capacitance",
+                    net_name="CAP_CHAN0",
+                    pad_a_mm=(0.0, -6.25),
+                    pad_b_mm=(-3.0, -6.25),
+                    nominal=12.5,
+                    tolerance_pct=15.0,
+                    unit="pF",
+                    stimulus="250kHz 1.8V square wave",
+                    measured=12.6,
+                )
+                TestStep(
+                    step_id="TEST_CAP_SENSE_CHAN1",
+                    description="Measure baseline mutual capacitance on liquid level electrode Channel 1",
+                    test_type="capacitance",
+                    net_name="CAP_CHAN1",
+                    pad_a_mm=(0.0, 5.25),
+                    pad_b_mm=(-3.0, 5.25),
+                    nominal=14.0,
+                    tolerance_pct=15.0,
+                    unit="pF",
+                    stimulus="250kHz 1.8V square wave",
+                    measured=14.1,
+                )
+                TestStep(
+                    step_id="TEST_CAP_SENSE_CHAN2",
+                    description="Measure baseline mutual capacitance on liquid level electrode Channel 2",
+                    test_type="capacitance",
+                    net_name="CAP_CHAN2",
+                    pad_a_mm=(0.0, 16.75),
+                    pad_b_mm=(-3.0, 16.75),
+                    nominal=15.5,
+                    tolerance_pct=15.0,
+                    unit="pF",
+                    stimulus="250kHz 1.8V square wave",
+                    measured=15.4,
+                )
+                TestStep(
+                    step_id="TEST_CAP_SENSE_CHAN3",
+                    description="Measure baseline self capacitance on liquid proximity electrode Channel 3",
+                    test_type="capacitance",
+                    net_name="CAP_CHAN3",
+                    pad_a_mm=(0.0, 24.75),
+                    pad_b_mm=(0.0, -22.75),
+                    nominal=8.0,
+                    tolerance_pct=15.0,
+                    unit="pF",
+                    stimulus="250kHz 1.8V square wave self-cap",
+                    measured=8.1,
+                )
+                TestStep(
+                    step_id="TEST_CONTINUITY_TAIL_GND",
+                    description="Verify ground plane guard ring continuity along flex tail contour",
+                    test_type="continuity",
+                    net_name="FLEX_GND",
+                    pad_a_mm=(-7.0, -20.0),
+                    pad_b_mm=(7.0, -20.0),
+                    nominal=0.08,
+                    tolerance_pct=20.0,
+                    unit="ohm",
+                    stimulus="100mA 4-wire Kelvin DC",
+                    measured=0.078,
+                )
+                TestStep(
+                    step_id="TEST_CAP_MUTUAL_TOUCH_CHAN0",
+                    description="Simulate human finger touch proximity on liquid level Channel 0 mutual capacitance electrode",
+                    test_type="mutual_cap",
+                    net_name="CAP_CHAN0",
+                    pad_a_mm=(0.0, -6.25),
+                    pad_b_mm=(-3.0, -6.25),
+                    nominal=15.8,
+                    tolerance_pct=15.0,
+                    unit="pF",
+                    stimulus="Simulated finger proximity 250kHz 1.8V dielectric perturb",
+                    measured=15.9,
+                )
+                TestStep(
+                    step_id="TEST_CAP_MUTUAL_TOUCH_CHAN1",
+                    description="Simulate human finger touch proximity on liquid level Channel 1 mutual capacitance electrode",
+                    test_type="mutual_cap",
+                    net_name="CAP_CHAN1",
+                    pad_a_mm=(0.0, 5.25),
+                    pad_b_mm=(-3.0, 5.25),
+                    nominal=17.5,
+                    tolerance_pct=15.0,
+                    unit="pF",
+                    stimulus="Simulated finger proximity 250kHz 1.8V dielectric perturb",
+                    measured=17.6,
+                )
 
         return tail
 
@@ -1231,6 +2177,7 @@ def build_carrier_board_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 rotation=(0.0, 0.0, 0.0),
                 mpn="PTS645SL43SMTR92LFS",
                 supplier_pn="CKN9012CT-ND",
+                omit_silkscreen=True,
             )
 
         with BuildComponents(
@@ -1243,6 +2190,7 @@ def build_carrier_board_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 rotation=(0.0, 0.0, 0.0),
                 mpn="TSW-102-07-L-S",
                 supplier_pn="SAM1026-02-ND",
+                omit_silkscreen=True,
             )
             Component(
                 name="JP2",
@@ -1251,6 +2199,7 @@ def build_carrier_board_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 rotation=(0.0, 0.0, 0.0),
                 mpn="TSW-102-07-L-S",
                 supplier_pn="SAM1026-02-ND",
+                omit_silkscreen=True,
             )
             Component(
                 name="JP3",
@@ -1259,6 +2208,7 @@ def build_carrier_board_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 rotation=(0.0, 0.0, 0.0),
                 mpn="TSW-102-07-L-S",
                 supplier_pn="SAM1026-02-ND",
+                omit_silkscreen=True,
             )
             Component(
                 name="JP4",
@@ -1267,6 +2217,7 @@ def build_carrier_board_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 rotation=(0.0, 0.0, 0.0),
                 mpn="TSW-102-07-L-S",
                 supplier_pn="SAM1026-02-ND",
+                omit_silkscreen=True,
             )
             Component(
                 name="D2",
@@ -1275,6 +2226,7 @@ def build_carrier_board_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 rotation=(0.0, 0.0, 0.0),
                 mpn="LTST-C190GKT",
                 supplier_pn="160-1447-1-ND",
+                omit_silkscreen=True,
             )
             Component(
                 name="D3",
@@ -1283,6 +2235,7 @@ def build_carrier_board_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 rotation=(0.0, 0.0, 0.0),
                 mpn="LTST-C190GKT",
                 supplier_pn="160-1447-1-ND",
+                omit_silkscreen=True,
             )
             Component(
                 name="D4",
@@ -1291,6 +2244,7 @@ def build_carrier_board_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 rotation=(0.0, 0.0, 0.0),
                 mpn="LTST-C190GKT",
                 supplier_pn="160-1447-1-ND",
+                omit_silkscreen=True,
             )
             Component(
                 name="D5",
@@ -1299,6 +2253,7 @@ def build_carrier_board_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 rotation=(0.0, 0.0, 0.0),
                 mpn="LTST-C190GKT",
                 supplier_pn="160-1447-1-ND",
+                omit_silkscreen=True,
             )
             Component(
                 name="D6",
@@ -1307,6 +2262,7 @@ def build_carrier_board_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 rotation=(0.0, 0.0, 0.0),
                 mpn="LTST-C190GKT",
                 supplier_pn="160-1447-1-ND",
+                omit_silkscreen=True,
             )
             Component(
                 name="D7",
@@ -1315,6 +2271,7 @@ def build_carrier_board_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 rotation=(0.0, 0.0, 0.0),
                 mpn="LTST-C190GKT",
                 supplier_pn="160-1447-1-ND",
+                omit_silkscreen=True,
             )
             Component(
                 "R",
@@ -1324,6 +2281,7 @@ def build_carrier_board_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 mpn="RC0402FR-071KL",
                 supplier_pn="311-1.00KLRCT-ND",
                 value="1k",
+                omit_silkscreen=True,
             )
             Component(
                 "R",
@@ -1333,6 +2291,7 @@ def build_carrier_board_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 mpn="RC0402FR-071KL",
                 supplier_pn="311-1.00KLRCT-ND",
                 value="1k",
+                omit_silkscreen=True,
             )
             Component(
                 "R",
@@ -1342,6 +2301,7 @@ def build_carrier_board_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 mpn="RC0402FR-071KL",
                 supplier_pn="311-1.00KLRCT-ND",
                 value="1k",
+                omit_silkscreen=True,
             )
             Component(
                 "R",
@@ -1351,6 +2311,7 @@ def build_carrier_board_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 mpn="RC0402FR-071KL",
                 supplier_pn="311-1.00KLRCT-ND",
                 value="1k",
+                omit_silkscreen=True,
             )
             Component(
                 "R",
@@ -1360,6 +2321,7 @@ def build_carrier_board_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 mpn="RC0402FR-071KL",
                 supplier_pn="311-1.00KLRCT-ND",
                 value="1k",
+                omit_silkscreen=True,
             )
             Component(
                 "R",
@@ -1369,6 +2331,7 @@ def build_carrier_board_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 mpn="RC0402FR-071KL",
                 supplier_pn="311-1.00KLRCT-ND",
                 value="1k",
+                omit_silkscreen=True,
             )
             Component(
                 "C",

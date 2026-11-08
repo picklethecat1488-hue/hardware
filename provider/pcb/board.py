@@ -1,7 +1,7 @@
 """build123d custom context manager for declarative PCB part modeling with integrated stackup and metadata."""
 
 from contextvars import ContextVar, Token
-from typing import Any, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from build123d import BuildPart
 from build123d.build_common import operations_apply_to
@@ -13,10 +13,13 @@ from model.pcb import (
     CapacitiveElectrodeModel,
     CopperRegionModel,
     FlexType,
+    FlexZoneModel,
     MountingHoleModel,
+    NetClassModel,
     PCBConfig,
     PCBDesignRulesModel,
     PCBObstacleModel,
+    SchematicSheetModel,
     SheetSize,
     SilkscreenTextModel,
     SilkscreenGraphicModel,
@@ -53,6 +56,14 @@ class BuildPcb(BuildPart):
         board_type: Union[BoardType, str] = BoardType.RIGID,
         shape_ref: Optional[str] = None,
         revision: str = "1.0",
+        sheet_size: Union[SheetSize, str] = SheetSize.A4,
+        omitted_silkscreen_designators: Optional[Sequence[str]] = None,
+        design_rules: Optional[Union[PCBDesignRulesModel, Dict[str, Any]]] = None,
+        net_classes: Optional[Sequence[Union[NetClassModel, Dict[str, Any]]]] = None,
+        flex_zones: Optional[Sequence[Union[FlexZoneModel, Dict[str, Any]]]] = None,
+        obstacles: Optional[Sequence[Union[PCBObstacleModel, Dict[str, Any]]]] = None,
+        schematic_sheets: Optional[Sequence[Union[SchematicSheetModel, Dict[str, Any]]]] = None,
+        assembly_test: Optional[Union[AssemblyTestModel, Dict[str, Any]]] = None,
         stackup: Optional[Union[BuildStackup, StackupModel]] = None,
         capacitive_sensors: Optional[Sequence[CapacitiveElectrodeModel]] = None,
         outline_polygon: Optional[Sequence[Tuple[float, float]]] = None,
@@ -66,8 +77,17 @@ class BuildPcb(BuildPart):
             board_type: Substrate construction ('rigid', 'flex', or 'rigid-flex').
             shape_ref: Optional target geometry shape reference (defaults to name).
             revision: Board revision identifier.
+            sheet_size: Schematic sheet size standard (A4, A3, etc.).
+            omitted_silkscreen_designators: Optional sequence of designators to omit from silkscreen.
+            design_rules: Fabrication clearance and DRC constraints.
+            net_classes: High-speed and differential net classes.
+            flex_zones: Rigid-flex flexible substrate zones.
+            obstacles: 3D clearance keepouts and component bounding obstacles.
+            schematic_sheets: Schematic drawing sheet definitions.
+            assembly_test: Factory automated test instructions.
             stackup: Multi-layer stackup model or BuildStackup context.
             capacitive_sensors: Optional sequence of capacitive electrode models.
+            outline_polygon: Board contour polygon vertices.
             coverlay_color: Optional protective coverlay film color (e.g. 'black').
             mode: Optional BuildMode for build123d part builder.
         """
@@ -76,7 +96,39 @@ class BuildPcb(BuildPart):
         self.shape_ref = shape_ref or name
         self.board_type: BoardType = BoardType(board_type) if isinstance(board_type, str) else board_type
         self.revision = revision
+        self.sheet_size = SheetSize(sheet_size) if isinstance(sheet_size, str) else sheet_size
         self.coverlay_color = coverlay_color
+        self.omitted_silkscreen_designators: List[str] = list(omitted_silkscreen_designators or [])
+
+        if isinstance(design_rules, PCBDesignRulesModel):
+            self.design_rules: Optional[PCBDesignRulesModel] = design_rules
+        elif isinstance(design_rules, dict):
+            self.design_rules = PCBDesignRulesModel(**design_rules)
+        else:
+            self.design_rules = None
+
+        self.net_classes: List[NetClassModel] = []
+        for nc in net_classes or []:
+            self.net_classes.append(nc if isinstance(nc, NetClassModel) else NetClassModel(**nc))
+
+        self.flex_zones: List[FlexZoneModel] = []
+        for fz in flex_zones or []:
+            self.flex_zones.append(fz if isinstance(fz, FlexZoneModel) else FlexZoneModel(**fz))
+
+        self.obstacles: List[PCBObstacleModel] = []
+        for obs in obstacles or []:
+            self.obstacles.append(obs if isinstance(obs, PCBObstacleModel) else PCBObstacleModel(**obs))
+
+        self.schematic_sheets: List[SchematicSheetModel] = []
+        for ss in schematic_sheets or []:
+            self.schematic_sheets.append(ss if isinstance(ss, SchematicSheetModel) else SchematicSheetModel(**ss))
+
+        if isinstance(assembly_test, AssemblyTestModel):
+            self.assembly_test: Optional[AssemblyTestModel] = assembly_test
+        elif isinstance(assembly_test, dict):
+            self.assembly_test = AssemblyTestModel(**assembly_test)
+        else:
+            self.assembly_test = None
 
         if isinstance(stackup, BuildStackup):
             self.stackup_model: Optional[StackupModel] = stackup.to_model()
@@ -98,7 +150,6 @@ class BuildPcb(BuildPart):
         self.nets: List[Any] = []
         self.symbol_table: Dict[str, SymbolTableEntry] = {}
         self.test_steps: List[AssemblyTestStepModel] = []
-        self.obstacles: List[PCBObstacleModel] = []
         self.wiring: Optional[Any] = None
         self._token: Optional[Token] = None
 
@@ -172,24 +223,56 @@ class BuildPcb(BuildPart):
             )
 
         meta = getattr(self, "metadata", None)
-        sheet_size = meta.sheet_size if meta and meta.sheet_size else SheetSize.A4
-        omitted = list(meta.omitted_silkscreen_designators) if meta else []
-        design_rules = meta.design_rules if meta and meta.design_rules else PCBDesignRulesModel()
-        b_type = meta.board_type if meta and meta.board_type else self.board_type
-        rev = meta.revision if meta and meta.revision else self.revision
+        sheet_size = (meta.sheet_size if meta and meta.sheet_size else None) or self.sheet_size or SheetSize.A4
+        omitted = list(self.omitted_silkscreen_designators)
+        if meta and meta.omitted_silkscreen_designators:
+            for des in meta.omitted_silkscreen_designators:
+                if des not in omitted:
+                    omitted.append(des)
+        # Derive omitted silkscreen designators from footprints flagged with omit_silkscreen
+        for fp in self.footprints:
+            is_omitted = getattr(fp, "omit_silkscreen", False)
+            if not is_omitted and hasattr(fp, "footprint"):
+                is_omitted = getattr(fp.footprint, "omit_silkscreen", False)
+            if is_omitted:
+                fp_name = getattr(fp, "name", None) or getattr(getattr(fp, "footprint", None), "name", None)
+                if fp_name and fp_name not in omitted:
+                    omitted.append(fp_name)
+
+        design_rules = (
+            (meta.design_rules if meta and meta.design_rules else None) or self.design_rules or PCBDesignRulesModel()
+        )
+        b_type = (meta.board_type if meta and meta.board_type else None) or self.board_type
+        rev = (meta.revision if meta and meta.revision else None) or self.revision
         f_type = meta.flex_type if meta and meta.flex_type else None
-        net_classes = list(meta.net_classes) if meta and meta.net_classes else []
-        flex_zones = list(meta.flex_zones) if meta and meta.flex_zones else []
+        net_classes = list(self.net_classes)
+        if meta and meta.net_classes:
+            for nc in meta.net_classes:
+                if nc not in net_classes:
+                    net_classes.append(nc)
+        flex_zones = list(self.flex_zones)
+        if meta and meta.flex_zones:
+            for fz in meta.flex_zones:
+                if fz not in flex_zones:
+                    flex_zones.append(fz)
         cap_sensors = list(self.capacitive_sensors)
         if meta and meta.capacitive_sensors:
-            cap_sensors.extend(meta.capacitive_sensors)
-        schematic_sheets = list(meta.schematic_sheets) if meta and meta.schematic_sheets else []
+            for cs in meta.capacitive_sensors:
+                if cs not in cap_sensors:
+                    cap_sensors.append(cs)
+        schematic_sheets = list(self.schematic_sheets)
+        if meta and meta.schematic_sheets:
+            for ss in meta.schematic_sheets:
+                if ss not in schematic_sheets:
+                    schematic_sheets.append(ss)
         obstacles = list(self.obstacles)
         if meta and meta.obstacles:
             for obs in meta.obstacles:
                 if obs not in obstacles:
                     obstacles.append(obs)
-        assembly_test = meta.assembly_test if meta and meta.assembly_test else None
+        assembly_test = getattr(self, "assembly_test", None) or (
+            meta.assembly_test if meta and meta.assembly_test else None
+        )
         if assembly_test is None and self.test_steps:
             assembly_test = AssemblyTestModel(
                 instructions=list(self.test_steps),
@@ -243,7 +326,16 @@ class BuildFlexPCB(BuildPcb):
         self,
         name: str = "flex_pcb",
         flex_type: Union[FlexType, str] = FlexType.CAPACITIVE,
+        shape_ref: Optional[str] = None,
         revision: str = "1.0",
+        sheet_size: Union[SheetSize, str] = SheetSize.A4,
+        omitted_silkscreen_designators: Optional[Sequence[str]] = None,
+        design_rules: Optional[Union[PCBDesignRulesModel, Dict[str, Any]]] = None,
+        net_classes: Optional[Sequence[Union[NetClassModel, Dict[str, Any]]]] = None,
+        flex_zones: Optional[Sequence[Union[FlexZoneModel, Dict[str, Any]]]] = None,
+        obstacles: Optional[Sequence[Union[PCBObstacleModel, Dict[str, Any]]]] = None,
+        schematic_sheets: Optional[Sequence[Union[SchematicSheetModel, Dict[str, Any]]]] = None,
+        assembly_test: Optional[Union[AssemblyTestModel, Dict[str, Any]]] = None,
         stackup: Optional[Union[BuildStackup, StackupModel]] = None,
         capacitive_sensors: Optional[Sequence[CapacitiveElectrodeModel]] = None,
         outline_polygon: Optional[Sequence[Tuple[float, float]]] = None,
@@ -254,7 +346,16 @@ class BuildFlexPCB(BuildPcb):
         super().__init__(
             name=name,
             board_type=BoardType.FLEX,
+            shape_ref=shape_ref,
             revision=revision,
+            sheet_size=sheet_size,
+            omitted_silkscreen_designators=omitted_silkscreen_designators,
+            design_rules=design_rules,
+            net_classes=net_classes,
+            flex_zones=flex_zones,
+            obstacles=obstacles,
+            schematic_sheets=schematic_sheets,
+            assembly_test=assembly_test,
             stackup=stackup,
             capacitive_sensors=capacitive_sensors,
             outline_polygon=outline_polygon,

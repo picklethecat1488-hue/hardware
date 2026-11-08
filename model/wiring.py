@@ -71,6 +71,43 @@ class PinModel(BaseModel):
     drill_dia_mm: Optional[float] = Field(default=None, description="Drill hole diameter in mm for thru_hole pads")
 
 
+class PinListModel(BaseModel):
+    """Strongly-typed collection model for footprint pin definitions."""
+
+    pins: List[PinModel] = Field(default_factory=list, description="List of pin models")
+
+    def __init__(self, pins: Any = None, **data: Any) -> None:
+        """Initialize pin list collection model."""
+        if isinstance(pins, (list, tuple)):
+            super().__init__(pins=list(pins), **data)
+        elif isinstance(pins, dict) and "pins" in pins:
+            super().__init__(**pins)
+        elif pins is not None and not data:
+            super().__init__(pins=[pins])
+        else:
+            super().__init__(**data)
+
+    def __iter__(self):
+        """Iterate over pin models."""
+        return iter(self.pins)
+
+    def __getitem__(self, idx: Union[int, slice]) -> Any:
+        """Index access into pin models."""
+        return self.pins[idx]
+
+    def __len__(self) -> int:
+        """Count of pin models in collection."""
+        return len(self.pins)
+
+    def append(self, pin: PinModel) -> None:
+        """Append pin model."""
+        self.pins.append(pin)
+
+    def extend(self, pins: Sequence[PinModel]) -> None:
+        """Extend pin models."""
+        self.pins.extend(pins)
+
+
 class PinRef:
     """Resolved reference to a physical component pin with absolute coordinates."""
 
@@ -224,7 +261,7 @@ class FootprintModel(BaseModel):
     slots_per_side: Optional[int] = Field(default=None, description="Optional total number of DIP slots per side")
     label: Optional[LabelModel] = Field(default=None, description="Label settings for the footprint")
     value: Optional[str] = Field(default=None, description="Component electrical value (e.g. '100nF', '10k', '2.2uF')")
-    pins: List[PinModel] = Field(default_factory=list, description="List of pins on the footprint")
+    pins: Union[PinListModel, List[PinModel]] = Field(default_factory=list, description="List of pins on the footprint")
     mpn: Optional[str] = Field(default=None, description="Manufacturer part number for BOM generation")
     supplier_pn: Optional[str] = Field(default=None, description="Supplier part number (e.g. LCSC, DigiKey)")
     bga_fanout: Optional[BgaFanoutModel] = Field(default=None, description="Optional BGA fanout configuration")
@@ -248,6 +285,28 @@ class FootprintModel(BaseModel):
         default=False,
         description="Do Not Populate (DNP) flag - excludes component from manufacturing BOM",
     )
+    omit_silkscreen: bool = Field(
+        default=False,
+        description="Whether to omit silkscreen reference designator text on the PCB",
+    )
+
+    @field_validator("pins", mode="before")
+    @classmethod
+    def parse_pins(cls, v: Any) -> List[PinModel]:
+        """Parse pins from PinListModel, list of PinModel, or list of dicts."""
+        if isinstance(v, PinListModel):
+            return list(v.pins)
+        if isinstance(v, (list, tuple)):
+            res = []
+            for item in v:
+                if isinstance(item, PinModel):
+                    res.append(item)
+                elif isinstance(item, dict):
+                    res.append(PinModel(**item))
+                else:
+                    res.append(item)
+            return res
+        return v
 
 
 class NetModel(BaseModel):

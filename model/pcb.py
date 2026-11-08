@@ -3,8 +3,8 @@
 import math
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
-from pydantic import BaseModel, Field, model_validator
+from typing import Any, Dict, List, Optional, Tuple, Union
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # Default relative permittivity (epsilon_r) for standard FR-4 dielectric substrates
 DEFAULT_FR4_DIELECTRIC_PERMITTIVITY: float = 4.2
@@ -498,6 +498,33 @@ class NetClassModel(BaseModel):
     )
 
 
+class RuleSeverity(StrEnum):
+    """KiCad DRC rule severity level."""
+
+    IGNORE = "ignore"
+    WARNING = "warning"
+    ERROR = "error"
+
+
+class RuleSeveritiesModel(BaseModel):
+    """Strongly typed KiCad DRC rule severity overrides."""
+
+    model_config = ConfigDict(extra="allow")
+
+    hole_to_hole: Optional[RuleSeverity] = None
+    hole_near_hole: Optional[RuleSeverity] = None
+    lib_footprint_issues: Optional[RuleSeverity] = None
+    text_height: Optional[RuleSeverity] = None
+    silk_overlap: Optional[RuleSeverity] = None
+    silk_over_copper: Optional[RuleSeverity] = None
+    track_dangling: Optional[RuleSeverity] = None
+    silk_edge_clearance: Optional[RuleSeverity] = None
+
+    def to_dict(self) -> Dict[str, str]:
+        """Convert rule severities to KiCad design settings dictionary."""
+        return {k: (v.value if hasattr(v, "value") else str(v)) for k, v in self.model_dump(exclude_none=True).items()}
+
+
 class PCBDesignRulesModel(BaseModel):
     """Design rules and manufacturing constraints for PCB routing, clearance, and DRC validation."""
 
@@ -551,10 +578,22 @@ class PCBDesignRulesModel(BaseModel):
     pad_to_mask_clearance_mm: float = Field(
         default=0.0, ge=0.0, description="Solder mask expansion clearance in millimeters"
     )
-    rule_severities: Dict[str, str] = Field(
-        default_factory=dict,
+    rule_severities: Optional[Union[RuleSeveritiesModel, Dict[str, str]]] = Field(
+        default=None,
         description="KiCad DRC rule severity overrides (e.g. {'track_dangling': 'ignore', 'text_height': 'ignore'})",
     )
+
+    @field_validator("rule_severities", mode="before")
+    @classmethod
+    def parse_rule_severities(cls, v: Any) -> Optional[Union[RuleSeveritiesModel, Dict[str, str]]]:
+        """Parse dictionary or model into RuleSeveritiesModel."""
+        if v is None:
+            return None
+        if isinstance(v, RuleSeveritiesModel):
+            return v
+        if isinstance(v, dict):
+            return RuleSeveritiesModel(**v)
+        return v
 
     def to_kicad_pro_rules(self) -> Dict[str, float]:
         """Convert design rules to KiCad .kicad_pro design_settings rules dictionary."""
@@ -602,7 +641,10 @@ class PCBDesignRulesModel(BaseModel):
             "rules": self.to_kicad_pro_rules(),
         }
         if self.rule_severities:
-            design_settings["rule_severities"] = dict(self.rule_severities)
+            if isinstance(self.rule_severities, RuleSeveritiesModel):
+                design_settings["rule_severities"] = self.rule_severities.to_dict()
+            elif isinstance(self.rule_severities, dict):
+                design_settings["rule_severities"] = dict(self.rule_severities)
 
         return {
             "board": {
@@ -828,6 +870,44 @@ class SchematicSheetModel(BaseModel):
     layout: SchematicLayoutModel = Field(
         default_factory=SchematicLayoutModel, description="Layout grid and dimension parameters for this sheet"
     )
+
+    @field_validator("components", mode="before")
+    @classmethod
+    def parse_components(cls, v: Any) -> List[str]:
+        """Normalize component instances or designator strings into string list."""
+        if isinstance(v, (list, tuple)):
+            res = []
+            for item in v:
+                if hasattr(item, "name"):
+                    res.append(str(item.name))
+                else:
+                    res.append(str(item))
+            return res
+        return v
+
+    @field_validator("pin_breakouts", mode="before")
+    @classmethod
+    def parse_pin_breakouts(cls, v: Any) -> Dict[str, List[str]]:
+        """Normalize component keys and pin lists into dict[str, list[str]]."""
+        if isinstance(v, dict):
+            res = {}
+            for k, val in v.items():
+                k_name = k.name if hasattr(k, "name") else str(k)
+                res[k_name] = [str(x) for x in val]
+            return res
+        return v
+
+    @field_validator("pin_sides", mode="before")
+    @classmethod
+    def parse_pin_sides(cls, v: Any) -> Dict[str, Dict[str, str]]:
+        """Normalize component keys into string dictionary."""
+        if isinstance(v, dict):
+            res = {}
+            for k, val in v.items():
+                k_name = k.name if hasattr(k, "name") else str(k)
+                res[k_name] = {str(pk): str(pv) for pk, pv in val.items()}
+            return res
+        return v
 
 
 class TraceSegmentModel(BaseModel):

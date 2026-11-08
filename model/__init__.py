@@ -20,7 +20,9 @@ from .fluid_config import FluidConfig
 from .fluid_body import FluidBody, FluidBodyType, FluidBodyTracker
 from .coordinates import CoordinateSpace, CoordinateSystem, SpatialPose
 from .wiring import (
+    PinSide,
     PinModel,
+    PinListModel,
     LabelModel,
     FootprintModel,
     NetModel,
@@ -45,6 +47,8 @@ from .pcb import (
     PCBMaterialModel,
     PCBMaterialsModel,
     PCBDesignRulesModel,
+    RuleSeverity,
+    RuleSeveritiesModel,
     PCBConfig,
     SilkscreenTextModel,
     SilkscreenGraphicModel,
