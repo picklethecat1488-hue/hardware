@@ -514,10 +514,8 @@ def test_regression_bug_131_schematic_collinear_wire_overlaps() -> None:
     from provider.schematic_diagram import SchematicDiagram
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
-    pcb_yaml_path = provider.wiring_path.parent / "pcb.yaml"
-    with open(pcb_yaml_path) as f:
-        cfg = PCBConfig(**yaml.safe_load(f))
+    wiring = provider.wiring
+    cfg = provider.pcb_config
 
     diag = SchematicDiagram(wiring=wiring, pcb_config=cfg)
     segs = diag.compute_sheet_wire_segments()
@@ -1088,8 +1086,8 @@ def test_regression_bug_154_carrier_board_project_rename() -> None:
     carrier_dir = repo_root / "projects" / "carrier_board"
     assert carrier_dir.is_dir(), "carrier_board project directory must exist"
     assert (carrier_dir / "manifest.yaml").is_file()
-    assert (carrier_dir / "pcb.yaml").is_file()
-    assert (carrier_dir / "wiring.yaml").is_file()
+    assert (carrier_dir / "pcb.py").is_file()
+    assert (carrier_dir / "cad.py").is_file()
     assert (carrier_dir / "measurements.yaml").is_file()
     assert (repo_root / "projects" / "carrier_board.md").is_file()
     assert (repo_root / "projects_config" / "carrier_board_config.py").is_file()
@@ -2090,13 +2088,10 @@ def test_regression_bug_249_remove_vload_sw_from_ble_module() -> None:
         for pin in net.pins:
             assert pin[0] != "U11" or pin[1] != "VLOAD_SW", "U11 must not have any pin connected to VLOAD_SW"
 
-    # 3. pcb.yaml must not have VLOAD_SW in Sheet 2 pin_breakouts
-    pcb_yaml_path = provider.wiring_path.parent / "pcb.yaml"
-    with open(pcb_yaml_path, encoding="utf-8") as f:
-        pcb_data = yaml.safe_load(f)
-    sheet_2 = pcb_data["schematic_sheets"][1]
-    if "pin_breakouts" in sheet_2 and "U11" in sheet_2["pin_breakouts"]:
-        assert "VLOAD_SW" not in sheet_2["pin_breakouts"]["U11"]
+    # 3. pcb_config must not have VLOAD_SW in Sheet 2 pin_breakouts
+    sheet_2 = provider.pcb_config.schematic_sheets[1]
+    if sheet_2.pin_breakouts and "U11" in sheet_2.pin_breakouts:
+        assert "VLOAD_SW" not in sheet_2.pin_breakouts["U11"]
 
 
 def test_regression_bug_250_nina_nfc_antenna_and_tuning_caps() -> None:
@@ -2286,10 +2281,8 @@ def test_regression_bug_255_pullup_resistors_unbridged_with_individual_power_des
     import yaml
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
-    pcb_yaml_path = provider.wiring_path.parent / "pcb.yaml"
-    with open(pcb_yaml_path) as f:
-        cfg = PCBConfig(**yaml.safe_load(f))
+    wiring = provider.wiring
+    cfg = provider.pcb_config
 
     diag = SchematicDiagram(wiring=wiring, pcb_config=cfg)
     sheet_plans = diag._build_sheet_plans()
@@ -2845,7 +2838,9 @@ def test_regression_bug_276_j4_fpc_connector_mpn_and_supplier_pn() -> None:
     """Verify BUG-276: J2 is Hirose FH12-30S-0.5SH(55) receptacle on carrier board, and J4 is integral male mating tab marked DNP."""
     from model.wiring import Wiring
 
-    wiring = Wiring("projects/carrier_board/wiring.yaml")
+    from projects.carrier_board.provider import CarrierBoardProvider
+
+    wiring = CarrierBoardProvider().wiring
 
     # 1. Verify wiring.yaml footprints for J2 (carrier_board) and J4 (flex_tail)
     j2 = next(c for c in wiring.footprints if c.name == "J2")
@@ -3012,7 +3007,9 @@ def test_regression_bug_segmented_palolo_739_bom_supplier_questions() -> None:
     from model.wiring import Wiring
 
     # 1. Y1 crystal MPN must be ECS-240-8-32B-CKM to match XTAL-3225-4P package
-    wiring = Wiring("projects/carrier_board/wiring.yaml")
+    from projects.carrier_board.provider import CarrierBoardProvider
+
+    wiring = CarrierBoardProvider().wiring
     y1 = next(c for c in wiring.footprints if c.name == "Y1")
     assert y1.mpn in ("ECS-240-8-32B-CKM", "ECS-240-8-30B-CKM"), f"Y1 MPN must be valid ECS crystal, got {y1.mpn}"
     assert y1.package == "XTAL-3225-4P"
@@ -3116,11 +3113,10 @@ def test_regression_bug_writhing_vermis_367_black_coverlay_color() -> None:
     assert "Black" in flex_spec.get("coverlay", "")
 
     # 2. PCB config flex zones must specify coverlay_color == "black"
-    pcb_path = Path("projects/carrier_board/pcb.yaml")
-    pcb_data = yaml.safe_load(pcb_path.read_text(encoding="utf-8"))
-    flex_zones = pcb_data.get("flex_zones", [])
+    provider = CarrierBoardProvider()
+    flex_zones = provider.pcb_config.flex_zones
     assert len(flex_zones) > 0
-    assert flex_zones[0].get("coverlay_color") == "black"
+    assert flex_zones[0].coverlay_color == "black"
 
     # 3. Supplier project summary must specify Black coverlay
     provider = CarrierBoardProvider()

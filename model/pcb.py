@@ -37,6 +37,15 @@ class FlexType(StrEnum):
     CAPACITIVE = "capacitive"
 
 
+class RouteStyle(StrEnum):
+    """Routing geometry style for manual copper trace routes."""
+
+    STRAIGHT = "straight"
+    CHAMFER_45 = "45_deg"
+    CURVED = "curved"
+    MANHATTAN = "manhattan"
+
+
 class StackupLayerModel(BaseModel):
     """Data model representing an individual layer in a multi-layer stackup."""
 
@@ -692,15 +701,38 @@ class AssemblyTestStepModel(BaseModel):
     """Factory assembly testing step for automated test fixtures (bed-of-nails, flying probe)."""
 
     step_id: str = Field(description="Unique test step identifier (e.g. TEST_IMP_DIFF_100)")
+    subassembly: Optional[str] = Field(
+        default=None, description="Subassembly identifier (e.g. carrier_board, flex_tail)"
+    )
     description: str = Field(description="Test procedure description")
     test_type: str = Field(description="Type of test: continuity, isolation, impedance, capacitance, voltage")
-    net_or_points: List[str] = Field(description="Nets, component pins, or test coupon pads under test")
+    net_or_points: List[str] = Field(
+        default_factory=list, description="Nets, component pins, or test coupon pads under test"
+    )
     expected_nominal: Optional[float] = Field(default=None, description="Nominal expected value")
     tolerance_pct: Optional[float] = Field(
         default=None, ge=0.0, description="Acceptable percentage tolerance (e.g. 10.0 for +/-10%)"
     )
     unit: str = Field(default="", description="Measurement unit (e.g. ohm, pF, V, mA)")
     stimulus: Optional[str] = Field(default=None, description="Optional stimulus signal (e.g. 100kHz 1V RMS)")
+    net_name: Optional[str] = Field(default=None, description="Target net name for continuity or voltage test")
+    pad_a_mm: Optional[Tuple[float, float]] = Field(default=None, description="Probe pad A coordinate (x, y) in mm")
+    pad_b_mm: Optional[Tuple[float, float]] = Field(default=None, description="Probe pad B coordinate (x, y) in mm")
+    nominal: Optional[float] = Field(default=None, description="Nominal expected value alias")
+    measured: Optional[float] = Field(default=None, description="Simulated or measured value")
+
+    @model_validator(mode="after")
+    def sync_nominal(self) -> "AssemblyTestStepModel":
+        """Synchronize nominal with expected_nominal and net_name with net_or_points."""
+        if self.nominal is None and self.expected_nominal is not None:
+            self.nominal = self.expected_nominal
+        elif self.expected_nominal is None and self.nominal is not None:
+            self.expected_nominal = self.nominal
+        if self.net_name and not self.net_or_points:
+            self.net_or_points = [self.net_name]
+        elif not self.net_name and self.net_or_points:
+            self.net_name = self.net_or_points[0]
+        return self
 
 
 class AssemblyTestModel(BaseModel):
@@ -872,6 +904,28 @@ class PCBObstacleModel(BaseModel):
     layer: str = Field(default="F.Cu", description="Board layer location ('F.Cu' or 'B.Cu')")
 
 
+class SymbolTableEntry(BaseModel):
+    """Metadata record tracing a component on the schematic/PCB back to its declaring block."""
+
+    designator: str = Field(description="Canonical reference designator (e.g. C1, U2)")
+    block: str = Field(default="default", description="Context manager block name (e.g. power_supply, mcu_core)")
+    subassembly: Optional[str] = Field(default=None, description="Optional subassembly identifier")
+    package: str = Field(description="Footprint package identifier")
+    value: Optional[str] = Field(default=None, description="Component electrical value")
+    mpn: Optional[str] = Field(default=None, description="Manufacturer part number")
+    supplier_pn: Optional[str] = Field(default=None, description="Supplier part number")
+    position_mm: Tuple[float, float, float] = Field(
+        default=(0.0, 0.0, 0.0), description="Absolute component position (x, y, z) in mm"
+    )
+    rotation_deg: Tuple[float, float, float] = Field(
+        default=(0.0, 0.0, 0.0), description="Component orientation (pitch, roll, yaw) in deg"
+    )
+    layer: str = Field(default="F.Cu", description="Placement copper layer ('F.Cu' or 'B.Cu')")
+    source_file: Optional[str] = Field(default=None, description="Source python file")
+    source_line: Optional[int] = Field(default=None, description="Source line number")
+    connected_nets: List[str] = Field(default_factory=list, description="Nets connected to component pins")
+
+
 class PCBConfig(BaseModel):
     """Top-level configuration model defining complete physical board, stackup, and high-speed rules."""
 
@@ -951,6 +1005,14 @@ class PCBConfig(BaseModel):
     obstacles: List[PCBObstacleModel] = Field(
         default_factory=list,
         description="Physical component and fixture obstacles for CAD and simulation",
+    )
+    symbol_table: Dict[str, SymbolTableEntry] = Field(
+        default_factory=dict,
+        description="Component symbol table mapping designators to declaring block and metadata",
+    )
+    test_steps: List[AssemblyTestStepModel] = Field(
+        default_factory=list,
+        description="Ordered factory assembly and simulation test steps",
     )
 
     @property

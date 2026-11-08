@@ -559,8 +559,12 @@ class Builder:
                     continue
                 processed_providers.add(provider)
 
-                wiring_file = getattr(provider, "wiring_path", None)
-                if not wiring_file or not Path(wiring_file).exists():
+                wiring = getattr(provider, "wiring", None)
+                if wiring is None:
+                    wiring_file = getattr(provider, "wiring_path", None)
+                    if wiring_file and Path(wiring_file).exists():
+                        wiring = Wiring(Path(wiring_file))
+                if wiring is None:
                     continue
 
                 pcb_config = provider.pcb_config
@@ -568,7 +572,6 @@ class Builder:
                     raise ValueError(f"Project '{provider.name}' does not configure a PCB manifest or PCBConfig.")
 
                 self.logger.print(f"Compiling PCBs: {provider.name}/{subassembly}", symbol="🔌 ")
-                wiring = Wiring(Path(wiring_file))
 
                 sub_pcb_config = None
                 if subassembly in provider.part:

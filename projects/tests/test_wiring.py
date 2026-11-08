@@ -27,13 +27,13 @@ def test_register_layout_success():
     assert PIN_LAYOUT_REGISTRY["my_custom_namespace:my_ns_pkg"] == my_ns_layout
 
 
-def test_wiring_class():
+def test_wiring_class(tmp_path):
     """Verify that the Wiring class correctly loads and resolves footprints and nets."""
     # Ensure layouts are registered
     import projects.cat_fountain.layouts  # type: ignore
+    from projects.cat_fountain.pcb import build_cat_fountain_wiring
 
-    yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
-    wiring = Wiring(yaml_path)
+    wiring = build_cat_fountain_wiring()
 
     # Test footprints loading
     footprints = wiring.footprints
@@ -41,7 +41,6 @@ def test_wiring_class():
     pico = next(f for f in footprints if f.name == "pico")
     assert pico.dimensions == (17.0, 52.0, 1.6)
     assert len(pico.pins) > 0
-    assert pico.namespace == "cat_fountain"
     assert pico.package == "board"
 
     # Test pins layout calculation
@@ -57,6 +56,12 @@ def test_wiring_class():
     assert len(nets) > 0
     gnd_net = next(n for n in nets if n.name == "gnd")
     assert gnd_net.color == "black"
+
+    # Also verify exporting to YAML and reloading via Wiring(yaml_path) works identically
+    saved_yaml = wiring.to_yaml(tmp_path / "wiring.yaml")
+    reloaded = Wiring(saved_yaml)
+    assert len(reloaded.footprints) == len(wiring.footprints)
+    assert len(reloaded.nets) == len(wiring.nets)
 
 
 def test_register_layout_overlap():
@@ -102,8 +107,9 @@ def test_automatic_namespace_inference():
 
 def test_pico_gpio_labels_simplified():
     """Verify that Pico GPIO pins have simplified GPx labels without net name collisions (BUG-FOSSORIAL-BRISTLE-291)."""
-    yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
-    wiring = Wiring(yaml_path)
+    from projects.cat_fountain.pcb import build_cat_fountain_wiring
+
+    wiring = build_cat_fountain_wiring()
 
     pico = next(f for f in wiring.footprints if f.name == "pico")
     power_gnd_labels = {"GND", "VSYS", "3V3"}
@@ -125,8 +131,9 @@ def test_pico_gpio_labels_simplified():
 
 def test_tmc6300_motor_driver_pins():
     """Verify that TMC6300 motor driver output pins are renamed to U, V, W (BUG-DEEP-BURROWER-108)."""
-    yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
-    wiring = Wiring(yaml_path)
+    from projects.cat_fountain.pcb import build_cat_fountain_wiring
+
+    wiring = build_cat_fountain_wiring()
 
     driver = next(f for f in wiring.footprints if f.name == "motor_driver")
     pin_names = {p.name for p in driver.pins}
@@ -146,9 +153,9 @@ def test_footprint_label_positions_and_pico_gnd_no_overlap():
     """Verify that footprint labels respect position offsets and Pico GND labels do not collide (BUG-PROBOSCID-NIGHTCRAWLER-523)."""
     import projects.cat_fountain.layouts  # type: ignore
     from provider import Room, WiringDiagram
+    from projects.cat_fountain.pcb import build_cat_fountain_wiring
 
-    yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
-    wiring = Wiring(yaml_path)
+    wiring = build_cat_fountain_wiring()
 
     room = Room()
     diagram = WiringDiagram(wiring)

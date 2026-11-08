@@ -169,12 +169,9 @@ class TestCatFountainProvider:
     @pytest.mark.slow
     def test_wiring_diagram_class(self, provider):
         """Verify that WiringDiagram populates the room with all pads and wires."""
-        from pathlib import Path
-        from provider import Wiring, WiringDiagram
+        from provider import WiringDiagram
 
-        yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
-        bowl_part = provider.build_bowl("bowl").part
-        wiring = Wiring(yaml_path, bowl_part)
+        wiring = provider.wiring
 
         room = Room()
         diagram = WiringDiagram(wiring)
@@ -1816,10 +1813,9 @@ class TestCatFountainProvider:
     def test_regression_bug_hairy_wasp_932_tmc6300_6pwm_wiring_and_no_sense_pin(self, provider):
         """Verify BUG-HAIRY-WASP-932: TMC6300 uses 6-PWM control (UH..WL), SEN pin is disconnected, and GP26 speed sensor is preserved."""
         from pathlib import Path
-        from model.wiring import Wiring
+        from projects.cat_fountain.pcb import build_cat_fountain_wiring
 
-        yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
-        wiring = Wiring(yaml_path)
+        wiring = build_cat_fountain_wiring()
 
         # 1. Pico pin allocation: GP16..GP21 for 6-PWM, GP22 for DIAG, and GP26 for speed sensor
         pico = next(f for f in wiring.footprints if f.name == "pico")
@@ -1860,10 +1856,9 @@ class TestCatFountainProvider:
     def test_regression_bug_camouflaged_midge_831_no_cyan_wire_in_cat_fountain_wiring(self):
         """Verify BUG-CAMOUFLAGED-MIDGE-831: Cat fountain wiring diagram does not use cyan wire color."""
         from pathlib import Path
-        from model.wiring import Wiring
+        from projects.cat_fountain.pcb import build_cat_fountain_wiring
 
-        yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
-        wiring = Wiring(yaml_path)
+        wiring = build_cat_fountain_wiring()
 
         cyan_nets = [net.name for net in wiring.nets if net.color.lower() == "cyan"]
         assert not cyan_nets, f"Cyan wire color is prohibited in loom, but found in nets: {cyan_nets}"
@@ -1909,8 +1904,7 @@ class TestCatFountainProvider:
         )
 
         # 2. Check wiring.yaml footprint dimensions, rotation, and absence of screw mounting holes
-        yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
-        wiring = Wiring(yaml_path)
+        wiring = provider.wiring
         driver = next(f for f in wiring.footprints if f.name == "motor_driver")
         assert tuple(driver.dimensions) == (20.32, 15.24, 1.6), (
             f"Expected TMC6300 board dimensions [20.32, 15.24, 1.6], got {driver.dimensions}"
@@ -2066,8 +2060,7 @@ class TestCatFountainProvider:
         assert provider.settings.swd_board_width == 13.7
 
         # 2. Footprint in wiring.yaml
-        yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
-        wiring = Wiring(yaml_path)
+        wiring = provider.wiring
         swd_fp = next((f for f in wiring.footprints if f.name == "swd_adapter"), None)
         assert swd_fp is not None, "swd_adapter footprint must exist in wiring.yaml"
         assert tuple(swd_fp.dimensions) == (19.1, 13.7, 1.6)

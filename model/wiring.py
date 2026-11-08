@@ -1,14 +1,17 @@
 """Data models and container class for component wiring, footprints, and net connections."""
 
 import math
+import logging
 import yaml
 from enum import StrEnum
 from pathlib import Path
-from typing import Tuple, List, Optional, Callable, Any, Dict
+from typing import Tuple, List, Optional, Callable, Any, Dict, Sequence, Union
 from functools import cached_property
 from pydantic import BaseModel, Field, validate_call, field_validator
 from build123d import Vector, Location
 from model.pcb import BgaFanoutModel
+
+logger = logging.getLogger(__name__)
 
 # Footprint Layout Registry
 PIN_LAYOUT_REGISTRY = {}
@@ -66,6 +69,83 @@ class PinModel(BaseModel):
     pad_shape: str = Field(default="circle", description="Pad shape: circle, rect, oval, roundrect")
     pad_size_mm: Tuple[float, float] = Field(default=(0.5, 0.5), description="Pad dimensions (width, height)")
     drill_dia_mm: Optional[float] = Field(default=None, description="Drill hole diameter in mm for thru_hole pads")
+
+
+class PinRef:
+    """Resolved reference to a physical component pin with absolute coordinates."""
+
+    def __init__(
+        self,
+        component_name: str,
+        pin: PinModel,
+        component_position: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+        component_rotation: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+    ) -> None:
+        """Initialize pin reference and compute absolute world coordinates."""
+        self.component_name = component_name
+        self.pin = pin
+        self.component_position = component_position
+        self.component_rotation = component_rotation
+
+        rot_deg = component_rotation[2] if len(component_rotation) >= 3 else 0.0
+        if abs(rot_deg) > 1e-4:
+            rad = math.radians(rot_deg)
+            cos_r, sin_r = math.cos(rad), math.sin(rad)
+            rx = pin.position[0] * cos_r + pin.position[1] * sin_r
+            ry = -pin.position[0] * sin_r + pin.position[1] * cos_r
+            rz = pin.position[2] if len(pin.position) >= 3 else 0.0
+        else:
+            rx = pin.position[0]
+            ry = pin.position[1]
+            rz = pin.position[2] if len(pin.position) >= 3 else 0.0
+
+        self.x = round(component_position[0] + rx, 4)
+        self.y = round(component_position[1] + ry, 4)
+        self.z = round(component_position[2] + rz, 4)
+
+    @property
+    def name(self) -> str:
+        """Pin identifier name."""
+        return self.pin.name
+
+    @property
+    def number(self) -> Optional[str]:
+        """Physical pin package number."""
+        return self.pin.number
+
+    @property
+    def pin_name(self) -> Optional[str]:
+        """Functional pin designation."""
+        return self.pin.pin_name
+
+    @property
+    def signal_name(self) -> Optional[str]:
+        """Signal designation."""
+        return self.pin.signal_name
+
+    @property
+    def pos(self) -> Tuple[float, float]:
+        """2D planar coordinate (x, y) in mm."""
+        return (self.x, self.y)
+
+    @property
+    def pos_2d(self) -> Tuple[float, float]:
+        """2D planar coordinate (x, y) in mm."""
+        return (self.x, self.y)
+
+    @property
+    def pos_3d(self) -> Tuple[float, float, float]:
+        """3D absolute coordinate (x, y, z) in mm."""
+        return (self.x, self.y, self.z)
+
+    def as_tuple(self) -> Tuple[str, str]:
+        """Return (component_name, pin_spec) tuple for NetModel."""
+        pin_key = self.pin.number or self.pin.name
+        return (self.component_name, str(pin_key))
+
+    def __repr__(self) -> str:
+        """Return formatted string representation of pin reference."""
+        return f"<PinRef {self.component_name}.{self.pin.name} at ({self.x}, {self.y})>"
 
 
 class LabelModel(BaseModel):
@@ -214,27 +294,138 @@ class Wiring:
     """Class encapsulating wiring layout, component footprints, and net connections."""
 
     @validate_call
-    def __init__(self, yaml_path: Path, parent_part: Optional[Any] = None):
+    def __init__(self, yaml_path: Optional[Union[str, Path]] = None, parent_part: Optional[Any] = None):
         """Initialize the Wiring configuration container and load components/nets."""
-        self.yaml_path = yaml_path
+        self.yaml_path = Path(yaml_path) if yaml_path is not None else None
         self.parent_part = parent_part
-        with open(yaml_path, "r") as f:
-            self.config = yaml.safe_load(f) or {}
-
-        # Resolve any explicit imports in wiring YAML
+        self.config = {}
         self.shared_footprints = dict(load_shared_footprints())
-        imports = self.config.get("imports", [])
-        for imp in imports:
-            imp_path = (self.yaml_path.parent / imp).resolve()
-            if not imp_path.exists():
-                imp_path = (self.yaml_path.parent.parent / imp).resolve()
-            if imp_path.exists():
-                with open(imp_path, "r") as f:
-                    imp_data = yaml.safe_load(f)
-                if imp_data and isinstance(imp_data, dict):
-                    fps = imp_data.get("footprints", {})
-                    if isinstance(fps, dict):
-                        self.shared_footprints.update(fps)
+        self.symbol_table: Dict[str, Any] = {}
+
+        if self.yaml_path is not None:
+            if self.yaml_path.exists() and self.yaml_path.suffix == ".yaml":
+                with open(self.yaml_path, "r") as f:
+                    self.config = yaml.safe_load(f) or {}
+
+                # Resolve any explicit imports in wiring YAML
+                imports = self.config.get("imports", [])
+                for imp in imports:
+                    imp_path = (self.yaml_path.parent / imp).resolve()
+                    if not imp_path.exists():
+                        imp_path = (self.yaml_path.parent.parent / imp).resolve()
+                    if imp_path.exists():
+                        with open(imp_path, "r") as f:
+                            imp_data = yaml.safe_load(f)
+                        if imp_data and isinstance(imp_data, dict):
+                            fps = imp_data.get("footprints", {})
+                            if isinstance(fps, dict):
+                                self.shared_footprints.update(fps)
+            else:
+                parts = self.yaml_path.parts
+                if "projects" in parts:
+                    idx = parts.index("projects")
+                    if idx + 1 < len(parts):
+                        proj_name = parts[idx + 1]
+                        import importlib
+
+                        try:
+                            mod = importlib.import_module(f"projects.{proj_name}")
+                            for attr in dir(mod):
+                                obj = getattr(mod, attr)
+                                if isinstance(obj, type) and obj.__name__.endswith("Provider"):
+                                    prov = obj()
+                                    if getattr(prov, "wiring", None) is not None:
+                                        in_mem = prov.wiring
+                                        self.config = dict(in_mem.config)
+                                        self.symbol_table = dict(in_mem.symbol_table)
+                                        self.__dict__["footprints"] = list(in_mem.footprints)
+                                        self.__dict__["nets"] = list(in_mem.nets)
+                                        break
+                        except Exception as e:
+                            logger.warning("Could not load in-memory wiring for project %s: %s", proj_name, e)
+
+    @classmethod
+    def from_models(
+        cls,
+        footprints: Sequence[FootprintModel],
+        nets: Sequence[NetModel],
+        parent_part: Optional[Any] = None,
+        symbol_table: Optional[Dict[str, Any]] = None,
+    ) -> "Wiring":
+        """Construct an in-memory Wiring instance directly from FootprintModel and NetModel objects."""
+        inst = cls.__new__(cls)
+        inst.yaml_path = None
+        inst.parent_part = parent_part
+        inst.shared_footprints = dict(load_shared_footprints())
+        inst.symbol_table = dict(symbol_table or {})
+        inst.config = {
+            "components": [
+                {
+                    "name": fp.name,
+                    "package": fp.package,
+                    "position": list(fp.position),
+                    "rotation": list(fp.rotation),
+                    "dimensions": list(fp.dimensions),
+                    "pins": [p.model_dump() for p in fp.pins],
+                }
+                for fp in footprints
+            ],
+            "nets": [
+                {
+                    "name": net.name,
+                    "color": net.color,
+                    "pins": [list(p) for p in net.pins],
+                    "offset": list(net.offset),
+                    "path": [list(p) for p in net.path],
+                }
+                for net in nets
+            ],
+        }
+        inst.__dict__["footprints"] = list(footprints)
+        inst.__dict__["nets"] = list(nets)
+        return inst
+
+    def to_yaml(self, path: Union[str, Path]) -> Path:
+        """Export in-memory footprints and netlist to a valid wiring.yaml file."""
+        out_path = Path(path)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        raw_components = []
+        for fp in self.footprints:
+            c_dict: Dict[str, Any] = {
+                "name": fp.name,
+                "package": fp.package if not fp.namespace else f"{fp.namespace}:{fp.package}",
+                "position": [round(float(v), 4) for v in fp.position],
+                "rotation": [round(float(v), 4) for v in fp.rotation],
+                "dimensions": [round(float(v), 4) for v in fp.dimensions],
+                "layer": fp.layer,
+            }
+            if fp.value:
+                c_dict["value"] = fp.value
+            if fp.mpn:
+                c_dict["mpn"] = fp.mpn
+            if fp.supplier_pn:
+                c_dict["supplier_pn"] = fp.supplier_pn
+            if fp.shape_ref:
+                c_dict["shape_ref"] = fp.shape_ref
+            raw_components.append(c_dict)
+
+        raw_nets = []
+        for net in self.nets:
+            raw_nets.append(
+                {
+                    "name": net.name,
+                    "color": net.color,
+                    "pins": [list(p) for p in net.pins],
+                }
+            )
+
+        data = {
+            "components": raw_components,
+            "nets": raw_nets,
+        }
+        with open(out_path, "w", encoding="utf-8") as f:
+            yaml.safe_dump(data, f, sort_keys=False)
+        return out_path
 
     @cached_property
     def footprints(self) -> List[FootprintModel]:
@@ -437,6 +628,7 @@ class Wiring:
         filtered.parent_part = self.parent_part
         filtered.config = self.config
         filtered.shared_footprints = self.shared_footprints
+        filtered.symbol_table = dict(getattr(self, "symbol_table", {}))
         if footprints and isinstance(footprints[0], str):
             target_names = set(footprints)
             filtered.__dict__["footprints"] = [fp for fp in self.footprints if fp.name in target_names]

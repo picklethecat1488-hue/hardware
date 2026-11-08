@@ -314,7 +314,38 @@ class Provider:
     @property
     def wiring_path(self) -> Path:
         """Return the path to the provider's wiring specification file."""
-        return self.project_dir / "wiring.yaml"
+        w_yaml = self.project_dir / "wiring.yaml"
+        if w_yaml.exists():
+            return w_yaml
+        pcb_py = self.project_dir / "pcb.py"
+        if pcb_py.exists():
+            return pcb_py
+        return w_yaml
+
+    @property
+    def wiring(self) -> Optional[Any]:
+        """Return the provider's Wiring container (in-memory or loaded from wiring_path)."""
+        if hasattr(self, "_wiring") and self._wiring is not None:
+            return self._wiring
+
+        for p_name, part_builder in getattr(self, "part", {}).items():
+            try:
+                part_obj = part_builder(p_name, None, Mode.DEFAULT)
+                w = getattr(part_obj, "wiring", None)
+                if w is not None:
+                    return w
+                if hasattr(part_obj, "part") and getattr(part_obj.part, "wiring", None) is not None:
+                    return part_obj.part.wiring
+            except Exception:
+                pass
+
+        w_path = self.wiring_path
+        if w_path and w_path.exists() and w_path.suffix == ".yaml":
+            from model.wiring import Wiring
+
+            return Wiring(w_path)
+
+        return None
 
     @property
     def pcb_manifest_path(self) -> Path:
@@ -323,13 +354,18 @@ class Provider:
 
     @property
     def pcb_manifest(self) -> Optional[dict[str, Any]]:
-        """Return raw YAML data from pcb.yaml if it exists."""
+        """Return raw YAML data from pcb.yaml if it exists, or dump from pcb_config."""
         p = self.pcb_manifest_path
         if os.path.exists(p):
             import yaml
 
             with open(p, "r", encoding="utf-8") as f:
                 return yaml.safe_load(f)
+        if getattr(self, "_building_pcb_config", False):
+            return None
+        cfg = getattr(self, "pcb_config", None)
+        if cfg is not None:
+            return cfg.model_dump()
         return None
 
     def stackup(self) -> Optional[Any]:
@@ -401,6 +437,19 @@ class Provider:
         """Return PCBConfig populated with stackup, holes, copper regions, and test points, omitting traces and vias."""
         data = self.pcb_manifest
         if not data:
+            if hasattr(self, "_pcb_config") and self._pcb_config is not None:
+                return self._pcb_config
+            for p_name, part_builder in getattr(self, "part", {}).items():
+                try:
+                    part_obj = part_builder(p_name, None, Mode.DEFAULT)
+                    if hasattr(part_obj, "to_pcb_config"):
+                        return part_obj.to_pcb_config()
+                    elif hasattr(part_obj, "pcb_metadata"):
+                        return part_obj.pcb_metadata
+                    elif hasattr(part_obj, "part") and hasattr(part_obj.part, "pcb_metadata"):
+                        return part_obj.part.pcb_metadata
+                except Exception:
+                    pass
             return None
 
         from model.pcb import PCBConfig, PCBMaterialsModel, StackupModel

@@ -7,15 +7,19 @@ from build123d import BuildPart
 from build123d.build_common import operations_apply_to
 
 from model.pcb import (
+    AssemblyTestModel,
+    AssemblyTestStepModel,
     BoardType,
     CapacitiveElectrodeModel,
     CopperRegionModel,
     FlexType,
     MountingHoleModel,
     PCBConfig,
+    PCBObstacleModel,
     SilkscreenTextModel,
     SilkscreenGraphicModel,
     StackupModel,
+    SymbolTableEntry,
     TestPointModel,
     TraceSegmentModel,
     ViaModel,
@@ -85,6 +89,12 @@ class BuildPcb(BuildPart):
         self.outline_polygon: Optional[List[Tuple[float, float]]] = (
             [tuple(p) for p in outline_polygon] if outline_polygon else None
         )
+        self.footprints: List[Any] = []
+        self.nets: List[Any] = []
+        self.symbol_table: Dict[str, SymbolTableEntry] = {}
+        self.test_steps: List[AssemblyTestStepModel] = []
+        self.obstacles: List[PCBObstacleModel] = []
+        self.wiring: Optional[Any] = None
         self._token: Optional[Token] = None
 
     @property
@@ -107,11 +117,23 @@ class BuildPcb(BuildPart):
             self._token = None
         super().__exit__(exc_type, exc_val, exc_tb)
 
+        # Synthesize in-memory Wiring container if footprints or nets were registered
+        from model.wiring import Wiring
+
+        if self.wiring is None and (self.footprints or self.nets):
+            self.wiring = Wiring.from_models(
+                footprints=self.footprints,
+                nets=self.nets,
+                symbol_table=self.symbol_table,
+            )
+
         # Attach metadata to the built part object and self for runtime discovery
         meta = self.to_pcb_config()
         self.pcb_metadata = meta
         if self.part is not None:
             setattr(self.part, "pcb_metadata", meta)
+            if self.wiring is not None:
+                setattr(self.part, "wiring", self.wiring)
 
     def to_pcb_config(self) -> PCBConfig:
         """Construct strongly-typed PCBConfig from context metadata."""
@@ -121,6 +143,14 @@ class BuildPcb(BuildPart):
             if callable(bb):
                 bbox = bb()
                 dims = (round(bbox.size.X, 4), round(bbox.size.Y, 4), round(self.thickness_mm, 4))
+
+        assembly_test = None
+        if self.test_steps:
+            assembly_test = AssemblyTestModel(
+                instructions=list(self.test_steps),
+                test_fixture="flying_probe",
+                pass_criteria="all_steps_within_tolerance",
+            )
 
         return PCBConfig(
             name=self.name,
@@ -139,6 +169,10 @@ class BuildPcb(BuildPart):
             outline_polygon=list(self.outline_polygon) if self.outline_polygon else None,
             test_points=list(self.test_points),
             capacitive_sensors=list(self.capacitive_sensors),
+            obstacles=list(self.obstacles),
+            symbol_table=dict(self.symbol_table),
+            test_steps=list(self.test_steps),
+            assembly_test=assembly_test,
         )
 
     @classmethod

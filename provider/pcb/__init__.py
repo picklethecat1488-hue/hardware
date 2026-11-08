@@ -6,7 +6,14 @@ from .capacitive import CapacitiveSensingGenerator, CapacitiveGeometry, HatchLin
 from .exporter import PCBExporter
 from .eye_diagram import EyeDiagramSimulator, EyeDiagramConfig, EyeDiagramResult
 from .rerun_logger import log_drc_report, log_eye_diagram
-from .silkscreen import BuildSilkscreen, SilkscreenText, find_empty_space_for_label
+from .silkscreen import (
+    BuildSilkscreen,
+    SilkscreenText,
+    SilkscreenRect,
+    SilkscreenLine,
+    SilkscreenPolygon,
+    find_empty_space_for_label,
+)
 from .stackup import BuildStackup, StackupLayer
 from .drill_holes import BuildDrillHoles, MountingHole, DrillHole
 from .board import BuildPcb, BuildFlexPCB
@@ -14,6 +21,8 @@ from model.pcb import FlexType
 from .routing import (
     BuildTraces,
     Trace,
+    Route,
+    RouteStyle,
     BuildVias,
     Via,
     BuildCopperRegions,
@@ -23,6 +32,9 @@ from .routing import (
     TestPoint,
 )
 from .jax_router import JaxPCBRouter
+from .layout import BuildComponents, Component
+from .wiring import BuildWiring, Net, DiffPair, Bus
+from .test_steps import BuildTestSteps, TestStep
 from .supplier import package_supplier_pcb_files, generate_pcb_project_summary
 
 __all__ = [
@@ -53,6 +65,8 @@ __all__ = [
     "DrillHole",
     "BuildTraces",
     "Trace",
+    "Route",
+    "RouteStyle",
     "BuildVias",
     "Via",
     "BuildCopperRegions",
@@ -67,4 +81,12 @@ __all__ = [
     "JaxPCBRouter",
     "package_supplier_pcb_files",
     "generate_pcb_project_summary",
+    "BuildTestSteps",
+    "TestStep",
+    "BuildComponents",
+    "Component",
+    "BuildWiring",
+    "Net",
+    "DiffPair",
+    "Bus",
 ]
