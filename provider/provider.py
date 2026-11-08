@@ -146,10 +146,8 @@ class ProviderOrchestrator(Orchestrator):
 
                     import types
 
-                    wiring = None
-                    if os.path.exists(self.provider.wiring_path):
-                        wiring = Wiring(self.provider.wiring_path)
-                    else:
+                    wiring = self.provider.wiring
+                    if wiring is None:
                         wiring = types.SimpleNamespace(footprints=[], nets=[])
 
                     exporter = PCBExporter(pcb_cfg, wiring)
@@ -312,19 +310,8 @@ class Provider:
         return Path(inspect.getfile(self.__class__)).resolve().parent
 
     @property
-    def wiring_path(self) -> Path:
-        """Return the path to the provider's wiring specification file."""
-        w_yaml = self.project_dir / "wiring.yaml"
-        if w_yaml.exists():
-            return w_yaml
-        pcb_py = self.project_dir / "pcb.py"
-        if pcb_py.exists():
-            return pcb_py
-        return w_yaml
-
-    @property
     def wiring(self) -> Optional[Any]:
-        """Return the provider's Wiring container (in-memory or loaded from wiring_path)."""
+        """Return the provider's Wiring container (in-memory or loaded from part)."""
         if hasattr(self, "_wiring") and self._wiring is not None:
             return self._wiring
 
@@ -338,29 +325,25 @@ class Provider:
                     return part_obj.part.wiring
             except Exception:
                 pass
-
-        w_path = self.wiring_path
-        if w_path and w_path.exists() and w_path.suffix == ".yaml":
-            from model.wiring import Wiring
-
-            return Wiring(w_path)
-
         return None
 
-    @property
-    def pcb_manifest_path(self) -> Path:
-        """Return the path to the provider's PCB configuration file (pcb.yaml)."""
-        return self.project_dir / "pcb.yaml"
+    def get_wiring(self, subassembly: Optional[str] = None) -> Optional[Any]:
+        """Return Wiring container for a specific subassembly or the design as a whole."""
+        if subassembly and hasattr(self, "part") and subassembly in self.part:
+            try:
+                part_obj = self.part[subassembly](subassembly, None, Mode.DEFAULT)
+                w = getattr(part_obj, "wiring", None)
+                if w is not None:
+                    return w
+                if hasattr(part_obj, "part") and getattr(part_obj.part, "wiring", None) is not None:
+                    return part_obj.part.wiring
+            except Exception:
+                pass
+        return self.wiring
 
     @property
     def pcb_manifest(self) -> Optional[dict[str, Any]]:
-        """Return raw YAML data from pcb.yaml if it exists, or dump from pcb_config."""
-        p = self.pcb_manifest_path
-        if os.path.exists(p):
-            import yaml
-
-            with open(p, "r", encoding="utf-8") as f:
-                return yaml.safe_load(f)
+        """Return raw dict from pcb_config attribute."""
         if getattr(self, "_building_pcb_config", False):
             return None
         cfg = getattr(self, "pcb_config", None)
@@ -433,169 +416,177 @@ class Provider:
         """
         return []
 
-    def get_pcb_config_without_routes(self) -> Optional[PCBConfig]:
-        """Return PCBConfig populated with stackup, holes, copper regions, and test points, omitting traces and vias."""
-        data = self.pcb_manifest
-        if not data:
-            if hasattr(self, "_pcb_config") and self._pcb_config is not None:
-                return self._pcb_config
+    @property
+    def pcb_config(self) -> Optional[PCBConfig]:
+        """Return strongly-typed PCBConfig synthesized from BuildPcb contexts and provider methods."""
+        if hasattr(self, "_cached_pcb_config") and self._cached_pcb_config is not None:
+            return self._cached_pcb_config
+
+        if getattr(self, "_building_pcb_config", False):
+            return None
+
+        self._building_pcb_config = True
+        try:
+            from model.pcb import AssemblyTestModel, BoardType, PCBConfig, StackupModel
+            from provider.pcb.drill_holes import BuildDrillHoles
+            from provider.pcb.routing import BuildCopperRegions, BuildTestPoints, BuildTraces, BuildVias
+            from provider.pcb.silkscreen import BuildSilkscreen
+            from provider.pcb.stackup import BuildStackup
+
+            # 1. Discover all BuildPcb instances / metadata across registered parts
+            pcb_parts: list[tuple[str, PCBConfig]] = []
             for p_name, part_builder in getattr(self, "part", {}).items():
                 try:
                     part_obj = part_builder(p_name, None, Mode.DEFAULT)
-                    if hasattr(part_obj, "to_pcb_config"):
-                        return part_obj.to_pcb_config()
-                    elif hasattr(part_obj, "pcb_metadata"):
-                        return part_obj.pcb_metadata
-                    elif hasattr(part_obj, "part") and hasattr(part_obj.part, "pcb_metadata"):
-                        return part_obj.part.pcb_metadata
+                    meta = getattr(part_obj, "pcb_metadata", None)
+                    if meta is None and hasattr(part_obj, "part"):
+                        meta = getattr(part_obj.part, "pcb_metadata", None)
+                    if meta is not None and isinstance(meta, PCBConfig):
+                        pcb_parts.append((p_name, meta))
                 except Exception:
                     pass
-            return None
 
-        from model.pcb import PCBConfig, PCBMaterialsModel, StackupModel
-        from provider.pcb.stackup import BuildStackup
-        from provider.pcb.drill_holes import BuildDrillHoles
-        from provider.pcb.routing import BuildCopperRegions, BuildTestPoints
+            if not pcb_parts:
+                return None
 
-        config = PCBConfig.model_validate(data)
+            # Primary PCB (first one or rigid/rigid-flex)
+            primary_name, primary_cfg = pcb_parts[0]
+            for p_name, p_cfg in pcb_parts:
+                if p_cfg.board_type in (BoardType.RIGID, BoardType.RIGID_FLEX):
+                    primary_name, primary_cfg = p_name, p_cfg
+                    break
 
-        # 1. Stackup from provider context manager
-        provider_stackup = self.stackup()
-        if provider_stackup is not None:
-            if isinstance(provider_stackup, BuildStackup):
-                config.stackup = provider_stackup.to_model()
-            elif isinstance(provider_stackup, StackupModel):
-                config.stackup = provider_stackup
-        elif config.stackup is not None:
-            config.stackup.resolve_materials(PCBMaterialsModel.default())
+            # Merge metadata from all subassemblies into primary
+            combined_test_steps = list(primary_cfg.test_steps)
+            combined_obstacles = list(primary_cfg.obstacles)
+            combined_sensors = list(primary_cfg.capacitive_sensors)
+            combined_symbol_table = dict(primary_cfg.symbol_table)
+            combined_traces = list(primary_cfg.traces)
+            combined_vias = list(primary_cfg.vias)
 
-        # 2. Drill / mounting holes from provider context manager
-        provider_holes = self.mounting_holes()
-        if provider_holes:
-            if isinstance(provider_holes, BuildDrillHoles):
-                config.mounting_holes = list(provider_holes.holes)
+            for p_name, p_cfg in pcb_parts:
+                if p_name != primary_name:
+                    for s in p_cfg.test_steps:
+                        if s not in combined_test_steps:
+                            combined_test_steps.append(s)
+                    for obs in p_cfg.obstacles:
+                        if obs not in combined_obstacles:
+                            combined_obstacles.append(obs)
+                    for cs in p_cfg.capacitive_sensors:
+                        if cs not in combined_sensors:
+                            combined_sensors.append(cs)
+                    for tr in p_cfg.traces:
+                        if tr not in combined_traces:
+                            combined_traces.append(tr)
+                    for v in p_cfg.vias:
+                        if v not in combined_vias:
+                            combined_vias.append(v)
+                    combined_symbol_table.update(p_cfg.symbol_table)
+
+            # Stackup from provider or primary
+            s = self.stackup()
+            stackup_model = primary_cfg.stackup
+            if isinstance(s, BuildStackup):
+                stackup_model = s.to_model()
+            elif isinstance(s, StackupModel):
+                stackup_model = s
+
+            # Mounting holes
+            p_holes = self.mounting_holes()
+            if p_holes:
+                holes = list(p_holes.holes if isinstance(p_holes, BuildDrillHoles) else p_holes)
             else:
-                config.mounting_holes = list(provider_holes)
+                holes = list(primary_cfg.mounting_holes)
 
-        # 3. Silkscreen texts from provider context manager
-        provider_texts = self.silkscreen()
-        if provider_texts:
-            config.silkscreen_texts = list(provider_texts)
-
-        if hasattr(self, "silkscreen_graphics") and callable(self.silkscreen_graphics):
-            provider_graphics = self.silkscreen_graphics()
-            if provider_graphics:
-                config.silkscreen_graphics = list(provider_graphics)
-
-        # 4. Copper regions from provider context manager
-        p_regions = self.copper_regions()
-        if p_regions:
-            if isinstance(p_regions, BuildCopperRegions):
-                config.copper_regions = list(p_regions.regions)
-            else:
-                config.copper_regions = list(p_regions)
-
-        # 5. Test points from provider context manager
-        p_tps = self.test_points()
-        if p_tps:
-            if isinstance(p_tps, BuildTestPoints):
-                config.test_points = list(p_tps.test_points)
-            else:
-                config.test_points = list(p_tps)
-
-        # 6. Merge metadata and derive dimensions_mm from build123d shape if shape_ref is present
-        if config.shape_ref and config.shape_ref in self.part:
-            part_builder = self.part[config.shape_ref]
-            part_obj = part_builder(config.shape_ref, None, Mode.DEFAULT)
-            pcb_meta = getattr(part_obj, "pcb_metadata", None)
-            if pcb_meta is None and hasattr(part_obj, "part"):
-                pcb_meta = getattr(part_obj.part, "pcb_metadata", None)
-            if pcb_meta is not None:
-                if config.stackup is None and pcb_meta.stackup is not None:
-                    config.stackup = pcb_meta.stackup
-                if not config.mounting_holes and pcb_meta.mounting_holes:
-                    config.mounting_holes = pcb_meta.mounting_holes
-                if not config.silkscreen_texts and pcb_meta.silkscreen_texts:
-                    config.silkscreen_texts = pcb_meta.silkscreen_texts
-                if not config.copper_regions and pcb_meta.copper_regions:
-                    config.copper_regions = pcb_meta.copper_regions
-                if not config.test_points and pcb_meta.test_points:
-                    config.test_points = pcb_meta.test_points
-
-            if config.dimensions_mm is None:
-                bb = getattr(part_obj, "bounding_box", None)
-                if bb is None and hasattr(part_obj, "part"):
-                    bb = getattr(part_obj.part, "bounding_box", None)
-                if callable(bb):
-                    bbox = bb()
-                elif bb is not None:
-                    bbox = bb
-                else:
-                    bbox = None
-
-                if bbox is not None:
-                    th_z = config.stackup.total_thickness_mm if config.stackup else bbox.size.Z
-                    config.dimensions_mm = (round(bbox.size.X, 4), round(bbox.size.Y, 4), round(th_z, 4))
-
-        return config
-
-    @property
-    def pcb_config(self) -> Optional[PCBConfig]:
-        """Return parsed PCBConfig Pydantic model from pcb.yaml if available."""
-        config = self.get_pcb_config_without_routes()
-        if config is None:
-            return None
-
-        from provider.pcb.routing import BuildTraces, BuildVias
-
-        # Traces from provider context manager
-        p_traces = self.traces()
-        if p_traces:
-            if isinstance(p_traces, BuildTraces):
-                config.traces = list(p_traces.traces)
-            else:
-                config.traces = list(p_traces)
-
-        # Vias from provider context manager
-        p_vias = self.vias()
-        if p_vias:
-            if isinstance(p_vias, BuildVias):
-                config.vias = list(p_vias.vias)
-            else:
-                config.vias = list(p_vias)
-
-        # Silkscreen from provider context manager
-        if hasattr(self, "silkscreen") and callable(self.silkscreen):
+            # Silkscreen texts
             p_silkscreen = self.silkscreen()
             if p_silkscreen:
-                from provider.pcb.silkscreen import BuildSilkscreen
+                silkscreen_texts = list(
+                    p_silkscreen.texts if isinstance(p_silkscreen, BuildSilkscreen) else p_silkscreen
+                )
+            else:
+                silkscreen_texts = list(primary_cfg.silkscreen_texts)
 
-                if isinstance(p_silkscreen, BuildSilkscreen):
-                    config.silkscreen_texts = list(p_silkscreen.texts)
-                else:
-                    config.silkscreen_texts = list(p_silkscreen)
+            # Silkscreen graphics
+            silkscreen_graphics = (
+                list(self.silkscreen_graphics())
+                if hasattr(self, "silkscreen_graphics")
+                else list(primary_cfg.silkscreen_graphics)
+            )
 
-        if hasattr(self, "silkscreen_graphics") and callable(self.silkscreen_graphics):
-            p_graphics = self.silkscreen_graphics()
-            if p_graphics:
-                config.silkscreen_graphics = list(p_graphics)
+            # Copper regions
+            p_regions = self.copper_regions()
+            if p_regions:
+                copper_regions = list(p_regions.regions if isinstance(p_regions, BuildCopperRegions) else p_regions)
+            else:
+                copper_regions = list(primary_cfg.copper_regions)
 
-        # Fall back to shape metadata traces/vias/silkscreen if not present
-        if config.shape_ref and config.shape_ref in self.part:
-            part_builder = self.part[config.shape_ref]
-            part_obj = part_builder(config.shape_ref, None, Mode.DEFAULT)
-            pcb_meta = getattr(part_obj, "pcb_metadata", None)
-            if pcb_meta is None and hasattr(part_obj, "part"):
-                pcb_meta = getattr(part_obj.part, "pcb_metadata", None)
-            if pcb_meta is not None:
-                if not config.traces and pcb_meta.traces:
-                    config.traces = pcb_meta.traces
-                if not config.vias and pcb_meta.vias:
-                    config.vias = pcb_meta.vias
-                if not config.silkscreen_texts and pcb_meta.silkscreen_texts:
-                    config.silkscreen_texts = pcb_meta.silkscreen_texts
+            # Test points
+            p_tps = self.test_points()
+            if p_tps:
+                test_points = list(p_tps.test_points if isinstance(p_tps, BuildTestPoints) else p_tps)
+            else:
+                test_points = list(primary_cfg.test_points)
 
-        return config
+            # Traces and vias
+            p_traces = self.traces()
+            if p_traces:
+                traces = list(p_traces.traces if isinstance(p_traces, BuildTraces) else p_traces)
+            else:
+                traces = combined_traces
+
+            p_vias = self.vias()
+            if p_vias:
+                vias = list(p_vias.vias if isinstance(p_vias, BuildVias) else p_vias)
+            else:
+                vias = combined_vias
+
+            w = self.wiring
+            if w and hasattr(w, "symbol_table"):
+                combined_symbol_table.update(w.symbol_table)
+
+            assembly_test = primary_cfg.assembly_test
+            if combined_test_steps:
+                assembly_test = AssemblyTestModel(
+                    instructions=combined_test_steps,
+                    test_fixture="flying_probe",
+                    pass_criteria="all_steps_within_tolerance",
+                )
+
+            # Board type: rigid-flex if multiple boards with flex
+            board_type = primary_cfg.board_type
+            if len(pcb_parts) > 1 and any(p[1].board_type == BoardType.FLEX for p in pcb_parts):
+                board_type = BoardType.RIGID_FLEX
+
+            cfg = primary_cfg.model_copy(
+                update={
+                    "board_type": board_type,
+                    "stackup": stackup_model,
+                    "mounting_holes": holes,
+                    "silkscreen_texts": silkscreen_texts,
+                    "silkscreen_graphics": silkscreen_graphics,
+                    "copper_regions": copper_regions,
+                    "test_points": test_points,
+                    "traces": traces,
+                    "vias": vias,
+                    "obstacles": combined_obstacles,
+                    "capacitive_sensors": combined_sensors,
+                    "symbol_table": combined_symbol_table,
+                    "test_steps": combined_test_steps,
+                    "assembly_test": assembly_test,
+                }
+            )
+            self._cached_pcb_config = cfg
+            return cfg
+        finally:
+            self._building_pcb_config = False
+
+    def get_pcb_config_without_routes(self) -> Optional[PCBConfig]:
+        """Return PCBConfig populated with stackup, holes, copper regions, and test points, omitting traces and vias."""
+        cfg = self.pcb_config
+        if cfg is None:
+            return None
+        return cfg.model_copy(update={"traces": [], "vias": []})
 
     @property
     def manifest(self) -> dict[str, dict[str, Any]]:

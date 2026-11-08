@@ -561,10 +561,6 @@ class Builder:
 
                 wiring = getattr(provider, "wiring", None)
                 if wiring is None:
-                    wiring_file = getattr(provider, "wiring_path", None)
-                    if wiring_file and Path(wiring_file).exists():
-                        wiring = Wiring(Path(wiring_file))
-                if wiring is None:
                     continue
 
                 pcb_config = provider.pcb_config

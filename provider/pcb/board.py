@@ -15,7 +15,9 @@ from model.pcb import (
     FlexType,
     MountingHoleModel,
     PCBConfig,
+    PCBDesignRulesModel,
     PCBObstacleModel,
+    SheetSize,
     SilkscreenTextModel,
     SilkscreenGraphicModel,
     StackupModel,
@@ -49,6 +51,7 @@ class BuildPcb(BuildPart):
         self,
         name: str = "board",
         board_type: Union[BoardType, str] = BoardType.RIGID,
+        shape_ref: Optional[str] = None,
         revision: str = "1.0",
         stackup: Optional[Union[BuildStackup, StackupModel]] = None,
         capacitive_sensors: Optional[Sequence[CapacitiveElectrodeModel]] = None,
@@ -61,6 +64,7 @@ class BuildPcb(BuildPart):
         Args:
             name: PCB identifier or subassembly name.
             board_type: Substrate construction ('rigid', 'flex', or 'rigid-flex').
+            shape_ref: Optional target geometry shape reference (defaults to name).
             revision: Board revision identifier.
             stackup: Multi-layer stackup model or BuildStackup context.
             capacitive_sensors: Optional sequence of capacitive electrode models.
@@ -69,6 +73,7 @@ class BuildPcb(BuildPart):
         """
         super().__init__(mode=mode)
         self.name = name
+        self.shape_ref = shape_ref or name
         self.board_type: BoardType = BoardType(board_type) if isinstance(board_type, str) else board_type
         self.revision = revision
         self.coverlay_color = coverlay_color
@@ -108,6 +113,13 @@ class BuildPcb(BuildPart):
         """Enter context and set ambient BuildPcb context var."""
         super().__enter__()
         self._token = _current_build_pcb.set(self)
+        from provider.pcb.metadata import PcbMetadata
+
+        ambient_meta = PcbMetadata.current()
+        if ambient_meta is not None:
+            self.metadata = ambient_meta
+            if ambient_meta.obstacles:
+                self.obstacles.extend(ambient_meta.obstacles)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
@@ -116,6 +128,13 @@ class BuildPcb(BuildPart):
             _current_build_pcb.reset(self._token)
             self._token = None
         super().__exit__(exc_type, exc_val, exc_tb)
+
+        # Workaround folding: automatically set label and urdf_label
+        if self.part is not None:
+            self.part.label = self.name
+            self.part.urdf_label = self.name
+        self.label = self.name
+        self.urdf_label = self.name
 
         # Synthesize in-memory Wiring container if footprints or nets were registered
         from model.wiring import Wiring
@@ -152,13 +171,47 @@ class BuildPcb(BuildPart):
                 pass_criteria="all_steps_within_tolerance",
             )
 
+        meta = getattr(self, "metadata", None)
+        sheet_size = meta.sheet_size if meta and meta.sheet_size else SheetSize.A4
+        omitted = list(meta.omitted_silkscreen_designators) if meta else []
+        design_rules = meta.design_rules if meta and meta.design_rules else PCBDesignRulesModel()
+        b_type = meta.board_type if meta and meta.board_type else self.board_type
+        rev = meta.revision if meta and meta.revision else self.revision
+        f_type = meta.flex_type if meta and meta.flex_type else None
+        net_classes = list(meta.net_classes) if meta and meta.net_classes else []
+        flex_zones = list(meta.flex_zones) if meta and meta.flex_zones else []
+        cap_sensors = list(self.capacitive_sensors)
+        if meta and meta.capacitive_sensors:
+            cap_sensors.extend(meta.capacitive_sensors)
+        schematic_sheets = list(meta.schematic_sheets) if meta and meta.schematic_sheets else []
+        obstacles = list(self.obstacles)
+        if meta and meta.obstacles:
+            for obs in meta.obstacles:
+                if obs not in obstacles:
+                    obstacles.append(obs)
+        assembly_test = meta.assembly_test if meta and meta.assembly_test else None
+        if assembly_test is None and self.test_steps:
+            assembly_test = AssemblyTestModel(
+                instructions=list(self.test_steps),
+                test_fixture="flying_probe",
+                pass_criteria="all_steps_within_tolerance",
+            )
+
         return PCBConfig(
             name=self.name,
-            board_type=self.board_type,
-            revision=self.revision,
+            board_type=b_type,
+            flex_type=f_type,
+            revision=rev,
             coverlay_color=self.coverlay_color,
             dimensions_mm=dims,
-            shape_ref=self.name,
+            shape_ref=meta.shape_ref if meta and getattr(meta, "shape_ref", None) else self.shape_ref,
+            sheet_size=sheet_size,
+            omitted_silkscreen_designators=omitted,
+            design_rules=design_rules,
+            net_classes=net_classes,
+            flex_zones=flex_zones,
+            capacitive_sensors=cap_sensors,
+            schematic_sheets=schematic_sheets,
             stackup=self.stackup_model,
             mounting_holes=list(self.mounting_holes),
             silkscreen_texts=list(self.silkscreen_texts),
@@ -168,8 +221,7 @@ class BuildPcb(BuildPart):
             copper_regions=list(self.copper_regions),
             outline_polygon=list(self.outline_polygon) if self.outline_polygon else None,
             test_points=list(self.test_points),
-            capacitive_sensors=list(self.capacitive_sensors),
-            obstacles=list(self.obstacles),
+            obstacles=obstacles,
             symbol_table=dict(self.symbol_table),
             test_steps=list(self.test_steps),
             assembly_test=assembly_test,

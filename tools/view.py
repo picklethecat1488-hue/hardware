@@ -189,7 +189,7 @@ class Viewer:
             from provider.pcb.exporter import PCBExporter
 
             subassembly = TargetParser.split_target(target)[1]
-            wiring = Wiring(provider.wiring_path) if os.path.exists(provider.wiring_path) else None
+            wiring = provider.wiring
 
             solid = None
             sub_pcb_config = None

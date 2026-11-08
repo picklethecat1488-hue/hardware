@@ -901,7 +901,7 @@ class TestViewer:
 
         mock_provider = MagicMock()
         mock_provider.name = "carrier_board"
-        mock_provider.wiring_path = tmp_path / "wiring.yaml"
+        mock_provider.wiring = MagicMock(footprints=[], nets=[])
         mock_provider.pcb_config = MagicMock()
         mock_provider.pcb_config.dimensions_mm = (50.0, 50.0, 1.6)
         mock_provider.pcb_config.stackup.total_thickness_mm = 1.6
@@ -936,7 +936,7 @@ class TestViewer:
 
         mock_provider = MagicMock()
         mock_provider.name = "carrier_board"
-        mock_provider.wiring_path = tmp_path / "wiring.yaml"
+        mock_provider.wiring = MagicMock(footprints=[], nets=[])
         mock_provider.pcb_config = MagicMock()
         mock_provider.pcb_config.dimensions_mm = (100.0, 15.0, 0.2)
         mock_provider.pcb_config.stackup.total_thickness_mm = 0.2
@@ -1041,7 +1041,7 @@ class TestViewer:
 
         mock_provider = MagicMock()
         mock_provider.name = "carrier_board"
-        mock_provider.wiring_path = tmp_path / "wiring.yaml"
+        mock_provider.wiring = MagicMock(footprints=[], nets=[])
         mock_provider.pcb_config = MagicMock()
         mock_provider.pcb_config.dimensions_mm = (60.0, 90.0, 1.51)
         mock_provider.pcb_config.stackup.total_thickness_mm = 1.51

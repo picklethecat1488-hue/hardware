@@ -400,9 +400,9 @@ def test_schematic_diagram_dynamic_scaling(tmp_path: Path):
 def test_carrier_board_wiring_and_diagram_generation(tmp_path: Path):
     """Verify that CarrierBoard wiring YAML parses footprints and nets, generates diagrams, and exports BOM/CPL."""
     provider = CarrierBoardProvider()
-    assert provider.wiring_path.exists()
+    assert provider.wiring is not None
 
-    wiring = Wiring(provider.wiring_path)
+    wiring = provider.wiring
     assert len(wiring.footprints) >= 62
     footprint_names = [fp.name for fp in wiring.footprints]
     assert "U1" in footprint_names
@@ -809,7 +809,7 @@ def test_carrier_board_full_milestones_integration(tmp_path: Path):
     assert enclosure_bottom.part.is_valid()
 
     # Milestone 5 & 6: Wiring passives, actives, and flex fanout
-    wiring = Wiring(provider.wiring_path)
+    wiring = provider.wiring
     fp_names = {fp.name for fp in wiring.footprints}
     assert {"R1", "R2", "C1", "C2", "C3", "J2"}.issubset(fp_names)
     assert "Q1" not in fp_names
@@ -835,7 +835,7 @@ def test_carrier_board_manufacturing_artifacts_and_pos_alignment(tmp_path: Path)
     provider = CarrierBoardProvider()
     cfg = provider.pcb_config
     assert cfg is not None
-    wiring = Wiring(provider.wiring_path)
+    wiring = provider.wiring
 
     # 1. DRC validation: ensure all nets connected, no airwires, zero collisions
     drc_checker = PCBDesignRulesChecker(cfg)
@@ -1103,7 +1103,7 @@ def test_carrier_board_test_points_and_zero_drc_errors():
     assert abs(point_dist("TP9", "TP10") - 4.0) < 1e-3
 
     # DRC check: 0 errors on carrier_board
-    wiring = Wiring(provider.wiring_path)
+    wiring = provider.wiring
     drc = PCBDesignRulesChecker(cfg)
     report = drc.check_all(wiring=wiring)
     assert report.passed, f"DRC failed:\n{report.summary()}"
@@ -1171,7 +1171,7 @@ def test_schematic_discrete_component_truth_table(tmp_path: Path):
 
     # Verify Q1 was removed from carrier board wiring per CR feedback
     provider = CarrierBoardProvider()
-    wiring = Wiring(provider.wiring_path)
+    wiring = provider.wiring
     assert not any(fp.name == "Q1" for fp in wiring.footprints)
 
     # 2. Verify auto-generated default transistor truth table for discrete transistor without explicit truth table
@@ -1219,7 +1219,7 @@ def test_schematic_diagram_geometric_offsets_and_gnd_placement(tmp_path: Path) -
     from provider.schematic_diagram import SchematicDiagram, GROUND_NET_NAMES, POWER_NET_NAMES
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     diag = SchematicDiagram(wiring, pcb_config=provider.pcb_config)
 
     # 1. Verify sheet plans generation and pin sorting
@@ -1265,7 +1265,7 @@ def test_regression_j_usb_edge_facing_and_drc_exemption() -> None:
     from provider.pcb.drc import PCBDesignRulesChecker
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     j3 = next(fp for fp in wiring.footprints if fp.name == "J3")
 
     # Rotation 270 degrees orients connector mouth toward -X (left board edge at X=-30.0)
@@ -1288,13 +1288,13 @@ def test_regression_piezo_speaker_circular_silkscreen_and_placement() -> None:
     import yaml
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     u5 = next(fp for fp in wiring.footprints if fp.name == "U5")
 
     assert u5.package == "piezo_speaker_12mm"
 
     # Verify footprint definition in thru_hole.yaml has circular geometry
-    thru_hole_yaml = provider.wiring_path.parent.parent / "footprints" / "thru_hole.yaml"
+    thru_hole_yaml = Path("projects/footprints/thru_hole.yaml")
     with open(thru_hole_yaml, encoding="utf-8") as f:
         data = yaml.safe_load(f)
     piezo = data["footprints"]["piezo_speaker_12mm"]
@@ -1333,7 +1333,7 @@ def test_regression_subassembly_footprint_isolation() -> None:
     from provider import Mode
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
 
     # Carrier board router
     carrier_cfg = provider.get_pcb_config_without_routes()
@@ -1365,7 +1365,7 @@ def test_regression_flex_tail_front_routing_and_silkscreen(tmp_path: Path) -> No
     from provider import Mode
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     flex_part = provider.part.get("flex_tail")
     assert flex_part is not None
     flex_res = flex_part("flex_tail", None, Mode.DEFAULT)
@@ -1401,7 +1401,7 @@ def test_schematic_drc_carrier_board_passes() -> None:
     from provider.pcb.drc import PCBDesignRulesChecker
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     checker = PCBDesignRulesChecker(provider.pcb_config)
 
     violations = checker.check_schematic(wiring)
@@ -1629,7 +1629,7 @@ def test_regression_smd_no_connect_pads_included_on_pcb(tmp_path: Path) -> None:
     from provider.pcb.exporter import PCBExporter
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
 
     # 1. Verify U1 has all 184 balls defined
     u1 = next((fp for fp in wiring.footprints if fp.name == "U1"), None)
@@ -1672,7 +1672,7 @@ def test_regression_inner_copper_layers_and_auto_routing_connectivity(tmp_path: 
     from provider.pcb.kicad_cli import KiCadCLI
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
 
     # 1. Verify KiCad screen-space pin rotation math for rotated footprints (J3 at 270 deg)
     j3 = next((fp for fp in wiring.footprints if fp.name == "J3"), None)
@@ -1964,7 +1964,7 @@ def test_regression_enclosure_m2_cutout_and_component_silkscreens() -> None:
         assert comp in silk_texts, f"Component RefDes {comp} must be present in carrier silkscreen"
 
     # 3. Verify zero DRC errors across carrier board with all silkscreen texts
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     checker = PCBDesignRulesChecker(provider.pcb_config)
     violations = checker.check_all(wiring=wiring)
     assert violations.error_count == 0, f"DRC errors found: {[v.description for v in violations.violations.errors]}"
@@ -1976,7 +1976,7 @@ def test_regression_schematic_page_boundary_drc_and_layout(tmp_path: Path) -> No
     from provider.pcb.drc import DRCRuleName
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     checker = PCBDesignRulesChecker(provider.pcb_config)
 
     # 1. Verify 0 schematic DRC violations across all 7 sheets
@@ -1997,7 +1997,7 @@ def test_regression_schematic_page_boundary_drc_and_layout(tmp_path: Path) -> No
 def test_regression_battery_connector_j13(tmp_path: Path) -> None:
     """Verify BUG-070: JST-PH battery connector J13, C13 decoupling, and VBAT net."""
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     checker = PCBDesignRulesChecker(provider.pcb_config)
 
     # 1. Verify J13 and C13 are defined in wiring footprints
@@ -2070,7 +2070,7 @@ def test_regression_downselection_results_application() -> None:
 
     # 3. Verify all downselected components are placed in wiring footprints
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     fp_map = {fp.name: fp for fp in wiring.footprints}
     u1 = fp_map["U1"]
     assert u1.package == "VFBGA-184", f"Expected U1 package VFBGA-184, got {u1.package}"
@@ -2104,7 +2104,7 @@ def test_regression_bug_083_schematic_symbol_overlap_and_sheet7_pullups(tmp_path
     from provider.pcb.drc import DRCRuleName
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     checker = PCBDesignRulesChecker(provider.pcb_config)
 
     # 1. Verify 0 schematic symbol overlap DRC errors
@@ -2155,7 +2155,7 @@ def test_regression_bug_082_carrier_board_routing_and_kicad_drc(tmp_path: Path):
     from provider.pcb.kicad_cli import KiCadCLI
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     pcb_cfg = provider.pcb_config
 
     # 1. Verify drc.py checks on carrier_board pass with 0 errors
@@ -2190,7 +2190,7 @@ def test_regression_bug_084_carrier_board_and_schematic_revision_2_0(tmp_path: P
     from provider.pcb.exporter import PCBExporter
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     pcb_cfg = provider.pcb_config
 
     # 1. Config revision must be 2.0
@@ -2270,7 +2270,7 @@ def test_regression_bug_085_clip_on_mounting_posts() -> None:
 def test_regression_bug_086_azoteq_capacitive_sensing() -> None:
     """Verify BUG-086: Downselection of U2 to Azoteq IQS7222A001QNR / IQS7211A in QFN-20."""
     provider = CarrierBoardProvider()
-    wiring = Wiring(provider.wiring_path)
+    wiring = provider.wiring
     fp_map = {fp.name: fp for fp in wiring.footprints}
 
     # 1. Verify U2 package, MPN, and layer
@@ -2390,7 +2390,7 @@ def test_regression_bug_087_power_test_points():
     assert abs(point_dist("TP3", "TP4") - 4.0) < 1e-3
 
     # Schematic & boundary DRC check
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     checker = PCBDesignRulesChecker(cfg)
     sch_violations = checker.check_schematic(wiring=wiring)
     assert len(sch_violations.errors) == 0, f"Schematic DRC errors: {[v.description for v in sch_violations.errors]}"
@@ -2416,7 +2416,7 @@ def test_regression_bug_088_schematic_defects_and_drc() -> None:
     from provider.schematic_diagram import SchematicDiagram
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     cfg = provider.pcb_config
 
     # 1. Verify live design passes all schematic DRC checks with 0 errors
@@ -2471,7 +2471,7 @@ def test_regression_bug_089_schematic_subsystem_organization() -> None:
     from provider.pcb.drc import PCBDesignRulesChecker
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     cfg = provider.pcb_config
 
     assert cfg.schematic_sheets is not None
@@ -2526,7 +2526,7 @@ def test_regression_bug_090_enclosure_cad_feedback() -> None:
     provider = CarrierBoardProvider()
     cfg = provider.pcb_config
     assert cfg is not None
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     fp_map = {fp.name: fp for fp in wiring.footprints}
 
     # 1. Verify SWD cutout is spaced apart from USB cutout with a solid wall barrier
@@ -2624,7 +2624,7 @@ def test_regression_bug_092_carrier_board_top_logo() -> None:
     assert logo_asset.exists(), f"Unique logo image asset must exist at {logo_asset}"
 
     # 4. DRC check verifies zero silkscreen-to-pad overlap errors
-    wiring = Wiring(provider.wiring_path)
+    wiring = provider.wiring
     checker = PCBDesignRulesChecker(provider.pcb_config)
     violations = [
         v for v in checker.check_clearances_and_overlaps(wiring=wiring) if v.rule_name == "SILKSCREEN_PAD_OVERLAP"
@@ -2708,7 +2708,7 @@ def test_regression_bug_105_bug_106_audio_en_and_sensor_power_architecture() -> 
     from model.wiring import Wiring
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
 
     # 1. Verify AUDIO_EN connects MCU L4 to audio amp U4 SD_MODE (BUG-105)
     audio_en_net = next((net for net in wiring.nets if net.name == "AUDIO_EN"), None)
@@ -2774,7 +2774,7 @@ def test_regression_schematic_router_invariants_bug_098_through_104() -> None:
     from provider.schematic_diagram import SchematicDiagram
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     sd = SchematicDiagram(wiring, pcb_config=provider.pcb_config)
     sheets = sd._build_sheet_plans()
 
@@ -2804,7 +2804,7 @@ def test_regression_bugs_115_through_127() -> None:
     from provider.pcb.drc import _get_pin_absolute_pos
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     pcb_cfg = provider.pcb_config
 
     # BUG-115: Dedicated Peripheral Power Regulation & Gating sheet and PERIPH nets
@@ -2989,7 +2989,7 @@ def test_regression_bug_184_power_and_gnd_symbols_pulled_to_sheet_edges(tmp_path
     from provider.schematic_diagram import SchematicDiagram, POWER_NET_NAMES
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     diag = SchematicDiagram(wiring, pcb_config=provider.pcb_config)
     plans = diag._build_sheet_plans()
 
@@ -3056,7 +3056,7 @@ def test_regression_bug_206_off_sheet_schematic_feedback(tmp_path: Path) -> None
     from provider.schematic_diagram import SchematicDiagram
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     cfg = provider.pcb_config
 
     # 1. Verify Status and Overrides has been split into 4 distinct sub-sheets

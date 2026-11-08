@@ -119,6 +119,11 @@ class PinRef:
         return self.pin.pin_name
 
     @property
+    def label(self) -> Optional[str]:
+        """Pin label designation."""
+        return self.pin.label
+
+    @property
     def signal_name(self) -> Optional[str]:
         """Signal designation."""
         return self.pin.signal_name

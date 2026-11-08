@@ -23,13 +23,13 @@ from build123d import (
 from model import Wiring, TextArgs, DiagramStyle
 from provider import Room, WiringDiagram, Mode as ProviderMode
 from model.wiring import FootprintModel, NetModel, LabelModel, PinModel
-from provider.pcb import BuildComponents, Component, BuildWiring, Net
+from provider.pcb import BuildComponents, Component, BuildWiring, Net, BuildPcb
 
 
 def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
     """Construct in-memory Wiring container for Cat Fountain using BuildComponents and BuildWiring."""
     with BuildComponents(name="cat_fountain_components", parent_part=parent_part) as layout:
-        Component(
+        battery = Component(
             name="battery",
             package="battery",
             dimensions=(25.0, 35.0, 6.0),
@@ -38,7 +38,7 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
             label={"text": "LiPo Battery", "position": [0.0, -20.0, 0.0], "align": ["center", "max"]},
             pins=[{"name": "+", "label": "+", "side": "right"}, {"name": "-", "label": "-", "side": "right"}],
         )
-        Component(
+        charger = Component(
             name="charger",
             package="board",
             dimensions=(18.0, 29.0, 1.6),
@@ -54,7 +54,7 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 {"name": "S2", "label": "S2", "side": "left"},
             ],
         )
-        Component(
+        pico = Component(
             name="pico",
             package="board",
             dimensions=(17.0, 52.0, 1.6),
@@ -91,7 +91,7 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 {"name": "GP26", "label": "GP26", "side": "left", "slot": 11},
             ],
         )
-        Component(
+        fuel_gauge = Component(
             name="fuel_gauge",
             package="board",
             dimensions=(24.0, 20.0, 1.6),
@@ -107,7 +107,7 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 {"name": "ALRT", "label": "ALRT", "side": "left"},
             ],
         )
-        Component(
+        current_monitor = Component(
             name="current_monitor",
             package="board",
             dimensions=(25.0, 21.5, 1.6),
@@ -123,7 +123,7 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 {"name": "VIN-", "label": "VIN-", "side": "left"},
             ],
         )
-        Component(
+        motor_driver = Component(
             name="motor_driver",
             package="board",
             dimensions=(20.32, 15.24, 1.6),
@@ -146,7 +146,7 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 {"name": "W", "label": "W", "side": "left"},
             ],
         )
-        Component(
+        motor = Component(
             name="motor",
             package="motor",
             dimensions=(13.8, 13.8, 9.3),
@@ -159,7 +159,7 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 {"name": "W", "label": "W", "side": "top"},
             ],
         )
-        Component(
+        sensor_east = Component(
             name="sensor_east",
             package="tof_sensor",
             dimensions=(17.0, 25.0, 2.0),
@@ -174,7 +174,7 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 {"name": "INT", "label": "INT", "side": "left"},
             ],
         )
-        Component(
+        sensor_north = Component(
             name="sensor_north",
             package="tof_sensor",
             dimensions=(25.0, 17.0, 2.0),
@@ -189,7 +189,7 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 {"name": "INT", "label": "INT", "side": "bottom"},
             ],
         )
-        Component(
+        sensor_west = Component(
             name="sensor_west",
             package="tof_sensor",
             dimensions=(17.0, 25.0, 2.0),
@@ -204,7 +204,7 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 {"name": "INT", "label": "INT", "side": "right"},
             ],
         )
-        Component(
+        led = Component(
             name="led",
             package="led",
             dimensions=(10.0, 10.0, 1.0),
@@ -216,7 +216,7 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 {"name": "DIN", "label": "DIN", "side": "left"},
             ],
         )
-        Component(
+        speed_sensor = Component(
             name="speed_sensor",
             package="TO-92",
             dimensions=(4.5, 2.2, 4.5),
@@ -229,7 +229,7 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
                 {"name": "OUT", "label": "OUT", "side": "right"},
             ],
         )
-        Component(
+        swd_adapter = Component(
             name="swd_adapter",
             package="board",
             dimensions=(19.1, 13.7, 1.6),
@@ -247,84 +247,84 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
         Net(
             name="gnd",
             pins=[
-                ["battery", "-"],
-                ["charger", "GND"],
-                ["charger", "BAT-"],
-                ["fuel_gauge", "GND"],
-                ["sensor_east", "GND"],
-                ["current_monitor", "GND"],
-                ["motor_driver", "GND"],
-                ["led", "GND"],
-                ["sensor_north", "GND"],
-                ["sensor_west", "GND"],
-                ["pico", "GND_R"],
-                ["speed_sensor", "GND"],
+                battery.pin("-"),
+                charger.pin("GND"),
+                charger.pin("BAT-"),
+                fuel_gauge.pin("GND"),
+                sensor_east.pin("GND"),
+                current_monitor.pin("GND"),
+                motor_driver.pin("GND"),
+                led.pin("GND"),
+                sensor_north.pin("GND"),
+                sensor_west.pin("GND"),
+                pico.pin("GND_R"),
+                speed_sensor.pin("GND"),
             ],
             color="black",
         )
         Net(
             name="vcc_logic",
             pins=[
-                ["pico", "3V3"],
-                ["sensor_west", "VCC"],
-                ["sensor_north", "VCC"],
-                ["led", "VCC"],
-                ["sensor_east", "VCC"],
-                ["fuel_gauge", "VIN"],
-                ["motor_driver", "VIO"],
-                ["speed_sensor", "VCC"],
+                pico.pin("3V3"),
+                sensor_west.pin("VCC"),
+                sensor_north.pin("VCC"),
+                led.pin("VCC"),
+                sensor_east.pin("VCC"),
+                fuel_gauge.pin("VIN"),
+                motor_driver.pin("VIO"),
+                speed_sensor.pin("VCC"),
             ],
             color="red",
         )
-        Net(name="vcc_bat", pins=[["battery", "+"], ["charger", "BAT+"], ["fuel_gauge", "BAT"]], color="red")
-        Net(name="vcc_sys_pico", pins=[["charger", "SYS"], ["pico", "VSYS"]], color="red")
-        Net(name="vcc_sys_cm", pins=[["charger", "SYS"], ["current_monitor", "VIN+"]], color="red")
-        Net(name="cm_jumper", pins=[["current_monitor", "VCC"], ["current_monitor", "VIN+"]], color="red")
-        Net(name="vcc_sys_md", pins=[["current_monitor", "VIN-"], ["motor_driver", "VCC"]], color="red")
+        Net(name="vcc_bat", pins=[battery.pin("+"), charger.pin("BAT+"), fuel_gauge.pin("BAT")], color="red")
+        Net(name="vcc_sys_pico", pins=[charger.pin("SYS"), pico.pin("VSYS")], color="red")
+        Net(name="vcc_sys_cm", pins=[charger.pin("SYS"), current_monitor.pin("VIN+")], color="red")
+        Net(name="cm_jumper", pins=[current_monitor.pin("VCC"), current_monitor.pin("VIN+")], color="red")
+        Net(name="vcc_sys_md", pins=[current_monitor.pin("VIN-"), motor_driver.pin("VCC")], color="red")
         Net(
             name="sda",
             pins=[
-                ["pico", "GP12"],
-                ["sensor_west", "SDA"],
-                ["sensor_north", "SDA"],
-                ["current_monitor", "SDA"],
-                ["sensor_east", "SDA"],
-                ["fuel_gauge", "SDA"],
+                pico.pin("GP12"),
+                sensor_west.pin("SDA"),
+                sensor_north.pin("SDA"),
+                current_monitor.pin("SDA"),
+                sensor_east.pin("SDA"),
+                fuel_gauge.pin("SDA"),
             ],
             color="yellow",
         )
         Net(
             name="scl",
             pins=[
-                ["pico", "GP13"],
-                ["sensor_west", "SCL"],
-                ["sensor_north", "SCL"],
-                ["current_monitor", "SCL"],
-                ["sensor_east", "SCL"],
-                ["fuel_gauge", "SCL"],
+                pico.pin("GP13"),
+                sensor_west.pin("SCL"),
+                sensor_north.pin("SCL"),
+                current_monitor.pin("SCL"),
+                sensor_east.pin("SCL"),
+                fuel_gauge.pin("SCL"),
             ],
             color="blue",
             offset=(1.5, 1.5),
         )
-        Net(name="motor_u", pins=[["motor_driver", "U"], ["motor", "U"]], color="purple")
-        Net(name="motor_v", pins=[["motor_driver", "V"], ["motor", "V"]], color="green")
-        Net(name="motor_w", pins=[["motor_driver", "W"], ["motor", "W"]], color="blue")
-        Net(name="led_data", pins=[["pico", "GP11"], ["led", "DIN"]], color="purple")
-        Net(name="ctrl_xshut_n", pins=[["pico", "GP4"], ["sensor_north", "XSHUT"]], color="orange")
-        Net(name="ctrl_xshut_e", pins=[["pico", "GP5"], ["sensor_east", "XSHUT"]], color="orange")
-        Net(name="ctrl_xshut_w", pins=[["pico", "GP6"], ["sensor_west", "XSHUT"]], color="orange")
-        Net(name="ctrl_int_n", pins=[["pico", "GP7"], ["sensor_north", "INT"]], color="green")
-        Net(name="ctrl_int_e", pins=[["pico", "GP9"], ["sensor_east", "INT"]], color="green")
-        Net(name="ctrl_int_w", pins=[["pico", "GP10"], ["sensor_west", "INT"]], color="green")
-        Net(name="ctrl_alrt", pins=[["pico", "GP14"], ["fuel_gauge", "ALRT"]], color="orange")
-        Net(name="ctrl_uh", pins=[["pico", "GP16"], ["motor_driver", "UH"]], color="brown")
-        Net(name="ctrl_ul", pins=[["pico", "GP17"], ["motor_driver", "UL"]], color="teal", offset=(1.0, 1.0))
-        Net(name="ctrl_vh", pins=[["pico", "GP18"], ["motor_driver", "VH"]], color="magenta")
-        Net(name="ctrl_vl", pins=[["pico", "GP19"], ["motor_driver", "VL"]], color="purple", offset=(1.0, 1.0))
-        Net(name="ctrl_wh", pins=[["pico", "GP20"], ["motor_driver", "WH"]], color="yellow")
-        Net(name="ctrl_wl", pins=[["pico", "GP21"], ["motor_driver", "WL"]], color="orange", offset=(1.0, 1.0))
-        Net(name="ctrl_diag", pins=[["pico", "GP22"], ["motor_driver", "DIAG"]], color="blue")
-        Net(name="speed_sense", pins=[["pico", "GP26"], ["speed_sensor", "OUT"]], color="green")
+        Net(name="motor_u", pins=[motor_driver.pin("U"), motor.pin("U")], color="purple")
+        Net(name="motor_v", pins=[motor_driver.pin("V"), motor.pin("V")], color="green")
+        Net(name="motor_w", pins=[motor_driver.pin("W"), motor.pin("W")], color="blue")
+        Net(name="led_data", pins=[pico.pin("GP11"), led.pin("DIN")], color="purple")
+        Net(name="ctrl_xshut_n", pins=[pico.pin("GP4"), sensor_north.pin("XSHUT")], color="orange")
+        Net(name="ctrl_xshut_e", pins=[pico.pin("GP5"), sensor_east.pin("XSHUT")], color="orange")
+        Net(name="ctrl_xshut_w", pins=[pico.pin("GP6"), sensor_west.pin("XSHUT")], color="orange")
+        Net(name="ctrl_int_n", pins=[pico.pin("GP7"), sensor_north.pin("INT")], color="green")
+        Net(name="ctrl_int_e", pins=[pico.pin("GP9"), sensor_east.pin("INT")], color="green")
+        Net(name="ctrl_int_w", pins=[pico.pin("GP10"), sensor_west.pin("INT")], color="green")
+        Net(name="ctrl_alrt", pins=[pico.pin("GP14"), fuel_gauge.pin("ALRT")], color="orange")
+        Net(name="ctrl_uh", pins=[pico.pin("GP16"), motor_driver.pin("UH")], color="brown")
+        Net(name="ctrl_ul", pins=[pico.pin("GP17"), motor_driver.pin("UL")], color="teal", offset=(1.0, 1.0))
+        Net(name="ctrl_vh", pins=[pico.pin("GP18"), motor_driver.pin("VH")], color="magenta")
+        Net(name="ctrl_vl", pins=[pico.pin("GP19"), motor_driver.pin("VL")], color="purple", offset=(1.0, 1.0))
+        Net(name="ctrl_wh", pins=[pico.pin("GP20"), motor_driver.pin("WH")], color="yellow")
+        Net(name="ctrl_wl", pins=[pico.pin("GP21"), motor_driver.pin("WL")], color="orange", offset=(1.0, 1.0))
+        Net(name="ctrl_diag", pins=[pico.pin("GP22"), motor_driver.pin("DIAG")], color="blue")
+        Net(name="speed_sense", pins=[pico.pin("GP26"), speed_sensor.pin("OUT")], color="green")
 
     wiring = Wiring.from_models(
         footprints=layout.components,
@@ -335,9 +335,9 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
     return wiring
 
 
-def make_pcb(w: float, l: float, h: float = 2.0) -> Part:
+def make_pcb(w: float, l: float, h: float = 2.0, name: str = "pcb") -> Part:
     """Build a dummy 3D solid for a rectangular PCB with corner fillets."""
-    with BuildPart() as pcb:
+    with BuildPcb(name=name) as pcb:
         Box(w, l, h, align=(Align.CENTER, Align.CENTER, Align.CENTER))
         r = min(1.5, min(w, l) * 0.4)
         if r > 0.1:
@@ -345,9 +345,9 @@ def make_pcb(w: float, l: float, h: float = 2.0) -> Part:
     return cast(Part, pcb.part)
 
 
-def make_sensor_pcb() -> Part:
+def make_sensor_pcb(name: str = "sensor_pcb") -> Part:
     """Build a dummy 3D solid for a ToF sensor PCB module."""
-    with BuildPart() as pcb:
+    with BuildPcb(name=name) as pcb:
         Box(2.0, 25.0, 17.0, align=(Align.CENTER, Align.CENTER, Align.CENTER))
         fillet(pcb.edges().filter_by(Axis.X), radius=1.5)
     return cast(Part, pcb.part)

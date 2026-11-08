@@ -25,7 +25,7 @@ class CarrierBoardConfig(BaseModel):
     )
 
     routing_path: Optional[str] = Field(
-        default=None,
+        default="projects/carrier_board/routing.yaml",
         description="Path to persisted routing YAML file defining traces and vias.",
     )
 

@@ -529,8 +529,8 @@ class CarrierBoardCAD:
         batt_x = self.settings.enclosure_battery_mount_x
         batt_y = self.settings.enclosure_battery_mount_y
         j13_x, j13_y = -23.0, 16.0
-        if self.wiring_path.exists():
-            wiring = Wiring(str(self.wiring_path))
+        if self.wiring:
+            wiring = self.wiring
             j13_comp = next((c for c in wiring.footprints if c.name == "J13"), None)
             if j13_comp:
                 j13_x, j13_y = j13_comp.position[0], j13_comp.position[1]
@@ -655,31 +655,3 @@ class CarrierBoardCAD:
         """Render standalone snap-fit battery cover."""
         cover = self.battery_cover("battery_cover", None, mode)
         room.add("battery_cover", cover.part, color=(0.20, 0.22, 0.28), alpha=0.9)
-
-    @property
-    def btle_status_signaling(self) -> dict[str, dict[str, str]]:
-        """Return BTLE connection status signaling configuration for RGB LED (D1) and piezo buzzer (U5).
-
-        Status Modes:
-            - pairing: LED D1 pulses blue, buzzer U5 emits rising chirp (1kHz -> 2kHz).
-              Triggered by capacitive touch input gesture on flex tail or proximity sensor.
-            - connected: LED D1 solid cyan, buzzer U5 emits single confirmation tone (2.5kHz).
-            - disconnected: LED D1 breathing white, buzzer U5 emits descending tone (2kHz -> 1kHz).
-        """
-        return {
-            "pairing": {
-                "led_color": "blue_pulse",
-                "buzzer_tone": "chirp_rising_1khz_2khz",
-                "trigger": "capacitive_touch_gesture_or_proximity",
-            },
-            "connected": {
-                "led_color": "solid_cyan",
-                "buzzer_tone": "confirmation_beep_2.5khz",
-                "trigger": "ble_peer_connected",
-            },
-            "disconnected": {
-                "led_color": "breathing_white",
-                "buzzer_tone": "descending_tone_2khz_1khz",
-                "trigger": "ble_peer_disconnected",
-            },
-        }

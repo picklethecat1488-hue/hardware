@@ -34,7 +34,8 @@ from .routing import (
 from .jax_router import JaxPCBRouter
 from .layout import BuildComponents, Component
 from .wiring import BuildWiring, Net, DiffPair, Bus
-from .test_steps import BuildTestSteps, TestStep
+from .test_steps import BuildTestSteps, BuildAssemblyTestSteps, TestStep
+from .metadata import PcbMetadata
 from .supplier import package_supplier_pcb_files, generate_pcb_project_summary
 
 __all__ = [
@@ -82,7 +83,9 @@ __all__ = [
     "package_supplier_pcb_files",
     "generate_pcb_project_summary",
     "BuildTestSteps",
+    "BuildAssemblyTestSteps",
     "TestStep",
+    "PcbMetadata",
     "BuildComponents",
     "Component",
     "BuildWiring",

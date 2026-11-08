@@ -130,10 +130,8 @@ def verify_signal_lines_isolation(
         pcb_cfg = getattr(provider, "pcb_config", None)
         if pcb_cfg and getattr(pcb_cfg, "wiring", None):
             wiring = pcb_cfg.wiring
-        elif hasattr(provider, "wiring_path") and Path(provider.wiring_path).exists():
-            from model.wiring import Wiring
-
-            wiring = Wiring(Path(provider.wiring_path))
+        elif hasattr(provider, "wiring"):
+            wiring = provider.wiring
 
     if not wiring or not hasattr(wiring, "nets"):
         return {
@@ -256,10 +254,8 @@ def verify_diff_pair_compliance(
         pcb_cfg = getattr(provider, "pcb_config", None)
         if pcb_cfg and getattr(pcb_cfg, "wiring", None):
             wiring = pcb_cfg.wiring
-        elif hasattr(provider, "wiring_path") and Path(provider.wiring_path).exists():
-            from model.wiring import Wiring
-
-            wiring = Wiring(Path(provider.wiring_path))
+        elif hasattr(provider, "wiring"):
+            wiring = provider.wiring
 
     net_names = {net.name for net in wiring.nets} if wiring and hasattr(wiring, "nets") else set()
 
@@ -599,8 +595,8 @@ def create_flying_probe_hooks(
     # Resolve test steps yaml path
     if test_steps_path is None:
         p_root = getattr(provider, "root", None)
-        if p_root is None and hasattr(provider, "wiring_path"):
-            p_root = Path(provider.wiring_path).parent
+        if p_root is None and hasattr(provider, "__file__"):
+            p_root = Path(provider.__file__).parent
         if p_root:
             test_steps_path = Path(p_root) / "pcb_test_steps.yaml"
 
@@ -618,10 +614,6 @@ def create_flying_probe_hooks(
     # Synthesize physical flying probe test steps for all signal line isolation checks
     # so the flying probes physically navigate to and probe every signal line against GND/power
     wiring = getattr(provider, "wiring", None)
-    if wiring is None and hasattr(provider, "wiring_path") and Path(provider.wiring_path).exists():
-        from model.wiring import Wiring
-
-        wiring = Wiring(Path(provider.wiring_path))
 
     pcb_cfg = getattr(provider, "pcb_config", None)
 

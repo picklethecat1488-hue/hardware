@@ -17,7 +17,7 @@ def config_route(provider: Any, target: str, subassembly: Optional[str]) -> None
     if cfg is None:
         raise ValueError("PCB configuration not found for carrier_board")
 
-    project_dir = provider.wiring_path.parent
+    project_dir = Path(__file__).parent
     routing_file = project_dir / "routing.yaml"
     auto_traces, auto_vias = [], []
 

@@ -9,7 +9,7 @@ from model.wiring import PinRef
 _current_test_steps: ContextVar[Optional["BuildTestSteps"]] = ContextVar("_current_test_steps", default=None)
 
 
-class BuildTestSteps:
+class BuildAssemblyTestSteps:
     """Context manager for declarative PCB assembly and flying probe simulation test steps."""
 
     __test__ = False
@@ -28,7 +28,7 @@ class BuildTestSteps:
         self.steps: List[AssemblyTestStepModel] = []
         self._token: Optional[Token] = None
 
-    def __enter__(self) -> "BuildTestSteps":
+    def __enter__(self) -> "BuildAssemblyTestSteps":
         """Enter test steps builder context."""
         self._token = _current_test_steps.set(self)
         return self
@@ -46,7 +46,7 @@ class BuildTestSteps:
             active_pcb.test_steps.extend(self.steps)
 
     @classmethod
-    def _get_context(cls) -> Optional["BuildTestSteps"]:
+    def _get_context(cls) -> Optional["BuildAssemblyTestSteps"]:
         """Retrieve active test steps builder context if present."""
         return _current_test_steps.get()
 
@@ -56,6 +56,9 @@ class BuildTestSteps:
             self.steps.append(item)
         else:
             self.steps.extend(item)
+
+
+BuildTestSteps = BuildAssemblyTestSteps
 
 
 class TestStep:
@@ -68,10 +71,12 @@ class TestStep:
         step_id: str,
         description: str,
         test_type: str = "continuity",
-        net_name: Optional[str] = None,
+        net_name: Optional[Union[str, Any]] = None,
+        net_or_points: Optional[Union[str, Any, Sequence[Any]]] = None,
         pad_a: Optional[Union[Tuple[float, float], PinRef, Any]] = None,
         pad_b: Optional[Union[Tuple[float, float], PinRef, Any]] = None,
         nominal: Optional[float] = None,
+        expected_nominal: Optional[float] = None,
         tolerance_pct: Optional[float] = 10.0,
         unit: str = "ohm",
         stimulus: Optional[str] = None,
@@ -79,38 +84,76 @@ class TestStep:
         pad_a_mm: Optional[Tuple[float, float]] = None,
         pad_b_mm: Optional[Tuple[float, float]] = None,
         subassembly: Optional[str] = None,
+        name: Optional[str] = None,
+        **kwargs: Any,
     ) -> None:
-        """Define an automated test fixture step."""
-        pad_a = pad_a or pad_a_mm
-        pad_b = pad_b or pad_b_mm
-        ctx = BuildTestSteps._get_context()
-        resolved_sub = subassembly or (ctx.subassembly if ctx else None)
+        """Define an automated test fixture step with type-safe net and pin references."""
+        pad_a = pad_a if pad_a is not None else pad_a_mm
+        pad_b = pad_b if pad_b is not None else pad_b_mm
+        ctx = BuildAssemblyTestSteps._get_context()
+        from provider.pcb.board import BuildPcb
+
+        current_pcb = BuildPcb.current()
+        resolved_sub = (
+            subassembly or name or (ctx.subassembly if ctx else None) or (current_pcb.name if current_pcb else None)
+        )
+
+        resolved_net_name = net_name
+        resolved_net_points: List[str] = []
+        if hasattr(net_name, "name"):
+            resolved_net_name = getattr(net_name, "name")
+
+        if net_or_points is not None:
+            if isinstance(net_or_points, str):
+                resolved_net_points = [net_or_points]
+                if not resolved_net_name:
+                    resolved_net_name = net_or_points
+            elif hasattr(net_or_points, "name"):
+                resolved_net_points = [str(getattr(net_or_points, "name"))]
+                if not resolved_net_name:
+                    resolved_net_name = str(getattr(net_or_points, "name"))
+            elif isinstance(net_or_points, (list, tuple)):
+                for np in net_or_points:
+                    if hasattr(np, "name"):
+                        resolved_net_points.append(str(getattr(np, "name")))
+                    elif isinstance(np, PinRef):
+                        resolved_net_points.append(f"{np.component_name}.{np.name}")
+                    else:
+                        resolved_net_points.append(str(np))
+                if not resolved_net_name and resolved_net_points:
+                    resolved_net_name = resolved_net_points[0]
+
+        if resolved_net_name and not resolved_net_points:
+            resolved_net_points = [str(resolved_net_name)]
 
         # Resolve pad coordinates
         def _resolve_coord(p: Any) -> Optional[Tuple[float, float]]:
             if p is None:
                 return None
             if isinstance(p, PinRef):
-                return (p.x, p.y)
+                return (round(p.x, 4), round(p.y, 4))
             if hasattr(p, "pos"):
-                return tuple(p.pos)
+                pos = getattr(p, "pos")
+                return (round(float(pos[0]), 4), round(float(pos[1]), 4))
             if isinstance(p, (tuple, list)) and len(p) >= 2:
                 return (round(float(p[0]), 4), round(float(p[1]), 4))
             return None
 
         pt_a = _resolve_coord(pad_a)
         pt_b = _resolve_coord(pad_b)
+        val_nom = nominal if nominal is not None else expected_nominal
 
         self.model = AssemblyTestStepModel(
             step_id=step_id,
             subassembly=resolved_sub,
             description=description,
             test_type=test_type,
-            net_name=net_name or "",
+            net_name=str(resolved_net_name or ""),
+            net_or_points=resolved_net_points,
             pad_a_mm=pt_a,
             pad_b_mm=pt_b,
-            nominal=nominal,
-            expected_nominal=nominal,
+            nominal=val_nom,
+            expected_nominal=val_nom,
             tolerance_pct=tolerance_pct,
             unit=unit,
             stimulus=stimulus,

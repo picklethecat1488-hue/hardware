@@ -21,7 +21,7 @@ def test_regression_bug_072_flex_tail_cutout_zero_intersection() -> None:
     h_shell = standoff_h + provider.settings.board_thickness + 10.0
     z_carrier = -h_shell / 2.0 + wall + standoff_h + (provider.settings.board_thickness / 2.0)
 
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     j2_comp = next(c for c in wiring.footprints if c.name == "J2")
     j_flex_comp = next(c for c in wiring.footprints if c.name == "J4")
     dx = j2_comp.position[0] - j_flex_comp.position[0]
@@ -45,7 +45,7 @@ def test_regression_bug_073_gpio_cutout_and_key() -> None:
     lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
     wall = provider.settings.enclosure_wall_thickness
 
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     j14 = next(c for c in wiring.footprints if c.name == "J14")
     gpio_x, gpio_y = j14.position[0], j14.position[1]
 
@@ -66,7 +66,7 @@ def test_regression_bug_074_peripheral_cutouts_and_identifiers() -> None:
     z_carrier = -h_shell / 2.0 + wall + standoff_h + (provider.settings.board_thickness / 2.0)
     z_conn = z_carrier + (provider.settings.board_thickness / 2.0) + 2.0
 
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     comp_map = {c.name: c for c in wiring.footprints}
 
     wall_x = (w / 2.0) - (wall / 2.0)
@@ -80,7 +80,7 @@ def test_regression_bug_074_peripheral_cutouts_and_identifiers() -> None:
 def test_regression_bug_110_expansion_headers_jst_ph() -> None:
     """Verify BUG-110 & BUG-174: expansion header connectors J9 and J10 are 7-pin JST-PH style connectors with GND."""
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     comp_map = {c.name: c for c in wiring.footprints}
 
     assert comp_map["J9"].package == "JST-PH-7P", f"J9 package should be JST-PH-7P, got {comp_map['J9'].package}"
@@ -101,7 +101,7 @@ def test_regression_bug_113_carrier_board_serial_cutouts_do_not_overlap() -> Non
     z_conn = z_carrier + (provider.settings.board_thickness / 2.0) + 2.0
     wall_x = (w / 2.0) - (wall / 2.0)
 
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     comp_map = {c.name: c for c in wiring.footprints}
 
     connectors = ["J6", "J7", "J8", "J9", "J10"]
@@ -136,8 +136,8 @@ def test_regression_bug_075_swd_cutout() -> None:
     from model.wiring import Wiring
 
     swd_y = -15.0
-    if provider.wiring_path.exists():
-        wiring = Wiring(str(provider.wiring_path))
+    if provider.wiring:
+        wiring = provider.wiring
         comp_map = {c.name: c for c in wiring.footprints}
         if "J5" in comp_map:
             swd_y = comp_map["J5"].position[1]
@@ -215,7 +215,7 @@ def test_regression_bug_078_led_cutout_and_cover() -> None:
     wall = provider.settings.enclosure_wall_thickness
 
     # Query D1 position from wiring
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     d1 = next(c for c in wiring.footprints if c.name == "D1")
     led_x, led_y = d1.position[0], d1.position[1]
 
@@ -422,7 +422,7 @@ def test_regression_bug_195_flying_probes_diff_pair_and_mutual_cap_compliance() 
 def test_regression_bug_214_btle_support_and_enclosure_cover_bluetooth_logo() -> None:
     """Verify BUG-214: PCIe connector/cutout removed, BTLE UART 1Mb/s added, Bluetooth logo on lid."""
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     comp_map = {c.name: c for c in wiring.footprints}
     net_map = {n.name: n for n in wiring.nets}
 
@@ -451,12 +451,6 @@ def test_regression_bug_214_btle_support_and_enclosure_cover_bluetooth_logo() ->
     # 4. Main user LED D1 and piezo buzzer U5 provide BTLE connection status
     assert "D1" in comp_map, "Main user RGB LED D1 must exist"
     assert "U5" in comp_map, "Piezo buzzer U5 must exist"
-    signaling = provider.btle_status_signaling
-    assert "pairing" in signaling and "connected" in signaling and "disconnected" in signaling
-    assert "blue" in signaling["pairing"]["led_color"]
-    assert "solid_cyan" in signaling["connected"]["led_color"]
-    assert "buzzer_tone" in signaling["pairing"]
-    assert "buzzer_tone" in signaling["connected"]
 
     # 5. Integrated PCB antenna and ground plane keepout
     assert provider.settings.ble_antenna_length > 0
@@ -575,7 +569,7 @@ def test_regression_bug_133_flex_tail_schematic_isolated() -> None:
     from model.wiring import Wiring
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(Path(provider.wiring_path))
+    wiring = provider.wiring
     flex_wiring = wiring.filter_by_footprints(["J4"])
     assert len(flex_wiring.footprints) == 1
     assert flex_wiring.footprints[0].name == "J4"
@@ -597,7 +591,7 @@ def test_regression_bug_134_carrier_board_components_match_schematic() -> None:
     from provider.pcb.drc import PCBDesignRulesChecker
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(Path(provider.wiring_path))
+    wiring = provider.wiring
     footprints = {fp.name: fp for fp in wiring.footprints}
     for j_name in ("J6", "J7", "J8"):
         assert j_name in footprints, f"Footprint {j_name} must exist in wiring"
@@ -653,7 +647,7 @@ def test_regression_bug_140_flex_tail_support() -> None:
     length = provider.settings.board_length + 2.0 * (provider.settings.enclosure_clearance + wall)
     z_carrier = -h_shell / 2.0 + wall + standoff_h + (provider.settings.board_thickness / 2.0)
 
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     j2 = next(c for c in wiring.footprints if c.name == "J2")
     j4 = next(c for c in wiring.footprints if c.name == "J4")
     dz = j2.position[2] - j4.position[2]
@@ -715,7 +709,7 @@ def test_regression_bug_143_peripheral_cutouts_uniform_size() -> None:
     z_conn = z_carrier + (provider.settings.board_thickness / 2.0) + 2.0
     wall_x = (w / 2.0) - (wall / 2.0)
 
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     comp_map = {c.name: c for c in wiring.footprints}
     periph_connectors = ["J6", "J7", "J8", "J9", "J10"]
 
@@ -755,7 +749,7 @@ def test_regression_bug_145_battery_cradle_and_cover_extend_over_j13() -> None:
     provider = CarrierBoardProvider()
     lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
     cover = provider.battery_cover("battery_cover", None, Mode.DEFAULT)
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     j13 = next(c for c in wiring.footprints if c.name == "J13")
     j13_x, j13_y = j13.position[0], j13.position[1]
 
@@ -774,7 +768,7 @@ def test_regression_bug_145_battery_cradle_and_cover_extend_over_j13() -> None:
 def test_regression_bug_146_mipi_camera_routing_removed() -> None:
     """Verify BUG-146: MIPI camera routing and differential nets are removed from board."""
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     pcb_cfg = provider.pcb_config
 
     # No nets with MIPI in their name should exist
@@ -889,7 +883,7 @@ def test_regression_bug_149_mutual_intersection_test() -> None:
     carrier_geom = carrier.part.locate(Location((0.0, 0.0, z_carrier)))
     lid_geom = lid.part.locate(Location((0.0, 0.0, z_lid)))
 
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     j2_comp = next(c for c in wiring.footprints if c.name == "J2")
     j4_comp = next(c for c in wiring.footprints if c.name == "J4")
     dx = j2_comp.position[0] - j4_comp.position[0]
@@ -1130,7 +1124,7 @@ def test_regression_bug_157_action_button_routed() -> None:
     from provider.pcb.drc import PCBDesignRulesChecker
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     flex_part = provider.part["flex_tail"]("flex_tail", None, None)
     flex_config = flex_part.to_pcb_config()
     if not flex_config.stackup:
@@ -1345,7 +1339,7 @@ def test_regression_bug_173_174_schematic_netlist_disconnects_and_missing_gnd() 
     from provider.pcb.drc import PCBDesignRulesChecker, DRCRuleName
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(Path(provider.wiring_path))
+    wiring = provider.wiring
     footprints = {fp.name: fp for fp in wiring.footprints}
 
     # Verify J9 and J10 exist and have 7 pins with pin_name, signal_name, and number
@@ -1456,7 +1450,7 @@ def test_regression_bug_176_jst_connector_spacing_and_zero_drc_errors() -> None:
     from model.wiring import Wiring
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     comp_map = {c.name: c for c in wiring.footprints}
 
     # Connector lengths along Y axis: 6P = 14.0mm, 7P = 16.0mm
@@ -1484,7 +1478,7 @@ def test_regression_bug_177_enclosure_bottom_cutouts_and_lid_markers() -> None:
     from provider import Mode
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     comp_map = {c.name: c for c in wiring.footprints}
 
     enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
@@ -1517,7 +1511,7 @@ def test_regression_bug_179_right_side_ports_clear_mounting_holes() -> None:
     from model.wiring import Wiring
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     comp_map = {c.name: c for c in wiring.footprints}
 
     # Connector lengths along Y: J6-J8 = 14mm, J9-J10 = 16mm
@@ -1606,7 +1600,7 @@ def test_regression_bug_183_carrier_board_hardening() -> None:
     from provider.pcb.kicad_cli import KiCadCLI
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     comp_map = {c.name: c for c in wiring.footprints}
 
     # Verify SW1 reset button exists and is placed
@@ -1693,7 +1687,7 @@ def test_regression_bug_207_sheet_17_components_on_carrier_board() -> None:
     from provider.pcb.kicad_cli import KiCadCLI
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     comp_map = {c.name: c for c in wiring.footprints}
 
     # Verify all 17 components from Sheet 17 and sub-sheets are placed on the board
@@ -1796,7 +1790,7 @@ def test_regression_bug_210_passives_have_values() -> None:
     from projects.carrier_board.provider import CarrierBoardProvider
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     fp_map = {fp.name: fp for fp in wiring.footprints}
 
     # Verify all 14 capacitors have non-empty capacitance values
@@ -1845,7 +1839,7 @@ def test_regression_bug_209_silkscreen_readability_and_spacing() -> None:
 
     # 4. Verify PCB DRC passes with 0 violations
     drc = PCBDesignRulesChecker(pcb_cfg)
-    report = drc.check_all(wiring=Wiring(str(provider.wiring_path)))
+    report = drc.check_all(wiring=provider.wiring)
     assert report.passed, f"PCB DRC failed:\n{report.summary()}"
     assert report.error_count == 0
 
@@ -1865,7 +1859,7 @@ def test_regression_bug_219_reset_relocation_and_horizontal_jumpers() -> None:
     from provider.pcb.drc import PCBDesignRulesChecker
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     pcb_cfg = provider.pcb_config
 
     fp_map = {fp.name: fp for fp in wiring.footprints}
@@ -1993,7 +1987,7 @@ def test_regression_bug_231_nina_b312_flashed_module_swd_header_and_footprint() 
     from provider.pcb.drc import PCBDesignRulesChecker
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     pcb_cfg = provider.pcb_config
 
     fp_map = {fp.name: fp for fp in wiring.footprints}
@@ -2043,7 +2037,7 @@ def test_power_hardening_bug_243() -> None:
     from provider.pcb.drc import PCBDesignRulesChecker
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     comp_map = {c.name: c for c in wiring.footprints}
 
     for name in ("C15", "C16", "C17", "D8"):
@@ -2070,7 +2064,7 @@ def test_regression_bug_249_remove_vload_sw_from_ble_module() -> None:
     from model.wiring import Wiring
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
 
     # 1. MOD-BLE-PCB-ANT footprint in ic.yaml must not have VLOAD_SW
     ic_yaml_path = Path(__file__).resolve().parent.parent / "footprints" / "ic.yaml"
@@ -2101,7 +2095,7 @@ def test_regression_bug_250_nina_nfc_antenna_and_tuning_caps() -> None:
     from provider.pcb.drc import PCBDesignRulesChecker
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     nets_map = {n.name: n for n in wiring.nets}
 
     # 1. Verify NFC1 and NFC2 nets exist
@@ -2146,7 +2140,7 @@ def test_regression_bug_251_j15_no_connect_and_u11_reset_button(tmp_path: Path) 
     from provider.pcb.drc import PCBDesignRulesChecker
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     comp_map = {c.name: c for c in wiring.footprints}
     nets_map = {n.name: n for n in wiring.nets}
 
@@ -2207,7 +2201,7 @@ def test_regression_proposal_ct8_channel_routed_to_j2_without_flex_modification(
     from provider.pcb.drc import PCBDesignRulesChecker
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     nets_map = {n.name: n for n in wiring.nets}
 
     # 1. CAP_CT8 net exists
@@ -2329,7 +2323,7 @@ def test_regression_bug_256_flex_tail_schematic_primary_signal_nets(tmp_path: Pa
     from pdfminer.high_level import extract_text
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
 
     # 1. Verify Wiring.filter_by_footprints scopes nets strictly to connected footprints
     flex_wiring = wiring.filter_by_footprints(["J4"])
@@ -2387,7 +2381,7 @@ def test_regression_bug_259_schematic_floating_pins_and_layout() -> None:
     from provider.schematic_diagram import SchematicDiagram
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     diag = SchematicDiagram(wiring=wiring, pcb_config=provider.pcb_config)
     plans = diag._build_sheet_plans()
 
@@ -2449,7 +2443,7 @@ def test_regression_bug_260_schematic_index_sheet_names_fit_page() -> None:
     from provider.schematic_diagram import SchematicDiagram
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     diag = SchematicDiagram(wiring=wiring, pcb_config=provider.pcb_config)
     sheet_plans = diag._build_sheet_plans()
     toc_plans = diag._plan_pdf_toc_pages(wiring.footprints, diag.wiring.nets, sheet_plans)
@@ -2648,7 +2642,7 @@ def test_regression_bug_266_remove_led_and_jumper_opposite_side_designators(tmp_
     assert set(removed_designators).issubset(set(pcb_cfg.omitted_silkscreen_designators))
 
     # Verify that during PCB export, none of these designators are auto-rendered on F.SilkS or any layer
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     exp = PCBExporter(pcb_cfg, wiring=wiring)
     out_pcb = tmp_path / "carrier_board.kicad_pcb"
     exp.export_kicad_pcb(str(out_pcb))
@@ -2666,7 +2660,7 @@ def test_regression_bug_267_c18_c19_vertical_stack_and_u11_clearance() -> None:
     from provider.pcb.drc import PCBDesignRulesChecker
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
     comp_map = {c.name: c for c in wiring.footprints}
     nets_map = {n.name: n for n in wiring.nets}
 

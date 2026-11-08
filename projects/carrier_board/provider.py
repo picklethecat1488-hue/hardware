@@ -71,7 +71,6 @@ from .cad import CarrierBoardCAD
 from .pcb import (
     CarrierBoardPCB,
     build_carrier_board_wiring,
-    build_carrier_board_pcb_config,
     build_carrier_board_system_wiring,
     get_flex_tail_traces,
     get_flex_tail_vias,
@@ -97,17 +96,6 @@ class CarrierBoardProvider(CarrierBoardCAD, CarrierBoardPCB, Provider):
     def settings(self) -> CarrierBoardConfig:
         """Return typed configuration settings."""
         return cast(CarrierBoardConfig, super().settings)
-
-    @property
-    def pcb_config(self) -> PCBConfig:
-        """Return the in-memory strongly typed PCBConfig model."""
-        if not hasattr(self, "_cached_pcb_config") or self._cached_pcb_config is None:
-            self._building_pcb_config = True
-            try:
-                self._cached_pcb_config = build_carrier_board_pcb_config(self)
-            finally:
-                self._building_pcb_config = False
-        return self._cached_pcb_config
 
     @property
     def wiring(self) -> Wiring:

@@ -31,7 +31,13 @@ class ComponentInstance:
         """Initialize placed component instance."""
         self.footprint = footprint
         self._pins = list(pins)
-        self._pins_by_name: Dict[str, PinRef] = {p.name: p for p in pins}
+        self._pins_by_name: Dict[str, PinRef] = {}
+        for p in pins:
+            self._pins_by_name[p.name] = p
+            if p.pin_name:
+                self._pins_by_name[p.pin_name] = p
+            if p.label:
+                self._pins_by_name[p.label] = p
         self._pins_by_num: Dict[str, PinRef] = {p.number: p for p in pins if p.number is not None}
 
     @property
@@ -89,6 +95,11 @@ class ComponentInstance:
         available = list(self._pins_by_name.keys())
         raise KeyError(f"Pin '{name_or_num}' not found on component '{self.name}'. Available pins: {available}")
 
+    @property
+    def named_pin(self) -> "NamedPinAccessor":
+        """Accessor for named pins on this component."""
+        return NamedPinAccessor(self._pins_by_name, self.name)
+
     def __getitem__(self, name_or_num: Union[str, int]) -> PinRef:
         """Lookup pin by name or number with dictionary syntax."""
         return self.pin(name_or_num)
@@ -96,6 +107,37 @@ class ComponentInstance:
     def __repr__(self) -> str:
         """Return formatted string representation of component instance."""
         return f"<ComponentInstance {self.name} ({self.package}) at {self.position}>"
+
+
+class NamedPinAccessor:
+    """Helper enabling dict indexing, attribute access, and calling by pin functional name."""
+
+    def __init__(self, pins: Dict[str, PinRef], comp_name: str) -> None:
+        """Initialize named pin accessor."""
+        self._pins = pins
+        self._comp_name = comp_name
+
+    def __getitem__(self, name: str) -> PinRef:
+        """Retrieve pin by functional name."""
+        key = str(name).strip()
+        if key in self._pins:
+            return self._pins[key]
+        for k, p in self._pins.items():
+            if k.upper() == key.upper():
+                return p
+        available = list(self._pins.keys())
+        raise KeyError(f"Pin '{name}' not found on component '{self._comp_name}'. Available pins: {available}")
+
+    def __getattr__(self, name: str) -> PinRef:
+        """Attribute lookup for pin functional name."""
+        try:
+            return self[name]
+        except KeyError as err:
+            raise AttributeError(str(err)) from err
+
+    def __call__(self, name: str) -> PinRef:
+        """Callable lookup for pin functional name."""
+        return self[name]
 
 
 class BuildComponents:
@@ -229,6 +271,32 @@ class Component(list):
         if name is not None:
             name_or_prefix = name
             auto_number = False
+        elif not name_or_prefix:
+            pkg_lower = package.lower()
+            val_lower = (value or "").lower()
+            if "resistor" in pkg_lower or pkg_lower.startswith("r_"):
+                name_or_prefix = "R"
+            elif (
+                "capacitor" in pkg_lower
+                or pkg_lower.startswith("c_")
+                or any(u in val_lower for u in ("f", "uf", "pf", "nf"))
+            ):
+                name_or_prefix = "C"
+            elif any(d in pkg_lower for d in ("led", "sod", "diode")):
+                name_or_prefix = "D"
+            elif "sw" in pkg_lower or "switch" in pkg_lower:
+                name_or_prefix = "SW"
+            elif any(j in pkg_lower for j in ("jst", "fpc", "usb", "header", "conn")):
+                name_or_prefix = "J"
+            elif any(u in pkg_lower for u in ("qfn", "bga", "sot", "tssop", "wson", "mod", "ic")):
+                name_or_prefix = "U"
+            elif "xtal" in pkg_lower or "osc" in pkg_lower:
+                name_or_prefix = "Y"
+            elif "tp" in pkg_lower or "test_point" in pkg_lower:
+                name_or_prefix = "TP"
+            else:
+                name_or_prefix = "U"
+            auto_number = True
 
         ctx = BuildComponents._get_context()
         block_name = ctx.name if ctx else "default"
@@ -475,3 +543,8 @@ class Component(list):
     def pin(self, name_or_num: Union[str, int]) -> PinRef:
         """Retrieve pin from primary component."""
         return self.primary.pin(name_or_num)
+
+    @property
+    def named_pin(self) -> NamedPinAccessor:
+        """Named pin accessor for primary component instance."""
+        return self.primary.named_pin
