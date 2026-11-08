@@ -11,8 +11,11 @@ recordings/
 *.rrd
 # Bug and review tracking (decoupled to detached git branch 'bugs')
 feedback/
+feedback
 attachments/
+attachments
 feedback/attachments/
+feedback/attachments
 WORMS.md
 BUGS.md
 CR.md

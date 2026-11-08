@@ -11,12 +11,14 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import errno
 import json
 import mimetypes
+import os
 from pathlib import Path
 import re
 import socket
 import sqlite3
 import subprocess
 import sys
+import time
 from typing import Any, Dict, List, Optional
 import urllib.parse
 import uuid
@@ -118,17 +120,6 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             self.send_error(500, f"Internal server error: {e}")
 
     def _do_get_impl(self) -> None:
-        if hasattr(self.server, "review_server") and self.server.review_server:
-            try:
-                self.server.review_server.check_file_watch()
-            except Exception:
-                pass
-        if hasattr(self.server, "bug_server") and self.server.bug_server:
-            try:
-                self.server.bug_server.check_file_watch()
-            except Exception:
-                pass
-
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
@@ -152,6 +143,22 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         if path == "/apple-touch-icon.png":
             self._handle_serve_static("/static/apple-touch-icon.png")
             return
+
+        # Throttle external file-watch polling to at most once per 2.5s for dynamic API routes
+        now = time.time()
+        last_check = getattr(self.server, "_last_file_watch_check", 0.0)
+        if now - last_check >= 2.5:
+            self.server._last_file_watch_check = now
+            if hasattr(self.server, "review_server") and self.server.review_server:
+                try:
+                    self.server.review_server.check_file_watch()
+                except Exception:
+                    pass
+            if hasattr(self.server, "bug_server") and self.server.bug_server:
+                try:
+                    self.server.bug_server.check_file_watch()
+                except Exception:
+                    pass
 
         if path.startswith("/attachments/") or path.startswith("/build/attachments/"):
             self._handle_serve_attachment(path)
@@ -1318,6 +1325,7 @@ class DashboardServer(ThreadingHTTPServer):
         sqlite_review_file: Optional[Path] = None,
         markdown_bugs_path: Optional[Path] = None,
         markdown_review_path: Optional[Path] = None,
+        feedback_dir: Optional[Path] = None,
         revisions: Optional[List[str]] = None,
         fresh: bool = False,
         bind_and_activate: bool = True,
@@ -1326,6 +1334,7 @@ class DashboardServer(ThreadingHTTPServer):
         ensure_high_fd_limit()
         self.repo_root = (repo_root or get_git_root()).resolve()
         self.git_engine = GitEngine(repo_root=self.repo_root)
+        self.git_engine.ensure_feedback_worktree()
         self.host = host
         self.port = port
         self.active_branch = initial_branch or self.git_engine.get_current_branch()
@@ -1333,12 +1342,21 @@ class DashboardServer(ThreadingHTTPServer):
         self.initial_sync_done: bool = False
 
         md_review = markdown_review_path
-        if md_review is None and sqlite_review_file and sqlite_review_file.parent.name != "build":
-            md_review = sqlite_review_file.parent / "CR.md"
-
         md_bugs = markdown_bugs_path
-        if md_bugs is None and sqlite_bug_file and sqlite_bug_file.parent.name != "build":
-            md_bugs = sqlite_bug_file.parent / "BUGS.md"
+
+        custom_fb_dir = feedback_dir
+        if custom_fb_dir is None:
+            for sf in (sqlite_review_file, sqlite_bug_file):
+                if sf and sf.parent.name not in ("build", "target"):
+                    custom_fb_dir = sf.parent / "feedback" if (sf.parent / "feedback").exists() else sf.parent
+                    break
+        if custom_fb_dir is None and os.environ.get("FEEDBACK_DIR"):
+            try:
+                ws_root = get_git_root().resolve()
+            except Exception:
+                ws_root = self.repo_root.resolve()
+            if self.repo_root.resolve() == ws_root:
+                custom_fb_dir = Path(os.environ["FEEDBACK_DIR"]).resolve()
 
         review_state = sqlite_review_file.with_suffix(".json") if sqlite_review_file else None
         bug_state = sqlite_bug_file.with_suffix(".json") if sqlite_bug_file else None
@@ -1348,6 +1366,7 @@ class DashboardServer(ThreadingHTTPServer):
             host=host,
             port=port,
             repo_root=self.repo_root,
+            feedback_dir=custom_fb_dir,
             markdown_output=md_review,
             state_file=review_state,
             sqlite_file=sqlite_review_file,
@@ -1359,6 +1378,7 @@ class DashboardServer(ThreadingHTTPServer):
             host=host,
             port=port,
             repo_root=self.repo_root,
+            feedback_dir=custom_fb_dir,
             markdown_output=md_bugs,
             state_file=bug_state,
             sqlite_file=sqlite_bug_file,
@@ -1406,6 +1426,15 @@ class DashboardServer(ThreadingHTTPServer):
                 bug_dict[f"WORM-{norm_num}"] = b
             bug_dict[b.id] = b
 
+        # Collect existing feedback filenames once in-memory to prevent disk thrashing
+        feedback_files: Set[str] = set()
+        feedback_dir = self.repo_root / "feedback"
+        if feedback_dir.exists():
+            try:
+                feedback_files = {p.name for p in feedback_dir.iterdir()}
+            except OSError:
+                pass
+
         for node in smartlog_nodes:
             # Canonicalize existing tag IDs and filter out non-existent bugs
             retained_tags: List[CommitBugTagModel] = []
@@ -1420,18 +1449,10 @@ class DashboardServer(ThreadingHTTPServer):
                     tag.severity = b.severity.value if hasattr(b.severity, "value") else str(b.severity)
                     retained_tags.append(tag)
                 else:
-                    md_path = self.repo_root / "feedback" / f"BUG_{num}.md"
-                    if not md_path.exists() and num.isdigit():
-                        md_path = self.repo_root / "feedback" / f"BUG_{int(num):03d}.md"
-                    if not md_path.exists() and num.isdigit():
-                        md_path = self.repo_root / "feedback" / f"BUG_{int(num)}.md"
-                    if not md_path.exists():
-                        md_path = self.repo_root / "feedback" / f"WORM_{num}.md"
-                    if not md_path.exists() and num.isdigit():
-                        md_path = self.repo_root / "feedback" / f"WORM_{int(num):03d}.md"
-                    if not md_path.exists() and num.isdigit():
-                        md_path = self.repo_root / "feedback" / f"WORM_{int(num)}.md"
-                    if md_path.exists():
+                    candidates = [f"BUG_{num}.md", f"WORM_{num}.md"]
+                    if num.isdigit():
+                        candidates.extend([f"BUG_{int(num):03d}.md", f"BUG_{int(num)}.md", f"WORM_{int(num):03d}.md"])
+                    if any(c in feedback_files for c in candidates):
                         tag.id = canonical_id
                         retained_tags.append(tag)
             node.bug_tags = retained_tags
@@ -1454,18 +1475,14 @@ class DashboardServer(ThreadingHTTPServer):
                         )
                         existing_ids.add(canonical_id)
                     else:
-                        md_path = self.repo_root / "feedback" / f"BUG_{num}.md"
-                        if not md_path.exists() and num.isdigit():
-                            md_path = self.repo_root / "feedback" / f"BUG_{int(num):03d}.md"
-                        if not md_path.exists() and num.isdigit():
-                            md_path = self.repo_root / "feedback" / f"BUG_{int(num)}.md"
-                        if not md_path.exists():
-                            md_path = self.repo_root / "feedback" / f"WORM_{num}.md"
-                        if not md_path.exists() and num.isdigit():
-                            md_path = self.repo_root / "feedback" / f"WORM_{int(num):03d}.md"
-                        if not md_path.exists() and num.isdigit():
-                            md_path = self.repo_root / "feedback" / f"WORM_{int(num)}.md"
-                        if md_path.exists():
+                        candidates = [f"BUG_{num}.md", f"WORM_{num}.md"]
+                        if num.isdigit():
+                            candidates.extend(
+                                [f"BUG_{int(num):03d}.md", f"BUG_{int(num)}.md", f"WORM_{int(num):03d}.md"]
+                            )
+                        matched = next((c for c in candidates if c in feedback_files), None)
+                        if matched:
+                            md_path = feedback_dir / matched
                             status = "OPEN"
                             title = canonical_id
                             severity = "LOW"

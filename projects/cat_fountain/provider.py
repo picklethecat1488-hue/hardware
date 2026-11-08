@@ -1340,14 +1340,15 @@ class CatFountainProvider(Provider):
                 with Locations((0, 0, hub_h)):
                     Cylinder(radius=thrust_r, height=standoff_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
-            # Motor shaft through-hole
+            # Motor shaft through-hole extending through the full hub and thrust collar
             total_h = hub_h + standoff_h
-            Cylinder(
-                radius=shaft_r,
-                height=total_h + 2.0,
-                align=(Align.CENTER, Align.CENTER, Align.CENTER),
-                mode=Mode.SUBTRACT,
-            )
+            with Locations((0, 0, -1.0)):
+                Cylinder(
+                    radius=shaft_r,
+                    height=total_h + 2.0,
+                    align=(Align.CENTER, Align.CENTER, Align.MIN),
+                    mode=Mode.SUBTRACT,
+                )
 
             # Magnet pockets on the top face (Z = hub_h)
             for i in range(self.settings.magnet_count):

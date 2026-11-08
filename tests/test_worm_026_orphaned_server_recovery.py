@@ -17,7 +17,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from dashboard import check_existing_instance, has_active_window_process
+from forge import check_existing_instance, has_active_window_process
 
 
 def test_has_active_window_process_no_children() -> None:
@@ -54,9 +54,9 @@ def test_orphaned_server_recovery_cleans_lock_file() -> None:
     )
 
     with (
-        patch("dashboard.is_pid_alive", return_value=True),
-        patch("dashboard.is_port_in_use", return_value=True),
-        patch("dashboard.has_active_window_process", return_value=False),
+        patch("forge.is_pid_alive", return_value=True),
+        patch("forge.is_port_in_use", return_value=True),
+        patch("forge.has_active_window_process", return_value=False),
         patch("os.kill") as mock_kill,
     ):
         existing = check_existing_instance(lock_file, "127.0.0.1", 8767, cleanup_orphaned=True)

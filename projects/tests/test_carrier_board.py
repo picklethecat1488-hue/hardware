@@ -2561,14 +2561,15 @@ def test_regression_bug_262_supplier_pcb_guidelines_zip_outputs() -> None:
     assert (board_dir / "centroid_files.zip").exists(), "build/board/carrier_board/centroid_files.zip must exist"
     assert (board_dir / "assembly_files.zip").exists(), "build/board/carrier_board/assembly_files.zip must exist"
 
-    # 1. gerbers.zip: contains .pcb, .pcbdoc, .cam, .brd and gerber files
+    # 1. gerbers.zip: contains standard Gerber and drill files only per BUG-OPEN-003
     with zipfile.ZipFile(board_dir / "gerbers.zip", "r") as zf:
         names = zf.namelist()
         suffixes = {Path(n).suffix.lower() for n in names}
-        assert ".pcb" in suffixes, "gerbers.zip must contain .pcb files"
-        assert ".pcbdoc" in suffixes, "gerbers.zip must contain .pcbdoc files"
-        assert ".cam" in suffixes, "gerbers.zip must contain .cam files"
-        assert ".brd" in suffixes, "gerbers.zip must contain .brd files"
+        assert ".pcb" not in suffixes, "gerbers.zip must not contain .pcb companion files"
+        assert ".pcbdoc" not in suffixes, "gerbers.zip must not contain .pcbdoc companion files"
+        assert ".cam" not in suffixes, "gerbers.zip must not contain .cam companion files"
+        assert ".brd" not in suffixes, "gerbers.zip must not contain .brd companion files"
+        assert ".kicad_pcb" not in suffixes, "gerbers.zip must not contain .kicad_pcb files"
         assert ".gbr" in suffixes or any(n.endswith(".gbr") for n in names), "gerbers.zip must contain gerber files"
         # Check both PCBs are represented
         assert any("carrier_board" in n for n in names), "gerbers.zip must include carrier_board files"
@@ -2739,12 +2740,9 @@ def test_regression_bug_272_supplier_feedback_carrier_board() -> None:
 
     # Impedance control specifications in summary
     assert "CONTROLLED IMPEDANCE" in c_summary_txt, "project_summary.txt must have CONTROLLED IMPEDANCE section"
-    assert "50" in c_summary_txt and "0.18" in c_summary_txt, "50 Ohm SE track (0.18mm) must be specified"
-    assert "90" in c_summary_txt and "0.16" in c_summary_txt and "0.18" in c_summary_txt, (
-        "90 Ohm diff pair (0.16mm width / 0.18mm spacing) must be specified"
-    )
-    assert "85" in c_summary_txt and "0.15" in c_summary_txt, (
-        "85 Ohm diff pair (0.18mm width / 0.15mm spacing) must be specified"
+    assert "50" in c_summary_txt and "0.12" in c_summary_txt, "50 Ohm SE track (0.12mm) must be specified"
+    assert "90" in c_summary_txt and "0.12" in c_summary_txt, (
+        "90 Ohm diff pair (0.12mm width / 0.12mm spacing) must be specified"
     )
 
     # Via plugging confirmation (resin fill and cap / VIPPO)
@@ -2759,7 +2757,7 @@ def test_regression_bug_272_supplier_feedback_carrier_board() -> None:
     imp_file = carrier_dir / "impedance_control_info.txt"
     assert imp_file.is_file(), "impedance_control_info.txt must exist in carrier_board submission directory"
     imp_text = imp_file.read_text(encoding="utf-8")
-    assert "50" in imp_text and "90" in imp_text and "85" in imp_text
+    assert "50" in imp_text and "90" in imp_text
 
     # Packaging in gerbers.zip
     with zipfile.ZipFile(carrier_dir / "gerbers.zip", "r") as zf:
@@ -3338,3 +3336,50 @@ def test_regression_bug_fast_katydid_792_supplier_assembly_documents() -> None:
     sheet_names = wb.sheetnames
     assert "Commercial Invoice" in sheet_names
     assert "Packing List" in sheet_names
+
+
+def test_regression_bug_open_003_eq_gerber_standard_impedance_copper_balance() -> None:
+    """Verify BUG-OPEN-003: Gerber standard packaging, TG150 material, In2.Cu copper plane, and matched impedance info."""
+    import csv
+    from pathlib import Path
+    import zipfile
+
+    # 1. Verify EQ customer reply is filled out for all 7 items in CSV
+    csv_path = Path("feedback/attachments/BUG-OPEN-003/W908185ASE67-EQ.csv")
+    assert csv_path.is_file(), "W908185ASE67-EQ.csv must exist"
+    with open(csv_path, "r", encoding="utf-8") as f:
+        reader = csv.reader(f)
+        rows = [r for r in reader if r and r[0].isdigit()]
+    assert len(rows) == 7, "All 7 EQ items must be present in CSV"
+    for r in rows:
+        assert len(r) >= 7, f"Item {r[0]} must have 7 columns"
+        assert r[6].strip(), f"Item {r[0]} Customer Reply must not be empty"
+
+    # 2. Verify In2.Cu has a copper plane (balanced copper distribution to prevent warpage/delamination)
+    from projects.carrier_board.provider import CarrierBoardProvider
+
+    provider = CarrierBoardProvider()
+    cr = provider.copper_regions()
+    in2_regions = [r for r in cr.regions if r.layer == "In2.Cu"]
+    assert len(in2_regions) >= 1, "In2.Cu must have a GND copper plane region"
+    assert in2_regions[0].net == "GND"
+
+    # 3. Verify gerbers.zip contains standard Gerber files only
+    board_dir = Path("build/board/carrier_board")
+    with zipfile.ZipFile(board_dir / "gerbers.zip", "r") as zf:
+        suffixes = {Path(n).suffix.lower() for n in zf.namelist()}
+        for non_standard in (".pcb", ".pcbdoc", ".cam", ".brd", ".kicad_pcb"):
+            assert non_standard not in suffixes, f"gerbers.zip must not contain {non_standard}"
+
+    # 4. Verify impedance info matches routed track geometry (0.120mm width and spacing)
+    imp_file = board_dir / "carrier_board" / "impedance_control_info.txt"
+    assert imp_file.is_file()
+    imp_text = imp_file.read_text(encoding="utf-8")
+    assert "0.120 mm" in imp_text
+    assert "TG150" in imp_text
+    assert "PCIe" not in imp_text
+
+    # 5. Verify User Drawings silkscreen specifies TG150 and 0.12mm impedance
+    texts = [t.text for t in provider.silkscreen()]
+    assert any("TG150" in t for t in texts), "Silkscreen must specify TG150"
+    assert any("W=0.12mm" in t for t in texts), "Silkscreen must specify W=0.12mm"

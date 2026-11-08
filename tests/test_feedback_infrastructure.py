@@ -296,7 +296,7 @@ def test_code_review_no_feedback_leaves_no_markdown_files(tmp_path: Path) -> Non
     other_comment = CommentModel(
         id="c1",
         uuid=str(uuid.uuid4()),
-        file_path="src/dashboard.py",
+        file_path="tools/forge.py",
         start_line=10,
         end_line=10,
         severity=ReviewSeverity.MUST_FIX,
@@ -471,3 +471,78 @@ def test_export_markdown_elides_unchanged_write(tmp_path: Path) -> None:
     exporter.export_markdown(db, output_path)
     mtime2 = output_path.stat().st_mtime_ns
     assert mtime1 == mtime2, "export_markdown must elide rewriting identical BUGS.md content"
+
+
+def test_feedback_environment_variable_isolation(tmp_path: Path, monkeypatch) -> None:
+    """Verify FEEDBACK_DIR environment variable isolates servers from workspace feedback/."""
+    from provider.bug_report.server import BugReportServer
+    from provider.code_review.server import ReviewServer
+    from provider.dashboard.server import DashboardServer
+
+    custom_fb = tmp_path / "custom_isolated_feedback"
+    custom_fb.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("FEEDBACK_DIR", str(custom_fb))
+
+    bug_server = BugReportServer(bind_and_activate=False)
+    assert bug_server.feedback_dir.resolve() == custom_fb.resolve()
+
+    cr_server = ReviewServer(bind_and_activate=False)
+    assert cr_server.feedback_dir.resolve() == custom_fb.resolve()
+
+    dash_server = DashboardServer(bind_and_activate=False)
+    assert dash_server.bug_server.feedback_dir.resolve() == custom_fb.resolve()
+    assert dash_server.review_server.feedback_dir.resolve() == custom_fb.resolve()
+
+
+def test_detached_branch_refuses_to_commit_to_production_worktree_in_tests(tmp_path: Path) -> None:
+    """Verify DetachedBranchBugStore refuses to mutate production workspace feedback/ in test mode."""
+    from provider.bug_report.detached_branch import DetachedBranchBugStore
+    from model.bug_report import BugDatabaseModel, BugReportModel, BugStatus, BugSeverity, BugCategory
+    from provider.vcs.git_engine import get_git_root
+
+    ws_root = get_git_root()
+    prod_feedback = ws_root / "feedback"
+    if not (prod_feedback / ".git").is_file():
+        pytest.skip("Workspace feedback/ is not a git worktree")
+
+    store = DetachedBranchBugStore(repo_root=ws_root)
+    db = BugDatabaseModel(
+        bugs=[
+            BugReportModel(
+                id="BUG-TEST-ISOLATION-001",
+                title="Isolation Guard Test",
+                status=BugStatus.OPEN,
+                severity=BugSeverity.LOW,
+                category=BugCategory.PCB,
+            )
+        ]
+    )
+
+    # In test mode (PYTEST_CURRENT_TEST set), commit_database must return None without touching prod feedback
+    res = store.commit_database(db, commit_message="Attempted test commit to prod")
+    assert res is None
+    assert not (prod_feedback / "BUG_TEST-ISOLATION-001.md").exists()
+
+
+def test_forge_cli_custom_feedback_dir(tmp_path: Path, monkeypatch, capsys) -> None:
+    """Verify forge.py CLI supports --feedback-dir and properly configures isolated feedback directory."""
+    from forge import main
+
+    custom_fb = tmp_path / "cli_feedback"
+    custom_fb.mkdir(parents=True, exist_ok=True)
+    db_file = tmp_path / "cli_test.sqlite"
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "forge.py",
+            "--db-file",
+            str(db_file),
+            "--feedback-dir",
+            str(custom_fb),
+            "--list-bugs",
+        ],
+    )
+    main()
+    out = capsys.readouterr().out
+    assert "Hardware Bug Tracker" in out

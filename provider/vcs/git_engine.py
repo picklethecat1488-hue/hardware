@@ -14,6 +14,7 @@ import re
 import shutil
 import sqlite3
 import subprocess
+import tempfile
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Union
 
 from model.vcs import (
@@ -86,6 +87,292 @@ def get_git_root(cwd: Optional[Path] = None) -> Path:
     """
     root_str = run_git_command(["rev-parse", "--show-toplevel"], cwd=cwd).strip()
     return Path(root_str)
+
+
+def ensure_feedback_worktree(repo_root: Optional[Path] = None) -> bool:
+    """Ensure feedback/ is configured as a linked git worktree for tracking worms/bugs.
+
+    If feedback/ is not yet a git worktree, migrates any existing local feedback files,
+    flattens the branch tree if nested under feedback/, checks out the branch into feedback/
+    via git worktree add, and symlinks attachments/ -> feedback/attachments/.
+
+    Args:
+        repo_root: Root path of git repository (defaults to get_git_root()).
+
+    Returns:
+        True if feedback/ is a configured git worktree, False otherwise.
+    """
+    try:
+        root = (repo_root or get_git_root()).resolve()
+    except Exception:
+        return False
+
+    git_dir = root / ".git"
+    if not git_dir.exists():
+        return False
+
+    feedback_dir = root / "feedback"
+    if (feedback_dir / ".git").is_file():
+        return True
+
+    # Detect branch name: 'worms' for firmware, 'bugs' for hardware
+    is_worm = (root / "tools" / "dashboard" / "provider" / "worm_report").is_dir() or (
+        root / "provider" / "worm_report"
+    ).is_dir()
+    branch_name = "worms" if is_worm else "bugs"
+
+    def _ref_exists(ref: str) -> bool:
+        return (
+            subprocess.run(
+                ["git", "rev-parse", "--verify", "--quiet", ref],
+                cwd=str(root),
+                capture_output=True,
+                check=False,
+            ).returncode
+            == 0
+        )
+
+    has_local = _ref_exists(f"refs/heads/{branch_name}")
+    has_remote = _ref_exists(f"refs/remotes/origin/{branch_name}")
+
+    if not has_local and not has_remote and not feedback_dir.exists():
+        return False
+
+    # Fetch latest branch from origin if origin exists
+    try:
+        remotes_out = subprocess.run(
+            ["git", "remote"],
+            cwd=str(root),
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout.splitlines()
+        if "origin" in [r.strip() for r in remotes_out]:
+            subprocess.run(
+                ["git", "fetch", "origin", f"{branch_name}:refs/remotes/origin/{branch_name}"],
+                cwd=str(root),
+                capture_output=True,
+                check=False,
+            )
+            has_remote = _ref_exists(f"refs/remotes/origin/{branch_name}")
+    except Exception:
+        pass
+
+    # If branch only exists on remote, set up local tracking branch
+    if not has_local and has_remote:
+        subprocess.run(
+            ["git", "branch", "--track", branch_name, f"origin/{branch_name}"],
+            cwd=str(root),
+            capture_output=True,
+            check=False,
+        )
+        has_local = _ref_exists(f"refs/heads/{branch_name}")
+
+    # If neither exists but feedback_dir has files, create initial branch
+    if not has_local and not has_remote:
+        env = os.environ.copy()
+        env["GIT_AUTHOR_NAME"] = "User"
+        env["GIT_AUTHOR_EMAIL"] = "user@workspace"
+        env["GIT_COMMITTER_NAME"] = "User"
+        env["GIT_COMMITTER_EMAIL"] = "user@workspace"
+        empty_tree_res = subprocess.run(
+            ["git", "hash-object", "-t", "tree", "/dev/null"],
+            cwd=str(root),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        empty_tree = empty_tree_res.stdout.strip() if empty_tree_res.returncode == 0 else ""
+        if empty_tree:
+            commit_res = subprocess.run(
+                ["git", "commit-tree", empty_tree, "-m", f"Initialize {branch_name} branch"],
+                cwd=str(root),
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if commit_res.returncode == 0 and commit_res.stdout.strip():
+                subprocess.run(
+                    ["git", "branch", branch_name, commit_res.stdout.strip()],
+                    cwd=str(root),
+                    check=False,
+                )
+                has_local = True
+
+    if not has_local:
+        return False
+
+    # 1. Back up existing local feedback/ directory if present
+    backup_dir = None
+    if feedback_dir.exists() and feedback_dir.is_dir():
+        backup_dir = Path(tempfile.mkdtemp(prefix="feedback_wt_bak_"))
+        shutil.copytree(feedback_dir, backup_dir / "feedback", dirs_exist_ok=True)
+
+    # 2. Check if the branch tree has files nested under 'feedback/' and flatten them to root
+    ls_tree = subprocess.run(
+        ["git", "ls-tree", branch_name],
+        cwd=str(root),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if ls_tree.returncode == 0:
+        has_nested = any(
+            len(line.split()) >= 4 and line.split()[1] == "tree" and line.split()[3] == "feedback"
+            for line in ls_tree.stdout.splitlines()
+        )
+        if has_nested:
+            git_base = root / ".git" if (root / ".git").is_dir() else Path(tempfile.gettempdir())
+            tmp_idx1 = git_base / f"idx_flat1_{branch_name}_{os.getpid()}"
+            tmp_idx2 = git_base / f"idx_flat2_{branch_name}_{os.getpid()}"
+            env1 = os.environ.copy()
+            env1["GIT_INDEX_FILE"] = str(tmp_idx1)
+            env1["GIT_OPTIONAL_LOCKS"] = "0"
+            try:
+                subprocess.run(
+                    ["git", "read-tree", branch_name],
+                    cwd=str(root),
+                    env=env1,
+                    check=True,
+                    capture_output=True,
+                )
+                files_out = subprocess.run(
+                    ["git", "ls-files", "-s"],
+                    cwd=str(root),
+                    env=env1,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                ).stdout
+                new_entries = []
+                for line in files_out.splitlines():
+                    parts = line.strip().split(None, 3)
+                    if len(parts) >= 4:
+                        mode, sha, stage, p = parts[0], parts[1], parts[2], parts[3]
+                        if p.startswith("feedback/"):
+                            p = p[len("feedback/") :]
+                        new_entries.append(f"{mode} {sha}\t{p}")
+                env2 = os.environ.copy()
+                env2["GIT_INDEX_FILE"] = str(tmp_idx2)
+                env2["GIT_OPTIONAL_LOCKS"] = "0"
+                subprocess.run(
+                    ["git", "update-index", "--index-info"],
+                    cwd=str(root),
+                    env=env2,
+                    input="\n".join(new_entries) + "\n",
+                    text=True,
+                    check=True,
+                    capture_output=True,
+                )
+                new_tree = subprocess.run(
+                    ["git", "write-tree"],
+                    cwd=str(root),
+                    env=env2,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                ).stdout.strip()
+                parent_commit = subprocess.run(
+                    ["git", "rev-parse", branch_name],
+                    cwd=str(root),
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                ).stdout.strip()
+                c_env = env2.copy()
+                c_env["GIT_AUTHOR_NAME"] = "User"
+                c_env["GIT_AUTHOR_EMAIL"] = "user@workspace"
+                c_env["GIT_COMMITTER_NAME"] = "User"
+                c_env["GIT_COMMITTER_EMAIL"] = "user@workspace"
+                new_commit = subprocess.run(
+                    [
+                        "git",
+                        "commit-tree",
+                        new_tree,
+                        "-p",
+                        parent_commit,
+                        "-m",
+                        "Flatten feedback/ to worktree root",
+                    ],
+                    cwd=str(root),
+                    env=c_env,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                ).stdout.strip()
+                subprocess.run(
+                    ["git", "update-ref", f"refs/heads/{branch_name}", new_commit],
+                    cwd=str(root),
+                    check=True,
+                    capture_output=True,
+                )
+            except Exception:
+                pass
+            finally:
+                tmp_idx1.unlink(missing_ok=True)
+                tmp_idx2.unlink(missing_ok=True)
+
+    # 3. Remove non-worktree feedback/ directory before adding worktree
+    if feedback_dir.exists():
+        shutil.rmtree(feedback_dir, ignore_errors=True)
+
+    # 4. Add git worktree
+    res = subprocess.run(
+        ["git", "worktree", "add", "feedback", branch_name],
+        cwd=str(root),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if res.returncode != 0:
+        if backup_dir and (backup_dir / "feedback").exists():
+            shutil.copytree(backup_dir / "feedback", feedback_dir, dirs_exist_ok=True)
+            shutil.rmtree(backup_dir, ignore_errors=True)
+        return False
+
+    # 5. Restore backed up files into the newly created worktree
+    if backup_dir and (backup_dir / "feedback").exists():
+        for item in (backup_dir / "feedback").iterdir():
+            if item.name == ".git":
+                continue
+            dest = feedback_dir / item.name
+            if item.is_file():
+                shutil.copy2(item, dest)
+            elif item.is_dir():
+                shutil.copytree(item, dest, dirs_exist_ok=True)
+        shutil.rmtree(backup_dir, ignore_errors=True)
+
+    # 6. Synchronize attachments directory and link attachments -> feedback/attachments
+    att_dir = root / "attachments"
+    fb_att_dir = feedback_dir / "attachments"
+    fb_att_dir.mkdir(parents=True, exist_ok=True)
+
+    if att_dir.exists() and not att_dir.is_symlink():
+        for att_item in att_dir.iterdir():
+            dest = fb_att_dir / att_item.name
+            if att_item.is_file():
+                if not dest.exists():
+                    shutil.copy2(att_item, dest)
+            elif att_item.is_dir():
+                shutil.copytree(att_item, dest, dirs_exist_ok=True)
+        shutil.rmtree(att_dir, ignore_errors=True)
+
+    if not att_dir.exists():
+        try:
+            os.symlink("feedback/attachments", att_dir)
+        except OSError:
+            pass
+
+    # 7. Configure .gitattributes in feedback/ for git-lfs tracking
+    attr_file = feedback_dir / ".gitattributes"
+    lfs_entry = "attachments/** filter=lfs diff=lfs merge=lfs -text\n"
+    if not attr_file.exists() or "filter=lfs" not in attr_file.read_text(encoding="utf-8", errors="replace"):
+        with open(attr_file, "a", encoding="utf-8") as f:
+            f.write(lfs_entry)
+
+    print(f"[Xerxes VCS] Automatically configured 'feedback/' as a Git worktree on branch '{branch_name}'.")
+    return True
 
 
 def is_file_ignored(file_path: str) -> bool:
@@ -174,6 +461,8 @@ class GitEngine:
         self._commit_stat_cache: Dict[str, Tuple[int, int, int, List[str]]] = {}
         self._bug_tag_cache: Dict[str, Dict[str, str]] = {}
         self._file_diff_cache: Dict[Tuple[str, str], FileDiffModel] = {}
+        self._commit_files_cache: Dict[Tuple[str, bool], List[Dict[str, Any]]] = {}
+        self._remote_pr_cache: Optional[Set[int]] = None
 
     def get_head_commit(self) -> str:
         """Retrieve the commit hash of HEAD in the repository.
@@ -292,6 +581,95 @@ class GitEngine:
         except RuntimeError:
             return False
 
+    def ensure_feedback_worktree(self) -> bool:
+        """Ensure feedback/ is configured as a linked git worktree for tracking worms/bugs."""
+        return ensure_feedback_worktree(self.repo_root)
+
+    def sync_feedback_worktree(self, push: bool = True) -> Dict[str, Any]:
+        """Synchronize the feedback worktree directly using standard worktree operations."""
+        self.ensure_feedback_worktree()
+        feedback_dir = self.repo_root / "feedback"
+        if not (feedback_dir / ".git").is_file():
+            # Fall back to detached branch store
+            try:
+                from provider.bug_report.detached_branch import DetachedBranchBugStore
+
+                return DetachedBranchBugStore(self.repo_root).sync_branch(push=push)
+            except Exception as e:
+                return {"status": "error", "message": str(e)}
+
+        branch_name = "bugs"
+        env = os.environ.copy()
+        env["GIT_AUTHOR_NAME"] = "User"
+        env["GIT_AUTHOR_EMAIL"] = "user@workspace"
+        env["GIT_COMMITTER_NAME"] = "User"
+        env["GIT_COMMITTER_EMAIL"] = "user@workspace"
+
+        subprocess.run(["git", "add", "-A"], cwd=str(feedback_dir), check=False)
+        st = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=str(feedback_dir),
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout.strip()
+        if st:
+            subprocess.run(
+                ["git", "commit", "-m", f"Update {branch_name} database (v2)"],
+                cwd=str(feedback_dir),
+                env=env,
+                capture_output=True,
+                check=False,
+            )
+
+        has_remote = False
+        try:
+            remotes = subprocess.run(
+                ["git", "remote"],
+                cwd=str(feedback_dir),
+                capture_output=True,
+                text=True,
+                check=False,
+            ).stdout.splitlines()
+            has_remote = "origin" in [r.strip() for r in remotes]
+        except Exception:
+            has_remote = False
+
+        if has_remote:
+            subprocess.run(
+                ["git", "pull", "--rebase", "origin", branch_name],
+                cwd=str(feedback_dir),
+                capture_output=True,
+                check=False,
+            )
+
+        pushed = False
+        if has_remote and push:
+            push_proc = subprocess.run(
+                ["git", "push", "origin", branch_name],
+                cwd=str(feedback_dir),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            pushed = push_proc.returncode == 0
+
+        head_commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(feedback_dir),
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout.strip()
+
+        return {
+            "status": "ok",
+            "branch": branch_name,
+            "commit": head_commit,
+            "pushed": pushed,
+            "reconciled": True,
+        }
+
     def sync_repo(self, push: bool = True) -> Dict[str, Any]:
         """Synchronize repository with remotes, reconciling and pushing feedback/attachments.
 
@@ -312,21 +690,9 @@ class GitEngine:
                     except RuntimeError:
                         pass
             self.clear_diff_cache()
+            self.get_remote_pr_numbers(force_refresh=True)
 
-            detached_res = {}
-            try:
-                from provider.bug_report.detached_branch import DetachedBranchBugStore
-
-                detached_res = DetachedBranchBugStore(self.repo_root).sync_branch(push=push)
-            except Exception as e:
-                detached_res = {"status": "error", "message": str(e)}
-
-            staged_files: List[str] = []
-            try:
-                staged_files = self.stage_feedback_files()
-            except Exception:
-                pass
-
+            detached_res = self.sync_feedback_worktree(push=push)
             detached_pushed = detached_res.get("pushed", False)
             push_info = " Feedback and attachments pushed." if detached_pushed else ""
             msg = f"{out.strip() or 'Repository synchronized.'}{push_info}".strip()
@@ -335,7 +701,6 @@ class GitEngine:
                 "status": "ok",
                 "message": msg,
                 "detached": detached_res,
-                "staged_feedback": staged_files,
             }
         except RuntimeError as err:
             return {
@@ -947,25 +1312,41 @@ class GitEngine:
         base = self.get_repo_web_url() or f"https://github.com/workspace/{self.repo_root.name}"
         return f"{base}/pull/{pr_number}"
 
-    def get_remote_pr_numbers(self) -> Set[int]:
+    def get_remote_pr_numbers(self, force_refresh: bool = False) -> Set[int]:
         """Fetch set of valid pull request numbers existing on remote GitHub repository.
 
-        Cached on the instance to avoid repeatedly invoking ls-remote.
+        Cached on the instance to avoid repeatedly invoking ls-remote over the network.
+        Uses local remote-tracking references by default to prevent blocking network latency.
         """
-        if hasattr(self, "_remote_pr_cache") and self._remote_pr_cache is not None:
+        if not force_refresh and hasattr(self, "_remote_pr_cache") and self._remote_pr_cache is not None:
             return self._remote_pr_cache
 
         prs: Set[int] = set()
-        web_url = self.get_repo_web_url()
-        if web_url:
-            try:
-                output = run_git_command(["ls-remote", "origin", "refs/pull/*/head"], cwd=self.repo_root)
-                for line in output.splitlines():
-                    m = re.search(r"refs/pull/(\d+)/head", line)
-                    if m:
-                        prs.add(int(m.group(1)))
-            except RuntimeError:
-                pass
+
+        # Check local remote-tracking references first (0ms network latency)
+        try:
+            output = run_git_command(
+                ["for-each-ref", "--format=%(refname)", "refs/remotes/origin"],
+                cwd=self.repo_root,
+            )
+            for line in output.splitlines():
+                m = re.search(r"refs/remotes/origin/(?:pr|pull)[/-]?(\d+)", line)
+                if m:
+                    prs.add(int(m.group(1)))
+        except RuntimeError:
+            pass
+
+        if force_refresh:
+            web_url = self.get_repo_web_url()
+            if web_url:
+                try:
+                    output = run_git_command(["ls-remote", "origin", "refs/pull/*/head"], cwd=self.repo_root)
+                    for line in output.splitlines():
+                        m = re.search(r"refs/pull/(\d+)/head", line)
+                        if m:
+                            prs.add(int(m.group(1)))
+                except RuntimeError:
+                    pass
 
         self._remote_pr_cache = prs
         return prs
@@ -1128,7 +1509,7 @@ class GitEngine:
         if commit_hash in self._commit_diff_cache:
             return self._commit_diff_cache[commit_hash]
 
-        cmd = ["diff-tree", "--no-commit-id", "--numstat", "-r", commit_hash]
+        cmd = ["diff-tree", "--no-commit-id", "--numstat", "-r", "--root", commit_hash]
         try:
             output = run_git_command(cmd, cwd=self.repo_root)
         except RuntimeError:
@@ -1424,7 +1805,7 @@ class GitEngine:
         if commit_hash in self._commit_stat_cache:
             return self._commit_stat_cache[commit_hash]
 
-        cmd = ["diff-tree", "--no-commit-id", "--numstat", "-r", commit_hash]
+        cmd = ["diff-tree", "--no-commit-id", "--numstat", "-r", "--root", commit_hash]
         try:
             output = run_git_command(cmd, cwd=self.repo_root)
         except RuntimeError:
@@ -1457,13 +1838,17 @@ class GitEngine:
         if commit == "working":
             return self._get_working_tree_files_simple(include_feedback=include_feedback)
 
-        cmd_status = ["diff-tree", "--no-commit-id", "--name-status", "-r", commit]
+        cache_key = (commit, include_feedback)
+        if cache_key in self._commit_files_cache:
+            return self._commit_files_cache[cache_key]
+
+        cmd_status = ["diff-tree", "--no-commit-id", "--name-status", "-r", "--root", commit]
         try:
             status_out = run_git_command(cmd_status, cwd=self.repo_root)
         except RuntimeError:
             return []
 
-        cmd_numstat = ["diff-tree", "--no-commit-id", "--numstat", "-r", commit]
+        cmd_numstat = ["diff-tree", "--no-commit-id", "--numstat", "-r", "--root", commit]
         try:
             numstat_out = run_git_command(cmd_numstat, cwd=self.repo_root)
         except RuntimeError:
@@ -1505,6 +1890,7 @@ class GitEngine:
         for f in files:
             clean = f["path"].replace("\\", "/").strip().lstrip("./")
             f["is_lfs"] = f["path"] in lfs_set or clean in lfs_set or clean.startswith("attachments/")
+        self._commit_files_cache[cache_key] = files
         return files
 
     def _get_working_tree_files_simple(self, include_feedback: bool = False) -> List[Dict[str, Any]]:
@@ -1747,11 +2133,13 @@ class GitEngine:
         return diff_model
 
     def clear_diff_cache(self) -> None:
-        """Clear all in-memory cached commit summaries and file diff models."""
+        """Clear all in-memory cached commit summaries, file lists, and diff models."""
         self._commit_diff_cache.clear()
         self._commit_stat_cache.clear()
         self._bug_tag_cache.clear()
         self._file_diff_cache.clear()
+        self._commit_files_cache.clear()
+        self._remote_pr_cache = None
 
     def _parse_diff_hunks(self, raw_diff: str) -> List[DiffHunk]:
         """Parse raw unified diff text into structured DiffHunk instances."""
@@ -1932,6 +2320,7 @@ class GitEngine:
 
         # Find all individual WORM_*.md, BUG_*.md, and CR_*.md files
         files_to_stage: List[str] = []
+        is_wt = (feedback_dir / ".git").is_file()
         for p in feedback_dir.glob("*.md"):
             name = p.name
             # Explicitly exclude aggregated index files
@@ -1947,7 +2336,10 @@ class GitEngine:
             for i in range(0, len(files_to_stage), chunk_size):
                 chunk = files_to_stage[i : i + chunk_size]
                 try:
-                    run_git_command(["add", "-f", "--"] + chunk, cwd=self.repo_root)
+                    if is_wt:
+                        run_git_command(["add", "--"] + [Path(c).name for c in chunk], cwd=feedback_dir)
+                    else:
+                        run_git_command(["add", "-f", "--"] + chunk, cwd=self.repo_root)
                     staged.extend(chunk)
                 except Exception:
                     pass
@@ -2167,6 +2559,7 @@ class GitEngine:
         if commit_hash in [head, "HEAD"] or head.startswith(commit_hash):
             run_git_command(["reset", "HEAD~1"], cwd=self.repo_root)
             self.clear_diff_cache()
+            self.get_remote_pr_numbers(force_refresh=True)
             return {
                 "status": "ok",
                 "message": "Commit reset to working tree. You can now selectively stage and commit parts.",

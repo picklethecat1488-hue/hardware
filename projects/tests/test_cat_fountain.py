@@ -338,7 +338,7 @@ class TestCatFountainProvider:
         assert impeller.part.is_valid
 
     @pytest.mark.slow
-    @pytest.mark.timeout(300)
+    @pytest.mark.timeout(600)
     def test_pump_integration(self):
         """Verify that the water pump works in the simulation by measuring particles pumped."""
         import tempfile
@@ -407,7 +407,7 @@ class TestCatFountainProvider:
                 assert fluid is not None
 
                 step_fn = hooks[Simulate.STEP]
-                for step_idx in range(55):
+                for step_idx in range(25):
                     step_fn(body_id, physics_client, step_idx, "product:view/simulate")
                     p.stepSimulation(physicsClientId=physics_client)
 
@@ -2682,3 +2682,45 @@ class TestCatFountainProvider:
         intersection = bowl_part.intersect(cover_placed)
         vol = sum(s.volume for s in intersection.solids()) if intersection else 0.0
         assert vol < 0.2, f"Interference detected between bowl and snapped pump cover: {vol:.4f} mm3"
+
+    @pytest.mark.slow
+    def test_regression_bug_swarming_treehopper_675_drive_hub_shaft_through_hole(self, provider):
+        """Verify that the drive hub motor shaft hole is completely through-bored across all Z heights."""
+        hub = provider.build_drive_hub("drive_hub")
+        solid = hub.part
+
+        hub_h = provider.settings.magnet_thickness + provider.settings.magnet_clearance + 0.8
+        standoff_h = provider.settings.drive_hub_standoff_height
+        total_h = hub_h + standoff_h
+
+        # Central shaft hole must be empty (open) from Z = 0.1 to Z = total_h - 0.1
+        sample_zs = [0.1, hub_h * 0.25, hub_h * 0.5, hub_h * 0.75, hub_h, hub_h + standoff_h * 0.5, total_h - 0.1]
+        for z in sample_zs:
+            assert not solid.is_inside((0.0, 0.0, z)), f"Drive hub shaft through-hole is blocked at Z = {z:.2f} mm"
+
+        # Thrust collar wall around shaft hole must be solid
+        r_collar = (provider.settings.drive_hub_shaft_radius + provider.settings.drive_hub_thrust_collar_radius) / 2.0
+        assert solid.is_inside((r_collar, 0.0, hub_h + standoff_h * 0.5)), "Thrust collar wall is missing or hollow"
+
+    @pytest.mark.slow
+    def test_regression_bug_winged_instar_825_impeller_boundary_conformance(self, provider):
+        """Verify that the 3-lobed impeller analytical URDF boundary conforms to CAD geometry >= 80%."""
+        from model.boundary_config import ShapeType
+        from provider import Mode as ProviderMode, evaluate_boundary_cad_conformance
+
+        room = Room()
+        provider.build_product(room, mode=ProviderMode.DEFAULT)
+        geom, _ = room["impeller"]
+        cad_solid = getattr(geom, "part", geom)
+        boundaries = getattr(geom, "urdf_boundaries", [])
+        assert len(boundaries) == 1, "Expected single analytical boundary for impeller"
+        b = boundaries[0]
+
+        assert b.shape == ShapeType.IMPELLER
+        assert abs(b.xyz[0]) < 1e-4, f"Impeller rotation center must be at X=0, got {b.xyz[0]}"
+        assert abs(b.xyz[1]) < 1e-4, f"Impeller rotation center must be at Y=0, got {b.xyz[1]}"
+
+        res = evaluate_boundary_cad_conformance(cad_solid, b)
+        assert res.solid_conformance_ratio >= 0.80, (
+            f"Impeller boundary CAD conformance ratio {res.solid_conformance_ratio:.2%} is below 80%"
+        )

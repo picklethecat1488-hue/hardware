@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from dashboard import launch_browser
+from forge import launch_browser
 from provider.webview.launcher import (
     DEFAULT_BG_COLOR,
     DEFAULT_WINDOW_SIZE,
