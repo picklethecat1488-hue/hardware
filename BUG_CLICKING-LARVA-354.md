@@ -20,3 +20,7 @@ The height of the protruding feature is too small to print.
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1794248516656_cluu0.png](attachments/BUG-CLICKING-LARVA-354/screenshot_paste_1794248516656_cluu0.png) | Pasted screenshot screenshot_paste_1794248516656_cluu0.png |
 | `screenshot` | [screenshot_paste_1794248529568_wddvz.png](attachments/BUG-CLICKING-LARVA-354/screenshot_paste_1794248529568_wddvz.png) | Pasted screenshot screenshot_paste_1794248529568_wddvz.png |
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:3b7fdaad --> Compile bottom cover STL to verify smooth annular snap ridge and absence of unprintable horizontal shelf steps | `python tools/build.py cat_fountain/bottom_cover`
