@@ -2,12 +2,13 @@
 
 - **UUID**: `d4d28107-f07e-4d7a-ac51-9a7aee11c17c`
 - **ID**: `BUG-CLICKING-LARVA-354`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-09 18:20:44 UTC`
 - **Resolved**: `2026-11-09 23:00:42 UTC`
+- **Accepted**: `2026-11-09 23:00:47 UTC`
 
 #### Description
 
