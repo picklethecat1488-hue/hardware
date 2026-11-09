@@ -6,7 +6,7 @@ Guidelines for schematic capture, routing engines, DRC checks, headless KiCad to
 * **Pipeline Architecture**: The PCB engine follows a strict declarative pipeline:
   `pcb_materials.yaml imports -> manifest.yaml -> .kicad_pcb / .kicad_sch targets -> kicad_cli -> board and schematic files`.
 * **Headless CAM Generation**: Manufacturing board files (RS-274X Gerbers, Excellon NC drills, Gerber job files) must be generated strictly via headless `kicad-cli` (`KiCadCLI`), not custom DIY string formatting.
-* **Pre-Computed Route Persistence**: PCB viewing workflows (`view.py`) and standard artifact generation MUST consume pre-computed, persisted routing artifacts (`routing.yaml`, `routing_flex.yaml`) rather than invoking the A* auto-router on the fly. Auto-routing is an explicit orchestration action performed via `python tools/config.py '<target>'`.
+* **Pre-Computed Route Persistence**: PCB viewing workflows (`view.py`) and standard artifact generation MUST consume pre-computed, persisted routing artifacts (`carrier_board_routing.py`, `flex_tail.py`) rather than invoking the A* auto-router on the fly. Auto-routing is an explicit orchestration action performed via `python tools/config.py '<target>'` which emits strongly-typed Python modules generated from Jinja2 templates (`pcb_routing.py.j2`) using `BuildTraces`, `BuildLine`, `Polyline`, `Line`, `make_trace`, `BuildVias`, and `Via`.
 
 ## 2. Component Scoping & Canonical Reference Designators
 * **Subassembly Footprint Scoping**: Multi-board and rigid-flex assemblies must scope footprints, passives, and connectors explicitly to target subassemblies (via `shape_ref: carrier_board` or `shape_ref: flex_tail`). Never duplicate components across subassemblies or rely on hardcoded component names for footprint queries.
@@ -65,6 +65,7 @@ Guidelines for schematic capture, routing engines, DRC checks, headless KiCad to
           Line((-7.5, -24.2), (-7.5, -19.5))
           make_trace("CAP_TX2")
   ```
+* **Templatized Python Routing Code Generation**: PCB auto-routing outputs must be serialized to strongly-typed Python modules (`carrier_board_routing.py`) generated from Jinja2 templates (`provider/templates/pcb_routing.py.j2`) rather than raw YAML dictionary dumps. The generator groups traces by `(net, layer, width_mm)` and chains corner-turn directional changes into `Polyline(...)` while preserving collinear segments as distinct `Line(...)` primitives to guarantee OpenCASCADE edge preservation, 0 DRC violations, and exact Gerber invariance.
 
 ## 5. PCB Routing & DRC Invariants
 * **Planar Flex Routing**: Flexible PCB tails and ribbons must maintain planar single-layer routing without trace crossovers, ensure non-overlapping capacitive electrode traces with generous keepouts ($\ge 1.5$ mm clearance to flex outline edges), and provide silkscreen channel callouts directly on the substrate.

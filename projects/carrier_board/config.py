@@ -18,16 +18,22 @@ def config_route(provider: Any, target: str, subassembly: Optional[str]) -> None
         raise ValueError("PCB configuration not found for carrier_board")
 
     project_dir = Path(__file__).parent
-    routing_file = project_dir / "routing.yaml"
+    routing_file = project_dir / "carrier_board_routing.py"
     auto_traces, auto_vias = [], []
 
     if subassembly == "carrier_board" or not routing_file.exists():
         router = PCBAutoRouter(cfg, wiring)
         auto_traces, auto_vias = router.route_all_nets()
-        # 1. Save carrier board routing to per-project YAML file
-        router.save_routing_yaml(routing_file, auto_traces, auto_vias)
+        # 1. Save carrier board routing to per-project Python module
+        router.save_routing_python(
+            routing_file,
+            auto_traces,
+            auto_vias,
+            function_prefix="carrier_board",
+            board_name="Carrier Board",
+        )
     elif routing_file.exists():
-        auto_traces, auto_vias = PCBAutoRouter.load_routing_yaml(routing_file)
+        auto_traces, auto_vias = PCBAutoRouter.load_routing_python(routing_file)
 
     # 2. Persist path to root application .env so routes can be manually inspected or overridden
     if routing_file.is_relative_to(Path.cwd()):
