@@ -1276,11 +1276,18 @@ class CatFountainCAD:
                         height=mount_depth,
                         align=(Align.CENTER, Align.CENTER, Align.MIN),
                     )
-                # Annular snap-fit ridge on downward lip to lock tightly into casing recess (BUG-SPECKLED-ROACH-49)
+                # Annular snap-fit ridge on downward lip to lock tightly into casing recess (BUG-SPECKLED-ROACH-49, BUG-GOLDEN-FIREFLY-566)
                 with Locations((0, 0, -self.settings.pump_cover_snap_z_offset)):
+                    ridge_r = snap_r + self.settings.pump_cover_snap_ridge_offset
+                    ridge_minor = self.settings.pump_cover_snap_ridge_minor
+                    Cylinder(
+                        radius=ridge_r,
+                        height=ridge_minor * 2.0,
+                        align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                    )
                     Torus(
-                        major_radius=snap_r + self.settings.pump_cover_snap_ridge_offset,
-                        minor_radius=self.settings.pump_cover_snap_ridge_minor,
+                        major_radius=ridge_r,
+                        minor_radius=ridge_minor,
                     )
 
             # 2. Tube sleeve sliding down the vertical delivery tube

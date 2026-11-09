@@ -1655,6 +1655,9 @@ class TestCatFountainProvider:
         bowl_part = bowl.part
         cover_part = cover.part
         assert bowl_part is not None and cover_part is not None
+        assert len(cover_part.solids()) == 1, (
+            f"Pump cover has {len(cover_part.solids())} separate solids; must be a single merged solid"
+        )
 
         floor_z = provider.settings.floor_z
         hub_r = provider.settings.impeller_radius + provider.settings.magnet_radius + 1.0
@@ -2612,6 +2615,9 @@ class TestCatFountainProvider:
         bowl_part = bowl.part
         cover_part = cover.part
         assert bowl_part is not None and cover_part is not None
+        assert len(cover_part.solids()) == 1, (
+            f"Pump cover has {len(cover_part.solids())} separate solids; must be a single merged solid"
+        )
 
         mount_depth = provider.settings.pump_cover_mount_depth
         snap_z_offset = provider.settings.pump_cover_snap_z_offset
@@ -2698,3 +2704,11 @@ class TestCatFountainProvider:
         assert res.solid_conformance_ratio >= 0.80, (
             f"Impeller boundary CAD conformance ratio {res.solid_conformance_ratio:.2%} is below 80%"
         )
+
+    @pytest.mark.slow
+    def test_regression_bug_golden_firefly_566_pump_cover_single_solid(self, provider):
+        """Verify BUG-GOLDEN-FIREFLY-566: Pump cover STL is a single merged solid without floating rings."""
+        cover = provider.build_pump_cover("pump_cover")
+        assert cover.part is not None
+        solids = cover.part.solids()
+        assert len(solids) == 1, f"Expected 1 solid for pump_cover, found {len(solids)} separate solids"
