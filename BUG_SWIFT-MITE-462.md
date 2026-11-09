@@ -2,12 +2,13 @@
 
 - **UUID**: `a736e893-03c5-43c4-9dce-db6b5b6c5d1d`
 - **ID**: `BUG-SWIFT-MITE-462`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-09 18:19:42 UTC`
 - **Resolved**: `2026-11-09 23:00:49 UTC`
+- **Accepted**: `2026-11-09 23:00:55 UTC`
 
 #### Description
 
