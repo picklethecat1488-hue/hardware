@@ -19,3 +19,4 @@ The height of the protruding feature is too small to print.
 | Type | Filename | Description |
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1794248516656_cluu0.png](attachments/BUG-CLICKING-LARVA-354/screenshot_paste_1794248516656_cluu0.png) | Pasted screenshot screenshot_paste_1794248516656_cluu0.png |
+| `screenshot` | [screenshot_paste_1794248529568_wddvz.png](attachments/BUG-CLICKING-LARVA-354/screenshot_paste_1794248529568_wddvz.png) | Pasted screenshot screenshot_paste_1794248529568_wddvz.png |
