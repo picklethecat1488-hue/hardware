@@ -2,12 +2,13 @@
 
 - **UUID**: `99969033-d423-4f03-aade-a5fd45b12fda`
 - **ID**: `BUG-CREEPING-WATERSTRIDER-835`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-11-08 12:12:27 UTC`
 - **Resolved**: `2026-11-09 23:01:09 UTC`
+- **Accepted**: `2026-11-09 23:01:14 UTC`
 
 #### Description
 
