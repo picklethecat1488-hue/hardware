@@ -63,6 +63,11 @@ class ProviderManager:
                 if name not in sys.modules:
                     importlib.import_module(name)
 
+        # Discover footprints provider under provider/footprints
+        fp_path = os.path.join(repo_dir, "provider", "footprints")
+        if os.path.isdir(fp_path) and "provider.footprints" not in sys.modules:
+            importlib.import_module("provider.footprints")
+
         discovered: list[Provider] = []
 
         def find_subclasses(cls):

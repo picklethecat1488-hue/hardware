@@ -1098,13 +1098,9 @@ def test_regression_bug_154_carrier_board_project_rename() -> None:
 
 def test_regression_bug_156_m2_thru_holes() -> None:
     """Verify BUG-156: J1 M.2 connector footprint contains all required through-hole pins."""
-    from pathlib import Path
-    import yaml
+    from provider.footprints import get_shared_footprints
 
-    repo_root = Path(__file__).resolve().parents[2]
-    footprints_file = repo_root / "projects" / "footprints" / "ic.yaml"
-    with open(footprints_file) as f:
-        footprints = yaml.safe_load(f)["footprints"]
+    footprints = get_shared_footprints()
 
     m2_fp = footprints["M.2-KEY-M"]
     thru_hole_pins = [p for p in m2_fp["pins"] if p.get("pad_type") == "thru_hole"]
@@ -1924,7 +1920,7 @@ def test_regression_bug_220_flex_tail_flying_probe_isolation_excluded() -> None:
     """Verify BUG-220: Flex tail flying probe test excludes untestable carrier board isolation checks.
 
     Asserts that:
-    1. Flying probe simulation hooks for flex_tail only synthesize steps defined in pcb_test_steps.yaml.
+    1. Flying probe simulation hooks for flex_tail only synthesize steps defined in declarative test models.
     2. Zero TEST_ISO_* steps are created for flex_tail.
     3. flying_probe_signal_isolation on flex_tail reports empty checks.
     4. Rendered markdown report for flex_tail omits 'Signal Line Isolation Audit'.
@@ -2012,13 +2008,10 @@ def test_regression_bug_231_nina_b312_flashed_module_swd_header_and_footprint() 
     assert reset_net is not None, "BLE_RESET_N net must exist for SW2 reset button"
 
     # 4. Footprint dimensions
-    import yaml
-    from pathlib import Path
+    from provider.footprints import get_shared_footprints
 
-    repo_root = Path(__file__).resolve().parents[2]
-    with open(repo_root / "projects/footprints/ic.yaml") as f:
-        ic_fps = yaml.safe_load(f)["footprints"]
-    assert "MOD-BLE-PCB-ANT" in ic_fps, "MOD-BLE-PCB-ANT footprint must be defined in ic.yaml"
+    ic_fps = get_shared_footprints()
+    assert "MOD-BLE-PCB-ANT" in ic_fps, "MOD-BLE-PCB-ANT footprint must be defined in provider.footprints"
     ble_fp = ic_fps["MOD-BLE-PCB-ANT"]
     dims = ble_fp.get("dimensions", [])
     assert dims == [10.0, 15.0, 2.23], f"U11 dimensions must match LGA-72 Table 27 [10.0, 15.0, 2.23], got {dims}"
@@ -2066,11 +2059,11 @@ def test_regression_bug_249_remove_vload_sw_from_ble_module() -> None:
     provider = CarrierBoardProvider()
     wiring = provider.wiring
 
-    # 1. MOD-BLE-PCB-ANT footprint in ic.yaml must not have VLOAD_SW
-    ic_yaml_path = Path(__file__).resolve().parent.parent / "footprints" / "ic.yaml"
-    with open(ic_yaml_path, encoding="utf-8") as f:
-        ic_data = yaml.safe_load(f)
-    ble_fp = ic_data["footprints"]["MOD-BLE-PCB-ANT"]
+    # 1. MOD-BLE-PCB-ANT footprint in provider.footprints must not have VLOAD_SW
+    from provider.footprints import get_shared_footprints
+
+    shared_fps = get_shared_footprints()
+    ble_fp = shared_fps["MOD-BLE-PCB-ANT"]
     ble_pin_names = [p["name"] for p in ble_fp["pins"]]
     assert "VLOAD_SW" not in ble_pin_names, "MOD-BLE-PCB-ANT footprint must not have VLOAD_SW pin"
     assert "SWITCH_2" in ble_pin_names, "MOD-BLE-PCB-ANT footprint pin 18 must be SWITCH_2"

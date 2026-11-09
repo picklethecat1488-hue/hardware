@@ -348,6 +348,24 @@ class Viewer:
                     continue
 
         if not display_items:
+            candidates: list[str] = []
+            manifest_keys = list(self.target_parser.router.manifest.keys())
+            for t in input_targets:
+                base = TargetParser.get_base_target(t)
+                prefix_matches = [k for k in manifest_keys if k.startswith(base)]
+                if prefix_matches:
+                    candidates.extend(prefix_matches)
+                else:
+                    import difflib
+
+                    close = difflib.get_close_matches(base, manifest_keys, n=3, cutoff=0.5)
+                    candidates.extend(close)
+            if candidates:
+                unique = sorted(set(candidates))
+                raise ValueError(
+                    f"No geometry generated for the specified targets: {list(input_targets)}. "
+                    f"Did you mean: {', '.join(unique[:5])}?"
+                )
             raise ValueError("No geometry generated for the specified targets.")
 
         room = Room(config=self.manager.config, is_simulate=is_simulate)

@@ -67,20 +67,32 @@ Guidelines for schematic capture, routing engines, DRC checks, headless KiCad to
   ```
 * **Templatized Python Routing Code Generation**: PCB auto-routing outputs must be serialized to strongly-typed Python modules (`carrier_board_routing.py`) generated from Jinja2 templates (`provider/templates/pcb_routing.py.j2`) rather than raw YAML dictionary dumps. The generator groups traces by `(net, layer, width_mm)` and chains corner-turn directional changes into `Polyline(...)` while preserving collinear segments as distinct `Line(...)` primitives to guarantee OpenCASCADE edge preservation, 0 DRC violations, and exact Gerber invariance.
 
-## 5. PCB Routing & DRC Invariants
+## 5. Declarative Component Footprints & 3D Visual Inspection
+* **build123d Primitives for Footprints**: Standard SMD, Through-Hole, and IC component footprints are implemented declaratively using build123d primitives under `provider/footprints/` (`smd.py`, `thru_hole.py`, `ic.py`) using `BuildFootprint`, `Pad`, `PadShape`, `PadType`, and the `@footprint` registration decorator. Legacy footprint YAML files (`projects/footprints/*.yaml`) and test step YAML files (`pcb_test_steps.yaml`) are completely removed; footprints resolve directly from the Python registry via `get_shared_footprints()`.
+* **Integrated 3D Body & 2D Copper Pads**: `BuildFootprint` subclasses `BuildPart`, allowing 3D package geometries (`Box`, `Cylinder`) to be ambiently constructed inside the footprint definition alongside 2D copper pads (`Pad`) evaluated across ambient `Locations([...])` blocks.
+* **Provider Discoverability & 3D Inspection**: Footprints are exposed via `FootprintProvider` in `provider/footprints/provider.py` (decorated with `@discover_provider`), registering all standard footprints into `provider/footprints/manifest.yaml`. Every footprint can be inspected with bounding dimensions, 3D body solids, and copper pads via the CLI viewer:
+  ```bash
+  python tools/view.py footprints/<package_name>
+  # Examples:
+  python tools/view.py footprints/0402
+  python tools/view.py footprints/SOIC-8
+  python tools/view.py footprints/USB-C-16P
+  ```
+
+## 6. PCB Routing & DRC Invariants
 * **Planar Flex Routing**: Flexible PCB tails and ribbons must maintain planar single-layer routing without trace crossovers, ensure non-overlapping capacitive electrode traces with generous keepouts ($\ge 1.5$ mm clearance to flex outline edges), and provide silkscreen channel callouts directly on the substrate.
 * **Auto-Router Grid & Clearance Parity**: The PCB A* auto-router and DRC clearance definitions must maintain mathematical parity: trace widths and obstacle expansion margins must ensure adjacent grid corridors do not violate trace-to-trace spacing constraints ($s \ge (w_1 + w_2)/2 + \text{clearance}$). Stitching vias to internal power/ground planes and escape corridors must be generated dynamically from netlist graph topology.
 * **Net Escape Prioritization**: In high-density or mixed-signal PCB layouts, local pin-dense escape nets (MCU crystal oscillators, reset lines, boot controls) MUST be scheduled and routed before wide global multi-drop buses (PCIe, MIPI).
 * **Edge-Mounted Connector DRC Exemption**: Receptacle connectors intended to mate with external plugs (USB-C, card-edge, FPC sockets) must be permitted to sit flush with or slightly overhang board edges. DRC board boundary containment rules must exempt edge-facing connectors whose bounding center falls within the board outline.
 * **Subassembly Netlist Scoping & Antenna Termination**: Multi-subassembly projects sharing a top-level wiring declaration must scope connectivity DRC checks strictly to nets having two or more terminals on the specific subassembly. Antenna/stub detection algorithms must recognize non-pad copper structures (such as capacitive touch electrodes) as valid termination nodes to avoid false positive antenna violations.
 
-## 6. Schematic Router Invariants & Detour Rules
+## 7. Schematic Router Invariants & Detour Rules
 * **No Collinear Overlaps**: Parallel signal wires and dogleg corridor segments must never share collinear coordinates. Staggered doglegs must be sorted directionally (step-down vs step-up) so that vertical transitions occur at distinct coordinates with clean jumper bridge crossings.
 * **Corridor Boundary Clearance**: Vertical dogleg corridors must be strictly constrained to the channel interior ($x_v \in [x_{\text{left}} + 10.0, x_{\text{right}} - 10.0]$) to ensure wire stubs extending from component symbols have sufficient clearance and never run on top of connector/IC symbols or pin labels.
 * **Channel Passive Spacing**: Shunt and pull-up/pull-down passives residing in the same inter-component channel must be grouped together across overlapping channel spans and spaced with a generous pitch ($\ge 20.0$ mm pitch, minimum separation $\ge 16.0$ mm) to prevent text collisions.
 * **Concentric Detour Routing**: On-sheet wire detours around IC footprints must be sorted concentrically by pin coordinates to guarantee nested routing with zero wire crossings and no off-sheet connectors.
 
-## 7. Component Selection & Bare-Metal Firmware Co-Design
+## 8. Component Selection & Bare-Metal Firmware Co-Design
 * **Target Firmware Environment**: Downstream target execution environment is bare-metal Rust (`no_std`, Embassy asynchronous executor, `embedded-hal` driver abstractions, `defmt` logging, stack-based zero-allocation concurrency).
 * **Authoritative Datasheet Grounding**: ALWAYS obtain connector, IC, and peripheral information directly from the official manufacturer documentation archived in `docs/datasheets/`. Never trust third-party summaries or synthetic pin assignments.
 * **Programmable Component Qualification**: Active components integrated into designs must meet:
