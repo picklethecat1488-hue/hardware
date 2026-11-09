@@ -18,7 +18,3 @@ A. Increase the thickness to 1 mm. And then send the new file to us for an updat
 | Type | Filename | Description |
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1794248422642_wc8c3.png](attachments/BUG-SWIFT-MITE-462/screenshot_paste_1794248422642_wc8c3.png) | Pasted screenshot screenshot_paste_1794248422642_wc8c3.png |
-
-#### Review Tasks & Functional Checklist
-
-- [ ] <!-- task:fe091df8 --> Inspect bowl STL to verify >= 1.0mm thickness at PCB clip detent lip and charger port wall | `python tools/build.py cat_fountain:bowl:stl`
