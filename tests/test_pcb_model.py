@@ -326,9 +326,10 @@ def test_mounting_hole_model():
 
 def test_shared_footprint_libraries_loading_and_resolution(tmp_path: Path):
     """Verify loading shared SMD, TH, and IC footprint libraries and merging into Wiring models."""
-    from model.wiring import Wiring, load_shared_footprints
+    from model.wiring import Wiring
+    from provider.footprints import get_shared_footprints
 
-    shared = load_shared_footprints()
+    shared = get_shared_footprints()
     assert "0402" in shared
     assert "0603" in shared
     assert "SOT-23" in shared

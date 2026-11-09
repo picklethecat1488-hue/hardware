@@ -2024,9 +2024,8 @@ def test_regression_bug_231_nina_b312_flashed_module_swd_header_and_footprint() 
 
 
 def test_power_hardening_bug_243() -> None:
-    """Verify BUG-243: Power hardening components C15, C16, C17, D8 exist on bottom side with zero DRC errors."""
+    """Verify BUG-243 superseded by BUG-JUMPING-SILVERFISH-144: C15..D8 purged and DRC passes."""
     from projects.carrier_board.provider import CarrierBoardProvider
-    from model.wiring import Wiring
     from provider.pcb.drc import PCBDesignRulesChecker
 
     provider = CarrierBoardProvider()
@@ -2034,19 +2033,63 @@ def test_power_hardening_bug_243() -> None:
     comp_map = {c.name: c for c in wiring.footprints}
 
     for name in ("C15", "C16", "C17", "D8"):
-        assert name in comp_map, f"Power hardening component {name} must exist"
-        comp = comp_map[name]
-        assert comp.layer == "B.Cu" or comp.position[2] < 0, f"{name} must be on bottom side"
-
-    # Verify nets connected to 3V3 and GND
-    nets_map = {n.name: n for n in wiring.nets}
-    for name in ("C15", "C16", "C17", "D8"):
-        assert any(c == name for c, p in nets_map["3V3"].pins), f"{name} must connect to 3V3"
-        assert any(c == name for c, p in nets_map["GND"].pins), f"{name} must connect to GND"
+        assert name not in comp_map, f"{name} must be removed to eliminate parasitic antenna stubs"
 
     drc = PCBDesignRulesChecker(provider.pcb_config)
     report = drc.check_all(wiring=wiring)
     assert report.error_count == 0, f"Expected 0 DRC errors, got: {report.summary()}"
+
+
+def test_regression_bug_jumping_silverfish_144_unnecessary_vias_removed() -> None:
+    """Verify BUG-JUMPING-SILVERFISH-144: 8 unnecessary vias and dangling B.Cu stubs removed from carrier board."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = CarrierBoardProvider()
+    cfg = provider.pcb_config
+
+    unnecessary_via_positions = {
+        (12.2, 29.6),
+        (15.2, 29.6),
+        (12.5, 32.6),
+        (14.6, 32.8),
+        (13.8, 29.6),
+        (16.8, 29.6),
+        (13.5, 32.6),
+        (17.4, 32.8),
+    }
+
+    via_positions = {(round(v.position_mm[0], 2), round(v.position_mm[1], 2)) for v in cfg.vias}
+    for pos in unnecessary_via_positions:
+        assert pos not in via_positions, f"Unnecessary via at {pos} must be removed"
+
+    dangling_stubs = {
+        ((12.2, 29.0), (12.2, 29.6)),
+        ((15.2, 29.0), (15.2, 29.6)),
+        ((12.5, 32.0), (12.5, 32.6)),
+        ((14.6, 32.0), (14.6, 32.8)),
+        ((13.8, 29.0), (13.8, 29.6)),
+        ((16.8, 29.0), (16.8, 29.6)),
+        ((13.5, 32.0), (13.5, 32.6)),
+        ((17.4, 32.0), (17.4, 32.8)),
+    }
+    trace_segments = {
+        (
+            (round(t.start_mm[0], 2), round(t.start_mm[1], 2)),
+            (round(t.end_mm[0], 2), round(t.end_mm[1], 2)),
+        )
+        for t in cfg.traces
+    }
+    for stub in dangling_stubs:
+        assert stub not in trace_segments, f"Dangling stub {stub} must be removed"
+
+    comp_names = {c.name for c in provider.wiring.footprints}
+    for name in ("C15", "C16", "C17", "D8"):
+        assert name not in comp_names, f"{name} must not be present in carrier board wiring"
+
+    drc = PCBDesignRulesChecker(cfg)
+    report = drc.check_all(wiring=provider.wiring)
+    assert report.error_count == 0, f"Expected 0 DRC errors after via removal, got: {report.summary()}"
 
 
 def test_regression_bug_249_remove_vload_sw_from_ble_module() -> None:

@@ -19,8 +19,8 @@ from model.wiring import (
     PinListModel,
     PinList,
     TruthTableModel,
-    load_shared_footprints,
 )
+from provider.footprints import get_shared_footprints
 
 _current_build_components: ContextVar[Optional["BuildComponents"]] = ContextVar(
     "_current_build_components", default=None
@@ -402,7 +402,7 @@ class Component(list):
                 designators = [f"{prefix}{start_num + i}" for i in range(len(locations))]
 
         # 3. Resolve package template and pins
-        shared_templates = load_shared_footprints()
+        shared_templates = get_shared_footprints()
         pkg_key = package
         namespace = None
         if ":" in package:
