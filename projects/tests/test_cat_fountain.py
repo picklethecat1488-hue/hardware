@@ -2712,3 +2712,34 @@ class TestCatFountainProvider:
         assert cover.part is not None
         solids = cover.part.solids()
         assert len(solids) == 1, f"Expected 1 solid for pump_cover, found {len(solids)} separate solids"
+
+    @pytest.mark.slow
+    def test_regression_bug_swift_mite_462_bowl_minimum_wall_thickness(self, provider):
+        """Verify BUG-SWIFT-MITE-462: Bowl features minimum 1.0mm wall thickness at PCB clip lip and charger port."""
+        bowl = provider.build_bowl("bowl")
+        bowl_part = bowl.part
+        assert bowl_part is not None
+
+        # 1. PCB clip bottom retaining lip thickness >= 1.0mm
+        base_z = provider.settings.floor_z - provider.settings.bowl_thickness
+        standoff_h = provider.settings.motor_driver_standoff_height
+        snap_h = 1.8
+        pocket_bottom_z = base_z - standoff_h - snap_h
+        tmc_span = provider.settings.motor_driver_spacing_y
+        tmc_slide = provider.settings.motor_driver_spacing_x
+        mcx, mcy = 50.0, 15.0
+        assert bowl_part.is_inside((mcx + tmc_span / 2.0 - 0.1, mcy, pocket_bottom_z - 0.5)), (
+            "PCB clip retaining lip must be at least 1.0mm thick (solid at pocket_bottom_z - 0.5mm)"
+        )
+        assert bowl_part.is_inside((mcx, mcy + tmc_slide / 2.0 - 0.1, pocket_bottom_z - 0.5)), (
+            "PCB clip retaining lip must be at least 1.0mm thick (solid at pocket_bottom_z - 0.5mm)"
+        )
+
+        # 2. Wall thickness between charger standoff and charging port cutout >= 1.0mm
+        charger_x = provider.settings.charger_spacing_x / 2.0
+        charger_y = -79.0 - provider.settings.charger_spacing_y / 2.0
+        hole_edge_y = charger_y - provider.settings.pcb_hole_radius
+        standoff_z = base_z - provider.settings.charger_standoff_height / 2.0
+        assert bowl_part.is_inside((charger_x, hole_edge_y - 1.0, standoff_z)), (
+            f"Wall thickness between charger standoff hole and port cutout must be >= 1.0mm at Y={hole_edge_y - 1.0}"
+        )

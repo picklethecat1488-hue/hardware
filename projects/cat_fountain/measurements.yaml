@@ -250,5 +250,6 @@ motor_hub_support_radius: 15.0
 motor_hub_detent_y: -14.0
 motor_hub_detent_width: 3.0
 motor_hub_detent_depth: 0.8
-pcb_clip_detent_lip: 0.5
+pcb_clip_detent_lip: 1.0
 pcb_clip_stop_wall: 1.5
+charger_port_depth: 6.0

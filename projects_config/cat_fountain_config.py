@@ -1053,12 +1053,17 @@ class CatFountainConfig(BaseModel):
     @cached_property
     def pcb_clip_detent_lip(self) -> float:
         """Return the retention snap lip projection for slide-in PCB card guides."""
-        return float(self._raw_data.get("pcb_clip_detent_lip", 0.5))
+        return float(self._raw_data.get("pcb_clip_detent_lip", 0.0))
 
     @cached_property
     def pcb_clip_stop_wall(self) -> float:
         """Return the thickness of the positive end stop wall for slide-in PCB card guides."""
-        return float(self._raw_data.get("pcb_clip_stop_wall", 1.5))
+        return float(self._raw_data.get("pcb_clip_stop_wall", 0.0))
+
+    @cached_property
+    def charger_port_depth(self) -> float:
+        """Return the depth of the charging port cutout through the dry compartment outer wall."""
+        return float(self._raw_data.get("charger_port_depth", 0.0))
 
     @cached_property
     def motor_radius(self) -> float:

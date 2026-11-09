@@ -289,7 +289,9 @@ class CatFountainCAD:
                 clearance = 0.2
                 snap_depth = 0.35
                 snap_h = 1.8
-                total_h = standoff_h + pcb_t + 1.0
+                lip_t = self.settings.pcb_clip_detent_lip
+                chamfer_h = 0.3
+                total_h = standoff_h + snap_h + lip_t + chamfer_h
 
                 cutout_margin = self.settings.pcb_snap_socket_cutout_margin
 
@@ -329,7 +331,7 @@ class CatFountainCAD:
                         Box(
                             cutout_x + 0.6,
                             cutout_y + 0.6,
-                            0.3,
+                            chamfer_h,
                             align=(Align.CENTER, Align.CENTER, Align.MIN),
                             mode=Mode.SUBTRACT,
                         )
@@ -507,11 +509,12 @@ class CatFountainCAD:
             # Charging port hole in the outer wall of the dry compartment (back side, y = -r)
             # Centered on the USB port, which is located on the underside of the PCB
             usb_z = floor_z - t - self.settings.charger_standoff_height - 3.2
+            port_depth = self.settings.charger_port_depth
             with Locations((0, -r + t / 2.0, usb_z)):
                 with BuildPart(mode=Mode.PRIVATE) as port_cutout:
                     Box(
                         self.settings.charger_port_width,
-                        10.0,
+                        port_depth,
                         self.settings.charger_port_height,
                         align=(Align.CENTER, Align.CENTER, Align.CENTER),
                     )
