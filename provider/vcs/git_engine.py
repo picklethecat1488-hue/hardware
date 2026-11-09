@@ -1598,6 +1598,8 @@ class GitEngine:
                 file_path = file_path.split(" -> ")[1].strip()
 
             clean_path = file_path.strip().strip('"').strip("'").replace("\\", "/").strip().lstrip("./")
+            if clean_path.startswith("build/") or clean_path.startswith("target/"):
+                continue
             is_feedback = (
                 clean_path.startswith("feedback/")
                 or clean_path in IGNORED_REVIEW_FILES
@@ -2540,6 +2542,32 @@ class GitEngine:
                 cr_working.unlink()
             except OSError:
                 pass
+
+        # Requirement BUG-CREEPING-WATERSTRIDER-835: Update working comments in SQLite and sync feedback worktree
+        for sqlite_cand in [
+            self.repo_root / "build" / "code_review.sqlite",
+            self.repo_root / "target" / "code_review.sqlite",
+        ]:
+            if sqlite_cand.exists():
+                try:
+                    with sqlite3.connect(str(sqlite_cand)) as conn:
+                        conn.execute(
+                            "UPDATE comments SET commit_hash = ? WHERE commit_hash = 'working' OR commit_hash = ''",
+                            (head_commit,),
+                        )
+                        conn.execute(
+                            "UPDATE metadata SET value = ? WHERE key = 'commit_hash' AND (value = 'working' OR value = '')",
+                            (head_commit,),
+                        )
+                        conn.commit()
+                        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                except Exception:
+                    pass
+
+        try:
+            self.sync_feedback_worktree(push=False)
+        except Exception:
+            pass
 
         self.clear_diff_cache()
         return head_commit

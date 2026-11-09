@@ -3588,3 +3588,94 @@ def test_ensure_feedback_worktree_migration(tmp_path: Path) -> None:
     # 6. Verify idempotency
     res_second = engine.ensure_feedback_worktree()
     assert res_second is True
+
+
+def test_regression_bug_creeping_waterstrider_835_working_cr_committed(tmp_path: Path) -> None:
+    """Verify BUG-CREEPING-WATERSTRIDER-835: Working tree CR feedback moves to CR_<sha>.md upon commit."""
+    import sqlite3
+
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+    # Modify a file in working tree
+    (repo_dir / "file1.txt").write_text("working tree change\n", encoding="utf-8")
+
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        port = server.server_address[1]
+        base_url = f"http://127.0.0.1:{port}"
+
+        # 1. Add working tree review comment via /api/comment
+        payload = {
+            "commit_hash": "working",
+            "file_path": "file1.txt",
+            "start_line": 1,
+            "end_line": 1,
+            "body": "Fix this working change",
+            "severity": "proposal",
+        }
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            f"{base_url}/api/comment",
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+
+        cr_working = repo_dir / "feedback" / "CR_working.md"
+        assert cr_working.exists(), "CR_working.md should exist after adding working comment"
+        assert "Fix this working change" in cr_working.read_text(encoding="utf-8")
+
+        # 2. Commit working tree changes via /api/commit
+        commit_payload = {
+            "message": "commit foo",
+            "files": ["file1.txt"],
+        }
+        commit_data = json.dumps(commit_payload).encode("utf-8")
+        commit_req = urllib.request.Request(
+            f"{base_url}/api/commit",
+            data=commit_data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(commit_req) as resp:
+            assert resp.status == 200
+            res = json.loads(resp.read().decode("utf-8"))
+            new_sha = res["commit_hash"]
+
+        # 3. Trigger feedback sync (simulating reload / file watch / sync_feedback)
+        server.sync_feedback()
+
+        # 4. Verify CR_working.md is gone, and CR_<new_sha>.md exists with feedback
+        assert not cr_working.exists(), "CR_working.md should not exist after commit and sync"
+        cr_new = repo_dir / "feedback" / f"CR_{new_sha}.md"
+        assert cr_new.exists(), f"CR_{new_sha}.md should exist after commit"
+        assert "Fix this working change" in cr_new.read_text(encoding="utf-8")
+
+        # 5. Verify SQLite comments table updated commit_hash to new_sha
+        sqlite_file = repo_dir / "build" / "code_review.sqlite"
+        assert sqlite_file.exists()
+        with sqlite3.connect(str(sqlite_file)) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("SELECT commit_hash FROM comments").fetchall()
+            assert len(rows) >= 1
+            for row in rows:
+                assert row["commit_hash"] == new_sha, (
+                    f"Comment commit_hash should be {new_sha}, got {row['commit_hash']}"
+                )
+
+        # 6. Verify subsequent session recovery loads comment with new_sha
+        recovered_session = server.get_review_session([new_sha])
+        assert any(c.commit == new_sha for c in recovered_session.comments)
+    finally:
+        server.shutdown()
+        server.server_close()

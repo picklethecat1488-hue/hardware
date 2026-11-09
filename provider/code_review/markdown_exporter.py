@@ -505,6 +505,8 @@ class MarkdownReviewExporter:
                         match_c.resolved = True
                     if pc.body and pc.body != match_c.body:
                         match_c.body = pc.body
+                    if pc.commit and match_c.commit != pc.commit:
+                        match_c.commit = pc.commit
                 else:
                     session.comments.append(pc)
                     if pc.uuid:
