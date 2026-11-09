@@ -1,7 +1,7 @@
-# 🟢 `[WORM-CREEPING-LARVA-820]` Regression tests are not useful
+# 🟢 `[BUG-SERRATED-SKIPPER-578]` Regression tests are not useful
 
-- **UUID**: `c9679ffa-7211-4f3f-bea5-a57be3bc91a4`
-- **ID**: `WORM-CREEPING-LARVA-820`
+- **UUID**: `27221b71-6d51-4fef-bf34-2f2620e9b0df`
+- **ID**: `BUG-SERRATED-SKIPPER-578`
 - **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `GENERAL`
