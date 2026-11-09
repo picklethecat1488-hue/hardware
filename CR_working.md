@@ -8,15 +8,15 @@
 | :--- | :--- |
 | **Review Date** | `2026-11-08 11:45:41 UTC` |
 | **Revisions** | `working` |
-| **Overall Verdict** | **`APPROVED`** |
-| **Review Progress** | `0/22 files reviewed (0%)` |
-| **Total Comments** | `16 findings` |
+| **Overall Verdict** | **`CHANGES_REQUESTED`** |
+| **Review Progress** | `0/16 files reviewed (0%)` |
+| **Total Comments** | `20 findings` |
 
 ## Findings by Severity
 
 | Severity | Count | Meaning |
 | :--- | :---: | :--- |
-| **[MUST FIX]** | 16 | Must be resolved before merge; bugs, defects, or safety regressions. |
+| **[MUST FIX]** | 20 | Must be resolved before merge; bugs, defects, or safety regressions. |
 | **[PROPOSAL]** | 0 | Architecture ideas, design proposals, or optional enhancements. |
 | **[NIT]** | 0 | Minor formatting, naming, or cosmetic cleanups. |
 
@@ -59,6 +59,61 @@
 ```
 
 > **Reviewer (Reviewer)**: let’s remove this property, there’s no use case for it
+
+### [`projects/carrier_board/carrier_board.py`](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py) — ⏳ `PENDING`
+
+#### **[MUST FIX]** [projects/carrier_board/carrier_board.py:L1326-L1328](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L1326-L1328)
+<!-- comment-uuid: 98484bb2-40b2-40af-827e-c79ea6f36f68 -->
+<!-- comment-commit: working -->
+
+```python
+with BuildPcb(name="carrier_board", board_type=BoardType.RIGID) as pcb_ctx:
+        with BuildComponents(
+```
+
+> **Reviewer (Reviewer)**: This seems bad to me, we’re creating a separate BuildPcb CM just for definign the board wiring. We should remove this second definition!!
+
+#### **[MUST FIX]** [projects/carrier_board/carrier_board.py:L2327-L2349](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L2327-L2349)
+<!-- comment-uuid: 8b65070e-3c35-4017-9cbd-9b4523445f27 -->
+<!-- comment-commit: working -->
+
+```python
+all_components = carrier_comps.components + status_comps.components + rf_comps.components
+    symbol_table.update(carrier_comps.symbol_table_entries)
+    symbol_table.update(status_comps.symbol_table_entries)
+    symbol_table.update(rf_comps.symbol_table_entries)
+
+    merged_nets = list(pwr_nets.nets)
+    existing_net_names = {n.name for n in merged_nets}
+    for sn in sig_nets.nets:
+        if sn.name in existing_net_names:
+            target = next(n for n in merged_nets if n.name == sn.name)
+            for p in sn.pins:
+                if p not in target.pins:
+                    target.pins.append(p)
+        else:
+            merged_nets.append(sn)
+            existing_net_names.add(sn.name)
+
+    wiring = Wiring.from_models(
+        footprints=all_components,
+        nets=merged_nets,
+        parent_part=parent_part,
+        symbol_table=symbol_table,
+    )
+```
+
+> **Reviewer (Reviewer)**: We def shouldn’t require the user to manipulate the symbol table in their project code. This should all be handled transparently in the provider module when building the wiring object
+
+#### **[MUST FIX]** [projects/carrier_board/carrier_board.py:L2463](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L2463)
+<!-- comment-uuid: a2a98f2b-1d56-435f-8e23-1219d2e00381 -->
+<!-- comment-commit: working -->
+
+```python
+symbol_table=sys_comps.symbol_table_entries,
+```
+
+> **Reviewer (Reviewer)**: can we remove this parameter from Wiring.from_models while retaining the symbol table functionality
 
 ### [`projects/carrier_board/pcb.py`](file:///Users/<username>/gh/hardware/projects/carrier_board/pcb.py) — ⏳ `PENDING`
 
@@ -2628,6 +2683,16 @@ cfg.test_steps = cb_steps + flex_steps
 
 > **Reviewer (Reviewer)**: please apply the improvements discussed in [`@projects/carrier_board/pcb.py`](file:///Users/<username>/gh/hardware/projects/carrier_board/pcb.py) to this listing
 
+#### **[MUST FIX]** [projects/cat_fountain/pcb.py:L336](file:///Users/<username>/gh/hardware/projects/cat_fountain/pcb.py#L336)
+<!-- comment-uuid: ee5ceaa2-2d92-4aff-82dd-800735a5069e -->
+<!-- comment-commit: working -->
+
+```python
+symbol_table=layout.symbol_table_entries,
+```
+
+> **Reviewer (Reviewer)**: can we remove this parameter from Wiring.from_models while retaining the symbol table functionality
+
 ### [`provider/pcb/test_steps.py`](file:///Users/<username>/gh/hardware/provider/pcb/test_steps.py) — ⏳ `PENDING`
 
 #### **[MUST FIX]** [provider/pcb/test_steps.py:L12](file:///Users/<username>/gh/hardware/provider/pcb/test_steps.py#L12)
@@ -2731,9 +2796,6 @@ if wiring is None:
 
 ## Action Items Checklist
 
-- [x] **[MUST FIX]** [`provider/provider.py:L314-L348`](file:///Users/<username>/gh/hardware/provider/provider.py#L314-L348): let’s remove the wiring_path property and use a provider property for returning wiring for each subassembly. then, all pcb.py has to do is overload the wiring property <!-- uuid:4f134659-55da-4f50-af53-913c1fd58b5f -->
-- [x] **[MUST FIX]** [`provider/provider.py:L351-L369`](file:///Users/<username>/gh/hardware/provider/provider.py#L351-L369): same idea here; we can remove the pcb_manifest_path and only read the pcb manifest from the pcb_config attr <!-- uuid:1e3f05ed-393d-485e-8562-2d7a2694302a -->
-- [x] **[MUST FIX]** [`tools/build.py:L563-L566`](file:///Users/<username>/gh/hardware/tools/build.py#L563-L566): let’s remove the wiring_path fallback logic here <!-- uuid:9c4d7eb9-dbe4-4f4e-97f4-6dc2b3f8216f -->
 - [x] **[MUST FIX]** [`projects/carrier_board/cad.py:L659-L685`](file:///Users/<username>/gh/hardware/projects/carrier_board/cad.py#L659-L685): let’s remove this property, there’s no use case for it <!-- uuid:37285658-901e-48e5-a647-98c029ff4af3 -->
 - [x] **[MUST FIX]** [`projects/carrier_board/pcb.py:L245-L249`](file:///Users/<username>/gh/hardware/projects/carrier_board/pcb.py#L245-L249): can we fold this workaround logic into the BuildPcb context manager? <!-- uuid:daa0c72a-746b-4bbd-8326-160a0d4ba8a2 -->
 - [x] **[MUST FIX]** [`projects/carrier_board/pcb.py:L335-L340`](file:///Users/<username>/gh/hardware/projects/carrier_board/pcb.py#L335-L340): Can we fold this workaround logic into the BuilcPcb context manager? <!-- uuid:ff7731b0-cbec-470d-ab1e-8de54b8be10b -->
@@ -2747,3 +2809,10 @@ if wiring is None:
 - [x] **[MUST FIX]** [`projects/carrier_board/pcb.py:L3033-L3070`](file:///Users/<username>/gh/hardware/projects/carrier_board/pcb.py#L3033-L3070): the code for instantinating the PCB config should be moved to the provider module. there’s no reason to keep redefining it for every project <!-- uuid:c89703be-d087-40c5-833d-db435143c6c2 -->
 - [x] **[MUST FIX]** [`projects/cat_fountain/pcb.py:L2`](file:///Users/<username>/gh/hardware/projects/cat_fountain/pcb.py#L2): please apply the improvements discussed in [`@projects/carrier_board/pcb.py`](file:///Users/<username>/gh/hardware/projects/carrier_board/pcb.py) to this listing <!-- uuid:9d002d93-8530-4fe7-9aa5-7e90241b6cc6 -->
 - [x] **[MUST FIX]** [`provider/pcb/test_steps.py:L12`](file:///Users/<username>/gh/hardware/provider/pcb/test_steps.py#L12): this is a good start, but doesn’t go far enough to provide a safe environment to build PCB config and assembly testing steps. see my comments in [`@projects/carrier_board/pcb.py`](file:///Users/<username>/gh/hardware/projects/carrier_board/pcb.py) <!-- uuid:b6026d89-c299-4de7-bf1e-30f7e0a3db93 -->
+- [x] **[MUST FIX]** [`provider/provider.py:L314-L348`](file:///Users/<username>/gh/hardware/provider/provider.py#L314-L348): let’s remove the wiring_path property and use a provider property for returning wiring for each subassembly. then, all pcb.py has to do is overload the wiring property <!-- uuid:4f134659-55da-4f50-af53-913c1fd58b5f -->
+- [x] **[MUST FIX]** [`provider/provider.py:L351-L369`](file:///Users/<username>/gh/hardware/provider/provider.py#L351-L369): same idea here; we can remove the pcb_manifest_path and only read the pcb manifest from the pcb_config attr <!-- uuid:1e3f05ed-393d-485e-8562-2d7a2694302a -->
+- [x] **[MUST FIX]** [`tools/build.py:L563-L566`](file:///Users/<username>/gh/hardware/tools/build.py#L563-L566): let’s remove the wiring_path fallback logic here <!-- uuid:9c4d7eb9-dbe4-4f4e-97f4-6dc2b3f8216f -->
+- [ ] **[MUST FIX]** [`projects/carrier_board/carrier_board.py:L1326-L1328`](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L1326-L1328): This seems bad to me, we’re creating a separate BuildPcb CM just for definign the board wiring. We should remove this second definition!! <!-- uuid:98484bb2-40b2-40af-827e-c79ea6f36f68 -->
+- [ ] **[MUST FIX]** [`projects/carrier_board/carrier_board.py:L2327-L2349`](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L2327-L2349): We def shouldn’t require the user to manipulate the symbol table in their project code. This should all be handled transparently in the provider module when building the wiring object <!-- uuid:8b65070e-3c35-4017-9cbd-9b4523445f27 -->
+- [ ] **[MUST FIX]** [`projects/cat_fountain/pcb.py:L336`](file:///Users/<username>/gh/hardware/projects/cat_fountain/pcb.py#L336): can we remove this parameter from Wiring.from_models while retaining the symbol table functionality <!-- uuid:ee5ceaa2-2d92-4aff-82dd-800735a5069e -->
+- [ ] **[MUST FIX]** [`projects/carrier_board/carrier_board.py:L2463`](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L2463): can we remove this parameter from Wiring.from_models while retaining the symbol table functionality <!-- uuid:a2a98f2b-1d56-435f-8e23-1219d2e00381 -->
