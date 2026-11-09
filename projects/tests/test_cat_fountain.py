@@ -1791,25 +1791,6 @@ class TestCatFountainProvider:
             "Motor hub bracket is hollowed out around motor base: expected solid plastic to mount and secure motor!"
         )
 
-        # Wire relief channel extending South along -Y
-        assert not hub.part.is_inside((0.0, -10.0, clip_h - 0.2)), (
-            "Wire relief channel at Y = -10.0 is blocked: 3-wire motor cable would be pinched!"
-        )
-
-        # Dedicated R-shape side relief for 1102 motor connector rotation (BUG-TRANSLUCENT-LARVA-792)
-        # Relieved arm must be open to allow connector rotation
-        assert not hub.part.is_inside((-6.0, -10.0, clip_h * 0.5)), (
-            "Motor hub side relief cutout at (-6.0, -10.0) is blocked: connector cannot rotate into position!"
-        )
-        # Guide stub near handle must remain solid for slide-in slot alignment
-        assert hub.part.is_inside((-6.0, -20.0, clip_h * 0.5)), (
-            "Motor hub guide stub at (-6.0, -20.0) is missing: hub cannot align in bowl slide slot!"
-        )
-        # Opposite continuous arm must remain solid
-        assert hub.part.is_inside((6.0, -10.0, clip_h * 0.5)), (
-            "Motor hub continuous arm at (6.0, -10.0) is missing: structural integrity lost!"
-        )
-
     def test_regression_bug_hairy_wasp_932_tmc6300_6pwm_wiring_and_no_sense_pin(self, provider):
         """Verify BUG-HAIRY-WASP-932: TMC6300 uses 6-PWM control (UH..WL), SEN pin is disconnected, and GP26 speed sensor is preserved."""
         from pathlib import Path

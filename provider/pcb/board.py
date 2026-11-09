@@ -56,17 +56,6 @@ class BuildPcb(BuildPart):
         board_type: Union[BoardType, str] = BoardType.RIGID,
         shape_ref: Optional[str] = None,
         revision: str = "1.0",
-        sheet_size: Union[SheetSize, str] = SheetSize.A4,
-        omitted_silkscreen_designators: Optional[Sequence[str]] = None,
-        design_rules: Optional[Union[PCBDesignRulesModel, Dict[str, Any]]] = None,
-        net_classes: Optional[Sequence[Union[NetClassModel, Dict[str, Any]]]] = None,
-        flex_zones: Optional[Sequence[Union[FlexZoneModel, Dict[str, Any]]]] = None,
-        obstacles: Optional[Sequence[Union[PCBObstacleModel, Dict[str, Any]]]] = None,
-        schematic_sheets: Optional[Sequence[Union[SchematicSheetModel, Dict[str, Any]]]] = None,
-        assembly_test: Optional[Union[AssemblyTestModel, Dict[str, Any]]] = None,
-        stackup: Optional[Union[BuildStackup, StackupModel]] = None,
-        capacitive_sensors: Optional[Sequence[CapacitiveElectrodeModel]] = None,
-        outline_polygon: Optional[Sequence[Tuple[float, float]]] = None,
         coverlay_color: Optional[str] = None,
         mode: Any = None,
     ) -> None:
@@ -77,17 +66,6 @@ class BuildPcb(BuildPart):
             board_type: Substrate construction ('rigid', 'flex', or 'rigid-flex').
             shape_ref: Optional target geometry shape reference (defaults to name).
             revision: Board revision identifier.
-            sheet_size: Schematic sheet size standard (A4, A3, etc.).
-            omitted_silkscreen_designators: Optional sequence of designators to omit from silkscreen.
-            design_rules: Fabrication clearance and DRC constraints.
-            net_classes: High-speed and differential net classes.
-            flex_zones: Rigid-flex flexible substrate zones.
-            obstacles: 3D clearance keepouts and component bounding obstacles.
-            schematic_sheets: Schematic drawing sheet definitions.
-            assembly_test: Factory automated test instructions.
-            stackup: Multi-layer stackup model or BuildStackup context.
-            capacitive_sensors: Optional sequence of capacitive electrode models.
-            outline_polygon: Board contour polygon vertices.
             coverlay_color: Optional protective coverlay film color (e.g. 'black').
             mode: Optional BuildMode for build123d part builder.
         """
@@ -96,45 +74,16 @@ class BuildPcb(BuildPart):
         self.shape_ref = shape_ref or name
         self.board_type: BoardType = BoardType(board_type) if isinstance(board_type, str) else board_type
         self.revision = revision
-        self.sheet_size = SheetSize(sheet_size) if isinstance(sheet_size, str) else sheet_size
         self.coverlay_color = coverlay_color
-        self.omitted_silkscreen_designators: List[str] = list(omitted_silkscreen_designators or [])
-
-        if isinstance(design_rules, PCBDesignRulesModel):
-            self.design_rules: Optional[PCBDesignRulesModel] = design_rules
-        elif isinstance(design_rules, dict):
-            self.design_rules = PCBDesignRulesModel(**design_rules)
-        else:
-            self.design_rules = None
-
+        self.sheet_size: SheetSize = SheetSize.A4
+        self.omitted_silkscreen_designators: List[str] = []
+        self.design_rules: Optional[PCBDesignRulesModel] = None
         self.net_classes: List[NetClassModel] = []
-        for nc in net_classes or []:
-            self.net_classes.append(nc if isinstance(nc, NetClassModel) else NetClassModel(**nc))
-
         self.flex_zones: List[FlexZoneModel] = []
-        for fz in flex_zones or []:
-            self.flex_zones.append(fz if isinstance(fz, FlexZoneModel) else FlexZoneModel(**fz))
-
         self.obstacles: List[PCBObstacleModel] = []
-        for obs in obstacles or []:
-            self.obstacles.append(obs if isinstance(obs, PCBObstacleModel) else PCBObstacleModel(**obs))
-
         self.schematic_sheets: List[SchematicSheetModel] = []
-        for ss in schematic_sheets or []:
-            self.schematic_sheets.append(ss if isinstance(ss, SchematicSheetModel) else SchematicSheetModel(**ss))
-
-        if isinstance(assembly_test, AssemblyTestModel):
-            self.assembly_test: Optional[AssemblyTestModel] = assembly_test
-        elif isinstance(assembly_test, dict):
-            self.assembly_test = AssemblyTestModel(**assembly_test)
-        else:
-            self.assembly_test = None
-
-        if isinstance(stackup, BuildStackup):
-            self.stackup_model: Optional[StackupModel] = stackup.to_model()
-        else:
-            self.stackup_model = stackup
-
+        self.assembly_test: Optional[AssemblyTestModel] = None
+        self.stackup_model: Optional[StackupModel] = None
         self.mounting_holes: List[MountingHoleModel] = []
         self.silkscreen_texts: List[SilkscreenTextModel] = []
         self.silkscreen_graphics: List[SilkscreenGraphicModel] = []
@@ -142,10 +91,8 @@ class BuildPcb(BuildPart):
         self.vias: List[ViaModel] = []
         self.copper_regions: List[CopperRegionModel] = []
         self.test_points: List[TestPointModel] = []
-        self.capacitive_sensors: List[CapacitiveElectrodeModel] = list(capacitive_sensors or [])
-        self.outline_polygon: Optional[List[Tuple[float, float]]] = (
-            [tuple(p) for p in outline_polygon] if outline_polygon else None
-        )
+        self.capacitive_sensors: List[CapacitiveElectrodeModel] = []
+        self.outline_polygon: Optional[List[Tuple[float, float]]] = None
         self.footprints: List[Any] = []
         self.nets: List[Any] = []
         self.symbol_table: Dict[str, SymbolTableEntry] = {}
@@ -176,16 +123,20 @@ class BuildPcb(BuildPart):
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Exit context and attach metadata to the constructed CAD shape."""
         if self._token:
-            _current_build_pcb.reset(self._token)
+            try:
+                _current_build_pcb.reset(self._token)
+            except ValueError:
+                _current_build_pcb.set(None)
             self._token = None
         super().__exit__(exc_type, exc_val, exc_tb)
 
         # Workaround folding: automatically set label and urdf_label
+        lbl = self.shape_ref or self.name
         if self.part is not None:
-            self.part.label = self.name
-            self.part.urdf_label = self.name
-        self.label = self.name
-        self.urdf_label = self.name
+            self.part.label = lbl
+            self.part.urdf_label = lbl
+        self.label = lbl
+        self.urdf_label = lbl
 
         # Synthesize in-memory Wiring container if footprints or nets were registered
         from model.wiring import Wiring
@@ -194,7 +145,6 @@ class BuildPcb(BuildPart):
             self.wiring = Wiring.from_models(
                 footprints=self.footprints,
                 nets=self.nets,
-                symbol_table=self.symbol_table,
             )
 
         # Attach metadata to the built part object and self for runtime discovery
@@ -328,17 +278,6 @@ class BuildFlexPCB(BuildPcb):
         flex_type: Union[FlexType, str] = FlexType.CAPACITIVE,
         shape_ref: Optional[str] = None,
         revision: str = "1.0",
-        sheet_size: Union[SheetSize, str] = SheetSize.A4,
-        omitted_silkscreen_designators: Optional[Sequence[str]] = None,
-        design_rules: Optional[Union[PCBDesignRulesModel, Dict[str, Any]]] = None,
-        net_classes: Optional[Sequence[Union[NetClassModel, Dict[str, Any]]]] = None,
-        flex_zones: Optional[Sequence[Union[FlexZoneModel, Dict[str, Any]]]] = None,
-        obstacles: Optional[Sequence[Union[PCBObstacleModel, Dict[str, Any]]]] = None,
-        schematic_sheets: Optional[Sequence[Union[SchematicSheetModel, Dict[str, Any]]]] = None,
-        assembly_test: Optional[Union[AssemblyTestModel, Dict[str, Any]]] = None,
-        stackup: Optional[Union[BuildStackup, StackupModel]] = None,
-        capacitive_sensors: Optional[Sequence[CapacitiveElectrodeModel]] = None,
-        outline_polygon: Optional[Sequence[Tuple[float, float]]] = None,
         coverlay_color: Optional[str] = "black",
         mode: Any = None,
     ) -> None:
@@ -348,17 +287,6 @@ class BuildFlexPCB(BuildPcb):
             board_type=BoardType.FLEX,
             shape_ref=shape_ref,
             revision=revision,
-            sheet_size=sheet_size,
-            omitted_silkscreen_designators=omitted_silkscreen_designators,
-            design_rules=design_rules,
-            net_classes=net_classes,
-            flex_zones=flex_zones,
-            obstacles=obstacles,
-            schematic_sheets=schematic_sheets,
-            assembly_test=assembly_test,
-            stackup=stackup,
-            capacitive_sensors=capacitive_sensors,
-            outline_polygon=outline_polygon,
             coverlay_color=coverlay_color,
             mode=mode,
         )

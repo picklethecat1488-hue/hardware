@@ -6,10 +6,12 @@ from typing import Any, List, Optional, Sequence, Tuple, Union
 from model.pcb import AssemblyTestModel, AssemblyTestStepModel
 from model.wiring import PinRef
 
-_current_test_steps: ContextVar[Optional["BuildTestSteps"]] = ContextVar("_current_test_steps", default=None)
+_current_assembly_tests: ContextVar[Optional["BuildAssemblyTests"]] = ContextVar(
+    "_current_assembly_tests", default=None
+)
 
 
-class BuildAssemblyTestSteps:
+class BuildAssemblyTests:
     """Context manager for declarative PCB assembly and flying probe simulation test steps."""
 
     __test__ = False
@@ -28,15 +30,15 @@ class BuildAssemblyTestSteps:
         self.steps: List[AssemblyTestStepModel] = []
         self._token: Optional[Token] = None
 
-    def __enter__(self) -> "BuildAssemblyTestSteps":
+    def __enter__(self) -> "BuildAssemblyTests":
         """Enter test steps builder context."""
-        self._token = _current_test_steps.set(self)
+        self._token = _current_assembly_tests.set(self)
         return self
 
     def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
         """Exit test steps builder context and attach to active BuildPcb."""
         if self._token is not None:
-            _current_test_steps.reset(self._token)
+            _current_assembly_tests.reset(self._token)
             self._token = None
 
         from provider.pcb.board import BuildPcb
@@ -44,31 +46,45 @@ class BuildAssemblyTestSteps:
         active_pcb = BuildPcb.current()
         if active_pcb is not None:
             active_pcb.test_steps.extend(self.steps)
-            active_pcb.assembly_test = AssemblyTestModel(
-                instructions=list(active_pcb.test_steps),
-                test_fixture=self.test_fixture,
-                pass_criteria=self.pass_criteria,
-            )
+            if getattr(active_pcb, "assembly_test", None) is None:
+                active_pcb.assembly_test = AssemblyTestModel(
+                    instructions=list(active_pcb.test_steps),
+                    test_fixture=self.test_fixture,
+                    pass_criteria=self.pass_criteria,
+                )
 
     @classmethod
-    def _get_context(cls) -> Optional["BuildAssemblyTestSteps"]:
+    def current(cls) -> Optional["BuildAssemblyTests"]:
         """Retrieve active test steps builder context if present."""
-        return _current_test_steps.get()
+        return _current_assembly_tests.get()
 
-    def add(self, item: Union[AssemblyTestStepModel, Sequence[AssemblyTestStepModel]]) -> None:
-        """Append one or more test step models."""
-        if isinstance(item, AssemblyTestStepModel):
+    @classmethod
+    def _get_context(cls) -> Optional["BuildAssemblyTests"]:
+        """Retrieve active test steps builder context if present."""
+        return _current_assembly_tests.get()
+
+    def add(
+        self,
+        item: Union[
+            AssemblyTestModel,
+            AssemblyTestStepModel,
+            Sequence[Union[AssemblyTestModel, AssemblyTestStepModel]],
+        ],
+    ) -> None:
+        """Append one or more test step models or full assembly test plan."""
+        if isinstance(item, AssemblyTestModel):
+            self.test_fixture = item.test_fixture
+            self.pass_criteria = item.pass_criteria
+            self.steps.extend(item.instructions)
+        elif isinstance(item, AssemblyTestStepModel):
             self.steps.append(item)
-        else:
-            self.steps.extend(item)
-
-
-BuildTestSteps = BuildAssemblyTestSteps
-AssemblyTestMetadata = BuildAssemblyTestSteps
+        elif isinstance(item, (list, tuple)):
+            for step in item:
+                self.add(step)
 
 
 class TestStep:
-    """Declarative assembly or flying probe test step primitive evaluated inside a BuildTestSteps context."""
+    """Declarative assembly or flying probe test step primitive evaluated inside a BuildAssemblyTests context."""
 
     __test__ = False
 
@@ -96,75 +112,62 @@ class TestStep:
         """Define an automated test fixture step with type-safe net and pin references."""
         pad_a = pad_a if pad_a is not None else pad_a_mm
         pad_b = pad_b if pad_b is not None else pad_b_mm
-        ctx = BuildAssemblyTestSteps._get_context()
-        from provider.pcb.board import BuildPcb
+        ctx = BuildAssemblyTests.current()
+        resolved_sub = subassembly or (ctx.subassembly if ctx else None) or name
 
-        current_pcb = BuildPcb.current()
-        resolved_sub = (
-            subassembly or name or (ctx.subassembly if ctx else None) or (current_pcb.name if current_pcb else None)
-        )
+        resolved_nominal = nominal if nominal is not None else expected_nominal
 
-        resolved_net_name = net_name
-        resolved_net_points: List[str] = []
-        if hasattr(net_name, "name"):
-            resolved_net_name = getattr(net_name, "name")
-
-        if net_or_points is not None:
+        # Extract net name string from Net handle or name argument
+        parsed_net: Optional[str] = None
+        if net_name is not None:
+            parsed_net = net_name.name if hasattr(net_name, "name") else str(net_name)
+        elif net_or_points is not None:
             if isinstance(net_or_points, str):
-                resolved_net_points = [net_or_points]
-                if not resolved_net_name:
-                    resolved_net_name = net_or_points
+                parsed_net = net_or_points
             elif hasattr(net_or_points, "name"):
-                resolved_net_points = [str(getattr(net_or_points, "name"))]
-                if not resolved_net_name:
-                    resolved_net_name = str(getattr(net_or_points, "name"))
-            elif isinstance(net_or_points, (list, tuple)):
-                for np in net_or_points:
-                    if hasattr(np, "name"):
-                        resolved_net_points.append(str(getattr(np, "name")))
-                    elif isinstance(np, PinRef):
-                        resolved_net_points.append(f"{np.component_name}.{np.name}")
-                    else:
-                        resolved_net_points.append(str(np))
-                if not resolved_net_name and resolved_net_points:
-                    resolved_net_name = resolved_net_points[0]
+                parsed_net = str(net_or_points.name)
 
-        if resolved_net_name and not resolved_net_points:
-            resolved_net_points = [str(resolved_net_name)]
+        # Extract 2D coordinate points from PinRef or tuple
+        pt_a: Optional[Tuple[float, float]] = None
+        if isinstance(pad_a, PinRef):
+            pt_a = pad_a.position_2d
+        elif isinstance(pad_a, (tuple, list)) and len(pad_a) >= 2:
+            pt_a = (float(pad_a[0]), float(pad_a[1]))
 
-        # Resolve pad coordinates
-        def _resolve_coord(p: Any) -> Optional[Tuple[float, float]]:
-            if p is None:
-                return None
-            if isinstance(p, PinRef):
-                return (round(p.x, 4), round(p.y, 4))
-            if hasattr(p, "pos"):
-                pos = getattr(p, "pos")
-                return (round(float(pos[0]), 4), round(float(pos[1]), 4))
-            if isinstance(p, (tuple, list)) and len(p) >= 2:
-                return (round(float(p[0]), 4), round(float(p[1]), 4))
-            return None
+        pt_b: Optional[Tuple[float, float]] = None
+        if isinstance(pad_b, PinRef):
+            pt_b = pad_b.position_2d
+        elif isinstance(pad_b, (tuple, list)) and len(pad_b) >= 2:
+            pt_b = (float(pad_b[0]), float(pad_b[1]))
 
-        pt_a = _resolve_coord(pad_a)
-        pt_b = _resolve_coord(pad_b)
-        val_nom = nominal if nominal is not None else expected_nominal
+        net_points_list: List[str] = []
+        if isinstance(net_or_points, (list, tuple)):
+            for p in net_or_points:
+                if hasattr(p, "name"):
+                    net_points_list.append(str(p.name))
+                else:
+                    net_points_list.append(str(p))
+        elif parsed_net is not None:
+            net_points_list = [parsed_net]
 
         self.model = AssemblyTestStepModel(
             step_id=step_id,
-            subassembly=resolved_sub,
             description=description,
             test_type=test_type,
-            net_name=str(resolved_net_name or ""),
-            net_or_points=resolved_net_points,
+            net_or_points=net_points_list,
             pad_a_mm=pt_a,
             pad_b_mm=pt_b,
-            nominal=val_nom,
-            expected_nominal=val_nom,
-            tolerance_pct=tolerance_pct,
+            expected_nominal=resolved_nominal,
+            tolerance_pct=tolerance_pct or 10.0,
             unit=unit,
             stimulus=stimulus,
-            measured=measured,
+            measured_value=measured,
+            subassembly=resolved_sub,
         )
 
-        if ctx:
+        if ctx is not None:
             ctx.add(self.model)
+
+    def __repr__(self) -> str:
+        """Return formatted string representation of test step."""
+        return f"<TestStep {self.model.step_id}: {self.model.test_type} ({self.model.description})>"

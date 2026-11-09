@@ -74,19 +74,23 @@ def _resolve_coord(pt: Any) -> Tuple[float, float]:
 
 def _discretize_curve(path: Any, tolerance_mm: float = 0.05) -> List[Tuple[float, float]]:
     """Discretize build123d curve, wire, or edge geometry into ordered planar (x, y) vertices."""
-    wire = path
-    if hasattr(path, "wire"):
-        wire = path.wire()
-    elif hasattr(path, "line"):
-        wire = path.line
-
     edges = []
-    if hasattr(wire, "edges"):
-        edges = list(wire.edges())
-    elif hasattr(wire, "__iter__"):
-        edges = list(wire)
+    if hasattr(path, "edges") and callable(path.edges):
+        edges = list(path.edges())
+    elif hasattr(path, "edges"):
+        edges = list(path.edges)
+    elif hasattr(path, "wire"):
+        w = path.wire()
+        if w is not None and hasattr(w, "edges"):
+            edges = list(w.edges())
+    elif hasattr(path, "line"):
+        w = path.line
+        if hasattr(w, "edges"):
+            edges = list(w.edges())
+    elif hasattr(path, "__iter__"):
+        edges = list(path)
     else:
-        edges = [wire]
+        edges = [path]
 
     pts: List[Tuple[float, float]] = []
     for edge in edges:
@@ -158,6 +162,12 @@ class Trace:
         pts: List[Tuple[float, float]] = []
         if path is not None:
             pts = _discretize_curve(path)
+        elif not points and start is None and end is None:
+            from build123d import BuildLine
+
+            line_ctx = BuildLine._get_context()
+            if line_ctx is not None:
+                pts = _discretize_curve(line_ctx.line)
         elif points:
             pts = [_resolve_coord(p) for p in points]
         elif start is not None and end is not None:
@@ -177,6 +187,99 @@ class Trace:
                 self.segments.append(seg)
                 if ctx:
                     ctx.add(seg)
+
+
+def make_trace(
+    net: str,
+    layer: Optional[str] = None,
+    width_mm: Optional[float] = None,
+    path: Optional[Any] = None,
+    offset_mm: Optional[float] = None,
+    side: Optional[Union[Any, str]] = None,
+    tolerance_mm: float = 0.05,
+) -> List[TraceSegmentModel]:
+    """Convert build123d line geometry from active BuildLine context or explicit curve into TraceSegmentModels.
+
+    Args:
+        net: Electrical net name (e.g. 'CAP_TX2', 'GND').
+        layer: Target copper layer (defaults to active BuildTraces default or 'F.Cu').
+        width_mm: Conductor trace width in mm (defaults to active BuildTraces default or 0.15).
+        path: Optional explicit build123d Wire, Curve, or Compound. If omitted, uses active BuildLine context.
+        offset_mm: Optional offset distance in mm applied before segment extraction.
+        side: Offset side (Side.LEFT, Side.RIGHT, Side.BOTH) when offset_mm is supplied.
+        tolerance_mm: Maximum chord error tolerance for discretizing curved / arc segments.
+
+    Returns:
+        List of created TraceSegmentModel instances added to the active BuildTraces context.
+    """
+    from build123d import BuildLine
+
+    trace_ctx = BuildTraces._get_context()
+    resolved_layer = layer or (trace_ctx.default_layer if trace_ctx else "F.Cu")
+    resolved_width = width_mm or (trace_ctx.default_width_mm if trace_ctx else 0.15)
+
+    if path is None:
+        line_ctx = BuildLine._get_context()
+        if line_ctx is None:
+            raise ValueError(
+                "make_trace must be called within an active BuildLine context or provided an explicit path."
+            )
+        target_geom = line_ctx.line
+    else:
+        target_geom = path
+
+    if offset_mm is not None:
+        from build123d import Side, offset
+
+        resolved_side = Side(side) if isinstance(side, str) else (side or Side.LEFT)
+        target_geom = offset(target_geom, amount=offset_mm, side=resolved_side, closed=False)
+
+    edges = []
+    if hasattr(target_geom, "edges"):
+        edges = list(target_geom.edges())
+    elif hasattr(target_geom, "__iter__"):
+        edges = list(target_geom)
+    else:
+        edges = [target_geom]
+
+    segments: List[TraceSegmentModel] = []
+    for edge in edges:
+        geom_type_str = str(getattr(edge, "geom_type", "")).upper()
+        if "LINE" in geom_type_str:
+            p0 = (round(float(edge.start_point().X), 4), round(float(edge.start_point().Y), 4))
+            p1 = (round(float(edge.end_point().X), 4), round(float(edge.end_point().Y), 4))
+            if math.hypot(p1[0] - p0[0], p1[1] - p0[1]) > 1e-4:
+                seg = TraceSegmentModel(
+                    start_mm=p0,
+                    end_mm=p1,
+                    width_mm=resolved_width,
+                    layer=resolved_layer,
+                    net=net,
+                )
+                segments.append(seg)
+        else:
+            length = getattr(edge, "length", 1.0)
+            num_samples = max(8, int(math.ceil(length / max(tolerance_mm, 0.1))))
+            params = [i / (num_samples - 1) for i in range(num_samples)]
+            vecs = edge.positions(params)
+            pts = []
+            for v in vecs:
+                p = (round(float(v.X), 4), round(float(v.Y), 4))
+                if not pts or math.hypot(p[0] - pts[-1][0], p[1] - pts[-1][1]) > 1e-4:
+                    pts.append(p)
+            for i in range(len(pts) - 1):
+                seg = TraceSegmentModel(
+                    start_mm=pts[i],
+                    end_mm=pts[i + 1],
+                    width_mm=resolved_width,
+                    layer=resolved_layer,
+                    net=net,
+                )
+                segments.append(seg)
+
+    if trace_ctx is not None:
+        trace_ctx.add(segments)
+    return segments
 
 
 class Route:
@@ -453,10 +556,6 @@ class CopperRegion:
         )
         if ctx:
             ctx.add(self.model)
-
-
-# Alias
-CopperZone = CopperRegion
 
 
 class BuildTestPoints:

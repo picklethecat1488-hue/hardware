@@ -22,7 +22,9 @@ from .coordinates import CoordinateSpace, CoordinateSystem, SpatialPose
 from .wiring import (
     PinSide,
     PinModel,
+    Pin,
     PinListModel,
+    PinList,
     LabelModel,
     FootprintModel,
     NetModel,
@@ -41,6 +43,8 @@ from .pcb import (
     NetClassModel,
     BgaFanoutModel,
     FlexZoneModel,
+    ElectrodeType,
+    ElectrodeShape,
     CapacitiveElectrodeModel,
     AssemblyTestStepModel,
     AssemblyTestModel,
@@ -54,6 +58,7 @@ from .pcb import (
     SilkscreenGraphicModel,
     SchematicLayoutModel,
     SchematicSheetModel,
+    PinSideDef,
     resolve_subassembly_pcb_config,
 )
 from .simulation import FlyingProbeReportModel, FlyingProbeStepReportModel

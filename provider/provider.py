@@ -334,6 +334,7 @@ class Provider:
             return cfg.model_dump()
         return None
 
+    @property
     def stackup(self) -> Optional[Any]:
         """Define multi-layer PCB physical stackup using BuildStackup context manager.
 
@@ -345,6 +346,7 @@ class Provider:
         """
         return None
 
+    @property
     def mounting_holes(self) -> List[Any]:
         """Define CAD-located PCB drill and mounting holes using BuildDrillHoles context manager.
 
@@ -356,6 +358,7 @@ class Provider:
         """
         return []
 
+    @property
     def silkscreen(self) -> List[Any]:
         """Define CAD-located silkscreen text markings and annotations for PCB exports.
 
@@ -367,6 +370,7 @@ class Provider:
         """
         return []
 
+    @property
     def traces(self) -> List[Any]:
         """Define routed copper trace segments using BuildTraces context manager.
 
@@ -375,6 +379,7 @@ class Provider:
         """
         return []
 
+    @property
     def vias(self) -> List[Any]:
         """Define interlayer vias using BuildVias context manager.
 
@@ -383,6 +388,7 @@ class Provider:
         """
         return []
 
+    @property
     def copper_regions(self) -> List[Any]:
         """Define copper planes, ground fills, and shielding zones using BuildCopperRegions.
 
@@ -391,6 +397,7 @@ class Provider:
         """
         return []
 
+    @property
     def test_points(self) -> List[Any]:
         """Define exposed copper test points using BuildTestPoints context manager.
 
@@ -471,7 +478,7 @@ class Provider:
                     combined_symbol_table.update(p_cfg.symbol_table)
 
             # Stackup from provider or primary
-            s = self.stackup()
+            s = self.stackup() if callable(self.stackup) else self.stackup
             stackup_model = primary_cfg.stackup
             if isinstance(s, BuildStackup):
                 stackup_model = s.to_model()
@@ -479,14 +486,14 @@ class Provider:
                 stackup_model = s
 
             # Mounting holes
-            p_holes = self.mounting_holes()
+            p_holes = self.mounting_holes() if callable(self.mounting_holes) else self.mounting_holes
             if p_holes:
                 holes = list(p_holes.holes if isinstance(p_holes, BuildDrillHoles) else p_holes)
             else:
                 holes = list(primary_cfg.mounting_holes)
 
             # Silkscreen texts
-            p_silkscreen = self.silkscreen()
+            p_silkscreen = self.silkscreen() if callable(self.silkscreen) else self.silkscreen
             if p_silkscreen:
                 silkscreen_texts = list(
                     p_silkscreen.texts if isinstance(p_silkscreen, BuildSilkscreen) else p_silkscreen
@@ -495,34 +502,35 @@ class Provider:
                 silkscreen_texts = list(primary_cfg.silkscreen_texts)
 
             # Silkscreen graphics
-            silkscreen_graphics = (
-                list(self.silkscreen_graphics())
+            raw_silk_graphics = (
+                (self.silkscreen_graphics() if callable(self.silkscreen_graphics) else self.silkscreen_graphics)
                 if hasattr(self, "silkscreen_graphics")
-                else list(primary_cfg.silkscreen_graphics)
+                else primary_cfg.silkscreen_graphics
             )
+            silkscreen_graphics = list(raw_silk_graphics)
 
             # Copper regions
-            p_regions = self.copper_regions()
+            p_regions = self.copper_regions() if callable(self.copper_regions) else self.copper_regions
             if p_regions:
                 copper_regions = list(p_regions.regions if isinstance(p_regions, BuildCopperRegions) else p_regions)
             else:
                 copper_regions = list(primary_cfg.copper_regions)
 
             # Test points
-            p_tps = self.test_points()
+            p_tps = self.test_points() if callable(self.test_points) else self.test_points
             if p_tps:
                 test_points = list(p_tps.test_points if isinstance(p_tps, BuildTestPoints) else p_tps)
             else:
                 test_points = list(primary_cfg.test_points)
 
             # Traces and vias
-            p_traces = self.traces()
+            p_traces = self.traces() if callable(self.traces) else self.traces
             if p_traces:
                 traces = list(p_traces.traces if isinstance(p_traces, BuildTraces) else p_traces)
             else:
                 traces = combined_traces
 
-            p_vias = self.vias()
+            p_vias = self.vias() if callable(self.vias) else self.vias
             if p_vias:
                 vias = list(p_vias.vias if isinstance(p_vias, BuildVias) else p_vias)
             else:
@@ -537,7 +545,7 @@ class Provider:
                         combined_omitted_silkscreen.append(fp.name)
 
             assembly_test = primary_cfg.assembly_test
-            if combined_test_steps:
+            if assembly_test is None and combined_test_steps:
                 assembly_test = AssemblyTestModel(
                     instructions=combined_test_steps,
                     test_fixture="flying_probe",

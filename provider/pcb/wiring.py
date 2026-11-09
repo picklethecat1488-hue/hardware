@@ -31,7 +31,10 @@ class BuildWiring:
     def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
         """Exit wiring context and merge declared nets into active BuildPcb."""
         if self._token is not None:
-            _current_build_wiring.reset(self._token)
+            try:
+                _current_build_wiring.reset(self._token)
+            except ValueError:
+                _current_build_wiring.set(None)
             self._token = None
 
         from provider.pcb.board import BuildPcb
@@ -63,9 +66,52 @@ class BuildWiring:
                             sym.connected_nets.append(net.name)
 
     @classmethod
+    def current(cls) -> Optional["BuildWiring"]:
+        """Retrieve active wiring builder context if present."""
+        return _current_build_wiring.get()
+
+    @classmethod
     def _get_context(cls) -> Optional["BuildWiring"]:
         """Retrieve active wiring builder context if present."""
         return _current_build_wiring.get()
+
+    def add(self, item: Any) -> None:
+        """Add nets from a Wiring instance, NetModel, or sequence of NetModels."""
+        from model.wiring import Wiring
+
+        if isinstance(item, Wiring):
+            for net in item.nets:
+                self.add_net(
+                    name=net.name,
+                    pins=net.pins,
+                    pin_names=net.pin_names,
+                    color=net.color,
+                    offset=net.offset,
+                    path=net.path,
+                    priority=net.priority,
+                )
+            from provider.pcb.board import BuildPcb
+
+            active_pcb = BuildPcb.current()
+            if active_pcb is not None:
+                for fp in item.footprints:
+                    if fp not in active_pcb.footprints:
+                        active_pcb.footprints.append(fp)
+                if hasattr(item, "symbol_table") and item.symbol_table:
+                    active_pcb.symbol_table.update(item.symbol_table)
+        elif isinstance(item, NetModel):
+            self.add_net(
+                name=item.name,
+                pins=item.pins,
+                pin_names=item.pin_names,
+                color=item.color,
+                offset=item.offset,
+                path=item.path,
+                priority=item.priority,
+            )
+        elif isinstance(item, (list, tuple)):
+            for n in item:
+                self.add(n)
 
     def add_net(
         self,

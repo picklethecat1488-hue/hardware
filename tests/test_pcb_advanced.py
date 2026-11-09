@@ -920,13 +920,15 @@ def test_build_pcb_and_build_flex_pcb_context_managers(advanced_pcb_stackup: Sta
     from build123d import Box
     from model.pcb import FlexType
     from provider.pcb.board import BuildPcb, BuildFlexPCB
+    from provider.pcb.stackup import BuildStackup
 
     with BuildPcb(
         name="main_carrier",
         board_type="rigid",
         revision="2.0",
-        stackup=advanced_pcb_stackup,
     ) as pcb_builder:
+        with BuildStackup() as bs:
+            bs.add(advanced_pcb_stackup)
         Box(60.0, 40.0, pcb_builder.thickness_mm)
 
     assert pcb_builder.part is not None
@@ -945,8 +947,9 @@ def test_build_pcb_and_build_flex_pcb_context_managers(advanced_pcb_stackup: Sta
             name=f"flex_{ftype.value}",
             flex_type=ftype,
             revision="1.0",
-            stackup=advanced_pcb_stackup,
         ) as flex_builder:
+            with BuildStackup() as bs:
+                bs.add(advanced_pcb_stackup)
             Box(40.0, 15.0, 0.20)
 
         assert flex_builder.part is not None
@@ -1951,7 +1954,7 @@ def test_regression_enclosure_m2_cutout_and_component_silkscreens() -> None:
     assert bottom is not None and bottom.part is not None
 
     # 2. BUG-066 / BUG-214: Verify all component reference designators are present in silkscreen
-    silks = provider.silkscreen()
+    silks = provider.silkscreen
     silk_texts = {t.text for t in silks}
     assert "J1" not in silk_texts, "Legacy M.2 connector J1 must not be present in silkscreen"
     assert "Q1" not in silk_texts, "Q1 must not be present in silkscreen"
@@ -2021,7 +2024,7 @@ def test_regression_battery_connector_j13(tmp_path: Path) -> None:
     assert ("C13", "2") in gnd_pins
 
     # 3. Verify J13, C13, and polarity marks in carrier silkscreen
-    silks = provider.silkscreen()
+    silks = provider.silkscreen
     silk_texts = {t.text for t in silks}
     assert "J13" in silk_texts, "J13 silkscreen marking must be present"
     assert "C13" in silk_texts, "C13 silkscreen marking must be present"
@@ -2591,7 +2594,7 @@ def test_regression_bug_092_carrier_board_top_logo() -> None:
     from provider.pcb.drc import PCBDesignRulesChecker
 
     provider = CarrierBoardProvider()
-    silks = provider.silkscreen()
+    silks = provider.silkscreen
     silk_map = {t.text: t for t in silks}
 
     # 1. Logo must NOT be text (e.g. "ANTIGRAVITY", "[>", etc. must not be text strings)
@@ -2602,7 +2605,7 @@ def test_regression_bug_092_carrier_board_top_logo() -> None:
     assert "QUANTUM DYNAMICS // 0x414759" not in silk_map, "Carrier board logo must not be text hex signature"
 
     # 2. Logo must be present as a unique vector graphic within a square frame on F.SilkS
-    graphics = provider.silkscreen_graphics()
+    graphics = provider.silkscreen_graphics
     assert len(graphics) > 0, "Carrier board must contain silkscreen graphic elements for the logo"
 
     rect_frames = [g for g in graphics if g.shape == "rect" and g.layer == "F.SilkS"]

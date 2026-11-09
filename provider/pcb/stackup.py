@@ -1,7 +1,7 @@
 """build123d context manager and primitives for declarative PCB physical stackup definition."""
 
 from contextvars import ContextVar, Token
-from typing import List, Optional, Sequence, Union
+from typing import Any, List, Optional, Sequence, Union
 
 from build123d import Compound, Face, Pos, extrude
 
@@ -41,15 +41,48 @@ class BuildStackup:
         return self
 
     def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
-        """Exit stackup context and restore previous builder."""
+        """Exit stackup context and attach to active BuildPcb."""
         if self._token is not None:
             _current_stackup.reset(self._token)
             self._token = None
+
+        from provider.pcb.board import BuildPcb
+
+        active_pcb = BuildPcb.current()
+        if active_pcb is not None:
+            active_pcb.stackup_model = self.to_model()
+
+    @classmethod
+    def current(cls) -> Optional["BuildStackup"]:
+        """Retrieve active stackup builder context if present."""
+        return _current_stackup.get()
 
     @classmethod
     def _get_context(cls) -> Optional["BuildStackup"]:
         """Retrieve active stackup builder context if present."""
         return _current_stackup.get()
+
+    def add(
+        self,
+        item: Union[StackupModel, "BuildStackup", StackupLayerModel, Sequence[Any]],
+    ) -> None:
+        """Add layer specifications from a StackupModel, BuildStackup, or StackupLayerModel."""
+        if isinstance(item, StackupModel):
+            self.finish = item.finish
+            self.soldermask_color = item.soldermask_color
+            self.silkscreen_color = item.silkscreen_color
+            self.layers = list(item.layers)
+        elif isinstance(item, BuildStackup):
+            self.finish = item.finish
+            self.soldermask_color = item.soldermask_color
+            self.silkscreen_color = item.silkscreen_color
+            self.layers = list(item.layers)
+        elif isinstance(item, StackupLayerModel):
+            self.layers.append(item)
+        elif isinstance(item, (list, tuple)):
+            for lyr in item:
+                if isinstance(lyr, StackupLayerModel):
+                    self.layers.append(lyr)
 
     def add_layer(
         self,
@@ -98,13 +131,6 @@ class BuildStackup:
         )
         self.layers.append(layer_model)
         return layer_model
-
-    def add(self, item: Union[StackupLayerModel, Sequence[StackupLayerModel]]) -> None:
-        """Append one or more layer models directly."""
-        if isinstance(item, StackupLayerModel):
-            self.layers.append(item)
-        else:
-            self.layers.extend(item)
 
     @property
     def total_thickness_mm(self) -> float:

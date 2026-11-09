@@ -7,9 +7,9 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Tuple, List, Optional, Callable, Any, Dict, Sequence, Union
 from functools import cached_property
-from pydantic import BaseModel, Field, validate_call, field_validator
+from pydantic import BaseModel, Field, validate_call, field_validator, model_validator
 from build123d import Vector, Location
-from model.pcb import BgaFanoutModel
+from model.pcb import BgaFanoutModel, PinSide, PinSideDef
 
 logger = logging.getLogger(__name__)
 
@@ -41,15 +41,6 @@ def register_layout(package_name: str, namespace: Optional[str] = None, surface_
     return decorator
 
 
-class PinSide(StrEnum):
-    """Placement side for a pin label."""
-
-    LEFT = "left"
-    RIGHT = "right"
-    TOP = "top"
-    BOTTOM = "bottom"
-
-
 class PinModel(BaseModel):
     """Data model representing a connection pin on a footprint."""
 
@@ -62,13 +53,73 @@ class PinModel(BaseModel):
     position: Tuple[float, float, float] = Field(
         default=(0.0, 0.0, 0.0), description="3D offset relative to component center (x, y, z)"
     )
-    label: str = Field(description="Display label text for the pin")
-    side: PinSide = Field(description="Placement side for the pin label (left, right, top, bottom)")
+    label: Optional[str] = Field(default=None, description="Display label text for the pin")
+    side: PinSide = Field(
+        default=PinSide.LEFT, description="Placement side for the pin label (left, right, top, bottom)"
+    )
     slot: Optional[int] = Field(default=None, description="Optional slot index for DIP spacing")
     pad_type: str = Field(default="smd", description="Pad type: smd or thru_hole")
     pad_shape: str = Field(default="circle", description="Pad shape: circle, rect, oval, roundrect")
     pad_size_mm: Tuple[float, float] = Field(default=(0.5, 0.5), description="Pad dimensions (width, height)")
     drill_dia_mm: Optional[float] = Field(default=None, description="Drill hole diameter in mm for thru_hole pads")
+
+    @model_validator(mode="after")
+    def _default_label(self) -> "PinModel":
+        if self.label is None:
+            self.label = self.pin_name or self.name or ""
+        return self
+
+
+class Pin(PinModel):
+    """Declarative pin specification for component layout and footprint definition."""
+
+    def __init__(
+        self,
+        name: str,
+        pin_name: Optional[str] = None,
+        *,
+        label: Optional[str] = None,
+        side: Optional[Union[PinSide, str]] = None,
+        number: Optional[str] = None,
+        signal_name: Optional[str] = None,
+        position: Optional[Tuple[float, float, float]] = None,
+        slot: Optional[int] = None,
+        pad_type: Optional[str] = None,
+        pad_shape: Optional[str] = None,
+        pad_size_mm: Optional[Tuple[float, float]] = None,
+        drill_dia_mm: Optional[float] = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize declarative pin specification with smart defaults."""
+        init_kwargs: Dict[str, Any] = {"name": name}
+        if pin_name is not None:
+            init_kwargs["pin_name"] = pin_name
+        if number is not None:
+            init_kwargs["number"] = number
+        elif name.isdigit():
+            init_kwargs["number"] = name
+        if label is not None:
+            init_kwargs["label"] = label
+        elif pin_name is not None:
+            init_kwargs["label"] = pin_name
+        if signal_name is not None:
+            init_kwargs["signal_name"] = signal_name
+        if side is not None:
+            init_kwargs["side"] = PinSide(side) if isinstance(side, str) else side
+        if position is not None:
+            init_kwargs["position"] = position
+        if slot is not None:
+            init_kwargs["slot"] = slot
+        if pad_type is not None:
+            init_kwargs["pad_type"] = pad_type
+        if pad_shape is not None:
+            init_kwargs["pad_shape"] = pad_shape
+        if pad_size_mm is not None:
+            init_kwargs["pad_size_mm"] = pad_size_mm
+        if drill_dia_mm is not None:
+            init_kwargs["drill_dia_mm"] = drill_dia_mm
+        init_kwargs.update(kwargs)
+        super().__init__(**init_kwargs)
 
 
 class PinListModel(BaseModel):
@@ -76,14 +127,21 @@ class PinListModel(BaseModel):
 
     pins: List[PinModel] = Field(default_factory=list, description="List of pin models")
 
-    def __init__(self, pins: Any = None, **data: Any) -> None:
+    def __init__(self, *args: Any, pins: Any = None, **data: Any) -> None:
         """Initialize pin list collection model."""
-        if isinstance(pins, (list, tuple)):
-            super().__init__(pins=list(pins), **data)
-        elif isinstance(pins, dict) and "pins" in pins:
-            super().__init__(**pins)
-        elif pins is not None and not data:
-            super().__init__(pins=[pins])
+        if args:
+            if len(args) == 1 and isinstance(args[0], (list, tuple, PinListModel)):
+                pin_items = list(args[0])
+            else:
+                pin_items = list(args)
+            super().__init__(pins=pin_items, **data)
+        elif pins is not None:
+            if isinstance(pins, (list, tuple)):
+                super().__init__(pins=list(pins), **data)
+            elif isinstance(pins, dict) and "pins" in pins:
+                super().__init__(**pins)
+            else:
+                super().__init__(pins=[pins], **data)
         else:
             super().__init__(**data)
 
@@ -106,6 +164,9 @@ class PinListModel(BaseModel):
     def extend(self, pins: Sequence[PinModel]) -> None:
         """Extend pin models."""
         self.pins.extend(pins)
+
+
+PinList = PinListModel
 
 
 class PinRef:
@@ -182,7 +243,7 @@ class PinRef:
 
     def as_tuple(self) -> Tuple[str, str]:
         """Return (component_name, pin_spec) tuple for NetModel."""
-        pin_key = self.pin.number or self.pin.name
+        pin_key = self.pin.name or self.pin.number
         return (self.component_name, str(pin_key))
 
     def __repr__(self) -> str:
@@ -289,6 +350,27 @@ class FootprintModel(BaseModel):
         default=False,
         description="Whether to omit silkscreen reference designator text on the PCB",
     )
+    show_designator: bool = Field(
+        default=True,
+        description="Whether to render silkscreen reference designator text on the PCB",
+    )
+    block: Optional[str] = Field(
+        default=None,
+        description="Optional context block name where the component was instantiated",
+    )
+    symbol_table_entry: Optional[Any] = Field(
+        default=None,
+        description="Optional symbol table entry tracing this component to its declaring context block",
+    )
+
+    @model_validator(mode="after")
+    def sync_silkscreen_designator(self) -> "FootprintModel":
+        """Synchronize show_designator and omit_silkscreen boolean flags."""
+        if not self.show_designator:
+            self.omit_silkscreen = True
+        elif self.omit_silkscreen:
+            self.show_designator = False
+        return self
 
     @field_validator("pins", mode="before")
     @classmethod
@@ -414,14 +496,45 @@ class Wiring:
         footprints: Sequence[FootprintModel],
         nets: Sequence[NetModel],
         parent_part: Optional[Any] = None,
-        symbol_table: Optional[Dict[str, Any]] = None,
     ) -> "Wiring":
         """Construct an in-memory Wiring instance directly from FootprintModel and NetModel objects."""
         inst = cls.__new__(cls)
         inst.yaml_path = None
         inst.parent_part = parent_part
         inst.shared_footprints = dict(load_shared_footprints())
-        inst.symbol_table = dict(symbol_table or {})
+
+        # Synthesize symbol table transparently from footprints and nets
+        from model.pcb import SymbolTableEntry
+
+        connected_nets_by_fp: Dict[str, List[str]] = {}
+        for net in nets:
+            for p in net.pins:
+                c_name = p[0] if isinstance(p, (list, tuple)) else str(p).split(".")[0]
+                if c_name not in connected_nets_by_fp:
+                    connected_nets_by_fp[c_name] = []
+                if net.name not in connected_nets_by_fp[c_name]:
+                    connected_nets_by_fp[c_name].append(net.name)
+
+        table: Dict[str, SymbolTableEntry] = {}
+        for fp in footprints:
+            cached_entry = getattr(fp, "symbol_table_entry", None)
+            if cached_entry is not None:
+                table[fp.name] = cached_entry
+            else:
+                table[fp.name] = SymbolTableEntry(
+                    designator=fp.name,
+                    block=getattr(fp, "block", None) or "default",
+                    subassembly=getattr(fp, "shape_ref", None),
+                    package=fp.package,
+                    value=fp.value,
+                    mpn=fp.mpn,
+                    supplier_pn=fp.supplier_pn,
+                    position_mm=fp.position,
+                    rotation_deg=fp.rotation,
+                    layer=fp.layer,
+                    connected_nets=connected_nets_by_fp.get(fp.name, []),
+                )
+        inst.symbol_table = table
         inst.config = {
             "components": [
                 {

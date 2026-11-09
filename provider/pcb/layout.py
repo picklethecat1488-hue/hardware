@@ -8,13 +8,16 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from build123d import Location, LocationList
 
-from model.pcb import PCBObstacleModel, SymbolTableEntry
+from model.pcb import PCBObstacleModel, PinSide, PinSideDef, SchematicSheetModel, SymbolTableEntry
 from model.wiring import (
     PIN_LAYOUT_REGISTRY,
     FootprintModel,
     LabelModel,
     PinModel,
+    Pin,
     PinRef,
+    PinListModel,
+    PinList,
     TruthTableModel,
     load_shared_footprints,
 )
@@ -33,11 +36,14 @@ class ComponentInstance:
         self._pins = list(pins)
         self._pins_by_name: Dict[str, PinRef] = {}
         for p in pins:
-            self._pins_by_name[p.name] = p
+            if p.signal_name and p.signal_name not in self._pins_by_name:
+                self._pins_by_name[p.signal_name] = p
+            if p.label and p.label not in self._pins_by_name:
+                self._pins_by_name[p.label] = p
             if p.pin_name:
                 self._pins_by_name[p.pin_name] = p
-            if p.label:
-                self._pins_by_name[p.label] = p
+            if p.name:
+                self._pins_by_name[p.name] = p
         self._pins_by_num: Dict[str, PinRef] = {p.number: p for p in pins if p.number is not None}
 
     @property
@@ -172,7 +178,10 @@ class BuildComponents:
     def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
         """Exit component layout context and register into active BuildPcb."""
         if self._token is not None:
-            _current_build_components.reset(self._token)
+            try:
+                _current_build_components.reset(self._token)
+            except ValueError:
+                _current_build_components.set(None)
             self._token = None
 
         from provider.pcb.board import BuildPcb
@@ -200,6 +209,15 @@ class BuildComponents:
                     )
                     active_pcb.obstacles.append(obs)
 
+        from provider.pcb.schematic import SchematicConfig
+
+        active_schematic = SchematicConfig.current()
+        if active_schematic is not None:
+            for fp in self.components:
+                if not any(existing.name == fp.name for existing in active_schematic.components):
+                    active_schematic.components.append(fp)
+            active_schematic.symbol_table.update(self.symbol_table_entries)
+
     @classmethod
     def _get_context(cls) -> Optional["BuildComponents"]:
         """Retrieve active component layout context if present."""
@@ -216,6 +234,13 @@ class BuildComponents:
         if active_pcb is not None:
             designators.extend(fp.name for fp in active_pcb.footprints)
             designators.extend(active_pcb.symbol_table.keys())
+
+        from provider.pcb.schematic import SchematicConfig
+
+        active_schematic = SchematicConfig.current()
+        if active_schematic is not None:
+            designators.extend(fp.name for fp in active_schematic.components)
+            designators.extend(active_schematic.symbol_table.keys())
 
         ctx = cls._get_context()
         if ctx is not None:
@@ -237,6 +262,28 @@ class BuildComponents:
         self.components.append(instance.footprint)
         if symbol_entry is not None:
             self.symbol_table_entries[instance.name] = symbol_entry
+            instance.footprint.symbol_table_entry = symbol_entry
+            instance.footprint.block = self.name
+
+        from provider.pcb.schematic import SchematicConfig
+
+        active_schematic = SchematicConfig.current()
+        if active_schematic is not None:
+            if not any(fp.name == instance.name for fp in active_schematic.components):
+                active_schematic.components.append(instance.footprint)
+            if symbol_entry is not None:
+                active_schematic.symbol_table[instance.name] = symbol_entry
+
+    def __getitem__(self, name: str) -> ComponentInstance:
+        """Lookup placed component instance by designator."""
+        for inst in self.instances:
+            if inst.name == name:
+                return inst
+        raise KeyError(f"Component '{name}' not found in BuildComponents '{self.name}'")
+
+    def comp(self, name: str) -> ComponentInstance:
+        """Retrieve component instance by designator."""
+        return self[name]
 
 
 class Component(list):
@@ -254,6 +301,7 @@ class Component(list):
         unconnected: bool = False,
         dnp: bool = False,
         omit_silkscreen: bool = False,
+        show_designator: bool = True,
         position: Optional[Tuple[float, float, float]] = None,
         rotation: Optional[Tuple[float, float, float]] = None,
         dimensions: Optional[Tuple[float, float, float]] = None,
@@ -265,6 +313,10 @@ class Component(list):
         parent_part: Optional[Any] = None,
         auto_number: bool = True,
         name: Optional[str] = None,
+        sheet: Optional[Union[Any, str, Sequence[Union[Any, str]]]] = None,
+        schematic_sheets: Optional[Dict[Any, Union[PinSideDef, Dict[str, Any], Sequence[str]]]] = None,
+        pin_breakout: Optional[Sequence[str]] = None,
+        pin_sides: Optional[Union[PinSideDef, Dict[str, Union[PinSide, str]]]] = None,
         **kwargs: Any,
     ) -> None:
         """Instantiate one or more components using ambient LocationList context."""
@@ -298,6 +350,11 @@ class Component(list):
             else:
                 name_or_prefix = "U"
             auto_number = True
+
+        if not show_designator:
+            omit_silkscreen = True
+        elif omit_silkscreen:
+            show_designator = False
 
         ctx = BuildComponents._get_context()
         block_name = ctx.name if ctx else "default"
@@ -363,22 +420,27 @@ class Component(list):
         if pins is not None and base_raw_pins:
             overrides = {}
             for p in pins:
-                key = str(
-                    getattr(p, "number", None)
-                    or getattr(p, "name", None)
-                    or (p.get("number") or p.get("name") if isinstance(p, dict) else "")
-                )
-                overrides[key] = p
+                num_key = getattr(p, "number", None) if not isinstance(p, dict) else p.get("number")
+                name_key = getattr(p, "name", None) if not isinstance(p, dict) else p.get("name")
+                if num_key is not None:
+                    overrides[str(num_key)] = p
+                if name_key is not None:
+                    overrides[str(name_key)] = p
             raw_pins = []
             for bp in base_raw_pins:
                 merged = dict(bp)
-                p_key = str(bp.get("number") or bp.get("name"))
-                if p_key in overrides:
-                    ov = overrides[p_key]
-                    if isinstance(ov, PinModel):
-                        merged.update(ov.model_dump(exclude_none=True))
-                    elif isinstance(ov, dict):
-                        merged.update(ov)
+                bp_num = str(bp.get("number")) if bp.get("number") is not None else None
+                bp_name = str(bp.get("name")) if bp.get("name") is not None else None
+                matched_ov = None
+                if bp_num and bp_num in overrides:
+                    matched_ov = overrides[bp_num]
+                elif bp_name and bp_name in overrides:
+                    matched_ov = overrides[bp_name]
+                if matched_ov is not None:
+                    if isinstance(matched_ov, PinModel):
+                        merged.update(matched_ov.model_dump(exclude_unset=True))
+                    elif isinstance(matched_ov, dict):
+                        merged.update(matched_ov)
                 raw_pins.append(merged)
         elif pins is not None:
             raw_pins = list(pins)
@@ -490,6 +552,7 @@ class Component(list):
                 unconnected=unconnected,
                 dnp=dnp,
                 omit_silkscreen=omit_silkscreen,
+                show_designator=show_designator,
             )
 
             pin_refs = [
@@ -522,6 +585,71 @@ class Component(list):
 
             if ctx is not None:
                 ctx.add(instance, sym_entry)
+
+            # Register into schematic sheet(s)
+            sheet_map: Dict[Any, Any] = {}
+            if schematic_sheets is not None:
+                sheet_map.update(schematic_sheets)
+            if sheet is not None:
+                sheet_list = [sheet] if not isinstance(sheet, (list, tuple)) else list(sheet)
+                for s in sheet_list:
+                    if s not in sheet_map:
+                        sheet_map[s] = pin_sides if pin_sides is not None else pin_breakout
+
+            for sheet_target, pin_spec in sheet_map.items():
+                target_sheet_model = None
+                if hasattr(sheet_target, "model"):
+                    target_sheet_model = sheet_target.model
+                elif isinstance(sheet_target, SchematicSheetModel):
+                    target_sheet_model = sheet_target
+                elif isinstance(sheet_target, str):
+                    from provider.pcb.schematic import BuildSchematic, SchematicConfig
+
+                    bs_ctx = BuildSchematic.current()
+                    if bs_ctx is not None:
+                        for s in bs_ctx.sheets:
+                            if s.title == sheet_target or s.title.strip().lower() == sheet_target.strip().lower():
+                                target_sheet_model = s
+                                break
+                    if target_sheet_model is None:
+                        sc_ctx = SchematicConfig.current()
+                        if sc_ctx is not None:
+                            target_sheet_model = sc_ctx.get(sheet_target)
+                    if target_sheet_model is None:
+                        from provider.pcb.board import BuildPcb
+
+                        pcb_ctx = BuildPcb.current()
+                        if pcb_ctx is not None:
+                            for s in pcb_ctx.schematic_sheets:
+                                if s.title == sheet_target or s.title.strip().lower() == sheet_target.strip().lower():
+                                    target_sheet_model = s
+                                    break
+
+                if target_sheet_model is not None:
+                    resolved_breakout = None
+                    resolved_sides = None
+                    if isinstance(pin_spec, PinSideDef):
+                        resolved_sides = pin_spec
+                        resolved_breakout = pin_breakout or pin_spec.to_breakout_list()
+                    elif isinstance(pin_spec, dict):
+                        if any(k in pin_spec for k in ("left", "right", "top", "bottom")):
+                            resolved_sides = PinSideDef(**pin_spec)
+                            resolved_breakout = pin_breakout or resolved_sides.to_breakout_list()
+                        else:
+                            resolved_sides = pin_spec
+                            resolved_breakout = pin_breakout or list(pin_spec.keys())
+                    elif isinstance(pin_spec, (list, tuple)):
+                        resolved_breakout = [str(getattr(x, "name", x)) for x in pin_spec]
+                        resolved_sides = pin_sides
+                    else:
+                        resolved_breakout = pin_breakout
+                        resolved_sides = pin_sides
+
+                    target_sheet_model.add_component(
+                        name=des,
+                        pin_breakout=resolved_breakout,
+                        pin_sides=resolved_sides,
+                    )
 
     # Convenience forwards to primary instance when single component
     @property

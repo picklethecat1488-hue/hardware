@@ -68,17 +68,21 @@ from provider import (
 )
 from projects_config import CarrierBoardConfig
 from .cad import CarrierBoardCAD
-from .pcb import (
-    CarrierBoardPCB,
+from .carrier_board import (
+    CarrierBoardPCBListing,
     build_carrier_board_wiring,
     build_carrier_board_system_wiring,
+)
+from .flex_tail import (
+    FlexTailPCBListing,
     get_flex_tail_traces,
     get_flex_tail_vias,
 )
+from .pcb import CarrierBoardPCB
 
 
 @discover_provider
-class CarrierBoardProvider(CarrierBoardCAD, CarrierBoardPCB, Provider):
+class CarrierBoardProvider(CarrierBoardCAD, CarrierBoardPCBListing, FlexTailPCBListing, Provider):
     """Provider for 6-layer rigid-flex carrier board and enclosure geometry."""
 
     __test__ = False
@@ -96,13 +100,6 @@ class CarrierBoardProvider(CarrierBoardCAD, CarrierBoardPCB, Provider):
     def settings(self) -> CarrierBoardConfig:
         """Return typed configuration settings."""
         return cast(CarrierBoardConfig, super().settings)
-
-    @property
-    def wiring(self) -> Wiring:
-        """Return the in-memory declarative Wiring model."""
-        if not hasattr(self, "_cached_wiring") or self._cached_wiring is None:
-            self._cached_wiring = build_carrier_board_wiring()
-        return self._cached_wiring
 
     @property
     def system_wiring(self) -> Wiring:

@@ -22,7 +22,7 @@ from build123d import (
 )
 from model import Wiring, TextArgs, DiagramStyle
 from provider import Room, WiringDiagram, Mode as ProviderMode
-from model.wiring import FootprintModel, NetModel, LabelModel, PinModel, PinListModel, PinSide
+from model.wiring import FootprintModel, NetModel, LabelModel, PinModel, PinListModel, PinSide, PinList, Pin
 from provider.pcb import BuildComponents, Component, BuildWiring, Net, BuildPcb
 
 
@@ -36,12 +36,10 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
             position=(0.0, -40.0, 12.0),
             rotation=(0.0, 0.0, 0.0),
             label=LabelModel(text="LiPo Battery", position=(0.0, -20.0, 0.0), align=("center", "max")),
-            pins=PinListModel(
-                [
-                    PinModel(name="+", label="+", side=PinSide.RIGHT),
-                    PinModel(name="-", label="-", side=PinSide.RIGHT),
-                ]
-            ),
+            pins=[
+                Pin(name="+", label="+", side=PinSide.RIGHT),
+                Pin(name="-", label="-", side=PinSide.RIGHT),
+            ],
         )
         charger = Component(
             name="charger",
@@ -50,16 +48,14 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
             position=(0.0, -79.0, 23.0),
             rotation=(0.0, 0.0, 0.0),
             label=LabelModel(text="BQ25185", position=(0.0, -17.5, 0.0), align=("center", "max")),
-            pins=PinListModel(
-                [
-                    PinModel(name="BAT+", label="BAT+", side=PinSide.RIGHT),
-                    PinModel(name="BAT-", label="BAT-", side=PinSide.RIGHT),
-                    PinModel(name="S1", label="S1", side=PinSide.RIGHT),
-                    PinModel(name="SYS", label="SYS", side=PinSide.LEFT),
-                    PinModel(name="GND", label="GND", side=PinSide.LEFT),
-                    PinModel(name="S2", label="S2", side=PinSide.LEFT),
-                ]
-            ),
+            pins=[
+                Pin(name="BAT+", label="BAT+", side=PinSide.RIGHT),
+                Pin(name="BAT-", label="BAT-", side=PinSide.RIGHT),
+                Pin(name="S1", label="S1", side=PinSide.RIGHT),
+                Pin(name="SYS", label="SYS", side=PinSide.LEFT),
+                Pin(name="GND", label="GND", side=PinSide.LEFT),
+                Pin(name="S2", label="S2", side=PinSide.LEFT),
+            ],
         )
         pico = Component(
             name="pico",
@@ -69,36 +65,34 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
             rotation=(0.0, 0.0, 0.0),
             slots_per_side=20,
             label=LabelModel(text="PICO W", position=(0.0, 29.0, 0.0), align=("center", "min")),
-            pins=PinListModel(
-                [
-                    PinModel(name="GP2", label="GP2", side=PinSide.RIGHT, slot=3),
-                    PinModel(name="GP3", label="GP3", side=PinSide.RIGHT, slot=4),
-                    PinModel(name="GP4", label="GP4", side=PinSide.RIGHT, slot=5),
-                    PinModel(name="GP5", label="GP5", side=PinSide.RIGHT, slot=6),
-                    PinModel(name="GP6", label="GP6", side=PinSide.RIGHT, slot=8),
-                    PinModel(name="GP7", label="GP7", side=PinSide.RIGHT, slot=9),
-                    PinModel(name="GP8", label="GP8", side=PinSide.RIGHT, slot=10),
-                    PinModel(name="GP9", label="GP9", side=PinSide.RIGHT, slot=11),
-                    PinModel(name="GP10", label="GP10", side=PinSide.RIGHT, slot=13),
-                    PinModel(name="GP11", label="GP11", side=PinSide.RIGHT, slot=12),
-                    PinModel(name="GP12", label="GP12", side=PinSide.RIGHT, slot=15),
-                    PinModel(name="GP13", label="GP13", side=PinSide.RIGHT, slot=16),
-                    PinModel(name="GP14", label="GP14", side=PinSide.RIGHT, slot=18),
-                    PinModel(name="GP15", label="GP15", side=PinSide.RIGHT, slot=19),
-                    PinModel(name="GP16", label="GP16", side=PinSide.LEFT, slot=1),
-                    PinModel(name="GP17", label="GP17", side=PinSide.LEFT, slot=2),
-                    PinModel(name="GP18", label="GP18", side=PinSide.LEFT, slot=3),
-                    PinModel(name="GP19", label="GP19", side=PinSide.LEFT, slot=4),
-                    PinModel(name="GP20", label="GP20", side=PinSide.LEFT, slot=5),
-                    PinModel(name="GP21", label="GP21", side=PinSide.LEFT, slot=6),
-                    PinModel(name="GP22", label="GP22", side=PinSide.LEFT, slot=7),
-                    PinModel(name="GND_L", label="GND", side=PinSide.RIGHT, slot=2),
-                    PinModel(name="VSYS", label="VSYS", side=PinSide.LEFT, slot=18),
-                    PinModel(name="GND_R", label="GND", side=PinSide.LEFT, slot=17),
-                    PinModel(name="3V3", label="3V3", side=PinSide.LEFT, slot=15),
-                    PinModel(name="GP26", label="GP26", side=PinSide.LEFT, slot=11),
-                ]
-            ),
+            pins=[
+                Pin(name="GP2", label="GP2", side=PinSide.RIGHT, slot=3),
+                Pin(name="GP3", label="GP3", side=PinSide.RIGHT, slot=4),
+                Pin(name="GP4", label="GP4", side=PinSide.RIGHT, slot=5),
+                Pin(name="GP5", label="GP5", side=PinSide.RIGHT, slot=6),
+                Pin(name="GP6", label="GP6", side=PinSide.RIGHT, slot=8),
+                Pin(name="GP7", label="GP7", side=PinSide.RIGHT, slot=9),
+                Pin(name="GP8", label="GP8", side=PinSide.RIGHT, slot=10),
+                Pin(name="GP9", label="GP9", side=PinSide.RIGHT, slot=11),
+                Pin(name="GP10", label="GP10", side=PinSide.RIGHT, slot=13),
+                Pin(name="GP11", label="GP11", side=PinSide.RIGHT, slot=12),
+                Pin(name="GP12", label="GP12", side=PinSide.RIGHT, slot=15),
+                Pin(name="GP13", label="GP13", side=PinSide.RIGHT, slot=16),
+                Pin(name="GP14", label="GP14", side=PinSide.RIGHT, slot=18),
+                Pin(name="GP15", label="GP15", side=PinSide.RIGHT, slot=19),
+                Pin(name="GP16", label="GP16", side=PinSide.LEFT, slot=1),
+                Pin(name="GP17", label="GP17", side=PinSide.LEFT, slot=2),
+                Pin(name="GP18", label="GP18", side=PinSide.LEFT, slot=3),
+                Pin(name="GP19", label="GP19", side=PinSide.LEFT, slot=4),
+                Pin(name="GP20", label="GP20", side=PinSide.LEFT, slot=5),
+                Pin(name="GP21", label="GP21", side=PinSide.LEFT, slot=6),
+                Pin(name="GP22", label="GP22", side=PinSide.LEFT, slot=7),
+                Pin(name="GND_L", label="GND", side=PinSide.RIGHT, slot=2),
+                Pin(name="VSYS", label="VSYS", side=PinSide.LEFT, slot=18),
+                Pin(name="GND_R", label="GND", side=PinSide.LEFT, slot=17),
+                Pin(name="3V3", label="3V3", side=PinSide.LEFT, slot=15),
+                Pin(name="GP26", label="GP26", side=PinSide.LEFT, slot=11),
+            ],
         )
         fuel_gauge = Component(
             name="fuel_gauge",
@@ -107,16 +101,14 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
             position=(50.0, -45.0, 23.0),
             rotation=(0.0, 0.0, 0.0),
             label=LabelModel(text="MAX17048", position=(0.0, -13.0, 0.0), align=("center", "max")),
-            pins=PinListModel(
-                [
-                    PinModel(name="BAT", label="BAT", side=PinSide.RIGHT),
-                    PinModel(name="VIN", label="VIN", side=PinSide.RIGHT),
-                    PinModel(name="GND", label="GND", side=PinSide.RIGHT),
-                    PinModel(name="SDA", label="SDA", side=PinSide.RIGHT),
-                    PinModel(name="SCL", label="SCL", side=PinSide.RIGHT),
-                    PinModel(name="ALRT", label="ALRT", side=PinSide.LEFT),
-                ]
-            ),
+            pins=[
+                Pin(name="BAT", label="BAT", side=PinSide.RIGHT),
+                Pin(name="VIN", label="VIN", side=PinSide.RIGHT),
+                Pin(name="GND", label="GND", side=PinSide.RIGHT),
+                Pin(name="SDA", label="SDA", side=PinSide.RIGHT),
+                Pin(name="SCL", label="SCL", side=PinSide.RIGHT),
+                Pin(name="ALRT", label="ALRT", side=PinSide.LEFT),
+            ],
         )
         current_monitor = Component(
             name="current_monitor",
@@ -125,16 +117,14 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
             position=(50.0, -15.0, 23.0),
             rotation=(0.0, 0.0, 0.0),
             label=LabelModel(text="INA219", position=(15.5, 0.0, 0.0), align=("min", "center")),
-            pins=PinListModel(
-                [
-                    PinModel(name="VCC", label="VCC", side=PinSide.RIGHT),
-                    PinModel(name="GND", label="GND", side=PinSide.RIGHT),
-                    PinModel(name="SDA", label="SDA", side=PinSide.RIGHT),
-                    PinModel(name="SCL", label="SCL", side=PinSide.RIGHT),
-                    PinModel(name="VIN+", label="VIN+", side=PinSide.LEFT),
-                    PinModel(name="VIN-", label="VIN-", side=PinSide.LEFT),
-                ]
-            ),
+            pins=[
+                Pin(name="VCC", label="VCC", side=PinSide.RIGHT),
+                Pin(name="GND", label="GND", side=PinSide.RIGHT),
+                Pin(name="SDA", label="SDA", side=PinSide.RIGHT),
+                Pin(name="SCL", label="SCL", side=PinSide.RIGHT),
+                Pin(name="VIN+", label="VIN+", side=PinSide.LEFT),
+                Pin(name="VIN-", label="VIN-", side=PinSide.LEFT),
+            ],
         )
         motor_driver = Component(
             name="motor_driver",
@@ -143,23 +133,21 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
             position=(50.0, 15.0, 23.0),
             rotation=(0.0, 0.0, 90.0),
             label=LabelModel(text="TMC6300", position=(15.0, 0.0, 0.0), align=("min", "center")),
-            pins=PinListModel(
-                [
-                    PinModel(name="VCC", label="VCC", side=PinSide.RIGHT),
-                    PinModel(name="VIO", label="VIO", side=PinSide.RIGHT),
-                    PinModel(name="GND", label="GND", side=PinSide.RIGHT),
-                    PinModel(name="UH", label="UH", side=PinSide.RIGHT),
-                    PinModel(name="UL", label="UL", side=PinSide.RIGHT),
-                    PinModel(name="VH", label="VH", side=PinSide.RIGHT),
-                    PinModel(name="VL", label="VL", side=PinSide.RIGHT),
-                    PinModel(name="WH", label="WH", side=PinSide.RIGHT),
-                    PinModel(name="WL", label="WL", side=PinSide.RIGHT),
-                    PinModel(name="DIAG", label="DIAG", side=PinSide.RIGHT),
-                    PinModel(name="U", label="U", side=PinSide.LEFT),
-                    PinModel(name="V", label="V", side=PinSide.LEFT),
-                    PinModel(name="W", label="W", side=PinSide.LEFT),
-                ]
-            ),
+            pins=[
+                Pin(name="VCC", label="VCC", side=PinSide.RIGHT),
+                Pin(name="VIO", label="VIO", side=PinSide.RIGHT),
+                Pin(name="GND", label="GND", side=PinSide.RIGHT),
+                Pin(name="UH", label="UH", side=PinSide.RIGHT),
+                Pin(name="UL", label="UL", side=PinSide.RIGHT),
+                Pin(name="VH", label="VH", side=PinSide.RIGHT),
+                Pin(name="VL", label="VL", side=PinSide.RIGHT),
+                Pin(name="WH", label="WH", side=PinSide.RIGHT),
+                Pin(name="WL", label="WL", side=PinSide.RIGHT),
+                Pin(name="DIAG", label="DIAG", side=PinSide.RIGHT),
+                Pin(name="U", label="U", side=PinSide.LEFT),
+                Pin(name="V", label="V", side=PinSide.LEFT),
+                Pin(name="W", label="W", side=PinSide.LEFT),
+            ],
         )
         motor = Component(
             name="motor",
@@ -168,13 +156,11 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
             position=(0.0, 0.0, 28.0),
             rotation=(0.0, 0.0, 0.0),
             label=LabelModel(text="1102 BLDC", position=(-10.0, 0.0, 0.0), align=("max", "center")),
-            pins=PinListModel(
-                [
-                    PinModel(name="U", label="U", side=PinSide.TOP),
-                    PinModel(name="V", label="V", side=PinSide.TOP),
-                    PinModel(name="W", label="W", side=PinSide.TOP),
-                ]
-            ),
+            pins=[
+                Pin(name="U", label="U", side=PinSide.TOP),
+                Pin(name="V", label="V", side=PinSide.TOP),
+                Pin(name="W", label="W", side=PinSide.TOP),
+            ],
         )
         sensor_east = Component(
             name="sensor_east",
@@ -182,16 +168,14 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
             dimensions=(17.0, 25.0, 2.0),
             joint_ref={"joint": "sensor_port_east", "offset": [-18.3, 0.0, 0.0]},
             label=LabelModel(text="VL53L0X (EAST)", position=(10.0, 0.0, 0.0), align=("min", "center")),
-            pins=PinListModel(
-                [
-                    PinModel(name="VCC", label="VCC", side=PinSide.RIGHT),
-                    PinModel(name="GND", label="GND", side=PinSide.RIGHT),
-                    PinModel(name="SDA", label="SDA", side=PinSide.RIGHT),
-                    PinModel(name="SCL", label="SCL", side=PinSide.RIGHT),
-                    PinModel(name="XSHUT", label="XSHUT", side=PinSide.LEFT),
-                    PinModel(name="INT", label="INT", side=PinSide.LEFT),
-                ]
-            ),
+            pins=[
+                Pin(name="VCC", label="VCC", side=PinSide.RIGHT),
+                Pin(name="GND", label="GND", side=PinSide.RIGHT),
+                Pin(name="SDA", label="SDA", side=PinSide.RIGHT),
+                Pin(name="SCL", label="SCL", side=PinSide.RIGHT),
+                Pin(name="XSHUT", label="XSHUT", side=PinSide.LEFT),
+                Pin(name="INT", label="INT", side=PinSide.LEFT),
+            ],
         )
         sensor_north = Component(
             name="sensor_north",
@@ -199,16 +183,14 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
             dimensions=(25.0, 17.0, 2.0),
             joint_ref={"joint": "sensor_port_north", "offset": [-18.3, 0.0, 0.0]},
             label=LabelModel(text="VL53L0X (NORTH)", position=(0.0, 10.0, 0.0), align=("center", "min")),
-            pins=PinListModel(
-                [
-                    PinModel(name="VCC", label="VCC", side=PinSide.TOP),
-                    PinModel(name="GND", label="GND", side=PinSide.TOP),
-                    PinModel(name="SDA", label="SDA", side=PinSide.TOP),
-                    PinModel(name="SCL", label="SCL", side=PinSide.TOP),
-                    PinModel(name="XSHUT", label="XSHUT", side=PinSide.BOTTOM),
-                    PinModel(name="INT", label="INT", side=PinSide.BOTTOM),
-                ]
-            ),
+            pins=[
+                Pin(name="VCC", label="VCC", side=PinSide.TOP),
+                Pin(name="GND", label="GND", side=PinSide.TOP),
+                Pin(name="SDA", label="SDA", side=PinSide.TOP),
+                Pin(name="SCL", label="SCL", side=PinSide.TOP),
+                Pin(name="XSHUT", label="XSHUT", side=PinSide.BOTTOM),
+                Pin(name="INT", label="INT", side=PinSide.BOTTOM),
+            ],
         )
         sensor_west = Component(
             name="sensor_west",
@@ -216,16 +198,14 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
             dimensions=(17.0, 25.0, 2.0),
             joint_ref={"joint": "sensor_port_west", "offset": [-18.3, 0.0, 0.0]},
             label=LabelModel(text="VL53L0X (WEST)", position=(-10.0, 0.0, 0.0), align=("max", "center")),
-            pins=PinListModel(
-                [
-                    PinModel(name="VCC", label="VCC", side=PinSide.RIGHT),
-                    PinModel(name="GND", label="GND", side=PinSide.RIGHT),
-                    PinModel(name="SDA", label="SDA", side=PinSide.RIGHT),
-                    PinModel(name="SCL", label="SCL", side=PinSide.RIGHT),
-                    PinModel(name="XSHUT", label="XSHUT", side=PinSide.RIGHT),
-                    PinModel(name="INT", label="INT", side=PinSide.RIGHT),
-                ]
-            ),
+            pins=[
+                Pin(name="VCC", label="VCC", side=PinSide.RIGHT),
+                Pin(name="GND", label="GND", side=PinSide.RIGHT),
+                Pin(name="SDA", label="SDA", side=PinSide.RIGHT),
+                Pin(name="SCL", label="SCL", side=PinSide.RIGHT),
+                Pin(name="XSHUT", label="XSHUT", side=PinSide.RIGHT),
+                Pin(name="INT", label="INT", side=PinSide.RIGHT),
+            ],
         )
         led = Component(
             name="led",
@@ -233,13 +213,11 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
             dimensions=(10.0, 10.0, 1.0),
             joint_ref={"joint": "led_port", "offset": [0.0, 0.0, 0.0]},
             label=LabelModel(text="RGB LED", position=(0.0, 6.0, 0.0), align=("center", "min")),
-            pins=PinListModel(
-                [
-                    PinModel(name="VCC", label="VCC", side=PinSide.RIGHT),
-                    PinModel(name="GND", label="GND", side=PinSide.RIGHT),
-                    PinModel(name="DIN", label="DIN", side=PinSide.LEFT),
-                ]
-            ),
+            pins=[
+                Pin(name="VCC", label="VCC", side=PinSide.RIGHT),
+                Pin(name="GND", label="GND", side=PinSide.RIGHT),
+                Pin(name="DIN", label="DIN", side=PinSide.LEFT),
+            ],
         )
         speed_sensor = Component(
             name="speed_sensor",
@@ -248,13 +226,11 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
             position=(0.0, 17.5, 12.0),
             rotation=(0.0, 0.0, 0.0),
             label=LabelModel(text="Hall", position=(10.0, 0.0, 0.0), align=("min", "center")),
-            pins=PinListModel(
-                [
-                    PinModel(name="VCC", label="VCC", side=PinSide.LEFT),
-                    PinModel(name="GND", label="GND", side=PinSide.LEFT),
-                    PinModel(name="OUT", label="OUT", side=PinSide.RIGHT),
-                ]
-            ),
+            pins=[
+                Pin(name="VCC", label="VCC", side=PinSide.LEFT),
+                Pin(name="GND", label="GND", side=PinSide.LEFT),
+                Pin(name="OUT", label="OUT", side=PinSide.RIGHT),
+            ],
         )
         swd_adapter = Component(
             name="swd_adapter",
@@ -263,13 +239,11 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
             position=(-50.0, -45.0, 23.0),
             rotation=(0.0, 0.0, 90.0),
             label=LabelModel(text="SWD", position=(12.0, 0.0, 0.0), align=("min", "center")),
-            pins=PinListModel(
-                [
-                    PinModel(name="SWDIO", label="SWDIO", side=PinSide.RIGHT),
-                    PinModel(name="GND", label="GND", side=PinSide.RIGHT),
-                    PinModel(name="SWCLK", label="SWCLK", side=PinSide.RIGHT),
-                ]
-            ),
+            pins=[
+                Pin(name="SWDIO", label="SWDIO", side=PinSide.RIGHT),
+                Pin(name="GND", label="GND", side=PinSide.RIGHT),
+                Pin(name="SWCLK", label="SWCLK", side=PinSide.RIGHT),
+            ],
         )
 
     with BuildWiring(name="cat_fountain_nets") as net_ctx:
@@ -359,7 +333,6 @@ def build_cat_fountain_wiring(parent_part: Optional[Any] = None) -> Wiring:
         footprints=layout.components,
         nets=net_ctx.nets,
         parent_part=parent_part,
-        symbol_table=layout.symbol_table_entries,
     )
     return wiring
 

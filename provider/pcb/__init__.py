@@ -17,25 +17,35 @@ from .silkscreen import (
 from .stackup import BuildStackup, StackupLayer
 from .drill_holes import BuildDrillHoles, MountingHole, DrillHole
 from .board import BuildPcb, BuildFlexPCB
-from model.pcb import FlexType
+from model.pcb import FlexType, PinSideDef, ElectrodeType, ElectrodeShape
 from .routing import (
     BuildTraces,
     Trace,
+    make_trace,
     Route,
     RouteStyle,
     BuildVias,
     Via,
     BuildCopperRegions,
     CopperRegion,
-    CopperZone,
     BuildTestPoints,
     TestPoint,
 )
 from .jax_router import JaxPCBRouter
 from .layout import BuildComponents, Component
+from model.wiring import PinListModel, PinModel, Pin, PinSide
+
+PinList = PinListModel
 from .wiring import BuildWiring, Net, DiffPair, Bus
-from .test_steps import BuildTestSteps, BuildAssemblyTestSteps, AssemblyTestMetadata, TestStep
-from .schematic import SchematicMetadata, SchematicSheet
+from .test_steps import BuildAssemblyTests, TestStep
+from .schematic import BuildSchematic, SchematicConfig, SchematicSheet
+from .rules import (
+    BuildDesignRules,
+    BuildNetClasses,
+    BuildFlexZones,
+    BuildObstacles,
+    BuildCapacitiveSensors,
+)
 from .metadata import PcbMetadata
 from .supplier import package_supplier_pcb_files, generate_pcb_project_summary
 
@@ -67,31 +77,43 @@ __all__ = [
     "DrillHole",
     "BuildTraces",
     "Trace",
+    "make_trace",
     "Route",
     "RouteStyle",
     "BuildVias",
     "Via",
     "BuildCopperRegions",
     "CopperRegion",
-    "CopperZone",
     "BuildTestPoints",
     "TestPoint",
     "BuildPcb",
     "BuildFlexPCB",
     "FlexType",
+    "ElectrodeType",
+    "ElectrodeShape",
     "find_empty_space_for_label",
     "JaxPCBRouter",
     "package_supplier_pcb_files",
     "generate_pcb_project_summary",
-    "BuildTestSteps",
-    "BuildAssemblyTestSteps",
-    "AssemblyTestMetadata",
+    "BuildAssemblyTests",
     "TestStep",
-    "SchematicMetadata",
+    "BuildSchematic",
+    "SchematicConfig",
     "SchematicSheet",
+    "BuildDesignRules",
+    "BuildNetClasses",
+    "BuildFlexZones",
+    "BuildObstacles",
+    "BuildCapacitiveSensors",
     "PcbMetadata",
     "BuildComponents",
     "Component",
+    "Pin",
+    "PinList",
+    "PinListModel",
+    "PinModel",
+    "PinSide",
+    "PinSideDef",
     "BuildWiring",
     "Net",
     "DiffPair",

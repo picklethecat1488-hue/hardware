@@ -2627,7 +2627,7 @@ def test_regression_bug_266_remove_led_and_jumper_opposite_side_designators(tmp_
     from provider.pcb.exporter import PCBExporter
 
     provider = CarrierBoardProvider()
-    provider.silkscreen()
+    _ = provider.silkscreen
     pcb_cfg = provider.pcb_config
 
     bottom_texts = [t.text for t in pcb_cfg.silkscreen_texts if t.layer == "B.SilkS"]
@@ -3349,7 +3349,7 @@ def test_regression_bug_open_003_eq_gerber_standard_impedance_copper_balance() -
     from projects.carrier_board.provider import CarrierBoardProvider
 
     provider = CarrierBoardProvider()
-    cr = provider.copper_regions()
+    cr = provider.copper_regions
     in2_regions = [r for r in cr.regions if r.layer == "In2.Cu"]
     assert len(in2_regions) >= 1, "In2.Cu must have a GND copper plane region"
     assert in2_regions[0].net == "GND"
@@ -3370,6 +3370,6 @@ def test_regression_bug_open_003_eq_gerber_standard_impedance_copper_balance() -
     assert "PCIe" not in imp_text
 
     # 5. Verify User Drawings silkscreen specifies TG150 and 0.12mm impedance
-    texts = [t.text for t in provider.silkscreen()]
+    texts = [t.text for t in provider.silkscreen]
     assert any("TG150" in t for t in texts), "Silkscreen must specify TG150"
     assert any("W=0.12mm" in t for t in texts), "Silkscreen must specify W=0.12mm"
