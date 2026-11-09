@@ -1066,3 +1066,14 @@ class TestViewer:
             mock_exp_sch.assert_called_once()
             board_dir_arg = mock_exp_board.call_args[0][0]
             assert board_dir_arg == tmp_path / "board" / "carrier_board"
+
+    def test_show_view_not_found_with_suggestions(self, viewer):
+        """Verify helpful target suggestions when a mistyped target is requested."""
+        viewer.target_parser.router.manifest = {
+            "footprints/0402": {Section.VIEW: {}},
+            "footprints/0603": {Section.VIEW: {}},
+        }
+        viewer.target_parser.resolve = MagicMock(return_value=None)
+
+        with pytest.raises(ValueError, match=r"Did you mean: footprints/0402\?"):
+            viewer.show_view(["footprints/040"])
