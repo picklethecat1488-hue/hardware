@@ -1296,11 +1296,11 @@ def test_regression_piezo_speaker_circular_silkscreen_and_placement() -> None:
 
     assert u5.package == "piezo_speaker_12mm"
 
-    # Verify footprint definition in thru_hole.yaml has circular geometry
-    thru_hole_yaml = Path("projects/footprints/thru_hole.yaml")
-    with open(thru_hole_yaml, encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-    piezo = data["footprints"]["piezo_speaker_12mm"]
+    # Verify footprint definition in provider.footprints has circular geometry
+    from provider.footprints import get_shared_footprints
+
+    shared_fps = get_shared_footprints()
+    piezo = shared_fps["piezo_speaker_12mm"]
     assert piezo["shape"] == "circle"
     assert piezo["radius_mm"] == 6.0
 
@@ -2931,14 +2931,15 @@ def test_regression_bugs_115_through_127() -> None:
             assert ref_present, f"Reference for {fp.name} must be present in footprint"
         assert "(hide yes)" in kicad_text or "hide" in kicad_text
 
-    # CR Item 4d403f3fec09 & 6235032c3438: Flying probe simulator in provider library and test steps from YAML
-    from provider.simulation.flying_probe import load_test_steps_from_yaml, render_markdown_test_report
+    # Declarative flying probe test steps from provider models
+    from provider.simulation.flying_probe import (
+        render_markdown_test_report,
+        resolve_test_steps_from_provider,
+    )
 
-    test_steps_path = Path("projects/carrier_board/pcb_test_steps.yaml")
-    assert test_steps_path.exists(), "pcb_test_steps.yaml must exist"
-    carrier_steps = load_test_steps_from_yaml(test_steps_path, "carrier_board")
+    carrier_steps = resolve_test_steps_from_provider(provider, "carrier_board")
     assert len(carrier_steps) >= 5, f"carrier_board must declare test steps, found {len(carrier_steps)}"
-    flex_steps = load_test_steps_from_yaml(test_steps_path, "flex_tail")
+    flex_steps = resolve_test_steps_from_provider(provider, "flex_tail")
     assert len(flex_steps) >= 4, f"flex_tail must declare test steps, found {len(flex_steps)}"
 
     report_md = render_markdown_test_report("carrier_board", carrier_steps, len(carrier_steps), len(carrier_steps))

@@ -415,25 +415,15 @@ _SHARED_FOOTPRINTS_CACHE: Optional[Dict[str, Dict[str, Any]]] = None
 
 
 def load_shared_footprints(search_dir: Optional[Path] = None) -> Dict[str, Dict[str, Any]]:
-    """Load standard footprint definitions from shared yaml libraries (smd.yaml, thru_hole.yaml, ic.yaml)."""
+    """Load standard footprint definitions from provider.footprints declarative primitives."""
     global _SHARED_FOOTPRINTS_CACHE
-    if _SHARED_FOOTPRINTS_CACHE is not None and search_dir is None:
+    if _SHARED_FOOTPRINTS_CACHE is not None:
         return _SHARED_FOOTPRINTS_CACHE
 
-    footprints: Dict[str, Dict[str, Any]] = {}
-    base = search_dir or Path(__file__).parent.parent / "projects" / "footprints"
-    if base.exists() and base.is_dir():
-        for yml in sorted(base.glob("*.yaml")):
-            with open(yml, "r") as f:
-                data = yaml.safe_load(f)
-            if data and isinstance(data, dict):
-                fps = data.get("footprints", {})
-                if isinstance(fps, dict):
-                    footprints.update(fps)
+    from provider.footprints import get_shared_footprints
 
-    if search_dir is None:
-        _SHARED_FOOTPRINTS_CACHE = footprints
-    return footprints
+    _SHARED_FOOTPRINTS_CACHE = get_shared_footprints()
+    return _SHARED_FOOTPRINTS_CACHE
 
 
 class Wiring:

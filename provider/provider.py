@@ -266,6 +266,12 @@ class ProviderOrchestrator(Orchestrator):
             raise ValueError(f"Orchestration failed: one or more results for action '{action}' were None.")
 
 
+class DefaultProviderConfig(BaseModel):
+    """Default configuration model for base providers."""
+
+    pass
+
+
 class Provider:
     """Base class for all build providers."""
 
@@ -295,7 +301,7 @@ class Provider:
     @property
     def default_config(self) -> BaseModel:
         """Return a default instance of the provider's configuration (an empty BaseModel)."""
-        return BaseModel()
+        return DefaultProviderConfig()
 
     @property
     def settings(self) -> Any:

@@ -1,5 +1,6 @@
 """Declarative flexible polyimide sensing tail PCB layout, routing, and assembly tests for Carrier Board."""
 
+from functools import cached_property
 from typing import Optional, List
 from build123d import (
     BuildLine,
@@ -13,6 +14,8 @@ from build123d import (
 )
 from provider import Room, Mode
 from model.pcb import (
+    AssemblyTestModel,
+    AssemblyTestStepModel,
     TraceSegmentModel,
     ViaModel,
     FlexType,
@@ -33,6 +36,115 @@ from provider.pcb import (
     BuildObstacles,
     TestStep,
 )
+
+
+def build_flex_tail_assembly_test() -> AssemblyTestModel:
+    """Return flying probe assembly test instructions for Flex Tail."""
+    return AssemblyTestModel(
+        test_fixture="flying_probe",
+        pass_criteria="all_steps_within_tolerance",
+        subassembly="flex_tail",
+        instructions=[
+            AssemblyTestStepModel(
+                step_id="TEST_CAP_SENSE_CHAN0",
+                subassembly="flex_tail",
+                description="Measure baseline mutual capacitance on liquid level electrode Channel 0",
+                test_type="capacitance",
+                net_name="CAP_CHAN0",
+                pad_a_mm=(0.0, -6.25),
+                pad_b_mm=(-3.0, -6.25),
+                nominal=12.5,
+                tolerance_pct=15.0,
+                unit="pF",
+                stimulus="250kHz 1.8V square wave",
+                measured=12.6,
+            ),
+            AssemblyTestStepModel(
+                step_id="TEST_CAP_SENSE_CHAN1",
+                subassembly="flex_tail",
+                description="Measure baseline mutual capacitance on liquid level electrode Channel 1",
+                test_type="capacitance",
+                net_name="CAP_CHAN1",
+                pad_a_mm=(0.0, 5.25),
+                pad_b_mm=(-3.0, 5.25),
+                nominal=14.0,
+                tolerance_pct=15.0,
+                unit="pF",
+                stimulus="250kHz 1.8V square wave",
+                measured=14.1,
+            ),
+            AssemblyTestStepModel(
+                step_id="TEST_CAP_SENSE_CHAN2",
+                subassembly="flex_tail",
+                description="Measure baseline mutual capacitance on liquid level electrode Channel 2",
+                test_type="capacitance",
+                net_name="CAP_CHAN2",
+                pad_a_mm=(0.0, 16.75),
+                pad_b_mm=(-3.0, 16.75),
+                nominal=15.5,
+                tolerance_pct=15.0,
+                unit="pF",
+                stimulus="250kHz 1.8V square wave",
+                measured=15.4,
+            ),
+            AssemblyTestStepModel(
+                step_id="TEST_CAP_SENSE_CHAN3",
+                subassembly="flex_tail",
+                description="Measure baseline self capacitance on liquid proximity electrode Channel 3",
+                test_type="capacitance",
+                net_name="CAP_CHAN3",
+                pad_a_mm=(0.0, 24.75),
+                pad_b_mm=(0.0, -22.75),
+                nominal=8.0,
+                tolerance_pct=15.0,
+                unit="pF",
+                stimulus="250kHz 1.8V square wave self-cap",
+                measured=8.1,
+            ),
+            AssemblyTestStepModel(
+                step_id="TEST_CONTINUITY_TAIL_GND",
+                subassembly="flex_tail",
+                description="Verify ground plane guard ring continuity along flex tail contour",
+                test_type="continuity",
+                net_name="FLEX_GND",
+                pad_a_mm=(-7.0, -20.0),
+                pad_b_mm=(7.0, -20.0),
+                nominal=0.08,
+                tolerance_pct=20.0,
+                unit="ohm",
+                stimulus="100mA 4-wire Kelvin DC",
+                measured=0.078,
+            ),
+            AssemblyTestStepModel(
+                step_id="TEST_CAP_MUTUAL_TOUCH_CHAN0",
+                subassembly="flex_tail",
+                description="Simulate human finger touch proximity on liquid level Channel 0 mutual capacitance electrode",
+                test_type="mutual_cap",
+                net_name="CAP_CHAN0",
+                pad_a_mm=(0.0, -6.25),
+                pad_b_mm=(-3.0, -6.25),
+                nominal=15.8,
+                tolerance_pct=15.0,
+                unit="pF",
+                stimulus="Simulated finger proximity 250kHz 1.8V dielectric perturb",
+                measured=15.9,
+            ),
+            AssemblyTestStepModel(
+                step_id="TEST_CAP_MUTUAL_TOUCH_CHAN1",
+                subassembly="flex_tail",
+                description="Simulate human finger touch proximity on liquid level Channel 1 mutual capacitance electrode",
+                test_type="mutual_cap",
+                net_name="CAP_CHAN1",
+                pad_a_mm=(0.0, 5.25),
+                pad_b_mm=(-3.0, 5.25),
+                nominal=17.5,
+                tolerance_pct=15.0,
+                unit="pF",
+                stimulus="Simulated finger proximity 250kHz 1.8V dielectric perturb",
+                measured=17.6,
+            ),
+        ],
+    )
 
 
 def get_flex_tail_traces() -> List[TraceSegmentModel]:
@@ -381,102 +493,15 @@ class FlexTailPCBListing:
             # Manual traces and sensor routing on flexible polyimide substrate
             get_flex_tail_traces()
 
-            with BuildAssemblyTests(
-                test_fixture="flying_probe", pass_criteria="all_steps_within_tolerance", subassembly="flex_tail"
-            ) as tests:
-                TestStep(
-                    step_id="TEST_CAP_SENSE_CHAN0",
-                    description="Measure baseline mutual capacitance on liquid level electrode Channel 0",
-                    test_type="capacitance",
-                    net_name="CAP_CHAN0",
-                    pad_a_mm=(0.0, -6.25),
-                    pad_b_mm=(-3.0, -6.25),
-                    nominal=12.5,
-                    tolerance_pct=15.0,
-                    unit="pF",
-                    stimulus="250kHz 1.8V square wave",
-                    measured=12.6,
-                )
-                TestStep(
-                    step_id="TEST_CAP_SENSE_CHAN1",
-                    description="Measure baseline mutual capacitance on liquid level electrode Channel 1",
-                    test_type="capacitance",
-                    net_name="CAP_CHAN1",
-                    pad_a_mm=(0.0, 5.25),
-                    pad_b_mm=(-3.0, 5.25),
-                    nominal=14.0,
-                    tolerance_pct=15.0,
-                    unit="pF",
-                    stimulus="250kHz 1.8V square wave",
-                    measured=14.1,
-                )
-                TestStep(
-                    step_id="TEST_CAP_SENSE_CHAN2",
-                    description="Measure baseline mutual capacitance on liquid level electrode Channel 2",
-                    test_type="capacitance",
-                    net_name="CAP_CHAN2",
-                    pad_a_mm=(0.0, 16.75),
-                    pad_b_mm=(-3.0, 16.75),
-                    nominal=15.5,
-                    tolerance_pct=15.0,
-                    unit="pF",
-                    stimulus="250kHz 1.8V square wave",
-                    measured=15.4,
-                )
-                TestStep(
-                    step_id="TEST_CAP_SENSE_CHAN3",
-                    description="Measure baseline self capacitance on liquid proximity electrode Channel 3",
-                    test_type="capacitance",
-                    net_name="CAP_CHAN3",
-                    pad_a_mm=(0.0, 24.75),
-                    pad_b_mm=(0.0, -22.75),
-                    nominal=8.0,
-                    tolerance_pct=15.0,
-                    unit="pF",
-                    stimulus="250kHz 1.8V square wave self-cap",
-                    measured=8.1,
-                )
-                TestStep(
-                    step_id="TEST_CONTINUITY_TAIL_GND",
-                    description="Verify ground plane guard ring continuity along flex tail contour",
-                    test_type="continuity",
-                    net_name="FLEX_GND",
-                    pad_a_mm=(-7.0, -20.0),
-                    pad_b_mm=(7.0, -20.0),
-                    nominal=0.08,
-                    tolerance_pct=20.0,
-                    unit="ohm",
-                    stimulus="100mA 4-wire Kelvin DC",
-                    measured=0.078,
-                )
-                TestStep(
-                    step_id="TEST_CAP_MUTUAL_TOUCH_CHAN0",
-                    description="Simulate human finger touch proximity on liquid level Channel 0 mutual capacitance electrode",
-                    test_type="mutual_cap",
-                    net_name="CAP_CHAN0",
-                    pad_a_mm=(0.0, -6.25),
-                    pad_b_mm=(-3.0, -6.25),
-                    nominal=15.8,
-                    tolerance_pct=15.0,
-                    unit="pF",
-                    stimulus="Simulated finger proximity 250kHz 1.8V dielectric perturb",
-                    measured=15.9,
-                )
-                TestStep(
-                    step_id="TEST_CAP_MUTUAL_TOUCH_CHAN1",
-                    description="Simulate human finger touch proximity on liquid level Channel 1 mutual capacitance electrode",
-                    test_type="mutual_cap",
-                    net_name="CAP_CHAN1",
-                    pad_a_mm=(0.0, 5.25),
-                    pad_b_mm=(-3.0, 5.25),
-                    nominal=17.5,
-                    tolerance_pct=15.0,
-                    unit="pF",
-                    stimulus="Simulated finger proximity 250kHz 1.8V dielectric perturb",
-                    measured=17.6,
-                )
+            with BuildAssemblyTests(subassembly="flex_tail") as bat:
+                bat.add(self.flex_tail_tests)
 
         return tail
+
+    @cached_property
+    def flex_tail_tests(self) -> AssemblyTestModel:
+        """Return flying probe assembly test model for flex tail."""
+        return build_flex_tail_assembly_test()
 
     def view_flex_tail(self, room: Room, mode: Mode) -> None:
         """Assemble flex tail PCB with sensor pads and test points for inspection and simulation."""
@@ -487,6 +512,7 @@ class FlexTailPCBListing:
 
 __all__ = [
     "FlexTailPCBListing",
+    "build_flex_tail_assembly_test",
     "get_flex_tail_traces",
     "get_flex_tail_vias",
 ]

@@ -1,0 +1,480 @@
+'0402':
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+'0603':
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+0805:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+'1206':
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+BGA-196:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+FPC-15P-0.5MM:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+FPC-30P-0.5MM:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+JST-PH-2P:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+JST-PH-6P:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+JST-PH-7P:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+LED_RGB_4P:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+M.2-KEY-M:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+MOD-BLE-PCB-ANT:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+QFN-16-AMP:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+QFN-20:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+QFN-24:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+QFN-32:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+SOD-123:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+SOIC-8:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+SOT-23:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+SOT-23-5:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+SOT-23-6:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+SW_PUSH_SMD:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+TDFN-8:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+TSSOP-16:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+USB-C-16P:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+VFBGA-184:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+VQFN-16:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+WSON-8:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+XTAL-3225-4P:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+axial_resistor:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+mounting_hole_plated:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+piezo_speaker_12mm:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+pin_header_1x10:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+pin_header_1x2:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+pin_header_1x3:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+pin_header_1x4:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+pin_header_1x6:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+pin_header_2x5_1.27mm:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+radial_capacitor:
+  part:
+    modes:
+    - default
+  view:
+    modes:
+    - default
+  color:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0

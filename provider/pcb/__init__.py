@@ -47,6 +47,14 @@ from .rules import (
     BuildCapacitiveSensors,
 )
 from .metadata import PcbMetadata
+from .footprint import (
+    BuildFootprint,
+    Pad,
+    PadShape,
+    PadType,
+    footprint,
+    FOOTPRINT_REGISTRY,
+)
 from .supplier import package_supplier_pcb_files, generate_pcb_project_summary
 
 __all__ = [
@@ -118,4 +126,10 @@ __all__ = [
     "Net",
     "DiffPair",
     "Bus",
+    "BuildFootprint",
+    "Pad",
+    "PadShape",
+    "PadType",
+    "footprint",
+    "FOOTPRINT_REGISTRY",
 ]

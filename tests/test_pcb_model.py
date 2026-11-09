@@ -336,15 +336,10 @@ def test_shared_footprint_libraries_loading_and_resolution(tmp_path: Path):
     assert "QFN-24" in shared
     assert "USB-C-16P" in shared
 
-    # Verify that a custom wiring YAML with imports resolves package footprints automatically
+    # Verify that a custom wiring YAML resolves package footprints automatically
     custom_yaml = tmp_path / "custom_wiring.yaml"
     custom_yaml.write_text(
         """
-imports:
-  - footprints/smd.yaml
-  - footprints/thru_hole.yaml
-  - footprints/ic.yaml
-
 footprints:
   - name: R_TEST
     package: "0402"
