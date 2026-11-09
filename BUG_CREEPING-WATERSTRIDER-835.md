@@ -21,4 +21,4 @@ Example:
 
 #### Review Tasks & Functional Checklist
 
-- [ ] <!-- task:b933808b --> Verify working tree code review comments migrate to CR_<commit>.md upon git commit | `python tools/forge.py list-reviews --open`
+- [x] <!-- task:b933808b --> Verify working tree code review comments migrate to CR_<commit>.md upon git commit | `python tools/forge.py list-reviews --open`
