@@ -15,8 +15,6 @@ About your order, there is an engineering question for C-E77W908185A_pump_cover.
 As shown in the attached picture, your file has multiple separate parts that are not fully merged.
 If they need to be printed as a whole, please update your file and send it to us for an update via email.
 
-#### Attachments & References
+#### Review Tasks & Functional Checklist
 
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1794248350763_t74l0.png](attachments/BUG-GOLDEN-FIREFLY-566/screenshot_paste_1794248350763_t74l0.png) | Pasted screenshot screenshot_paste_1794248350763_t74l0.png |
+- [ ] <!-- task:75d8149f --> Inspect pump_cover STL mesh to verify single contiguous solid and no disconnected floating annular rings | `python tools/build.py cat_fountain:pump_cover:stl`
