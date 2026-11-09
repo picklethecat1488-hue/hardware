@@ -2743,3 +2743,43 @@ class TestCatFountainProvider:
         assert bowl_part.is_inside((charger_x, hole_edge_y - 1.0, standoff_z)), (
             f"Wall thickness between charger standoff hole and port cutout must be >= 1.0mm at Y={hole_edge_y - 1.0}"
         )
+
+    @pytest.mark.slow
+    def test_regression_bug_clicking_larva_354_bottom_cover_smooth_snap_ridge(self, provider):
+        """Verify BUG-CLICKING-LARVA-354: Bottom cover features smooth annular snap ridge with no unprintable shelves."""
+        from build123d import GeomType
+
+        cover = provider.build_bottom_cover("bottom_cover")
+        assert cover.part is not None
+
+        # 1. Single solid check
+        solids = cover.part.solids()
+        assert len(solids) == 1, f"Expected 1 solid for bottom_cover, found {len(solids)} separate solids"
+
+        # 2. No flat horizontal planar shelf faces on the snap ridge (Z = 1.2 or 2.2)
+        planar_shelves = [
+            f
+            for f in cover.part.faces()
+            if f.geom_type == GeomType.PLANE
+            and abs(f.normal_at().Z) > 0.9
+            and any(abs(f.bounding_box().min.Z - z0) < 1e-3 for z0 in (1.2, 2.2))
+        ]
+        assert len(planar_shelves) == 0, (
+            f"Found {len(planar_shelves)} unprintable planar shelves on bottom cover snap ridge"
+        )
+
+        # 3. Outer radius at snap ridge crest matches cover_r + snap_minor
+        cover_r = (
+            provider.settings.bowl_radius - provider.settings.bowl_thickness - provider.settings.bottom_cover_clearance
+        )
+        expected_crest_r = cover_r + provider.settings.bottom_cover_snap_ridge_minor
+        snap_z = provider.settings.bottom_cover_snap_ridge_z
+
+        # Point just inside the snap ridge crest must be solid
+        assert cover.part.is_inside((expected_crest_r - 0.05, 0.0, snap_z)), (
+            "Snap ridge crest must be solid at expected outer radius"
+        )
+        # Point outside the snap ridge crest must not be solid
+        assert not cover.part.is_inside((expected_crest_r + 0.05, 0.0, snap_z)), (
+            "Snap ridge must not extend beyond expected outer radius"
+        )

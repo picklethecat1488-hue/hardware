@@ -384,6 +384,16 @@ class CatFountainConfig(BaseModel):
         return float(self._raw_data.get("bottom_cover_drain_radius", 8.0))
 
     @cached_property
+    def bottom_cover_snap_ridge_minor(self) -> float:
+        """Return the minor radius of the bottom cover annular snap-fit ridge."""
+        return float(self._raw_data.get("bottom_cover_snap_ridge_minor", 0.0))
+
+    @cached_property
+    def bottom_cover_snap_ridge_z(self) -> float:
+        """Return the Z center offset of the bottom cover annular snap-fit ridge."""
+        return float(self._raw_data.get("bottom_cover_snap_ridge_z", 0.0))
+
+    @cached_property
     def rubber_feet_count(self) -> int:
         """Return the number of rubber feet depressions on the bottom cover."""
         return int(self._raw_data.get("rubber_feet_count", 4))

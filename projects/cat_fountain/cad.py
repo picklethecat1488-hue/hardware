@@ -881,16 +881,17 @@ class CatFountainCAD:
         with BuildPart() as cover:
             Cylinder(radius=cover_r, height=4.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
-            # Add a 0.5mm snap-fit annular ring around the perimeter
-            snap_ring_part = make_snap_ring(
-                outer_radius=cover_r + 0.5,
-                inner_radius=cover_r - 2.0,
-                height=1.0,
-                fillet_radius=0.4,
-                align_z=Align.MIN,
-            )
-            with Locations((0, 0, 1.2)):
-                add(snap_ring_part)
+            # Add a 0.5mm snap-fit annular Torus ridge around the perimeter (BUG-CLICKING-LARVA-354)
+            snap_minor = self.settings.bottom_cover_snap_ridge_minor
+            snap_z = self.settings.bottom_cover_snap_ridge_z
+            if snap_minor > 0.0:
+                with Locations((0, 0, snap_z)):
+                    Torus(
+                        major_radius=cover_r,
+                        minor_radius=snap_minor,
+                        align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                        mode=Mode.ADD,
+                    )
 
             # Funnel-shaped top surface to drain water towards the central drain hole
             with Locations((0, 0, 1.5)):
