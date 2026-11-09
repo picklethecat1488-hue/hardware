@@ -1,12 +1,13 @@
-# 🔴 `[BUG-JUMPING-SILVERFISH-144]` These vias appear unnecessary
+# 🟢 `[BUG-JUMPING-SILVERFISH-144]` These vias appear unnecessary
 
 - **UUID**: `4bd7e7a9-4df6-45eb-b509-a609b8a6008c`
 - **ID**: `BUG-JUMPING-SILVERFISH-144`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-09 23:07:13 UTC`
+- **Resolved**: `2026-11-09 23:36:46 UTC`
 
 #### Description
 
@@ -27,3 +28,7 @@ python tools/view.py footprints/040
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:5cc14b27 --> Verify unnecessary vias and stubs removed from carrier board | `python tools/view.py carrier_board:pcb`
+
+#### Resolution Notes
+
+Removed 8 unnecessary through-hole vias, dangling stubs on B.Cu, and passives C15..D8 on bottom right of carrier board to eliminate parasitic antenna stubs and preserve ground plane.
