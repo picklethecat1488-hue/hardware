@@ -17,4 +17,4 @@ If they need to be printed as a whole, please update your file and send it to us
 
 #### Review Tasks & Functional Checklist
 
-- [ ] <!-- task:75d8149f --> Inspect pump_cover STL mesh to verify single contiguous solid and no disconnected floating annular rings | `python tools/build.py cat_fountain:pump_cover:stl`
+- [x] <!-- task:75d8149f --> Inspect pump_cover STL mesh to verify single contiguous solid and no disconnected floating annular rings | `python tools/build.py cat_fountain:pump_cover:stl`
