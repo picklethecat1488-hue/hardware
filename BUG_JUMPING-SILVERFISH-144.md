@@ -23,3 +23,7 @@ python tools/view.py footprints/040
 | Type | Filename | Description |
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1794265655729_eo4n6.png](attachments/BUG-JUMPING-SILVERFISH-144/screenshot_paste_1794265655729_eo4n6.png) | Pasted screenshot screenshot_paste_1794265655729_eo4n6.png |
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:5cc14b27 --> Verify unnecessary vias and stubs removed from carrier board | `python tools/view.py carrier_board:pcb`
