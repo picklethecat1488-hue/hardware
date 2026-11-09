@@ -533,8 +533,15 @@ class PCBAutoRouter:
             Tuple of (generated_trace_segments, generated_interlayer_vias).
         """
         skip_nets = set(exclude_nets or set())
-        traces: List[TraceSegmentModel] = list(manual_traces or [])
-        vias: List[ViaModel] = list(manual_vias or [])
+        if manual_traces is None and getattr(self.config, "traces", None):
+            traces: List[TraceSegmentModel] = list(self.config.traces)
+        else:
+            traces: List[TraceSegmentModel] = list(manual_traces or [])
+
+        if manual_vias is None and getattr(self.config, "vias", None):
+            vias: List[ViaModel] = list(self.config.vias)
+        else:
+            vias: List[ViaModel] = list(manual_vias or [])
 
         # If a net is already fully covered by manual traces, skip it
         manual_net_names = {tr.net for tr in traces}

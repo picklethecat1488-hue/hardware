@@ -1,9 +1,12 @@
 """build123d context managers and primitives for declarative PCB routing, vias, copper regions, and test points."""
 
+import math
 from contextvars import ContextVar, Token
+from enum import StrEnum
 from typing import Any, List, Optional, Sequence, Tuple, Union
 
-from model.pcb import CopperRegionModel, TestPointModel, TraceSegmentModel, ViaModel
+from model.pcb import CopperRegionModel, RouteStyle, TestPointModel, TraceSegmentModel, ViaModel
+from model.wiring import PinRef
 
 _current_traces: ContextVar[Optional["BuildTraces"]] = ContextVar("_current_traces", default=None)
 _current_vias: ContextVar[Optional["BuildVias"]] = ContextVar("_current_vias", default=None)
@@ -14,9 +17,14 @@ _current_test_points: ContextVar[Optional["BuildTestPoints"]] = ContextVar("_cur
 class BuildTraces:
     """Context manager for declarative PCB copper trace routing."""
 
-    def __init__(self, default_layer: str = "F.Cu", default_width_mm: float = 0.20) -> None:
+    def __init__(
+        self,
+        default_layer: str = "F.Cu",
+        default_width_mm: float = 0.20,
+        layer: Optional[str] = None,
+    ) -> None:
         """Initialize trace routing builder context."""
-        self.default_layer = default_layer
+        self.default_layer = layer or default_layer
         self.default_width_mm = default_width_mm
         self.traces: List[TraceSegmentModel] = []
         self._token: Optional[Token] = None
@@ -51,6 +59,77 @@ class BuildTraces:
             self.traces.extend(item)
 
 
+def _resolve_coord(pt: Any) -> Tuple[float, float]:
+    """Extract (x, y) coordinate from a PinRef, tuple, list, or object with pos attribute."""
+    if isinstance(pt, PinRef):
+        return (pt.x, pt.y)
+    if hasattr(pt, "pos_2d"):
+        return tuple(pt.pos_2d)
+    if hasattr(pt, "pos"):
+        return tuple(pt.pos)
+    if isinstance(pt, (tuple, list)) and len(pt) >= 2:
+        return (round(float(pt[0]), 4), round(float(pt[1]), 4))
+    raise ValueError(f"Cannot resolve coordinate from: {pt}")
+
+
+def _discretize_curve(path: Any, tolerance_mm: float = 0.05) -> List[Tuple[float, float]]:
+    """Discretize build123d curve, wire, or edge geometry into ordered planar (x, y) vertices."""
+    edges = []
+    if hasattr(path, "edges") and callable(path.edges):
+        edges = list(path.edges())
+    elif hasattr(path, "edges"):
+        edges = list(path.edges)
+    elif hasattr(path, "wire"):
+        w = path.wire()
+        if w is not None and hasattr(w, "edges"):
+            edges = list(w.edges())
+    elif hasattr(path, "line"):
+        w = path.line
+        if hasattr(w, "edges"):
+            edges = list(w.edges())
+    elif hasattr(path, "__iter__"):
+        edges = list(path)
+    else:
+        edges = [path]
+
+    pts: List[Tuple[float, float]] = []
+    for edge in edges:
+        if not hasattr(edge, "positions"):
+            continue
+        geom_str = str(getattr(edge, "geom_type", "")).upper()
+        if "LINE" in geom_str:
+            vecs = edge.positions([0.0, 1.0])
+        else:
+            length = getattr(edge, "length", 1.0)
+            num_samples = max(8, int(math.ceil(length / max(tolerance_mm, 0.1))))
+            params = [i / (num_samples - 1) for i in range(num_samples)]
+            vecs = edge.positions(params)
+
+        for v in vecs:
+            p = (round(float(v.X), 4), round(float(v.Y), 4))
+            if not pts or math.hypot(p[0] - pts[-1][0], p[1] - pts[-1][1]) > 1e-4:
+                pts.append(p)
+
+    return pts
+
+
+def _generate_chamfer_45(p0: Tuple[float, float], p1: Tuple[float, float]) -> List[Tuple[float, float]]:
+    """Generate 45-degree chamfered path between p0 and p1."""
+    dx = p1[0] - p0[0]
+    dy = p1[1] - p0[1]
+    if abs(dx) < 1e-4 or abs(dy) < 1e-4 or abs(abs(dx) - abs(dy)) < 1e-4:
+        return [p0, p1]
+
+    if abs(dx) > abs(dy):
+        sx = 1.0 if dx > 0 else -1.0
+        x_turn = p1[0] - sx * abs(dy)
+        return [p0, (round(x_turn, 4), p0[1]), p1]
+    else:
+        sy = 1.0 if dy > 0 else -1.0
+        y_turn = p1[1] - sy * abs(dx)
+        return [p0, (p0[0], round(y_turn, 4)), p1]
+
+
 class Trace:
     """Declarative copper routing trace primitive evaluated inside a BuildTraces context."""
 
@@ -59,19 +138,21 @@ class Trace:
         net: str,
         layer: Optional[str] = None,
         width_mm: Optional[float] = None,
-        points: Optional[Sequence[Tuple[float, float]]] = None,
-        start: Optional[Tuple[float, float]] = None,
-        end: Optional[Tuple[float, float]] = None,
+        points: Optional[Sequence[Union[PinRef, Tuple[float, float]]]] = None,
+        start: Optional[Union[PinRef, Tuple[float, float]]] = None,
+        end: Optional[Union[PinRef, Tuple[float, float]]] = None,
+        path: Optional[Any] = None,
     ) -> None:
-        """Route a copper trace along polyline points or between start and end.
+        """Route a copper trace along polyline points, between start and end, or from build123d curve.
 
         Args:
             net: Electrical net name.
             layer: Copper layer (defaults to context default or F.Cu).
             width_mm: Trace conductor width in mm (defaults to context default).
-            points: Ordered sequence of vertices (x, y) defining the trace route.
-            start: Start coordinate (x, y) if 2-point trace.
-            end: End coordinate (x, y) if 2-point trace.
+            points: Ordered sequence of vertices defining the trace route.
+            start: Start coordinate or PinRef if 2-point trace.
+            end: End coordinate or PinRef if 2-point trace.
+            path: Optional build123d Wire, BuildLine, or Edge compound to discretize.
         """
         ctx = BuildTraces._get_context()
         resolved_layer = layer or (ctx.default_layer if ctx else "F.Cu")
@@ -79,22 +160,236 @@ class Trace:
         self.segments: List[TraceSegmentModel] = []
 
         pts: List[Tuple[float, float]] = []
-        if points:
-            pts = list(points)
+        if path is not None:
+            pts = _discretize_curve(path)
+        elif not points and start is None and end is None:
+            from build123d import BuildLine
+
+            line_ctx = BuildLine._get_context()
+            if line_ctx is not None:
+                pts = _discretize_curve(line_ctx.line)
+        elif points:
+            pts = [_resolve_coord(p) for p in points]
         elif start is not None and end is not None:
-            pts = [start, end]
+            pts = [_resolve_coord(start), _resolve_coord(end)]
 
         for i in range(len(pts) - 1):
-            seg = TraceSegmentModel(
-                start_mm=(round(pts[i][0], 4), round(pts[i][1], 4)),
-                end_mm=(round(pts[i + 1][0], 4), round(pts[i + 1][1], 4)),
-                width_mm=resolved_width,
-                layer=resolved_layer,
-                net=net,
+            p1 = pts[i]
+            p2 = pts[i + 1]
+            if math.hypot(p2[0] - p1[0], p2[1] - p1[1]) > 1e-4:
+                seg = TraceSegmentModel(
+                    start_mm=(round(p1[0], 4), round(p1[1], 4)),
+                    end_mm=(round(p2[0], 4), round(p2[1], 4)),
+                    width_mm=resolved_width,
+                    layer=resolved_layer,
+                    net=net,
+                )
+                self.segments.append(seg)
+                if ctx:
+                    ctx.add(seg)
+
+
+def make_trace(
+    net: str,
+    layer: Optional[str] = None,
+    width_mm: Optional[float] = None,
+    path: Optional[Any] = None,
+    offset_mm: Optional[float] = None,
+    side: Optional[Union[Any, str]] = None,
+    tolerance_mm: float = 0.05,
+) -> List[TraceSegmentModel]:
+    """Convert build123d line geometry from active BuildLine context or explicit curve into TraceSegmentModels.
+
+    Args:
+        net: Electrical net name (e.g. 'CAP_TX2', 'GND').
+        layer: Target copper layer (defaults to active BuildTraces default or 'F.Cu').
+        width_mm: Conductor trace width in mm (defaults to active BuildTraces default or 0.15).
+        path: Optional explicit build123d Wire, Curve, or Compound. If omitted, uses active BuildLine context.
+        offset_mm: Optional offset distance in mm applied before segment extraction.
+        side: Offset side (Side.LEFT, Side.RIGHT, Side.BOTH) when offset_mm is supplied.
+        tolerance_mm: Maximum chord error tolerance for discretizing curved / arc segments.
+
+    Returns:
+        List of created TraceSegmentModel instances added to the active BuildTraces context.
+    """
+    from build123d import BuildLine
+
+    trace_ctx = BuildTraces._get_context()
+    resolved_layer = layer or (trace_ctx.default_layer if trace_ctx else "F.Cu")
+    resolved_width = width_mm or (trace_ctx.default_width_mm if trace_ctx else 0.15)
+
+    if path is None:
+        line_ctx = BuildLine._get_context()
+        if line_ctx is None:
+            raise ValueError(
+                "make_trace must be called within an active BuildLine context or provided an explicit path."
             )
-            self.segments.append(seg)
-            if ctx:
-                ctx.add(seg)
+        target_geom = line_ctx.line
+    else:
+        target_geom = path
+
+    if offset_mm is not None:
+        from build123d import Side, offset
+
+        resolved_side = Side(side) if isinstance(side, str) else (side or Side.LEFT)
+        target_geom = offset(target_geom, amount=offset_mm, side=resolved_side, closed=False)
+
+    edges = []
+    if hasattr(target_geom, "edges"):
+        edges = list(target_geom.edges())
+    elif hasattr(target_geom, "__iter__"):
+        edges = list(target_geom)
+    else:
+        edges = [target_geom]
+
+    segments: List[TraceSegmentModel] = []
+    for edge in edges:
+        geom_type_str = str(getattr(edge, "geom_type", "")).upper()
+        if "LINE" in geom_type_str:
+            p0 = (round(float(edge.start_point().X), 4), round(float(edge.start_point().Y), 4))
+            p1 = (round(float(edge.end_point().X), 4), round(float(edge.end_point().Y), 4))
+            if math.hypot(p1[0] - p0[0], p1[1] - p0[1]) > 1e-4:
+                seg = TraceSegmentModel(
+                    start_mm=p0,
+                    end_mm=p1,
+                    width_mm=resolved_width,
+                    layer=resolved_layer,
+                    net=net,
+                )
+                segments.append(seg)
+        else:
+            length = getattr(edge, "length", 1.0)
+            num_samples = max(8, int(math.ceil(length / max(tolerance_mm, 0.1))))
+            params = [i / (num_samples - 1) for i in range(num_samples)]
+            vecs = edge.positions(params)
+            pts = []
+            for v in vecs:
+                p = (round(float(v.X), 4), round(float(v.Y), 4))
+                if not pts or math.hypot(p[0] - pts[-1][0], p[1] - pts[-1][1]) > 1e-4:
+                    pts.append(p)
+            for i in range(len(pts) - 1):
+                seg = TraceSegmentModel(
+                    start_mm=pts[i],
+                    end_mm=pts[i + 1],
+                    width_mm=resolved_width,
+                    layer=resolved_layer,
+                    net=net,
+                )
+                segments.append(seg)
+
+    if trace_ctx is not None:
+        trace_ctx.add(segments)
+    return segments
+
+
+class Route:
+    """Declarative routed trace primitive supporting styled geometry, pin snapping, and inline vias."""
+
+    def __init__(
+        self,
+        net: str,
+        start: Optional[Union[PinRef, Tuple[float, float]]] = None,
+        end: Optional[Union[PinRef, Tuple[float, float]]] = None,
+        style: Union[RouteStyle, str] = RouteStyle.CHAMFER_45,
+        layer: Optional[str] = None,
+        width_mm: Optional[float] = None,
+        via_at: Optional[Sequence[Union[PinRef, Tuple[float, float]]]] = None,
+        layer_end: Optional[str] = None,
+        via_drill_mm: Optional[float] = None,
+        via_pad_mm: Optional[float] = None,
+        start_mm: Optional[Union[PinRef, Tuple[float, float]]] = None,
+        end_mm: Optional[Union[PinRef, Tuple[float, float]]] = None,
+    ) -> None:
+        """Route an electrical net connection between start and end.
+
+        Args:
+            net: Electrical net name.
+            start: Starting pin or coordinate.
+            end: Ending pin or coordinate.
+            style: Geometric routing style (RouteStyle.CHAMFER_45, STRAIGHT, CURVED, MANHATTAN).
+            layer: Starting copper layer (default 'F.Cu').
+            width_mm: Conductor width in mm.
+            via_at: Optional via coordinates along the route for interlayer transitions.
+            layer_end: Copper layer after via transition (default 'B.Cu').
+            via_drill_mm: Via drill hole diameter in mm.
+            via_pad_mm: Via annular pad outer diameter in mm.
+            start_mm: Alias for start.
+            end_mm: Alias for end.
+        """
+        ctx = BuildTraces._get_context()
+        resolved_layer = layer or (ctx.default_layer if ctx else "F.Cu")
+        resolved_layer_end = layer_end or "B.Cu"
+        resolved_width = width_mm or (ctx.default_width_mm if ctx else 0.20)
+        route_style = RouteStyle(style) if isinstance(style, str) else style
+
+        p_start = _resolve_coord(start if start is not None else start_mm)
+        p_end = _resolve_coord(end if end is not None else end_mm)
+        via_pts = [_resolve_coord(v) for v in (via_at or [])]
+
+        waypoints = [p_start] + via_pts + [p_end]
+        self.segments: List[TraceSegmentModel] = []
+        self.vias: List[ViaModel] = []
+
+        from provider.pcb.board import BuildPcb
+
+        active_pcb = BuildPcb.current()
+
+        current_layer = resolved_layer
+        for i in range(len(waypoints) - 1):
+            w0 = waypoints[i]
+            w1 = waypoints[i + 1]
+
+            # Generate segment points according to style
+            match route_style:
+                case RouteStyle.STRAIGHT:
+                    seg_pts = [w0, w1]
+                case RouteStyle.MANHATTAN:
+                    mid_x = (w0[0] + w1[0]) / 2.0
+                    seg_pts = [w0, (round(mid_x, 4), w0[1]), (round(mid_x, 4), w1[1]), w1]
+                case RouteStyle.CHAMFER_45:
+                    seg_pts = _generate_chamfer_45(w0, w1)
+                case RouteStyle.CURVED:
+                    mid_x = (w0[0] + w1[0]) / 2.0
+                    seg_pts = [w0, (round(mid_x, 4), w0[1]), (round(mid_x, 4), w1[1]), w1]
+                case _:
+                    seg_pts = [w0, w1]
+
+            # Create trace segments for this leg
+            for j in range(len(seg_pts) - 1):
+                pt_a = seg_pts[j]
+                pt_b = seg_pts[j + 1]
+                if math.hypot(pt_b[0] - pt_a[0], pt_b[1] - pt_a[1]) > 1e-4:
+                    seg = TraceSegmentModel(
+                        start_mm=(round(pt_a[0], 4), round(pt_a[1], 4)),
+                        end_mm=(round(pt_b[0], 4), round(pt_b[1], 4)),
+                        width_mm=resolved_width,
+                        layer=current_layer,
+                        net=net,
+                    )
+                    self.segments.append(seg)
+                    if ctx:
+                        ctx.add(seg)
+
+            # If transitioning at a via
+            if i < len(via_pts):
+                v_pos = waypoints[i + 1]
+                v_model = ViaModel(
+                    position_mm=(round(v_pos[0], 4), round(v_pos[1], 4)),
+                    drill_diameter_mm=via_drill_mm or 0.20,
+                    pad_diameter_mm=via_pad_mm or 0.45,
+                    layer_start=current_layer,
+                    layer_end=resolved_layer_end,
+                    net=net,
+                )
+                self.vias.append(v_model)
+                if active_pcb is not None:
+                    active_pcb.vias.append(v_model)
+                v_ctx = BuildVias._get_context()
+                if v_ctx is not None:
+                    v_ctx.add(v_model)
+
+                # Switch active layer for next leg
+                current_layer = resolved_layer_end
 
 
 class BuildVias:
@@ -261,10 +556,6 @@ class CopperRegion:
         )
         if ctx:
             ctx.add(self.model)
-
-
-# Alias
-CopperZone = CopperRegion
 
 
 class BuildTestPoints:

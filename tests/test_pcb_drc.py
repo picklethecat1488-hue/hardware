@@ -589,7 +589,7 @@ def test_carrier_board_carrier_and_flex_tail_zero_drc_errors_and_warnings():
     from model.wiring import Wiring
 
     provider = CarrierBoardProvider()
-    wiring = Wiring(provider.wiring_path)
+    wiring = provider.wiring
 
     # 1. Carrier PCB check
     carrier_checker = PCBDesignRulesChecker(provider.pcb_config)
@@ -1085,7 +1085,7 @@ def test_drc_schematic_disconnected_passive() -> None:
 
     provider = CarrierBoardProvider()
     cfg = provider.pcb_config
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
 
     # 1. On valid board, verify zero SCHEMATIC_DISCONNECTED_PASSIVE violations
     checker = PCBDesignRulesChecker(cfg)
@@ -1125,7 +1125,7 @@ def test_drc_schematic_unconnected_pin() -> None:
 
     provider = CarrierBoardProvider()
     cfg = provider.pcb_config
-    wiring = Wiring(str(provider.wiring_path))
+    wiring = provider.wiring
 
     # 1. On valid board, verify zero SCHEMATIC_UNCONNECTED_PIN violations
     checker = PCBDesignRulesChecker(cfg)

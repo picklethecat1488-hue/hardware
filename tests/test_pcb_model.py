@@ -264,7 +264,7 @@ def test_carrier_board_provider_cad_silkscreen():
     from projects.carrier_board.provider import CarrierBoardProvider
 
     provider = CarrierBoardProvider()
-    texts = provider.silkscreen()
+    texts = provider.silkscreen
     assert len(texts) >= 2
     assert texts[0].text == "TEST BOARD CARRIER REV 2.0"
     assert texts[0].position == (0.0, 26.0)

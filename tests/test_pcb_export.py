@@ -598,7 +598,7 @@ def test_provider_pcb_output_cad_archive(tmp_path: Path, mock_pcb_config: PCBCon
     mock_prov.manifest = {"pcb_unit": {Section.PCB: {"modes": [Mode.DEFAULT]}}}
     mock_prov.pcb = {}
     mock_prov.pcb_config = mock_pcb_config
-    mock_prov.wiring_path = str(tmp_path / "wiring.yaml")
+    mock_prov.wiring = MagicMock(footprints=[], nets=[])
 
     orch = ProviderOrchestrator(mock_prov)
     results = orch.execute(("pcb_unit",), Section.PCB, (None,), (Mode.DEFAULT,))
