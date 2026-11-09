@@ -472,6 +472,34 @@ class PCBAutoRouter:
                 chains.append(chain)
             return chains
 
+        def segments_overlap(
+            s1: Tuple[Tuple[float, float], Tuple[float, float]],
+            s2: Tuple[Tuple[float, float], Tuple[float, float]],
+        ) -> bool:
+            v1 = (s1[1][0] - s1[0][0], s1[1][1] - s1[0][1])
+            l1 = math.hypot(*v1)
+            v2 = (s2[1][0] - s2[0][0], s2[1][1] - s2[0][1])
+            l2 = math.hypot(*v2)
+            if l1 < 1e-6 or l2 < 1e-6:
+                return False
+            cross = v1[0] * v2[1] - v1[1] * v2[0]
+            if abs(cross) / (l1 * l2) > 1e-4:
+                return False
+            w = (s2[0][0] - s1[0][0], s2[0][1] - s1[0][1])
+            cross2 = v1[0] * w[1] - v1[1] * w[0]
+            if abs(cross2) / l1 > 1e-3:
+                return False
+            t_q0 = (w[0] * v1[0] + w[1] * v1[1]) / (l1 * l1)
+            w2 = (s2[1][0] - s1[0][0], s2[1][1] - s1[0][1])
+            t_q1 = (w2[0] * v1[0] + w2[1] * v1[1]) / (l1 * l1)
+            t_min, t_max = min(t_q0, t_q1), max(t_q0, t_q1)
+            overlap_len = max(0.0, min(1.0, t_max) - max(0.0, t_min))
+            return overlap_len * l1 > 1e-4
+
+        def path_segs(path_dict: Dict[str, Any]) -> List[Tuple[Tuple[float, float], Tuple[float, float]]]:
+            pts = path_dict["points"]
+            return [(pts[i], pts[i + 1]) for i in range(len(pts) - 1)]
+
         trace_groups = []
         for (net, layer, width), segs in sorted(grouped.items(), key=lambda x: (x[0][0], x[0][1])):
             chains = chain_corner_turns_only(segs)
@@ -482,14 +510,40 @@ class PCBAutoRouter:
                     paths.append({"kind": "polyline", "points": pts})
                 else:
                     paths.append({"kind": "line", "points": [c[0].start_mm, c[0].end_mm]})
-            trace_groups.append(
-                {
-                    "net": net,
-                    "layer": layer,
-                    "width_mm": width,
-                    "paths": paths,
-                }
-            )
+
+            # Partition paths into non-overlapping groups so OpenCASCADE does not produce antenna stubs
+            path_blocks: List[List[Dict[str, Any]]] = []
+            for p in paths:
+                p_edges = path_segs(p)
+                placed = False
+                for b in path_blocks:
+                    conflict = False
+                    for existing_p in b:
+                        for s1 in p_edges:
+                            for s2 in path_segs(existing_p):
+                                if segments_overlap(s1, s2):
+                                    conflict = True
+                                    break
+                            if conflict:
+                                break
+                        if conflict:
+                            break
+                    if not conflict:
+                        b.append(p)
+                        placed = True
+                        break
+                if not placed:
+                    path_blocks.append([p])
+
+            for b in path_blocks:
+                trace_groups.append(
+                    {
+                        "net": net,
+                        "layer": layer,
+                        "width_mm": width,
+                        "paths": b,
+                    }
+                )
 
         # Group vias by net
         via_grouped: Dict[str, List[ViaModel]] = defaultdict(list)

@@ -14,8 +14,8 @@ def get_{{ function_prefix }}_traces() -> List[TraceSegmentModel]:
     with BuildTraces(default_layer="{{ default_layer }}", default_width_mm={{ default_width_mm }}) as bt:
         {% for group in trace_groups %}
         # Net {{ group.net }} [{{ group.layer }}]
-        {% for path in group.paths %}
         with BuildLine():
+            {% for path in group.paths %}
             {% if path.kind == "polyline" %}
             Polyline(
                 {% for pt in path.points %}
@@ -25,8 +25,8 @@ def get_{{ function_prefix }}_traces() -> List[TraceSegmentModel]:
             {% else %}
             Line(({{ path.points[0][0] }}, {{ path.points[0][1] }}), ({{ path.points[1][0] }}, {{ path.points[1][1] }}))
             {% endif %}
+            {% endfor %}
             make_trace("{{ group.net }}"{% if group.layer != default_layer %}, layer="{{ group.layer }}"{% endif %}{% if group.width_mm != default_width_mm %}, width_mm={{ group.width_mm }}{% endif %})
-        {% endfor %}
 
         {% endfor %}
     return list(bt.traces)

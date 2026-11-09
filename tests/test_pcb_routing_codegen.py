@@ -163,9 +163,9 @@ def test_carrier_board_persisted_routing_module() -> None:
     vias = get_carrier_board_vias()
     r_traces, r_vias = get_carrier_board_routing()
 
-    assert len(traces) == 1607
+    assert len(traces) == 1585
     assert len(vias) == 446
-    assert len(r_traces) == 1607
+    assert len(r_traces) == 1585
     assert len(r_vias) == 446
 
     # Verify key carrier board power and high-speed nets are present

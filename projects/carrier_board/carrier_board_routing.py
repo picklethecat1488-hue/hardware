@@ -15,111 +15,53 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net 3V3 [B.Cu]
         with BuildLine():
             Line((16.55, -8.2), (16.25, -7.75))
-            make_trace("3V3", layer="B.Cu")
-        with BuildLine():
             Line((17.2, -7.55), (16.75, -7.25))
-            make_trace("3V3", layer="B.Cu")
-        with BuildLine():
             Line((11.5, -6.0), (11.75, -6.25))
-            make_trace("3V3", layer="B.Cu")
-        with BuildLine():
             Line((11.5, -4.5), (11.75, -4.75))
-            make_trace("3V3", layer="B.Cu")
-        with BuildLine():
             Line((-8.5, -4.0), (-8.25, -4.25))
             make_trace("3V3", layer="B.Cu")
 
         # Net 3V3 [B.Cu]
         with BuildLine():
             Line((7.6, -21.0), (9.23, -21.0))
-            make_trace("3V3", layer="B.Cu", width_mm=0.15)
-        with BuildLine():
             Line((12.2, 29.0), (12.2, 29.6))
-            make_trace("3V3", layer="B.Cu", width_mm=0.15)
-        with BuildLine():
             Line((15.2, 29.0), (15.2, 29.6))
-            make_trace("3V3", layer="B.Cu", width_mm=0.15)
-        with BuildLine():
             Line((12.5, 32.0), (12.5, 32.6))
-            make_trace("3V3", layer="B.Cu", width_mm=0.15)
-        with BuildLine():
             Line((14.6, 32.0), (14.6, 32.8))
             make_trace("3V3", layer="B.Cu", width_mm=0.15)
 
         # Net 3V3 [F.Cu]
         with BuildLine():
             Line((-0.5, 0.25), (-1.0, 0.25))
-            make_trace("3V3")
-        with BuildLine():
             Line((-7.0, 38.0), (-6.5, 38.0))
-            make_trace("3V3")
-        with BuildLine():
             Line((13.0, -14.5), (12.5, -14.5))
-            make_trace("3V3")
-        with BuildLine():
             Line((-13.8, -8.0), (-13.5, -8.0))
-            make_trace("3V3")
-        with BuildLine():
             Line((-19.95, 11.3), (-19.5, 11.25))
-            make_trace("3V3")
-        with BuildLine():
             Line((-14.8, 10.0), (-14.5, 10.0))
-            make_trace("3V3")
-        with BuildLine():
             Line((-18.0, 22.5), (-17.75, 22.75))
-            make_trace("3V3")
-        with BuildLine():
             Line((-23.8, 21.0), (-23.5, 21.0))
-            make_trace("3V3")
-        with BuildLine():
             Line((-8.5, 8.0), (-8.25, 7.75))
-            make_trace("3V3")
-        with BuildLine():
             Line((7.5, 8.0), (7.75, 7.75))
-            make_trace("3V3")
-        with BuildLine():
             Line((-6.5, -9.0), (-6.25, -9.25))
-            make_trace("3V3")
-        with BuildLine():
             Line((16.905, 0.1), (17.25, -0.25))
-            make_trace("3V3")
-        with BuildLine():
             Line((-16.95, 15.75), (-17.25, 15.75))
-            make_trace("3V3")
-        with BuildLine():
             Line((11.2, 13.675), (11.5, 13.75))
-            make_trace("3V3")
-        with BuildLine():
             Line((16.8, 16.275), (17.25, 16.25))
-            make_trace("3V3")
-        with BuildLine():
             Line((16.2, 10.8), (16.5, 10.75))
-            make_trace("3V3")
-        with BuildLine():
             Line((-22.45, -31.75), (-22.75, -31.75))
-            make_trace("3V3")
-        with BuildLine():
             Line((-17.55, -32.75), (-17.25, -32.75))
-            make_trace("3V3")
-        with BuildLine():
             Line((-10.0, -26.0), (-9.5, -26.0))
-            make_trace("3V3")
-        with BuildLine():
             Line((17.05, 22.7), (17.05, 21.7))
             make_trace("3V3")
 
         # Net 3V3 [F.Cu]
         with BuildLine():
             Line((3.2, -20.0), (2.4, -20.5))
-            make_trace("3V3", width_mm=0.15)
-        with BuildLine():
             Polyline(
                 (-4.125, -40.0),
                 (-4.125, -39.0),
                 (-4.8, -38.6),
             )
-            make_trace("3V3", width_mm=0.15)
-        with BuildLine():
             Polyline(
                 (3.2, -14.0),
                 (2.4, -14.0),
@@ -140,8 +82,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-18.25, -0.5),
                 (-18.25, 0.0),
             )
-            make_trace("AUDIO_EN", layer="B.Cu")
-        with BuildLine():
             Line((-19.5, 13.0), (-19.5, 17.0))
             make_trace("AUDIO_EN", layer="B.Cu")
 
@@ -154,16 +94,12 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-15.75, -0.5),
                 (-15.75, -0.75),
             )
-            make_trace("AUDIO_EN", layer="B.Cu", width_mm=0.15)
-        with BuildLine():
             Polyline(
                 (-15.5, -3.75),
                 (-15.5, -5.75),
                 (-11.0, -5.75),
                 (-11.0, -6.0),
             )
-            make_trace("AUDIO_EN", layer="B.Cu", width_mm=0.15)
-        with BuildLine():
             Polyline(
                 (-9.5, -9.0),
                 (-8.5, -9.0),
@@ -186,8 +122,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-6.0, -1.5),
                 (-6.0, -2.0),
             )
-            make_trace("AUDIO_EN")
-        with BuildLine():
             Polyline(
                 (-18.25, 0.0),
                 (-18.25, 7.75),
@@ -202,8 +136,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-19.5, 12.25),
                 (-19.5, 13.0),
             )
-            make_trace("AUDIO_EN")
-        with BuildLine():
             Line((-19.5, 17.0), (-19.5, 20.25))
             make_trace("AUDIO_EN")
 
@@ -214,8 +146,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-15.5, -0.75),
                 (-15.5, -3.75),
             )
-            make_trace("AUDIO_EN", width_mm=0.15)
-        with BuildLine():
             Polyline(
                 (-11.0, -6.0),
                 (-9.75, -6.0),
@@ -223,8 +153,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-9.5, -7.75),
                 (-9.5, -9.0),
             )
-            make_trace("AUDIO_EN", width_mm=0.15)
-        with BuildLine():
             Polyline(
                 (2.5, -17.5),
                 (2.5, -18.0),
@@ -234,14 +162,12 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
 
         # Net BLE_CTS [B.Cu]
         with BuildLine():
-            Line((-0.5, -33.75), (-0.5, -22.0))
-            make_trace("BLE_CTS", layer="B.Cu")
-        with BuildLine():
             Polyline(
-                (-0.5, -33.75),
-                (-0.5, -34.2),
                 (1.2, -34.2),
+                (-0.5, -34.2),
+                (-0.5, -33.75),
             )
+            Line((-0.5, -33.75), (-0.5, -22.0))
             make_trace("BLE_CTS", layer="B.Cu")
 
         # Net BLE_CTS [F.Cu]
@@ -253,11 +179,7 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-2.25, -22.0),
                 (-2.0, -22.0),
             )
-            make_trace("BLE_CTS")
-        with BuildLine():
-            Line((-0.5, -22.0), (-2.0, -22.0))
-            make_trace("BLE_CTS")
-        with BuildLine():
+            Line((-2.0, -22.0), (-0.5, -22.0))
             Polyline(
                 (1.2, -34.2),
                 (1.2, -36.5),
@@ -269,19 +191,13 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net BLE_RESET_N [B.Cu]
         with BuildLine():
             Line((-2.0, -41.2), (-8.2, -41.2))
-            make_trace("BLE_RESET_N", layer="B.Cu", width_mm=0.15)
-        with BuildLine():
             Line((-8.2, -43.6), (-17.8, -43.6))
             make_trace("BLE_RESET_N", layer="B.Cu", width_mm=0.15)
 
         # Net BLE_RESET_N [F.Cu]
         with BuildLine():
             Line((-2.0, -40.0), (-2.0, -41.2))
-            make_trace("BLE_RESET_N", width_mm=0.15)
-        with BuildLine():
             Line((-8.2, -41.2), (-8.2, -43.6))
-            make_trace("BLE_RESET_N", width_mm=0.15)
-        with BuildLine():
             Polyline(
                 (-17.8, -43.6),
                 (-17.8, -36.5),
@@ -299,8 +215,7 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-14.0, -8.5),
                 (-14.0, -8.75),
             )
-            make_trace("BLE_RTS", layer="B.Cu")
-        with BuildLine():
+            Line((-1.0, -34.2), (-1.0, -34.0))
             Polyline(
                 (-1.0, -34.0),
                 (-1.0, -21.25),
@@ -309,25 +224,16 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-13.5, -21.0),
             )
             make_trace("BLE_RTS", layer="B.Cu")
-        with BuildLine():
-            Line((-1.0, -34.0), (-1.0, -34.2))
-            make_trace("BLE_RTS", layer="B.Cu")
 
         # Net BLE_RTS [F.Cu]
         with BuildLine():
             Line((-4.0, -3.75), (-4.0, -7.25))
-            make_trace("BLE_RTS")
-        with BuildLine():
-            Line((-14.0, -8.75), (-14.0, -22.0))
-            make_trace("BLE_RTS")
-        with BuildLine():
             Polyline(
-                (-13.5, -21.0),
-                (-13.5, -22.0),
+                (-14.0, -8.75),
                 (-14.0, -22.0),
+                (-13.5, -22.0),
+                (-13.5, -21.0),
             )
-            make_trace("BLE_RTS")
-        with BuildLine():
             Line((-1.0, -34.2), (-1.0, -40.0))
             make_trace("BLE_RTS")
 
@@ -338,8 +244,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-10.25, -6.25),
                 (-10.25, -6.75),
             )
-            make_trace("BLE_RX", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (2.0, -34.5),
                 (-9.0, -34.5),
@@ -354,19 +258,13 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net BLE_RX [F.Cu]
         with BuildLine():
             Line((-3.5, -3.75), (-3.5, -6.25))
-            make_trace("BLE_RX")
-        with BuildLine():
             Polyline(
                 (-10.25, -6.75),
                 (-10.25, -22.0),
                 (-10.0, -22.0),
+                (-10.0, -23.0),
             )
-            make_trace("BLE_RX")
-        with BuildLine():
             Line((2.0, -40.0), (2.0, -34.5))
-            make_trace("BLE_RX")
-        with BuildLine():
-            Line((-10.0, -23.0), (-10.0, -22.0))
             make_trace("BLE_RX")
 
         # Net BLE_SWDCLK [B.Cu]
@@ -413,8 +311,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net BLE_TX [B.Cu]
         with BuildLine():
             Line((1.0, -37.0), (-5.0, -37.0))
-            make_trace("BLE_TX", layer="B.Cu")
-        with BuildLine():
             Line((-5.0, -30.0), (-5.0, -22.0))
             make_trace("BLE_TX", layer="B.Cu")
 
@@ -433,14 +329,7 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-3.0, -22.0),
                 (-6.0, -22.0),
             )
-            make_trace("BLE_TX")
-        with BuildLine():
             Line((-5.0, -37.0), (-5.0, -30.0))
-            make_trace("BLE_TX")
-        with BuildLine():
-            Line((-5.0, -22.0), (-6.0, -22.0))
-            make_trace("BLE_TX")
-        with BuildLine():
             Line((1.0, -37.0), (1.0, -40.0))
             make_trace("BLE_TX")
 
@@ -455,8 +344,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-0.75, -0.25),
                 (-0.75, -0.5),
             )
-            make_trace("BOOT0", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-2.25, -0.5),
                 (-1.75, -0.5),
@@ -474,8 +361,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-9.5, -29.5),
                 (-11.75, -29.5),
             )
-            make_trace("BOOT0", layer="B.Cu", width_mm=0.15)
-        with BuildLine():
             Line((-7.5, -43.5), (10.5, -43.5))
             make_trace("BOOT0", layer="B.Cu", width_mm=0.15)
 
@@ -487,11 +372,7 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (2.25, 2.5),
                 (1.75, 2.5),
             )
-            make_trace("BOOT0")
-        with BuildLine():
             Line((-0.75, -0.5), (-2.25, -0.5))
-            make_trace("BOOT0")
-        with BuildLine():
             Polyline(
                 (-8.75, -1.75),
                 (-8.75, -11.25),
@@ -499,8 +380,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-9.25, -12.0),
                 (-9.5, -12.0),
             )
-            make_trace("BOOT0")
-        with BuildLine():
             Polyline(
                 (-9.5, -31.25),
                 (-9.5, -27.0),
@@ -510,7 +389,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-9.0, -12.75),
                 (-9.25, -12.75),
                 (-9.25, -12.0),
-                (-9.5, -12.0),
             )
             make_trace("BOOT0")
 
@@ -523,20 +401,12 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-7.5, -37.25),
                 (-7.5, -43.5),
             )
-            make_trace("BOOT0", width_mm=0.15)
-        with BuildLine():
             Polyline(
-                (10.5, -38.0),
+                (10.5, -43.5),
                 (10.5, -22.3),
                 (11.77, -22.3),
-                (11.77, -21.0),
+                (11.77, -18.0),
             )
-            make_trace("BOOT0", width_mm=0.15)
-        with BuildLine():
-            Line((11.77, -21.0), (11.77, -18.0))
-            make_trace("BOOT0", width_mm=0.15)
-        with BuildLine():
-            Line((10.5, -43.5), (10.5, -38.0))
             make_trace("BOOT0", width_mm=0.15)
 
         # Net CAP_CT8 [B.Cu]
@@ -559,8 +429,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (22.4, -21.1),
                 (23.8, -21.1),
             )
-            make_trace("CAP_CT8", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (27.1, -23.0),
                 (27.5, -23.0),
@@ -577,23 +445,17 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net CAP_CT8 [F.Cu]
         with BuildLine():
             Line((19.45, -9.0), (20.4, -9.0))
-            make_trace("CAP_CT8")
-        with BuildLine():
             Polyline(
                 (23.8, -21.1),
                 (23.8, -23.0),
                 (27.1, -23.0),
             )
-            make_trace("CAP_CT8")
-        with BuildLine():
             Line((0.6, 38.0), (0.0, 38.0))
             make_trace("CAP_CT8")
 
         # Net CAP_INT [B.Cu]
         with BuildLine():
             Line((-1.5, 7.25), (8.25, 7.25))
-            make_trace("CAP_INT", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (8.25, -0.75),
                 (10.75, -0.75),
@@ -614,8 +476,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-3.0, 7.25),
                 (-1.5, 7.25),
             )
-            make_trace("CAP_INT")
-        with BuildLine():
             Line((8.25, 7.25), (8.25, -0.75))
             make_trace("CAP_INT")
 
@@ -626,25 +486,15 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (16.25, -9.75),
                 (15.25, -9.75),
             )
-            make_trace("CAP_RX0", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (14.75, -12.75),
                 (19.75, -12.75),
                 (19.75, -13.5),
             )
-            make_trace("CAP_RX0", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (20.0, -13.5),
                 (20.0, -22.5),
                 (27.0, -22.5),
-                (27.0, -9.5),
-            )
-            make_trace("CAP_RX0", layer="B.Cu")
-        with BuildLine():
-            Polyline(
-                (27.0, -9.5),
                 (27.0, 26.0),
                 (23.0, 26.0),
                 (23.0, 38.0),
@@ -662,8 +512,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (14.75, -9.75),
                 (14.75, -12.75),
             )
-            make_trace("CAP_RX0")
-        with BuildLine():
             Line((19.75, -13.5), (20.0, -13.5))
             make_trace("CAP_RX0")
 
@@ -675,27 +523,17 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (17.0, -10.75),
                 (17.0, -11.25),
             )
-            make_trace("CAP_RX1", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (20.75, -13.0),
                 (20.5, -13.0),
                 (20.5, -22.0),
                 (26.5, -22.0),
-                (26.5, 8.5),
-            )
-            make_trace("CAP_RX1", layer="B.Cu")
-        with BuildLine():
-            Line((6.25, 36.25), (6.25, 37.75))
-            make_trace("CAP_RX1", layer="B.Cu")
-        with BuildLine():
-            Polyline(
-                (26.5, 8.5),
                 (26.5, 25.5),
                 (22.5, 25.5),
                 (22.5, 36.95),
                 (9.75, 36.95),
             )
+            Line((6.25, 36.25), (6.25, 37.75))
             make_trace("CAP_RX1", layer="B.Cu")
 
         # Net CAP_RX1 [F.Cu]
@@ -705,9 +543,8 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (17.0, -13.0),
                 (20.75, -13.0),
             )
-            make_trace("CAP_RX1")
-        with BuildLine():
             Polyline(
+                (9.75, 36.95),
                 (9.75, 33.5),
                 (9.25, 33.5),
                 (9.25, 35.0),
@@ -719,19 +556,11 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (6.75, 36.25),
                 (6.25, 36.25),
             )
-            make_trace("CAP_RX1")
-        with BuildLine():
             Polyline(
                 (6.25, 37.75),
                 (6.0, 37.75),
                 (6.0, 38.0),
             )
-            make_trace("CAP_RX1")
-        with BuildLine():
-            Line((9.75, 36.95), (9.75, 33.5))
-            make_trace("CAP_RX1")
-        with BuildLine():
-            Line((9.75, 36.95), (9.75, 33.5))
             make_trace("CAP_RX1")
 
         # Net CAP_RX2 [B.Cu]
@@ -741,21 +570,11 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (17.5, -10.75),
                 (17.5, -11.25),
             )
-            make_trace("CAP_RX2", layer="B.Cu")
-        with BuildLine():
             Line((7.25, 36.5), (7.25, 37.75))
-            make_trace("CAP_RX2", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (22.0, -17.0),
                 (22.0, -21.5),
                 (26.0, -21.5),
-                (26.0, 8.0),
-            )
-            make_trace("CAP_RX2", layer="B.Cu")
-        with BuildLine():
-            Polyline(
-                (26.0, 8.0),
                 (26.0, 25.0),
                 (22.0, 25.0),
                 (22.0, 36.5),
@@ -776,16 +595,12 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (22.0, -10.75),
                 (22.0, -17.0),
             )
-            make_trace("CAP_RX2")
-        with BuildLine():
             Polyline(
                 (9.25, 35.5),
                 (8.0, 35.5),
                 (8.0, 36.5),
                 (7.25, 36.5),
             )
-            make_trace("CAP_RX2")
-        with BuildLine():
             Polyline(
                 (7.25, 37.75),
                 (7.0, 37.75),
@@ -800,15 +615,11 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (18.0, -12.25),
                 (7.0, -12.25),
             )
-            make_trace("CAP_RX3", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (7.0, 2.25),
                 (9.75, 2.25),
                 (9.75, 2.75),
             )
-            make_trace("CAP_RX3", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (9.75, 3.75),
                 (7.5, 3.75),
@@ -816,26 +627,18 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (4.75, 4.25),
                 (4.75, 4.75),
             )
-            make_trace("CAP_RX3", layer="B.Cu")
-        with BuildLine():
             Line((4.25, 36.75), (4.25, 37.75))
             make_trace("CAP_RX3", layer="B.Cu")
 
         # Net CAP_RX3 [F.Cu]
         with BuildLine():
             Line((7.0, -12.25), (7.0, 2.25))
-            make_trace("CAP_RX3")
-        with BuildLine():
             Line((9.75, 2.75), (9.75, 3.75))
-            make_trace("CAP_RX3")
-        with BuildLine():
             Polyline(
                 (4.75, 4.75),
                 (4.75, 36.75),
                 (4.25, 36.75),
             )
-            make_trace("CAP_RX3")
-        with BuildLine():
             Polyline(
                 (4.25, 37.75),
                 (4.0, 37.75),
@@ -877,23 +680,17 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (18.25, -12.25),
                 (19.75, -12.25),
             )
-            make_trace("CAP_TX0", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (22.25, -1.5),
                 (21.75, -1.5),
                 (21.75, 4.75),
             )
-            make_trace("CAP_TX0", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (21.75, 23.5),
                 (21.25, 23.5),
                 (21.25, 24.0),
                 (9.0, 24.0),
             )
-            make_trace("CAP_TX0", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (7.5, 24.0),
                 (3.25, 24.0),
@@ -915,14 +712,8 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (22.25, -2.5),
                 (22.25, -1.5),
             )
-            make_trace("CAP_TX0")
-        with BuildLine():
             Line((21.75, 4.75), (21.75, 23.5))
-            make_trace("CAP_TX0")
-        with BuildLine():
             Line((9.0, 24.0), (7.5, 24.0))
-            make_trace("CAP_TX0")
-        with BuildLine():
             Polyline(
                 (3.25, 37.75),
                 (3.0, 37.75),
@@ -937,22 +728,16 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (18.75, -10.75),
                 (18.75, -11.25),
             )
-            make_trace("CAP_TX1", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (21.75, -2.0),
                 (21.25, -2.0),
                 (21.25, 4.75),
             )
-            make_trace("CAP_TX1", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (21.25, 19.25),
                 (8.5, 19.25),
                 (8.5, 22.5),
             )
-            make_trace("CAP_TX1", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (7.0, 23.5),
                 (2.5, 23.5),
@@ -974,18 +759,12 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (21.75, -3.0),
                 (21.75, -2.0),
             )
-            make_trace("CAP_TX1")
-        with BuildLine():
             Line((21.25, 4.75), (21.25, 19.25))
-            make_trace("CAP_TX1")
-        with BuildLine():
             Polyline(
                 (8.5, 22.5),
                 (7.0, 22.5),
                 (7.0, 23.5),
             )
-            make_trace("CAP_TX1")
-        with BuildLine():
             Polyline(
                 (2.25, 37.75),
                 (2.0, 37.75),
@@ -1000,15 +779,11 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (19.75, -9.75),
                 (19.75, -10.0),
             )
-            make_trace("CAP_TX2", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (21.25, -2.5),
                 (20.75, -2.5),
                 (20.75, 4.75),
             )
-            make_trace("CAP_TX2", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (20.75, 23.5),
                 (8.5, 23.5),
@@ -1023,11 +798,7 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (21.25, -10.0),
                 (21.25, -2.5),
             )
-            make_trace("CAP_TX2")
-        with BuildLine():
             Line((20.75, 4.75), (20.75, 23.5))
-            make_trace("CAP_TX2")
-        with BuildLine():
             Polyline(
                 (8.5, 36.0),
                 (8.5, 37.0),
@@ -1048,8 +819,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-20.75, -36.25),
                 (-21.25, -36.25),
             )
-            make_trace("CBUS2", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-21.25, -38.25),
                 (-20.5, -38.25),
@@ -1059,8 +828,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (16.5, -39.0),
                 (16.5, -39.25),
             )
-            make_trace("CBUS2", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (16.5, -30.54),
                 (22.25, -30.54),
@@ -1072,11 +839,7 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net CBUS2 [F.Cu]
         with BuildLine():
             Line((-19.75, -34.45), (-19.75, -35.75))
-            make_trace("CBUS2")
-        with BuildLine():
             Line((-21.25, -36.25), (-21.25, -38.25))
-            make_trace("CBUS2")
-        with BuildLine():
             Line((16.5, -39.25), (16.5, -30.54))
             make_trace("CBUS2")
 
@@ -1092,8 +855,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net CBUS3 [F.Cu]
         with BuildLine():
             Line((-19.25, -34.45), (-19.25, -38.25))
-            make_trace("CBUS3")
-        with BuildLine():
             Line((19.0, -39.0), (19.0, -39.43))
             make_trace("CBUS3")
 
@@ -1118,8 +879,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net CBUS4 [F.Cu]
         with BuildLine():
             Line((-20.25, -34.45), (-20.25, -36.25))
-            make_trace("CBUS4")
-        with BuildLine():
             Polyline(
                 (22.75, -33.0),
                 (22.75, -29.0),
@@ -1130,11 +889,7 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net CBUS5 [B.Cu]
         with BuildLine():
             Line((-20.75, -27.75), (-10.0, -27.75))
-            make_trace("CBUS5", layer="B.Cu")
-        with BuildLine():
             Line((-8.5, -31.75), (-1.5, -31.75))
-            make_trace("CBUS5", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (0.0, -31.75),
                 (17.75, -31.75),
@@ -1147,18 +902,12 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net CBUS5 [F.Cu]
         with BuildLine():
             Line((-20.75, -29.55), (-20.75, -27.75))
-            make_trace("CBUS5")
-        with BuildLine():
             Polyline(
                 (-10.0, -27.75),
                 (-10.0, -31.75),
                 (-8.5, -31.75),
             )
-            make_trace("CBUS5")
-        with BuildLine():
             Line((-1.5, -31.75), (0.0, -31.75))
-            make_trace("CBUS5")
-        with BuildLine():
             Polyline(
                 (18.0, -32.75),
                 (18.0, -34.25),
@@ -1176,8 +925,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-11.0, -27.0),
                 (-11.0, -26.75),
             )
-            make_trace("CBUS6", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-11.0, -36.75),
                 (-10.75, -36.75),
@@ -1191,11 +938,7 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net CBUS6 [F.Cu]
         with BuildLine():
             Line((-21.25, -29.55), (-21.25, -26.75))
-            make_trace("CBUS6")
-        with BuildLine():
             Line((-11.0, -26.75), (-11.0, -36.75))
-            make_trace("CBUS6")
-        with BuildLine():
             Line((19.0, -37.5), (19.0, -36.89))
             make_trace("CBUS6")
 
@@ -1207,29 +950,19 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-21.25, -27.25),
                 (-10.5, -27.25),
             )
-            make_trace("CBUS7", layer="B.Cu")
-        with BuildLine():
             Line((-8.5, -32.25), (-1.5, -32.25))
-            make_trace("CBUS7", layer="B.Cu")
-        with BuildLine():
             Line((0.0, -32.25), (17.0, -32.25))
             make_trace("CBUS7", layer="B.Cu")
 
         # Net CBUS7 [F.Cu]
         with BuildLine():
             Line((-21.75, -29.55), (-21.75, -27.75))
-            make_trace("CBUS7")
-        with BuildLine():
             Polyline(
                 (-10.5, -27.25),
                 (-10.5, -32.25),
                 (-8.5, -32.25),
             )
-            make_trace("CBUS7")
-        with BuildLine():
             Line((-1.5, -32.25), (0.0, -32.25))
-            make_trace("CBUS7")
-        with BuildLine():
             Polyline(
                 (17.0, -32.25),
                 (17.0, -30.75),
@@ -1252,8 +985,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-27.5, -1.0),
                 (-27.25, -1.0),
             )
-            make_trace("CC1")
-        with BuildLine():
             Line((-17.5, -1.0), (-17.5, -4.5))
             make_trace("CC1")
 
@@ -1269,8 +1000,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-27.5, 1.0),
                 (-27.25, 1.0),
             )
-            make_trace("CC2")
-        with BuildLine():
             Line((-17.5, 1.0), (-17.5, 4.5))
             make_trace("CC2")
 
@@ -1287,8 +1016,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (17.0, -19.75),
                 (17.0, -18.5),
             )
-            make_trace("DCD_N", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (23.4, -22.9),
                 (23.4, -27.0),
@@ -1304,8 +1031,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-21.75, -35.75),
                 (-21.75, -36.25),
             )
-            make_trace("DCD_N")
-        with BuildLine():
             Polyline(
                 (17.0, -18.5),
                 (17.0, -17.75),
@@ -1344,8 +1069,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-22.25, -35.75),
                 (-22.25, -38.25),
             )
-            make_trace("DSR_N")
-        with BuildLine():
             Polyline(
                 (20.25, -40.75),
                 (20.25, -25.0),
@@ -1379,8 +1102,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-22.5, -30.5),
                 (-23.25, -30.5),
             )
-            make_trace("DTR_N")
-        with BuildLine():
             Polyline(
                 (18.5, -23.0),
                 (22.5, -23.0),
@@ -1394,15 +1115,11 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net EXP_INT_I2C [B.Cu]
         with BuildLine():
             Line((-4.5, 3.5), (-7.5, 3.5))
-            make_trace("EXP_INT_I2C", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-6.75, 8.5),
                 (-6.5, 8.5),
                 (-6.5, 17.25),
             )
-            make_trace("EXP_INT_I2C", layer="B.Cu")
-        with BuildLine():
             Line((4.25, 17.25), (8.25, 17.25))
             make_trace("EXP_INT_I2C", layer="B.Cu")
 
@@ -1414,8 +1131,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-4.5, 3.5),
                 (-4.5, 3.55),
             )
-            make_trace("EXP_INT_I2C")
-        with BuildLine():
             Polyline(
                 (-7.5, 3.5),
                 (-7.5, 6.25),
@@ -1430,11 +1145,7 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-6.75, 8.75),
                 (-6.75, 8.5),
             )
-            make_trace("EXP_INT_I2C")
-        with BuildLine():
             Line((-6.5, 17.25), (4.25, 17.25))
-            make_trace("EXP_INT_I2C")
-        with BuildLine():
             Polyline(
                 (8.25, 17.25),
                 (8.5, 17.25),
@@ -1465,8 +1176,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (7.75, -1.25),
                 (10.25, -1.25),
             )
-            make_trace("EXP_INT_I3C", layer="B.Cu")
-        with BuildLine():
             Line((20.25, 10.5), (22.25, 10.5))
             make_trace("EXP_INT_I3C", layer="B.Cu")
 
@@ -1488,8 +1197,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (6.0, 0.0),
                 (6.0, -0.25),
             )
-            make_trace("EXP_INT_I3C")
-        with BuildLine():
             Polyline(
                 (10.25, -1.25),
                 (11.75, -1.25),
@@ -1513,8 +1220,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (20.25, 6.75),
                 (20.25, 10.5),
             )
-            make_trace("EXP_INT_I3C")
-        with BuildLine():
             Polyline(
                 (22.25, 10.5),
                 (22.25, 20.0),
@@ -1533,8 +1238,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (9.25, -1.5),
                 (9.25, -1.75),
             )
-            make_trace("EXP_INT_I3C1", layer="B.Cu")
-        with BuildLine():
             Line((19.75, 7.25), (22.5, 7.25))
             make_trace("EXP_INT_I3C1", layer="B.Cu")
 
@@ -1556,8 +1259,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (2.25, -0.5),
                 (5.25, -0.5),
             )
-            make_trace("EXP_INT_I3C1")
-        with BuildLine():
             Polyline(
                 (9.25, -1.75),
                 (9.5, -1.75),
@@ -1585,8 +1286,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (19.75, 7.0),
                 (19.75, 7.25),
             )
-            make_trace("EXP_INT_I3C1")
-        with BuildLine():
             Polyline(
                 (22.5, 7.25),
                 (22.5, 5.0),
@@ -1603,8 +1302,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (15.25, -13.25),
                 (15.25, -13.5),
             )
-            make_trace("EXP_INT_SPI", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (20.75, -9.5),
                 (21.5, -9.5),
@@ -1624,8 +1321,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (6.5, -12.75),
                 (13.75, -12.75),
             )
-            make_trace("EXP_INT_SPI")
-        with BuildLine():
             Polyline(
                 (15.25, -13.5),
                 (15.25, -10.75),
@@ -1650,8 +1345,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net FLEX0_A_CS0_N [F.Cu]
         with BuildLine():
             Line((4.0, 3.25), (5.0, 3.25))
-            make_trace("FLEX0_A_CS0_N")
-        with BuildLine():
             Polyline(
                 (16.75, 7.75),
                 (16.75, 8.0),
@@ -1681,8 +1374,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (3.25, 0.5),
                 (5.5, 0.5),
             )
-            make_trace("FLEX0_A_IO0")
-        with BuildLine():
             Polyline(
                 (12.5, -0.25),
                 (12.5, 0.0),
@@ -1705,8 +1396,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (5.5, 1.5),
                 (5.5, 1.75),
             )
-            make_trace("FLEX0_A_IO1")
-        with BuildLine():
             Polyline(
                 (9.25, 1.75),
                 (9.25, 7.5),
@@ -1745,8 +1434,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (6.5, 2.25),
                 (6.5, 8.5),
             )
-            make_trace("FLEX0_A_IO2")
-        with BuildLine():
             Polyline(
                 (14.25, 8.5),
                 (14.25, 8.25),
@@ -1773,8 +1460,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (6.0, 1.0),
                 (6.0, 0.75),
             )
-            make_trace("FLEX0_A_IO3")
-        with BuildLine():
             Polyline(
                 (15.5, 0.25),
                 (15.5, 0.0),
@@ -1785,8 +1470,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net FLEX0_A_SCK [B.Cu]
         with BuildLine():
             Line((3.0, 5.75), (8.75, 5.75))
-            make_trace("FLEX0_A_SCK", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (8.75, -0.25),
                 (12.0, -0.25),
@@ -1803,11 +1486,7 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (2.75, 5.75),
                 (3.0, 5.75),
             )
-            make_trace("FLEX0_A_SCK")
-        with BuildLine():
             Line((8.75, 5.75), (8.75, -0.25))
-            make_trace("FLEX0_A_SCK")
-        with BuildLine():
             Polyline(
                 (14.25, -0.75),
                 (14.25, -0.25),
@@ -1829,8 +1508,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net FTDI_3V3 [F.Cu]
         with BuildLine():
             Line((-17.55, -33.75), (-17.0, -33.75))
-            make_trace("FTDI_3V3")
-        with BuildLine():
             Line((-17.0, -30.25), (-17.55, -30.25))
             make_trace("FTDI_3V3")
 
@@ -1844,11 +1521,7 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-10.25, -33.5),
                 (-9.75, -33.5),
             )
-            make_trace("FTDI_BOOT0", layer="B.Cu", width_mm=0.15)
-        with BuildLine():
             Line((-7.5, -33.5), (-1.75, -33.5))
-            make_trace("FTDI_BOOT0", layer="B.Cu", width_mm=0.15)
-        with BuildLine():
             Polyline(
                 (6.5, -17.25),
                 (9.23, -17.25),
@@ -1864,8 +1537,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net FTDI_BOOT0 [F.Cu]
         with BuildLine():
             Line((-9.75, -33.5), (-7.5, -33.5))
-            make_trace("FTDI_BOOT0", width_mm=0.15)
-        with BuildLine():
             Polyline(
                 (-1.75, -33.5),
                 (6.5, -33.5),
@@ -1882,8 +1553,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-9.75, -31.75),
                 (-9.75, -33.0),
             )
-            make_trace("FTDI_NRST", layer="B.Cu", width_mm=0.15)
-        with BuildLine():
             Line((-7.0, -44.0), (8.25, -44.0))
             make_trace("FTDI_NRST", layer="B.Cu", width_mm=0.15)
 
@@ -1899,23 +1568,16 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-16.25, -30.75),
                 (-16.25, -30.0),
             )
-            make_trace("FTDI_NRST", width_mm=0.15)
-        with BuildLine():
             Polyline(
                 (-9.75, -33.0),
                 (-7.0, -33.0),
                 (-7.0, -44.0),
             )
-            make_trace("FTDI_NRST", width_mm=0.15)
-        with BuildLine():
             Polyline(
-                (8.25, -34.0),
+                (8.25, -44.0),
                 (8.25, -15.5),
                 (9.23, -15.5),
             )
-            make_trace("FTDI_NRST", width_mm=0.15)
-        with BuildLine():
-            Line((8.25, -44.0), (8.25, -34.0))
             make_trace("FTDI_NRST", width_mm=0.15)
 
         # Net FUEL_ALRT [B.Cu]
@@ -1939,8 +1601,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-2.25, 0.75),
                 (-2.25, 0.5),
             )
-            make_trace("FUEL_ALRT")
-        with BuildLine():
             Polyline(
                 (-13.75, -1.0),
                 (-13.5, -1.0),
@@ -1954,231 +1614,105 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net GND [B.Cu]
         with BuildLine():
             Line((16.55, -9.0), (18.0, -9.0))
-            make_trace("GND", layer="B.Cu")
-        with BuildLine():
             Line((-7.5, -4.0), (-7.0, -4.0))
-            make_trace("GND", layer="B.Cu")
-        with BuildLine():
             Line((13.5, -8.0), (13.75, -8.25))
-            make_trace("GND", layer="B.Cu")
-        with BuildLine():
             Line((13.5, -10.0), (13.75, -10.25))
-            make_trace("GND", layer="B.Cu")
-        with BuildLine():
             Line((-22.0, 20.75), (-20.0, 20.75))
             make_trace("GND", layer="B.Cu")
 
         # Net GND [B.Cu]
         with BuildLine():
             Line((13.8, 29.0), (13.8, 29.6))
-            make_trace("GND", layer="B.Cu", width_mm=0.15)
-        with BuildLine():
             Line((16.8, 29.0), (16.8, 29.6))
-            make_trace("GND", layer="B.Cu", width_mm=0.15)
-        with BuildLine():
             Line((13.5, 32.0), (13.5, 32.6))
-            make_trace("GND", layer="B.Cu", width_mm=0.15)
-        with BuildLine():
             Line((17.4, 32.0), (17.4, 32.8))
             make_trace("GND", layer="B.Cu", width_mm=0.15)
 
         # Net GND [F.Cu]
         with BuildLine():
             Line((-0.5, -0.25), (0.0, -0.25))
-            make_trace("GND")
-        with BuildLine():
             Line((-8.0, 38.0), (-7.5, 38.0))
-            make_trace("GND")
-        with BuildLine():
             Line((-9.5, 38.0), (-9.0, 38.0))
-            make_trace("GND")
-        with BuildLine():
             Line((9.5, 38.0), (10.0, 38.0))
-            make_trace("GND")
-        with BuildLine():
             Line((14.0, -14.5), (14.5, -14.5))
-            make_trace("GND")
-        with BuildLine():
             Line((-12.2, -8.0), (-11.75, -8.0))
-            make_trace("GND")
-        with BuildLine():
             Line((-27.5, -3.2), (-27.0, -3.25))
-            make_trace("GND")
-        with BuildLine():
             Line((-27.5, 3.2), (-27.0, 3.25))
-            make_trace("GND")
-        with BuildLine():
             Line((-16.5, -4.5), (-16.0, -4.5))
-            make_trace("GND")
-        with BuildLine():
             Line((-16.5, 4.5), (-16.0, 4.5))
-            make_trace("GND")
-        with BuildLine():
             Line((-19.0, 8.7), (-18.75, 8.5))
-            make_trace("GND")
-        with BuildLine():
             Line((-23.2, 10.0), (-22.75, 10.0))
-            make_trace("GND")
-        with BuildLine():
             Line((-13.2, 10.0), (-12.75, 10.0))
-            make_trace("GND")
-        with BuildLine():
             Line((-7.9, 0.45), (-7.5, 0.5))
-            make_trace("GND")
-        with BuildLine():
             Line((-10.1, 2.05), (-9.75, 2.0))
-            make_trace("GND")
-        with BuildLine():
             Line((-11.5, 2.5), (-11.0, 2.5))
-            make_trace("GND")
-        with BuildLine():
             Line((-11.5, 0.0), (-11.0, 0.0))
-            make_trace("GND")
-        with BuildLine():
             Line((-10.0, 8.0), (-9.5, 8.0))
-            make_trace("GND")
-        with BuildLine():
             Line((-8.5, -12.0), (-8.0, -12.0))
-            make_trace("GND")
-        with BuildLine():
             Line((8.5, 8.0), (9.0, 8.0))
-            make_trace("GND")
-        with BuildLine():
             Line((-5.5, -9.0), (-5.0, -9.0))
-            make_trace("GND")
-        with BuildLine():
             Line((-19.2, 14.0), (-18.75, 14.0))
-            make_trace("GND")
-        with BuildLine():
             Line((13.095, 7.9), (12.75, 8.25))
-            make_trace("GND")
-        with BuildLine():
             Line((-16.95, 16.75), (-17.25, 17.25))
-            make_trace("GND")
-        with BuildLine():
             Line((-16.95, 15.25), (-17.25, 14.75))
-            make_trace("GND")
-        with BuildLine():
             Line((-15.05, 15.75), (-14.75, 15.75))
-            make_trace("GND")
-        with BuildLine():
             Line((11.2, 14.975), (11.5, 15.0))
-            make_trace("GND")
-        with BuildLine():
             Line((11.2, 14.325), (11.5, 14.25))
-            make_trace("GND")
-        with BuildLine():
             Line((16.8, 11.725), (17.25, 11.75))
-            make_trace("GND")
-        with BuildLine():
             Line((16.8, 12.375), (17.25, 12.5))
-            make_trace("GND")
-        with BuildLine():
             Line((16.8, 13.025), (17.25, 13.0))
-            make_trace("GND")
-        with BuildLine():
             Line((16.8, 13.675), (17.25, 13.75))
-            make_trace("GND")
-        with BuildLine():
             Line((16.8, 14.325), (17.25, 14.25))
-            make_trace("GND")
-        with BuildLine():
             Line((16.8, 14.975), (17.25, 15.0))
-            make_trace("GND")
-        with BuildLine():
             Line((16.8, 15.625), (17.25, 15.5))
-            make_trace("GND")
-        with BuildLine():
             Line((-22.45, -33.25), (-22.75, -33.25))
-            make_trace("GND")
-        with BuildLine():
             Line((-17.55, -33.25), (-17.25, -33.25))
-            make_trace("GND")
-        with BuildLine():
             Line((-17.55, -31.75), (-17.25, -31.75))
-            make_trace("GND")
-        with BuildLine():
             Line((-18.25, -29.55), (-17.75, -29.25))
-            make_trace("GND")
-        with BuildLine():
             Line((-18.75, -29.55), (-18.75, -29.25))
-            make_trace("GND")
-        with BuildLine():
             Line((-20.25, -29.55), (-20.25, -29.25))
-            make_trace("GND")
-        with BuildLine():
             Line((-18.0, -22.0), (-17.5, -22.0))
-            make_trace("GND")
-        with BuildLine():
-            Line((-19.5, 20.75), (-19.5, 21.25))
-            make_trace("GND")
-        with BuildLine():
+            Polyline(
+                (-20.0, 20.75),
+                (-19.5, 20.75),
+                (-19.5, 21.25),
+            )
             Polyline(
                 (-22.2, 21.0),
                 (-22.25, 20.75),
                 (-22.0, 20.75),
             )
-            make_trace("GND")
-        with BuildLine():
-            Line((-20.0, 20.75), (-19.5, 20.75))
-            make_trace("GND")
-        with BuildLine():
             Line((18.0, 22.7), (18.0, 21.7))
             make_trace("GND")
 
         # Net GND [F.Cu]
         with BuildLine():
             Line((7.0, -14.0), (7.6, -13.2))
-            make_trace("GND", width_mm=0.15)
-        with BuildLine():
             Line((7.0, -16.0), (7.6, -16.0))
-            make_trace("GND", width_mm=0.15)
-        with BuildLine():
             Line((7.0, -18.0), (7.6, -18.0))
-            make_trace("GND", width_mm=0.15)
-        with BuildLine():
             Line((7.0, -20.0), (7.6, -20.5))
-            make_trace("GND", width_mm=0.15)
-        with BuildLine():
             Line((7.0, -22.0), (7.6, -22.0))
-            make_trace("GND", width_mm=0.15)
-        with BuildLine():
             Line((7.0, -24.0), (7.6, -24.0))
-            make_trace("GND", width_mm=0.15)
-        with BuildLine():
             Line((1.4, -11.0), (2.1, -11.0))
-            make_trace("GND", width_mm=0.15)
-        with BuildLine():
             Line((-2.5, -29.75), (-2.5, -28.75))
-            make_trace("GND", width_mm=0.15)
-        with BuildLine():
             Line((-13.1, -36.5), (-13.1, -35.5))
-            make_trace("GND", width_mm=0.15)
-        with BuildLine():
             Polyline(
                 (7.0, -35.7),
                 (6.35, -35.7),
                 (5.8, -36.25),
-            )
-            make_trace("GND", width_mm=0.15)
-        with BuildLine():
-            Polyline(
-                (7.0, -36.8),
                 (6.35, -36.8),
-                (5.8, -36.25),
+                (7.0, -36.8),
             )
             make_trace("GND", width_mm=0.15)
 
         # Net GPIO0 [B.Cu]
-        with BuildLine():
-            Line((19.0, -15.75), (19.0, -16.0))
-            make_trace("GPIO0", layer="B.Cu")
         with BuildLine():
             Polyline(
                 (-0.5, -13.5),
                 (13.5, -13.5),
                 (13.5, -15.75),
                 (19.0, -15.75),
+                (19.0, -16.0),
             )
             make_trace("GPIO0", layer="B.Cu")
 
@@ -2191,8 +1725,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-0.5, -6.75),
                 (-0.5, -13.5),
             )
-            make_trace("GPIO0")
-        with BuildLine():
             Line((19.0, -16.0), (19.0, -16.57))
             make_trace("GPIO0")
 
@@ -2203,8 +1735,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-0.25, -4.75),
                 (-4.5, -4.75),
             )
-            make_trace("GPIO1", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-4.5, -6.75),
                 (-3.5, -6.75),
@@ -2226,11 +1756,7 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-0.25, -2.25),
                 (-0.25, -2.5),
             )
-            make_trace("GPIO1")
-        with BuildLine():
             Line((-4.5, -4.75), (-4.5, -6.75))
-            make_trace("GPIO1")
-        with BuildLine():
             Polyline(
                 (16.25, -10.75),
                 (16.25, -19.0),
@@ -2246,8 +1772,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (0.5, -5.25),
                 (-7.5, -5.25),
             )
-            make_trace("GPIO2", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-7.5, -14.5),
                 (-1.0, -14.5),
@@ -2267,11 +1791,7 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net GPIO2 [F.Cu]
         with BuildLine():
             Line((0.5, -2.25), (0.5, -2.75))
-            make_trace("GPIO2")
-        with BuildLine():
             Line((-7.5, -5.25), (-7.5, -14.5))
-            make_trace("GPIO2")
-        with BuildLine():
             Line((19.0, -20.5), (19.0, -21.65))
             make_trace("GPIO2")
 
@@ -2282,15 +1802,11 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (1.5, -4.25),
                 (1.5, -2.25),
             )
-            make_trace("GPIO3", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-2.25, -1.0),
                 (-7.75, -1.0),
                 (-7.75, -1.25),
             )
-            make_trace("GPIO3", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-8.0, -8.75),
                 (-6.75, -8.75),
@@ -2309,8 +1825,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (0.5, -4.25),
                 (1.0, -4.25),
             )
-            make_trace("GPIO3")
-        with BuildLine():
             Polyline(
                 (1.5, -2.25),
                 (1.25, -2.25),
@@ -2323,16 +1837,12 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-0.75, -1.0),
                 (-2.25, -1.0),
             )
-            make_trace("GPIO3")
-        with BuildLine():
             Polyline(
                 (-7.75, -1.25),
                 (-7.75, -4.75),
                 (-8.0, -4.75),
                 (-8.0, -8.75),
             )
-            make_trace("GPIO3")
-        with BuildLine():
             Polyline(
                 (15.75, -11.25),
                 (15.75, -20.0),
@@ -2354,37 +1864,19 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (10.75, 9.25),
                 (10.75, 16.25),
             )
-            make_trace("I2C0_SCL", layer="B.Cu")
-        with BuildLine():
             Line((-1.5, 16.25), (10.25, 16.25))
             make_trace("I2C0_SCL", layer="B.Cu")
 
         # Net I2C0_SCL [F.Cu]
         with BuildLine():
             Line((0.5, 3.75), (0.5, 9.0))
-            make_trace("I2C0_SCL")
-        with BuildLine():
-            Line((10.75, 16.25), (11.0, 16.25))
-            make_trace("I2C0_SCL")
-        with BuildLine():
             Polyline(
                 (11.2, 16.275),
                 (11.2, 16.25),
                 (11.0, 16.25),
             )
-            make_trace("I2C0_SCL")
-        with BuildLine():
+            Line((11.0, 16.25), (10.25, 16.25))
             Line((-15.05, 16.25), (-1.5, 16.25))
-            make_trace("I2C0_SCL")
-        with BuildLine():
-            Line((10.25, 16.25), (11.0, 16.25))
-            make_trace("I2C0_SCL")
-        with BuildLine():
-            Polyline(
-                (11.2, 16.275),
-                (11.2, 16.25),
-                (11.0, 16.25),
-            )
             make_trace("I2C0_SCL")
 
         # Net I2C0_SDA [B.Cu]
@@ -2394,8 +1886,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (10.25, 9.5),
                 (10.25, 15.5),
             )
-            make_trace("I2C0_SDA", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-1.0, 15.75),
                 (9.75, 15.75),
@@ -2412,32 +1902,16 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (1.0, 8.5),
                 (1.0, 9.5),
             )
-            make_trace("I2C0_SDA")
-        with BuildLine():
-            Line((10.25, 15.5), (11.0, 15.5))
-            make_trace("I2C0_SDA")
-        with BuildLine():
             Polyline(
                 (11.2, 15.625),
                 (11.2, 15.5),
                 (11.0, 15.5),
             )
-            make_trace("I2C0_SDA")
-        with BuildLine():
+            Line((11.0, 15.5), (9.75, 15.5))
             Polyline(
                 (-15.05, 16.75),
                 (-1.0, 16.75),
                 (-1.0, 15.75),
-            )
-            make_trace("I2C0_SDA")
-        with BuildLine():
-            Line((9.75, 15.5), (11.0, 15.5))
-            make_trace("I2C0_SDA")
-        with BuildLine():
-            Polyline(
-                (11.2, 15.625),
-                (11.2, 15.5),
-                (11.0, 15.5),
             )
             make_trace("I2C0_SDA")
 
@@ -2451,13 +1925,8 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (8.5, 8.5),
                 (9.25, 8.5),
             )
-            make_trace("I2C2_SCL", layer="B.Cu")
-        with BuildLine():
-            Line((9.25, 18.75), (23.25, 18.75))
-            make_trace("I2C2_SCL", layer="B.Cu")
-        with BuildLine():
             Polyline(
-                (23.25, 18.75),
+                (9.25, 18.75),
                 (23.5, 18.75),
                 (23.5, 23.0),
             )
@@ -2471,11 +1940,7 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-6.0, 8.0),
                 (-5.5, 8.0),
             )
-            make_trace("I2C2_SCL")
-        with BuildLine():
             Line((9.25, 8.5), (9.25, 18.75))
-            make_trace("I2C2_SCL")
-        with BuildLine():
             Polyline(
                 (23.5, 23.0),
                 (23.5, 31.0),
@@ -2493,8 +1958,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-2.75, 23.0),
                 (7.5, 23.0),
             )
-            make_trace("I2C2_SDA", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (8.5, 23.0),
                 (23.0, 23.0),
@@ -2505,11 +1968,7 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net I2C2_SDA [F.Cu]
         with BuildLine():
             Line((-4.0, 3.75), (-4.0, 8.5))
-            make_trace("I2C2_SDA")
-        with BuildLine():
             Line((7.5, 23.0), (8.5, 23.0))
-            make_trace("I2C2_SDA")
-        with BuildLine():
             Polyline(
                 (23.0, 23.5),
                 (23.0, 33.0),
@@ -2520,30 +1979,22 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net I2C_SCL [B.Cu]
         with BuildLine():
             Line((-1.0, 6.75), (7.75, 6.75))
-            make_trace("I2C_SCL", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (12.25, -4.75),
                 (12.5, -4.75),
                 (12.5, -4.5),
             )
-            make_trace("I2C_SCL", layer="B.Cu")
-        with BuildLine():
             Polyline(
+                (18.0, -4.5),
                 (18.0, -4.0),
                 (15.0, -4.0),
                 (15.0, -4.75),
                 (14.75, -4.75),
                 (14.75, -5.0),
                 (12.5, -5.0),
-                (12.5, -4.5),
+                (12.5, -4.75),
             )
-            make_trace("I2C_SCL", layer="B.Cu")
-        with BuildLine():
             Line((18.0, -7.55), (18.0, -7.0))
-            make_trace("I2C_SCL", layer="B.Cu")
-        with BuildLine():
-            Line((18.0, -4.5), (18.0, -4.0))
             make_trace("I2C_SCL", layer="B.Cu")
 
         # Net I2C_SCL [F.Cu]
@@ -2557,16 +2008,12 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-1.0, 5.25),
                 (-1.0, 6.75),
             )
-            make_trace("I2C_SCL")
-        with BuildLine():
             Polyline(
                 (7.75, 6.75),
                 (7.75, -4.25),
                 (12.25, -4.25),
                 (12.25, -4.75),
             )
-            make_trace("I2C_SCL")
-        with BuildLine():
             Line((18.0, -7.0), (18.0, -4.5))
             make_trace("I2C_SCL")
 
@@ -2580,15 +2027,11 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (0.5, 10.0),
                 (3.0, 10.0),
             )
-            make_trace("I2C_SDA", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (4.25, 5.25),
                 (7.25, 5.25),
                 (7.25, 4.75),
             )
-            make_trace("I2C_SDA", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (9.0, -4.75),
                 (10.0, -4.75),
@@ -2596,27 +2039,22 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (12.5, -6.75),
                 (12.5, -6.0),
             )
-            make_trace("I2C_SDA", layer="B.Cu")
-        with BuildLine():
-            Line((14.0, -4.0), (13.25, -4.0))
-            make_trace("I2C_SDA", layer="B.Cu")
-        with BuildLine():
             Polyline(
-                (13.25, -5.75),
-                (12.5, -5.75),
                 (12.5, -6.0),
+                (12.5, -5.75),
+                (13.25, -5.75),
             )
-            make_trace("I2C_SDA", layer="B.Cu")
-        with BuildLine():
+            Polyline(
+                (14.0, -4.5),
+                (14.0, -4.0),
+                (13.25, -4.0),
+            )
             Polyline(
                 (17.6, -7.55),
                 (17.5, -7.25),
                 (17.5, -5.75),
                 (14.0, -5.75),
             )
-            make_trace("I2C_SDA", layer="B.Cu")
-        with BuildLine():
-            Line((14.0, -4.5), (14.0, -4.0))
             make_trace("I2C_SDA", layer="B.Cu")
 
         # Net I2C_SDA [F.Cu]
@@ -2634,8 +2072,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-6.0, 9.0),
                 (-1.5, 9.0),
             )
-            make_trace("I2C_SDA")
-        with BuildLine():
             Polyline(
                 (3.0, 10.0),
                 (3.0, 6.25),
@@ -2643,8 +2079,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (3.5, 5.25),
                 (4.25, 5.25),
             )
-            make_trace("I2C_SDA")
-        with BuildLine():
             Polyline(
                 (7.25, 4.75),
                 (7.25, 4.25),
@@ -2652,11 +2086,7 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (7.5, -4.75),
                 (9.0, -4.75),
             )
-            make_trace("I2C_SDA")
-        with BuildLine():
             Line((13.25, -4.0), (13.25, -5.75))
-            make_trace("I2C_SDA")
-        with BuildLine():
             Line((14.0, -5.75), (14.0, -4.5))
             make_trace("I2C_SDA")
 
@@ -2675,8 +2105,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (17.0, 8.25),
                 (17.0, 8.75),
             )
-            make_trace("I3C0_SCL", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (18.25, 10.0),
                 (23.25, 10.0),
@@ -2688,8 +2116,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net I3C0_SCL [F.Cu]
         with BuildLine():
             Line((-0.5, 3.75), (-0.5, 6.25))
-            make_trace("I3C0_SCL")
-        with BuildLine():
             Polyline(
                 (17.0, 8.75),
                 (17.0, 10.0),
@@ -2704,8 +2130,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (10.75, 16.75),
                 (10.75, 17.75),
             )
-            make_trace("I3C0_SDA", layer="B.Cu")
-        with BuildLine():
             Line((17.75, 18.25), (22.75, 18.25))
             make_trace("I3C0_SDA", layer="B.Cu")
 
@@ -2718,15 +2142,11 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (0.0, 5.75),
                 (0.0, 16.75),
             )
-            make_trace("I3C0_SDA")
-        with BuildLine():
             Polyline(
                 (10.75, 17.75),
                 (10.75, 18.25),
                 (17.75, 18.25),
             )
-            make_trace("I3C0_SDA")
-        with BuildLine():
             Polyline(
                 (22.75, 18.25),
                 (22.75, 18.0),
@@ -2742,8 +2162,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-3.25, 0.5),
                 (-6.5, 0.5),
             )
-            make_trace("I3C1_SCL", layer="B.Cu")
-        with BuildLine():
             Line((-3.0, -8.75), (12.75, -8.75))
             make_trace("I3C1_SCL", layer="B.Cu")
 
@@ -2756,8 +2174,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-3.0, 1.0),
                 (-3.0, 0.75),
             )
-            make_trace("I3C1_SCL")
-        with BuildLine():
             Polyline(
                 (-6.5, 0.5),
                 (-6.5, -8.25),
@@ -2767,8 +2183,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-4.5, -8.75),
                 (-3.0, -8.75),
             )
-            make_trace("I3C1_SCL")
-        with BuildLine():
             Polyline(
                 (12.75, -8.75),
                 (12.75, -2.75),
@@ -2789,16 +2203,12 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net I3C1_SDA [B.Cu]
         with BuildLine():
             Line((-1.5, 0.75), (-1.5, -4.25))
-            make_trace("I3C1_SDA", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-1.5, -6.75),
                 (9.75, -6.75),
                 (9.75, -7.0),
                 (16.25, -7.0),
             )
-            make_trace("I3C1_SDA", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (19.75, -3.0),
                 (23.0, -3.0),
@@ -2807,6 +2217,8 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (23.25, 5.0),
             )
             make_trace("I3C1_SDA", layer="B.Cu")
+
+        # Net I3C1_SDA [B.Cu]
         with BuildLine():
             Polyline(
                 (23.25, 5.0),
@@ -2818,11 +2230,7 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net I3C1_SDA [F.Cu]
         with BuildLine():
             Line((-1.5, 1.25), (-1.5, 0.75))
-            make_trace("I3C1_SDA")
-        with BuildLine():
             Line((-1.5, -4.25), (-1.5, -6.75))
-            make_trace("I3C1_SDA")
-        with BuildLine():
             Polyline(
                 (16.25, -7.0),
                 (16.25, -3.0),
@@ -2856,8 +2264,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (11.25, 11.5),
                 (11.25, 9.75),
             )
-            make_trace("LED_B")
-        with BuildLine():
             Polyline(
                 (17.25, 10.5),
                 (17.25, 10.75),
@@ -2875,8 +2281,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (11.25, 15.75),
                 (11.25, 16.75),
             )
-            make_trace("LED_G", layer="B.Cu")
-        with BuildLine():
             Line((10.25, 19.75), (18.75, 19.75))
             make_trace("LED_G", layer="B.Cu")
 
@@ -2887,16 +2291,12 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (11.5, 12.5),
                 (11.5, 12.25),
             )
-            make_trace("LED_G")
-        with BuildLine():
             Polyline(
                 (11.25, 16.75),
                 (11.25, 17.25),
                 (10.25, 17.25),
                 (10.25, 19.75),
             )
-            make_trace("LED_G")
-        with BuildLine():
             Polyline(
                 (18.75, 19.75),
                 (18.75, 9.25),
@@ -2927,8 +2327,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (11.0, 13.0),
                 (9.75, 13.0),
             )
-            make_trace("LED_R")
-        with BuildLine():
             Polyline(
                 (9.75, 11.5),
                 (9.75, 9.25),
@@ -2961,12 +2359,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
             Polyline(
                 (4.125, -36.0),
                 (5.425, -34.7),
-                (7.0, -34.7),
-            )
-            make_trace("NFC1", width_mm=0.15)
-        with BuildLine():
-            Polyline(
-                (7.0, -34.7),
                 (7.6, -34.7),
                 (7.6, -35.5),
             )
@@ -2982,17 +2374,9 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
             Polyline(
                 (4.125, -37.0),
                 (4.925, -37.8),
-                (7.0, -37.8),
-            )
-            make_trace("NFC2", width_mm=0.15)
-        with BuildLine():
-            Polyline(
-                (7.0, -37.8),
                 (7.6, -37.8),
                 (7.6, -37.0),
             )
-            make_trace("NFC2", width_mm=0.15)
-        with BuildLine():
             Polyline(
                 (11.0, -37.0),
                 (11.0, -38.5),
@@ -3010,8 +2394,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-7.0, 2.0),
                 (-7.0, 2.5),
             )
-            make_trace("NRST", layer="B.Cu")
-        with BuildLine():
             Line((-14.5, 6.75), (-11.0, 6.75))
             make_trace("NRST", layer="B.Cu")
 
@@ -3023,33 +2405,25 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net NRST [F.Cu]
         with BuildLine():
             Line((-3.0, 1.25), (-3.0, 1.75))
-            make_trace("NRST")
-        with BuildLine():
             Polyline(
                 (-7.0, 2.5),
                 (-7.0, 8.0),
                 (-7.5, 8.0),
             )
-            make_trace("NRST")
-        with BuildLine():
             Polyline(
-                (-11.0, 8.0),
-                (-11.0, 7.25),
-                (-7.75, 7.25),
-                (-7.75, 8.0),
                 (-7.5, 8.0),
+                (-7.75, 8.0),
+                (-7.75, 7.25),
+                (-11.0, 7.25),
+                (-11.0, 8.0),
             )
-            make_trace("NRST")
-        with BuildLine():
             Polyline(
                 (-15.75, -24.0),
                 (-15.75, -5.75),
                 (-14.5, -5.75),
                 (-14.5, 6.75),
             )
-            make_trace("NRST")
-        with BuildLine():
-            Line((-11.0, 6.75), (-11.0, 8.0))
+            Line((-11.0, 6.75), (-11.0, 7.25))
             make_trace("NRST")
 
         # Net NRST [F.Cu]
@@ -3061,11 +2435,7 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-16.5, -22.5),
                 (-16.5, -19.0),
             )
-            make_trace("NRST", width_mm=0.15)
-        with BuildLine():
             Line((-1.4, -11.0), (-1.4, -19.0))
-            make_trace("NRST", width_mm=0.15)
-        with BuildLine():
             Polyline(
                 (12.8, -19.0),
                 (12.8, -15.5),
@@ -3094,22 +2464,15 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-3.75, 1.25),
                 (-3.75, 1.0),
             )
-            make_trace("OSC_IN")
-        with BuildLine():
             Polyline(
                 (-10.0, 1.0),
                 (-10.0, 0.75),
                 (-10.1, 0.45),
-            )
-            make_trace("OSC_IN")
-        with BuildLine():
-            Polyline(
-                (-12.5, 2.5),
-                (-12.5, 0.75),
-                (-10.75, 0.75),
-                (-10.75, 0.5),
                 (-10.25, 0.5),
-                (-10.1, 0.45),
+                (-10.75, 0.5),
+                (-10.75, 0.75),
+                (-12.5, 0.75),
+                (-12.5, 2.5),
             )
             make_trace("OSC_IN")
 
@@ -3121,18 +2484,13 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-6.0, 2.0),
                 (-7.75, 2.0),
                 (-7.9, 2.05),
-            )
-            make_trace("OSC_OUT")
-        with BuildLine():
-            Polyline(
-                (-12.5, 0.0),
-                (-12.5, -0.75),
-                (-10.75, -0.75),
-                (-10.75, -0.5),
-                (-9.0, -0.5),
-                (-9.0, 2.0),
                 (-8.25, 2.0),
-                (-7.9, 2.05),
+                (-9.0, 2.0),
+                (-9.0, -0.5),
+                (-10.75, -0.5),
+                (-10.75, -0.75),
+                (-12.5, -0.75),
+                (-12.5, 0.0),
             )
             make_trace("OSC_OUT")
 
@@ -3152,8 +2510,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-6.25, 1.5),
                 (-6.5, 1.5),
             )
-            make_trace("PDM_CLK")
-        with BuildLine():
             Polyline(
                 (-15.5, 1.5),
                 (-15.5, 14.25),
@@ -3181,8 +2537,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-6.0, 0.25),
                 (-6.0, 0.0),
             )
-            make_trace("PDM_DAT")
-        with BuildLine():
             Polyline(
                 (-20.5, 0.5),
                 (-20.5, 13.25),
@@ -3202,8 +2556,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-5.5, -0.5),
                 (-14.0, -0.5),
             )
-            make_trace("PDM_LRCLK", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-14.5, 10.75),
                 (-18.25, 10.75),
@@ -3214,15 +2566,11 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net PDM_LRCLK [F.Cu]
         with BuildLine():
             Line((-4.0, -0.25), (-4.5, -0.25))
-            make_trace("PDM_LRCLK")
-        with BuildLine():
             Polyline(
                 (-14.0, -0.5),
                 (-14.0, 10.75),
                 (-14.5, 10.75),
             )
-            make_trace("PDM_LRCLK")
-        with BuildLine():
             Line((-18.25, 17.0), (-18.25, 19.5))
             make_trace("PDM_LRCLK")
 
@@ -3252,25 +2600,11 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (18.75, 26.25),
                 (21.5, 26.25),
                 (21.5, 37.0),
-                (24.5, 37.0),
-            )
-            make_trace("PERIPH_3V3")
-        with BuildLine():
-            Polyline(
-                (24.5, 37.0),
                 (25.75, 37.0),
                 (25.75, 22.0),
                 (24.5, 22.0),
             )
-            make_trace("PERIPH_3V3")
-        with BuildLine():
-            Polyline(
-                (25.75, 22.0),
-                (25.75, 7.0),
-                (24.5, 7.0),
-            )
-            make_trace("PERIPH_3V3")
-        with BuildLine():
+            Line((25.75, 22.0), (25.75, 7.0))
             Polyline(
                 (25.75, 7.0),
                 (25.75, 6.0),
@@ -3278,8 +2612,7 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (27.5, -18.0),
                 (24.5, -18.0),
             )
-            make_trace("PERIPH_3V3")
-        with BuildLine():
+            Line((25.75, 7.0), (24.5, 7.0))
             Polyline(
                 (27.5, -18.0),
                 (27.5, -35.0),
@@ -3294,8 +2627,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (21.0, -35.0),
                 (21.0, -29.75),
             )
-            make_trace("PERIPH_3V3", width_mm=0.15)
-        with BuildLine():
             Polyline(
                 (0.8, -25.5),
                 (0.8, -16.0),
@@ -3306,8 +2637,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net PERIPH_EN [B.Cu]
         with BuildLine():
             Line((-6.0, -2.75), (-9.25, -2.75))
-            make_trace("PERIPH_EN", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-12.0, -1.5),
                 (-14.25, -1.5),
@@ -3316,8 +2645,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-14.5, 0.0),
                 (-17.25, 0.0),
             )
-            make_trace("PERIPH_EN", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-18.75, 3.5),
                 (-17.25, 3.5),
@@ -3342,23 +2669,17 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-4.25, -2.75),
                 (-6.0, -2.75),
             )
-            make_trace("PERIPH_EN")
-        with BuildLine():
             Polyline(
                 (-9.25, -2.75),
                 (-9.25, -1.5),
                 (-12.0, -1.5),
             )
-            make_trace("PERIPH_EN")
-        with BuildLine():
             Polyline(
                 (-17.25, 0.0),
                 (-17.25, -0.5),
                 (-18.75, -0.5),
                 (-18.75, 3.5),
             )
-            make_trace("PERIPH_EN")
-        with BuildLine():
             Polyline(
                 (3.25, 4.5),
                 (3.25, 3.5),
@@ -3384,8 +2705,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (10.25, -4.25),
                 (10.25, -3.75),
             )
-            make_trace("SPI0_CS_N", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (11.25, -3.75),
                 (12.75, -3.75),
@@ -3406,11 +2725,7 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (0.0, -5.75),
                 (5.5, -5.75),
             )
-            make_trace("SPI0_CS_N")
-        with BuildLine():
             Line((10.25, -3.75), (11.25, -3.75))
-            make_trace("SPI0_CS_N")
-        with BuildLine():
             Polyline(
                 (18.75, -1.25),
                 (18.75, 1.0),
@@ -3418,6 +2733,8 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (19.0, 1.25),
             )
             make_trace("SPI0_CS_N")
+
+        # Net SPI0_CS_N [F.Cu]
         with BuildLine():
             Polyline(
                 (19.0, 1.25),
@@ -3438,8 +2755,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (9.75, -3.25),
                 (10.25, -3.25),
             )
-            make_trace("SPI0_MISO", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (11.25, -3.25),
                 (12.75, -3.25),
@@ -3460,11 +2775,7 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (6.0, -6.25),
                 (6.0, -5.25),
             )
-            make_trace("SPI0_MISO")
-        with BuildLine():
             Line((10.25, -3.25), (11.25, -3.25))
-            make_trace("SPI0_MISO")
-        with BuildLine():
             Polyline(
                 (18.25, -1.75),
                 (19.25, -1.75),
@@ -3482,8 +2793,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (15.75, -7.25),
                 (15.75, -7.5),
             )
-            make_trace("SPI0_MOSI", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (15.75, -4.75),
                 (17.25, -4.75),
@@ -3491,8 +2800,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (18.75, -5.0),
                 (18.75, -4.75),
             )
-            make_trace("SPI0_MOSI", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (19.75, -4.75),
                 (21.0, -4.75),
@@ -3506,11 +2813,7 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net SPI0_MOSI [F.Cu]
         with BuildLine():
             Line((-1.0, -3.75), (-1.0, -7.25))
-            make_trace("SPI0_MOSI")
-        with BuildLine():
             Line((15.75, -7.5), (15.75, -4.75))
-            make_trace("SPI0_MOSI")
-        with BuildLine():
             Line((18.75, -4.75), (19.75, -4.75))
             make_trace("SPI0_MOSI")
 
@@ -3522,8 +2825,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-1.5, -7.75),
                 (6.5, -7.75),
             )
-            make_trace("SPI0_SCK", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (6.5, -4.75),
                 (8.0, -4.75),
@@ -3534,8 +2835,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (9.75, -2.75),
                 (10.25, -2.75),
             )
-            make_trace("SPI0_SCK", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (11.25, -2.75),
                 (12.75, -2.75),
@@ -3543,8 +2842,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (17.75, -2.5),
                 (17.75, -2.25),
             )
-            make_trace("SPI0_SCK", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (20.25, -5.25),
                 (22.0, -5.25),
@@ -3560,14 +2857,8 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-2.0, -3.75),
                 (-2.0, -7.25),
             )
-            make_trace("SPI0_SCK")
-        with BuildLine():
             Line((6.5, -7.75), (6.5, -4.75))
-            make_trace("SPI0_SCK")
-        with BuildLine():
             Line((10.25, -2.75), (11.25, -2.75))
-            make_trace("SPI0_SCK")
-        with BuildLine():
             Polyline(
                 (17.75, -2.25),
                 (17.75, -2.5),
@@ -3620,22 +2911,16 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (3.5, 10.5),
                 (-1.5, 10.5),
             )
-            make_trace("SWD_CLK", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-3.5, 10.5),
                 (-5.0, 10.5),
                 (-5.0, 8.5),
             )
-            make_trace("SWD_CLK", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-5.0, 5.25),
                 (-13.0, 5.25),
                 (-13.0, 4.25),
             )
-            make_trace("SWD_CLK", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-13.75, -7.25),
                 (-16.5, -7.25),
@@ -3652,14 +2937,8 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (5.25, 4.25),
                 (5.25, 10.0),
             )
-            make_trace("SWD_CLK")
-        with BuildLine():
             Line((-1.5, 10.5), (-3.5, 10.5))
-            make_trace("SWD_CLK")
-        with BuildLine():
             Line((-5.0, 8.5), (-5.0, 5.25))
-            make_trace("SWD_CLK")
-        with BuildLine():
             Polyline(
                 (-13.0, 4.25),
                 (-13.0, 3.25),
@@ -3667,8 +2946,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-13.25, -7.25),
                 (-13.75, -7.25),
             )
-            make_trace("SWD_CLK")
-        with BuildLine():
             Polyline(
                 (-17.25, -13.25),
                 (-17.25, -13.5),
@@ -3685,8 +2962,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (4.25, -4.5),
                 (4.0, -4.5),
             )
-            make_trace("SWD_DIO", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (5.0, -5.0),
                 (4.75, -5.0),
@@ -3695,16 +2970,12 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-2.5, -8.25),
                 (-3.25, -8.25),
             )
-            make_trace("SWD_DIO", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-4.5, -7.75),
                 (-5.5, -7.75),
                 (-5.5, -7.25),
                 (-9.25, -7.25),
             )
-            make_trace("SWD_DIO", layer="B.Cu")
-        with BuildLine():
             Line((-9.25, -5.25), (-15.0, -5.25))
             make_trace("SWD_DIO", layer="B.Cu")
 
@@ -3717,26 +2988,18 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (4.5, 2.5),
                 (4.5, 2.25),
             )
-            make_trace("SWD_DIO")
-        with BuildLine():
             Polyline(
                 (4.0, -4.5),
                 (4.0, -5.0),
                 (5.0, -5.0),
             )
-            make_trace("SWD_DIO")
-        with BuildLine():
             Polyline(
                 (-3.25, -8.25),
                 (-3.5, -8.25),
                 (-3.5, -7.75),
                 (-4.5, -7.75),
             )
-            make_trace("SWD_DIO")
-        with BuildLine():
             Line((-9.25, -7.25), (-9.25, -5.25))
-            make_trace("SWD_DIO")
-        with BuildLine():
             Polyline(
                 (-15.0, -5.25),
                 (-17.0, -5.25),
@@ -3748,30 +3011,22 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net UART0_CTS [B.Cu]
         with BuildLine():
             Line((1.5, 11.0), (-1.5, 11.0))
-            make_trace("UART0_CTS", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-4.0, 10.0),
                 (-4.5, 10.0),
                 (-4.5, 8.5),
             )
-            make_trace("UART0_CTS", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-4.5, 4.75),
                 (-12.5, 4.75),
                 (-12.5, 3.75),
                 (-16.75, 3.75),
             )
-            make_trace("UART0_CTS", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-16.75, -2.75),
                 (-21.0, -2.75),
                 (-21.0, -4.0),
             )
-            make_trace("UART0_CTS", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-21.0, -23.5),
                 (-22.75, -23.5),
@@ -3792,24 +3047,14 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (1.5, 9.0),
                 (1.5, 11.0),
             )
-            make_trace("UART0_CTS")
-        with BuildLine():
             Polyline(
                 (-1.5, 11.0),
                 (-4.0, 11.0),
                 (-4.0, 10.0),
             )
-            make_trace("UART0_CTS")
-        with BuildLine():
             Line((-4.5, 8.5), (-4.5, 4.75))
-            make_trace("UART0_CTS")
-        with BuildLine():
             Line((-16.75, 3.75), (-16.75, -2.75))
-            make_trace("UART0_CTS")
-        with BuildLine():
             Line((-21.0, -4.0), (-21.0, -23.5))
-            make_trace("UART0_CTS")
-        with BuildLine():
             Line((-22.75, -31.25), (-22.45, -31.25))
             make_trace("UART0_CTS")
 
@@ -3820,26 +3065,18 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (0.25, 4.0),
                 (-9.0, 4.0),
             )
-            make_trace("UART0_RTS", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-9.0, 2.5),
                 (-10.5, 2.5),
                 (-10.5, 2.0),
                 (-15.0, 2.0),
             )
-            make_trace("UART0_RTS", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-15.0, -2.75),
                 (-14.0, -2.75),
                 (-14.0, -4.75),
             )
-            make_trace("UART0_RTS", layer="B.Cu")
-        with BuildLine():
             Line((-15.0, -25.5), (-15.0, -26.5))
-            make_trace("UART0_RTS", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-15.25, -37.5),
                 (-17.75, -37.5),
@@ -3855,14 +3092,8 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (0.25, 1.75),
                 (0.25, 2.0),
             )
-            make_trace("UART0_RTS")
-        with BuildLine():
             Line((-9.0, 4.0), (-9.0, 2.5))
-            make_trace("UART0_RTS")
-        with BuildLine():
             Line((-15.0, 2.0), (-15.0, -2.75))
-            make_trace("UART0_RTS")
-        with BuildLine():
             Polyline(
                 (-14.0, -4.75),
                 (-14.0, -6.75),
@@ -3875,15 +3106,11 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-15.0, -21.25),
                 (-15.0, -25.5),
             )
-            make_trace("UART0_RTS")
-        with BuildLine():
             Polyline(
                 (-15.0, -26.5),
                 (-15.0, -37.5),
                 (-15.25, -37.5),
             )
-            make_trace("UART0_RTS")
-        with BuildLine():
             Polyline(
                 (-19.75, -37.75),
                 (-19.75, -36.75),
@@ -3906,8 +3133,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-2.0, 5.25),
                 (-2.0, 6.25),
             )
-            make_trace("UART0_RXD")
-        with BuildLine():
             Polyline(
                 (-22.5, 6.25),
                 (-22.5, -30.0),
@@ -3923,8 +3148,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net UART0_TXD [F.Cu]
         with BuildLine():
             Line((-1.5, 3.75), (-1.5, 5.75))
-            make_trace("UART0_TXD")
-        with BuildLine():
             Polyline(
                 (-23.5, 5.75),
                 (-23.5, -29.25),
@@ -3949,8 +3172,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net USB_DM [F.Cu]
         with BuildLine():
             Line((-18.25, -34.45), (-18.25, -37.25))
-            make_trace("USB_DM")
-        with BuildLine():
             Polyline(
                 (-26.0, -2.75),
                 (-26.0, 0.25),
@@ -3966,8 +3187,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net USB_DP [F.Cu]
         with BuildLine():
             Line((-18.75, -34.45), (-18.75, -36.75))
-            make_trace("USB_DP")
-        with BuildLine():
             Polyline(
                 (-26.5, -36.75),
                 (-26.5, -0.25),
@@ -3984,8 +3203,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-21.0, 11.75),
                 (-21.0, 13.25),
             )
-            make_trace("VBAT", layer="B.Cu")
-        with BuildLine():
             Line((-17.75, 17.5), (-20.75, 17.5))
             make_trace("VBAT", layer="B.Cu")
 
@@ -4004,41 +3221,14 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
             Polyline(
                 (-24.0, 16.0),
                 (-24.0, 14.0),
-                (-20.8, 14.0),
-            )
-            make_trace("VBAT")
-        with BuildLine():
-            Polyline(
-                (-18.05, 11.3),
-                (-18.25, 11.25),
-                (-18.75, 11.25),
-            )
-            make_trace("VBAT")
-        with BuildLine():
-            Polyline(
-                (-21.0, 13.25),
                 (-21.0, 14.0),
+            )
+            Line((-21.0, 14.0), (-20.8, 14.0))
+            Polyline(
                 (-20.8, 14.0),
-            )
-            make_trace("VBAT")
-        with BuildLine():
-            Polyline(
-                (-16.95, 16.25),
-                (-17.75, 16.25),
-                (-17.75, 17.5),
-            )
-            make_trace("VBAT")
-        with BuildLine():
-            Line((-20.75, 17.5), (-20.75, 14.25))
-            make_trace("VBAT")
-        with BuildLine():
-            Polyline(
-                (-20.75, 14.25),
                 (-20.75, 14.0),
-                (-20.8, 14.0),
+                (-20.75, 17.5),
             )
-            make_trace("VBAT")
-        with BuildLine():
             Polyline(
                 (-18.0, -26.0),
                 (-18.0, -23.0),
@@ -4054,6 +3244,14 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-17.5, 11.25),
                 (-17.75, 11.25),
                 (-18.05, 11.3),
+                (-18.25, 11.25),
+                (-18.75, 11.25),
+            )
+            Line((-21.0, 13.25), (-21.0, 14.0))
+            Polyline(
+                (-16.95, 16.25),
+                (-17.75, 16.25),
+                (-17.75, 17.5),
             )
             make_trace("VBAT")
 
@@ -4068,8 +3266,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-16.5, -18.5),
                 (-16.5, -17.75),
             )
-            make_trace("VBAT", width_mm=0.15)
-        with BuildLine():
             Polyline(
                 (1.75, -17.5),
                 (1.75, -24.0),
@@ -4080,8 +3276,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net VBUS [B.Cu]
         with BuildLine():
             Line((-27.25, -2.25), (-12.75, -2.25))
-            make_trace("VBUS", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-11.0, -18.5),
                 (5.8, -18.5),
@@ -4093,13 +3287,12 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
 
         # Net VBUS [B.Cu]
         with BuildLine():
+            Line((14.25, -24.8), (9.23, -24.8))
             Polyline(
-                (14.25, -24.8),
+                (9.23, -24.8),
                 (2.4, -24.8),
                 (2.4, -22.0),
             )
-            make_trace("VBUS", layer="B.Cu", width_mm=0.15)
-        with BuildLine():
             Line((9.23, -24.8), (9.23, -23.6))
             make_trace("VBUS", layer="B.Cu", width_mm=0.15)
 
@@ -4113,24 +3306,13 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-15.5, -26.0),
                 (-14.0, -26.0),
             )
-            make_trace("VBUS")
-        with BuildLine():
             Polyline(
-                (-27.5, -2.4),
-                (-27.5, -2.25),
-                (-27.25, -2.25),
-            )
-            make_trace("VBUS")
-        with BuildLine():
-            Polyline(
-                (-12.75, -2.25),
-                (-12.75, -7.25),
-                (-13.0, -7.25),
-                (-13.0, -26.0),
                 (-14.0, -26.0),
+                (-13.0, -26.0),
+                (-13.0, -7.25),
+                (-12.75, -7.25),
+                (-12.75, -2.25),
             )
-            make_trace("VBUS")
-        with BuildLine():
             Polyline(
                 (-27.5, 2.4),
                 (-27.5, 2.25),
@@ -4138,6 +3320,8 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-28.5, -2.5),
                 (-27.75, -2.5),
                 (-27.5, -2.4),
+                (-27.5, -2.25),
+                (-27.25, -2.25),
             )
             make_trace("VBUS")
 
@@ -4148,11 +3332,7 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-11.0, -26.0),
                 (-11.0, -18.5),
             )
-            make_trace("VBUS", width_mm=0.15)
-        with BuildLine():
             Line((14.25, -19.0), (14.25, -24.8))
-            make_trace("VBUS", width_mm=0.15)
-        with BuildLine():
             Line((2.4, -22.0), (3.2, -22.0))
             make_trace("VBUS", width_mm=0.15)
 
@@ -4163,8 +3343,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-24.25, 9.25),
                 (-24.25, 9.5),
             )
-            make_trace("VBUS_CHG", layer="B.Cu")
-        with BuildLine():
             Polyline(
                 (-11.5, -18.0),
                 (5.4, -18.0),
@@ -4176,8 +3354,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net VBUS_CHG [B.Cu]
         with BuildLine():
             Line((-20.0, 9.25), (-20.0, 8.25))
-            make_trace("VBUS_CHG", layer="B.Cu", width_mm=0.15)
-        with BuildLine():
             Polyline(
                 (-20.25, -3.5),
                 (-19.5, -3.5),
@@ -4190,26 +3366,19 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net VBUS_CHG [F.Cu]
         with BuildLine():
             Polyline(
-                (-19.95, 8.7),
-                (-20.0, 9.0),
-                (-20.0, 9.25),
-            )
-            make_trace("VBUS_CHG")
-        with BuildLine():
-            Polyline(
-                (-24.25, 9.5),
-                (-24.25, 10.0),
-                (-24.8, 10.0),
-            )
-            make_trace("VBUS_CHG")
-        with BuildLine():
-            Polyline(
                 (-18.05, 8.7),
                 (-18.0, 9.0),
                 (-18.0, 9.5),
                 (-19.75, 9.5),
                 (-19.75, 8.75),
                 (-19.95, 8.7),
+                (-20.0, 9.0),
+                (-20.0, 9.25),
+            )
+            Polyline(
+                (-24.25, 9.5),
+                (-24.25, 10.0),
+                (-24.8, 10.0),
             )
             make_trace("VBUS_CHG")
 
@@ -4221,8 +3390,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
                 (-20.25, 0.0),
                 (-20.25, -3.5),
             )
-            make_trace("VBUS_CHG", width_mm=0.15)
-        with BuildLine():
             Polyline(
                 (13.6, -16.55),
                 (13.6, -23.6),

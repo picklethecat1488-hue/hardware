@@ -24,11 +24,6 @@ class CarrierBoardConfig(BaseModel):
         description="Material for enclosure and mechanical mounts.",
     )
 
-    routing_path: Optional[str] = Field(
-        default="projects/carrier_board/carrier_board_routing.py",
-        description="Path to persisted Python routing module defining traces and vias.",
-    )
-
     @cached_property
     def _raw_data(self) -> dict[Union[int, str], Any]:
         """Load and normalize raw measurements from the YAML file."""
