@@ -8,15 +8,15 @@
 | :--- | :--- |
 | **Review Date** | `2026-11-08 11:45:41 UTC` |
 | **Revisions** | `working` |
-| **Overall Verdict** | **`CHANGES_REQUESTED`** |
-| **Review Progress** | `0/24 files reviewed (0%)` |
-| **Total Comments** | `20 findings` |
+| **Overall Verdict** | **`APPROVED`** |
+| **Review Progress** | `0/27 files reviewed (0%)` |
+| **Total Comments** | `23 findings` |
 
 ## Findings by Severity
 
 | Severity | Count | Meaning |
 | :--- | :---: | :--- |
-| **[MUST FIX]** | 20 | Must be resolved before merge; bugs, defects, or safety regressions. |
+| **[MUST FIX]** | 23 | Must be resolved before merge; bugs, defects, or safety regressions. |
 | **[PROPOSAL]** | 0 | Architecture ideas, design proposals, or optional enhancements. |
 | **[NIT]** | 0 | Minor formatting, naming, or cosmetic cleanups. |
 
@@ -114,6 +114,131 @@ symbol_table=sys_comps.symbol_table_entries,
 ```
 
 > **Reviewer (Reviewer)**: can we remove this parameter from Wiring.from_models while retaining the symbol table functionality
+
+#### **[MUST FIX]** [projects/carrier_board/carrier_board.py:L562-L628](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L562-L628)
+<!-- comment-uuid: c1616d76-62e9-428e-8f94-640cfef21a69 -->
+<!-- comment-commit: working -->
+
+```python
+def schematic_config(self) -> SchematicConfig:
+        """Return cached SchematicConfig containing all 21 carrier board drawing sheets."""
+        return build_carrier_board_schematic_config()
+
+    def sheets(self) -> SchematicConfig:
+        """Return schematic drawing sheets configuration."""
+        return self.schematic_config
+
+    @cached_property
+    def assembly_test_config(self) -> AssemblyTestModel:
+        """Return cached assembly test model and instructions."""
+        return build_carrier_board_assembly_test()
+
+    def tests(self) -> AssemblyTestModel:
+        """Return assembly test model/instructions."""
+        return self.assembly_test_config
+
+    @cached_property
+    def net_class_config(self) -> List[NetClassModel]:
+        """Return cached high-speed and differential net classes."""
+        return build_carrier_board_net_classes()
+
+    def net_classes(self) -> List[NetClassModel]:
+        """Return high-speed and differential net classes."""
+        return self.net_class_config
+
+    @cached_property
+    def design_rules_config(self) -> PCBDesignRulesModel:
+        """Return cached PCB fabrication and layout design rules."""
+        return build_carrier_board_design_rules()
+
+    def design_rules(self) -> PCBDesignRulesModel:
+        """Return PCB fabrication design rules."""
+        return self.design_rules_config
+
+    @cached_property
+    def flex_zone_config(self) -> List[FlexZoneModel]:
+        """Return cached flex zones."""
+        return build_carrier_board_flex_zones()
+
+    def flex_zones(self) -> List[FlexZoneModel]:
+        """Return flex zones."""
+        return self.flex_zone_config
+
+    @cached_property
+    def obstacle_config(self) -> List[PCBObstacleModel]:
+        """Return cached 3D clearance keepouts and obstacles."""
+        return build_carrier_board_obstacles()
+
+    def obstacles(self) -> List[PCBObstacleModel]:
+        """Return 3D obstacles."""
+        return self.obstacle_config
+
+    @cached_property
+    def capacitive_sensor_config(self) -> List[CapacitiveElectrodeModel]:
+        """Return cached capacitive sensing electrode definitions."""
+        return build_carrier_board_capacitive_sensors()
+
+    def capacitive_sensors(self) -> List[CapacitiveElectrodeModel]:
+        """Return capacitive sensing electrodes."""
+        return self.capacitive_sensor_config
+
+    @property
+    def wiring(self) -> Wiring:
+        """Return in-memory wiring model."""
+        return build_carrier_board_wiring(schematic_config=self.schematic_config)
+```
+
+> **Reviewer (Reviewer)**: can we combine these sets of two cached properties into a set of single cached properties?
+
+#### **[MUST FIX]** [projects/carrier_board/carrier_board.py:L687-L704](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L687-L704)
+<!-- comment-uuid: c6403df6-0b63-40c6-a55d-f3a382f9753e -->
+<!-- comment-commit: working -->
+
+```python
+bdr.add(self.design_rules())
+            with BuildNetClasses() as bnc:
+                bnc.add(self.net_classes())
+            with BuildFlexZones() as bfz:
+                bfz.add(self.flex_zones())
+            with BuildObstacles() as bo:
+                bo.add(self.obstacles())
+            with BuildCapacitiveSensors() as bcs:
+                bcs.add(self.capacitive_sensors())
+            with BuildStackup() as bst:
+                bst.add(self.stackup())
+            with BuildWiring() as bw:
+                bw.add(self.wiring)
+            with BuildSchematic() as bs:
+                bs.add(self.sheets())
+            with BuildAssemblyTests() as bat:
+                bat.add(self.tests())
+```
+
+> **Reviewer (Reviewer)**: I’d prefer if the accessors invoked here (e.g. self.design_rules(), self.net_classes() etc. ) were all properties
+
+#### **[MUST FIX]** [projects/carrier_board/carrier_board.py:L731-L745](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L731-L745)
+<!-- comment-uuid: 1974ef72-82bc-45bd-a765-0f3748897ea2 -->
+<!-- comment-commit: working -->
+
+```python
+for r in cr.regions:
+                if r not in pcb.copper_regions:
+                    pcb.copper_regions.append(r)
+
+            with BuildSilkscreen() as silk:
+                omitted_designators = [
+                    fp.name for fp in self.wiring.footprints if getattr(fp, "omit_silkscreen", False)
+                ]
+                silk.omit_designators(omitted_designators)
+                silk.add(self.silkscreen())
+                silk.add(self.silkscreen_graphics())
+
+            with BuildTraces() as bt:
+                bt.add(self.traces())
+            with BuildVias() as bv:
+```
+
+> **Reviewer (Reviewer)**: I’d prefer if the accessors invoked here (e.g. self.design_rules(), self.net_classes() etc. ) were all properties
 
 ### [`projects/carrier_board/pcb.py`](file:///Users/<username>/gh/hardware/projects/carrier_board/pcb.py) — ⏳ `PENDING`
 
@@ -2812,7 +2937,10 @@ if wiring is None:
 - [x] **[MUST FIX]** [`provider/provider.py:L314-L348`](file:///Users/<username>/gh/hardware/provider/provider.py#L314-L348): let’s remove the wiring_path property and use a provider property for returning wiring for each subassembly. then, all pcb.py has to do is overload the wiring property <!-- uuid:4f134659-55da-4f50-af53-913c1fd58b5f -->
 - [x] **[MUST FIX]** [`provider/provider.py:L351-L369`](file:///Users/<username>/gh/hardware/provider/provider.py#L351-L369): same idea here; we can remove the pcb_manifest_path and only read the pcb manifest from the pcb_config attr <!-- uuid:1e3f05ed-393d-485e-8562-2d7a2694302a -->
 - [x] **[MUST FIX]** [`tools/build.py:L563-L566`](file:///Users/<username>/gh/hardware/tools/build.py#L563-L566): let’s remove the wiring_path fallback logic here <!-- uuid:9c4d7eb9-dbe4-4f4e-97f4-6dc2b3f8216f -->
-- [ ] **[MUST FIX]** [`projects/carrier_board/carrier_board.py:L1326-L1328`](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L1326-L1328): This seems bad to me, we’re creating a separate BuildPcb CM just for definign the board wiring. We should remove this second definition!! <!-- uuid:98484bb2-40b2-40af-827e-c79ea6f36f68 -->
-- [ ] **[MUST FIX]** [`projects/carrier_board/carrier_board.py:L2327-L2349`](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L2327-L2349): We def shouldn’t require the user to manipulate the symbol table in their project code. This should all be handled transparently in the provider module when building the wiring object <!-- uuid:8b65070e-3c35-4017-9cbd-9b4523445f27 -->
-- [ ] **[MUST FIX]** [`projects/cat_fountain/pcb.py:L336`](file:///Users/<username>/gh/hardware/projects/cat_fountain/pcb.py#L336): can we remove this parameter from Wiring.from_models while retaining the symbol table functionality <!-- uuid:ee5ceaa2-2d92-4aff-82dd-800735a5069e -->
-- [ ] **[MUST FIX]** [`projects/carrier_board/carrier_board.py:L2463`](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L2463): can we remove this parameter from Wiring.from_models while retaining the symbol table functionality <!-- uuid:a2a98f2b-1d56-435f-8e23-1219d2e00381 -->
+- [x] **[MUST FIX]** [`projects/carrier_board/carrier_board.py:L1326-L1328`](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L1326-L1328): This seems bad to me, we’re creating a separate BuildPcb CM just for definign the board wiring. We should remove this second definition!! <!-- uuid:98484bb2-40b2-40af-827e-c79ea6f36f68 -->
+- [x] **[MUST FIX]** [`projects/carrier_board/carrier_board.py:L2327-L2349`](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L2327-L2349): We def shouldn’t require the user to manipulate the symbol table in their project code. This should all be handled transparently in the provider module when building the wiring object <!-- uuid:8b65070e-3c35-4017-9cbd-9b4523445f27 -->
+- [x] **[MUST FIX]** [`projects/cat_fountain/pcb.py:L336`](file:///Users/<username>/gh/hardware/projects/cat_fountain/pcb.py#L336): can we remove this parameter from Wiring.from_models while retaining the symbol table functionality <!-- uuid:ee5ceaa2-2d92-4aff-82dd-800735a5069e -->
+- [x] **[MUST FIX]** [`projects/carrier_board/carrier_board.py:L2463`](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L2463): can we remove this parameter from Wiring.from_models while retaining the symbol table functionality <!-- uuid:a2a98f2b-1d56-435f-8e23-1219d2e00381 -->
+- [x] **[MUST FIX]** [`projects/carrier_board/carrier_board.py:L562-L628`](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L562-L628): can we combine these sets of two cached properties into a set of single cached properties? <!-- uuid:c1616d76-62e9-428e-8f94-640cfef21a69 -->
+- [x] **[MUST FIX]** [`projects/carrier_board/carrier_board.py:L687-L704`](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L687-L704): I’d prefer if the accessors invoked here (e.g. self.design_rules(), self.net_classes() etc. ) were all properties <!-- uuid:c6403df6-0b63-40c6-a55d-f3a382f9753e -->
+- [x] **[MUST FIX]** [`projects/carrier_board/carrier_board.py:L731-L745`](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L731-L745): I’d prefer if the accessors invoked here (e.g. self.design_rules(), self.net_classes() etc. ) were all properties <!-- uuid:1974ef72-82bc-45bd-a765-0f3748897ea2 -->
