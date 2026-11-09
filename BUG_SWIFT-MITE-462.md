@@ -13,6 +13,10 @@
 1. See the attached pic, the thickness for red-indicated places is too thin, and they may be broken during printing. There are two suggestions for your reference.
 A. Increase the thickness to 1 mm. And then send the new file to us for an update.
 
+#### Attached Commits
+
+- `b8520759`
+
 #### Review Tasks & Functional Checklist
 
 - [x] <!-- task:a23e29b4 --> Build bowl STL and inspect PCB clip detent lip and charger port wall thickness | `python tools/build.py cat_fountain:bowl:stl`
