@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Review Date** | `2026-09-30 06:47:53 UTC` |
+| **Review Date** | `2026-11-08 11:45:41 UTC` |
 | **Revisions** | `ff003f39e0e74c36ef277cb03da9b85afacdb61c` |
-| **Overall Verdict** | **`APPROVED`** |
-| **Review Progress** | `0/8 files reviewed (0%)` |
+| **Overall Verdict** | **`CHANGES_REQUESTED`** |
+| **Review Progress** | `0/3 files reviewed (0%)` |
 | **Total Comments** | `6 findings` |
 
 ## Findings by Severity
@@ -53,7 +53,7 @@
 <!-- comment-commit: ff003f39e0e74c36ef277cb03da9b85afacdb61c -->
 
 ```python
-repo_web_url = self.get_repo_web_url() or "https://github.com/picklethecat1488-hue/hardware"
+repo_web_url = self.get_repo_web_url() or "https://github.com/<username>/hardware"
 ```
 
 > **Reviewer (Reviewer)**: remove direct fallbacks from the codebase please
