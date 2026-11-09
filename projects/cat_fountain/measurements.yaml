@@ -8,6 +8,8 @@ floor_z: 41.0
 target_volume: 0.0010
 bottom_cover_clearance: 0.2
 bottom_cover_drain_radius: 8.0
+bottom_cover_snap_ridge_minor: 0.5
+bottom_cover_snap_ridge_z: 1.7
 rubber_feet_count: 4
 rubber_feet_radius: 5.5
 rubber_feet_depth: 1.0
@@ -250,5 +252,6 @@ motor_hub_support_radius: 15.0
 motor_hub_detent_y: -14.0
 motor_hub_detent_width: 3.0
 motor_hub_detent_depth: 0.8
-pcb_clip_detent_lip: 0.5
+pcb_clip_detent_lip: 1.0
 pcb_clip_stop_wall: 1.5
+charger_port_depth: 6.0

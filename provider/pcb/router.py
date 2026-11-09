@@ -419,6 +419,280 @@ class PCBAutoRouter:
         ]
         return traces, vias
 
+    @classmethod
+    def generate_routing_code(
+        cls,
+        traces: List[TraceSegmentModel],
+        vias: List[ViaModel],
+        function_prefix: str = "carrier_board",
+        board_name: str = "Carrier Board",
+        default_layer: str = "F.Cu",
+        default_width_mm: float = 0.12,
+        default_via_start: str = "F.Cu",
+        default_via_end: str = "B.Cu",
+        default_via_drill: float = 0.16,
+        default_via_pad: float = 0.36,
+    ) -> str:
+        """Render Python routing code using Jinja2 template with build123d primitives.
+
+        Chains multi-segment traces into Polyline at corner turns while preserving
+        collinear segments as Line to prevent OpenCASCADE edge merging anomalies.
+        """
+        from collections import defaultdict
+        import jinja2
+
+        # Group traces by (net, layer, width_mm)
+        grouped: Dict[Tuple[str, str, float], List[TraceSegmentModel]] = defaultdict(list)
+        for t in traces:
+            grouped[(t.net, t.layer, round(t.width_mm, 4))].append(t)
+
+        def chain_corner_turns_only(segs: List[TraceSegmentModel]) -> List[List[TraceSegmentModel]]:
+            pool = list(segs)
+            chains = []
+            while pool:
+                chain = [pool.pop(0)]
+                while True:
+                    tail = chain[-1].end_mm
+                    tail_prev = chain[-1].start_mm
+                    found = False
+                    for i, cand in enumerate(pool):
+                        if math.hypot(cand.start_mm[0] - tail[0], cand.start_mm[1] - tail[1]) < 1e-4:
+                            v1 = (tail[0] - tail_prev[0], tail[1] - tail_prev[1])
+                            v2 = (cand.end_mm[0] - cand.start_mm[0], cand.end_mm[1] - cand.start_mm[1])
+                            dot = v1[0] * v2[0] + v1[1] * v2[1]
+                            l1, l2 = math.hypot(*v1), math.hypot(*v2)
+                            if abs(dot / (l1 * l2)) > 0.999:
+                                # Collinear: do not merge into Polyline so OCCT does not fuse
+                                break
+                            chain.append(pool.pop(i))
+                            found = True
+                            break
+                    if not found:
+                        break
+                chains.append(chain)
+            return chains
+
+        def segments_overlap(
+            s1: Tuple[Tuple[float, float], Tuple[float, float]],
+            s2: Tuple[Tuple[float, float], Tuple[float, float]],
+        ) -> bool:
+            v1 = (s1[1][0] - s1[0][0], s1[1][1] - s1[0][1])
+            l1 = math.hypot(*v1)
+            v2 = (s2[1][0] - s2[0][0], s2[1][1] - s2[0][1])
+            l2 = math.hypot(*v2)
+            if l1 < 1e-6 or l2 < 1e-6:
+                return False
+            cross = v1[0] * v2[1] - v1[1] * v2[0]
+            if abs(cross) / (l1 * l2) > 1e-4:
+                return False
+            w = (s2[0][0] - s1[0][0], s2[0][1] - s1[0][1])
+            cross2 = v1[0] * w[1] - v1[1] * w[0]
+            if abs(cross2) / l1 > 1e-3:
+                return False
+            t_q0 = (w[0] * v1[0] + w[1] * v1[1]) / (l1 * l1)
+            w2 = (s2[1][0] - s1[0][0], s2[1][1] - s1[0][1])
+            t_q1 = (w2[0] * v1[0] + w2[1] * v1[1]) / (l1 * l1)
+            t_min, t_max = min(t_q0, t_q1), max(t_q0, t_q1)
+            overlap_len = max(0.0, min(1.0, t_max) - max(0.0, t_min))
+            return overlap_len * l1 > 1e-4
+
+        def path_segs(path_dict: Dict[str, Any]) -> List[Tuple[Tuple[float, float], Tuple[float, float]]]:
+            pts = path_dict["points"]
+            return [(pts[i], pts[i + 1]) for i in range(len(pts) - 1)]
+
+        trace_groups = []
+        for (net, layer, width), segs in sorted(grouped.items(), key=lambda x: (x[0][0], x[0][1])):
+            chains = chain_corner_turns_only(segs)
+            paths = []
+            for c in chains:
+                if len(c) > 1:
+                    pts = [c[0].start_mm] + [s.end_mm for s in c]
+                    paths.append({"kind": "polyline", "points": pts})
+                else:
+                    paths.append({"kind": "line", "points": [c[0].start_mm, c[0].end_mm]})
+
+            # Partition paths into non-overlapping groups so OpenCASCADE does not produce antenna stubs
+            path_blocks: List[List[Dict[str, Any]]] = []
+            for p in paths:
+                p_edges = path_segs(p)
+                placed = False
+                for b in path_blocks:
+                    conflict = False
+                    for existing_p in b:
+                        for s1 in p_edges:
+                            for s2 in path_segs(existing_p):
+                                if segments_overlap(s1, s2):
+                                    conflict = True
+                                    break
+                            if conflict:
+                                break
+                        if conflict:
+                            break
+                    if not conflict:
+                        b.append(p)
+                        placed = True
+                        break
+                if not placed:
+                    path_blocks.append([p])
+
+            for b in path_blocks:
+                trace_groups.append(
+                    {
+                        "net": net,
+                        "layer": layer,
+                        "width_mm": width,
+                        "paths": b,
+                    }
+                )
+
+        # Group vias by net
+        via_grouped: Dict[str, List[ViaModel]] = defaultdict(list)
+        for v in vias:
+            via_grouped[v.net].append(v)
+
+        via_groups = []
+        for net, v_list in sorted(via_grouped.items()):
+            via_groups.append(
+                {
+                    "net": net,
+                    "vias": [
+                        {
+                            "net": v.net,
+                            "x": round(v.position_mm[0], 4),
+                            "y": round(v.position_mm[1], 4),
+                            "drill_mm": round(v.drill_diameter_mm, 4),
+                            "pad_mm": round(v.pad_diameter_mm, 4),
+                            "layer_start": v.layer_start,
+                            "layer_end": v.layer_end,
+                        }
+                        for v in v_list
+                    ],
+                }
+            )
+
+        templates_dir = Path(__file__).parent.parent / "templates"
+        env = jinja2.Environment(
+            loader=jinja2.FileSystemLoader(str(templates_dir)),
+            trim_blocks=True,
+            lstrip_blocks=True,
+        )
+        template = env.get_template("pcb_routing.py.j2")
+        rendered = template.render(
+            board_name=board_name,
+            function_prefix=function_prefix,
+            default_layer=default_layer,
+            default_width_mm=default_width_mm,
+            default_via_start=default_via_start,
+            default_via_end=default_via_end,
+            default_via_drill=default_via_drill,
+            default_pad_mm=default_via_pad,
+            default_via_pad=default_via_pad,
+            trace_groups=trace_groups,
+            via_groups=via_groups,
+        )
+        return rendered
+
+    @classmethod
+    def save_routing_python(
+        cls,
+        path: Union[str, Path],
+        traces: List[TraceSegmentModel],
+        vias: List[ViaModel],
+        function_prefix: str = "carrier_board",
+        board_name: str = "Carrier Board",
+        default_layer: str = "F.Cu",
+        default_width_mm: float = 0.12,
+        default_via_start: str = "F.Cu",
+        default_via_end: str = "B.Cu",
+        default_via_drill: float = 0.16,
+        default_via_pad: float = 0.36,
+    ) -> Path:
+        """Persist generated routing to a Python module with build123d routing primitives.
+
+        Args:
+            path: Destination file path for routing Python module.
+            traces: List of trace segment models to serialize.
+            vias: List of via models to serialize.
+            function_prefix: Prefix for getter functions (e.g. 'carrier_board').
+            board_name: Human-readable board name.
+            default_layer: Context default copper layer.
+            default_width_mm: Context default conductor width.
+            default_via_start: Context default via start layer.
+            default_via_end: Context default via end layer.
+            default_via_drill: Context default via drill diameter.
+            default_via_pad: Context default via annular pad diameter.
+
+        Returns:
+            Resolved Path of the saved file.
+        """
+        import shutil
+        import subprocess
+
+        p = Path(path).resolve()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        code = cls.generate_routing_code(
+            traces=traces,
+            vias=vias,
+            function_prefix=function_prefix,
+            board_name=board_name,
+            default_layer=default_layer,
+            default_width_mm=default_width_mm,
+            default_via_start=default_via_start,
+            default_via_end=default_via_end,
+            default_via_drill=default_via_drill,
+            default_via_pad=default_via_pad,
+        )
+        p.write_text(code, encoding="utf-8")
+
+        ruff_bin = shutil.which("ruff")
+        if ruff_bin:
+            subprocess.run([ruff_bin, "format", str(p)], capture_output=True, check=False)
+
+        return p
+
+    @classmethod
+    def load_routing_python(cls, path: Union[str, Path]) -> Tuple[List[TraceSegmentModel], List[ViaModel]]:
+        """Dynamically load traces and vias from a Python routing module.
+
+        Args:
+            path: Source file path for routing Python module.
+
+        Returns:
+            Tuple of (traces, vias).
+        """
+        import importlib.util
+
+        p = Path(path).resolve()
+        if not p.exists():
+            raise FileNotFoundError(f"Routing module not found: {p}")
+
+        module_name = f"routing_dynamic_{p.stem}"
+        spec = importlib.util.spec_from_file_location(module_name, p)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Cannot load module from {p}")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+
+        # Look for get_*_routing, or get_*_traces + get_*_vias
+        for attr_name in dir(mod):
+            if attr_name.endswith("_routing") and callable(getattr(mod, attr_name)):
+                res = getattr(mod, attr_name)()
+                if isinstance(res, tuple) and len(res) == 2:
+                    return res[0], res[1]
+
+        traces_fn = None
+        vias_fn = None
+        for attr_name in dir(mod):
+            if attr_name.endswith("_traces") and callable(getattr(mod, attr_name)):
+                traces_fn = getattr(mod, attr_name)
+            elif attr_name.endswith("_vias") and callable(getattr(mod, attr_name)):
+                vias_fn = getattr(mod, attr_name)
+
+        if traces_fn is not None and vias_fn is not None:
+            return traces_fn(), vias_fn()
+
+        raise AttributeError(f"Module {p} does not export routing functions (_routing or _traces/_vias)")
+
     def get_footprints_for_board(self) -> List[Any]:
         """Return footprints belonging specifically to this board target (filtering by shape_ref)."""
         fps = list(self.wiring.footprints) if self.wiring else []

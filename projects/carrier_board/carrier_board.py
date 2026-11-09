@@ -756,14 +756,13 @@ class CarrierBoardPCBListing:
 
     @cached_property
     def _routed_network(self) -> tuple[list[TraceSegmentModel], list[ViaModel]]:
-        """Compute complete routed traces and vias directly from settings routing_path."""
-        from provider.pcb.router import PCBAutoRouter
+        """Compute complete routed traces and vias directly from carrier_board_routing.py."""
+        from projects.carrier_board.carrier_board_routing import (
+            get_carrier_board_traces,
+            get_carrier_board_vias,
+        )
 
-        routing_file = self.settings.routing_path
-        if routing_file and Path(routing_file).exists():
-            return PCBAutoRouter.load_routing_yaml(routing_file)
-
-        return [], []
+        return get_carrier_board_traces(), get_carrier_board_vias()
 
     @property
     def traces(self) -> list[TraceSegmentModel]:

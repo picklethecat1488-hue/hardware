@@ -1655,6 +1655,9 @@ class TestCatFountainProvider:
         bowl_part = bowl.part
         cover_part = cover.part
         assert bowl_part is not None and cover_part is not None
+        assert len(cover_part.solids()) == 1, (
+            f"Pump cover has {len(cover_part.solids())} separate solids; must be a single merged solid"
+        )
 
         floor_z = provider.settings.floor_z
         hub_r = provider.settings.impeller_radius + provider.settings.magnet_radius + 1.0
@@ -2612,6 +2615,9 @@ class TestCatFountainProvider:
         bowl_part = bowl.part
         cover_part = cover.part
         assert bowl_part is not None and cover_part is not None
+        assert len(cover_part.solids()) == 1, (
+            f"Pump cover has {len(cover_part.solids())} separate solids; must be a single merged solid"
+        )
 
         mount_depth = provider.settings.pump_cover_mount_depth
         snap_z_offset = provider.settings.pump_cover_snap_z_offset
@@ -2697,4 +2703,83 @@ class TestCatFountainProvider:
         res = evaluate_boundary_cad_conformance(cad_solid, b)
         assert res.solid_conformance_ratio >= 0.80, (
             f"Impeller boundary CAD conformance ratio {res.solid_conformance_ratio:.2%} is below 80%"
+        )
+
+    @pytest.mark.slow
+    def test_regression_bug_golden_firefly_566_pump_cover_single_solid(self, provider):
+        """Verify BUG-GOLDEN-FIREFLY-566: Pump cover STL is a single merged solid without floating rings."""
+        cover = provider.build_pump_cover("pump_cover")
+        assert cover.part is not None
+        solids = cover.part.solids()
+        assert len(solids) == 1, f"Expected 1 solid for pump_cover, found {len(solids)} separate solids"
+
+    @pytest.mark.slow
+    def test_regression_bug_swift_mite_462_bowl_minimum_wall_thickness(self, provider):
+        """Verify BUG-SWIFT-MITE-462: Bowl features minimum 1.0mm wall thickness at PCB clip lip and charger port."""
+        bowl = provider.build_bowl("bowl")
+        bowl_part = bowl.part
+        assert bowl_part is not None
+
+        # 1. PCB clip bottom retaining lip thickness >= 1.0mm
+        base_z = provider.settings.floor_z - provider.settings.bowl_thickness
+        standoff_h = provider.settings.motor_driver_standoff_height
+        snap_h = 1.8
+        pocket_bottom_z = base_z - standoff_h - snap_h
+        tmc_span = provider.settings.motor_driver_spacing_y
+        tmc_slide = provider.settings.motor_driver_spacing_x
+        mcx, mcy = 50.0, 15.0
+        assert bowl_part.is_inside((mcx + tmc_span / 2.0 - 0.1, mcy, pocket_bottom_z - 0.5)), (
+            "PCB clip retaining lip must be at least 1.0mm thick (solid at pocket_bottom_z - 0.5mm)"
+        )
+        assert bowl_part.is_inside((mcx, mcy + tmc_slide / 2.0 - 0.1, pocket_bottom_z - 0.5)), (
+            "PCB clip retaining lip must be at least 1.0mm thick (solid at pocket_bottom_z - 0.5mm)"
+        )
+
+        # 2. Wall thickness between charger standoff and charging port cutout >= 1.0mm
+        charger_x = provider.settings.charger_spacing_x / 2.0
+        charger_y = -79.0 - provider.settings.charger_spacing_y / 2.0
+        hole_edge_y = charger_y - provider.settings.pcb_hole_radius
+        standoff_z = base_z - provider.settings.charger_standoff_height / 2.0
+        assert bowl_part.is_inside((charger_x, hole_edge_y - 1.0, standoff_z)), (
+            f"Wall thickness between charger standoff hole and port cutout must be >= 1.0mm at Y={hole_edge_y - 1.0}"
+        )
+
+    @pytest.mark.slow
+    def test_regression_bug_clicking_larva_354_bottom_cover_smooth_snap_ridge(self, provider):
+        """Verify BUG-CLICKING-LARVA-354: Bottom cover features smooth annular snap ridge with no unprintable shelves."""
+        from build123d import GeomType
+
+        cover = provider.build_bottom_cover("bottom_cover")
+        assert cover.part is not None
+
+        # 1. Single solid check
+        solids = cover.part.solids()
+        assert len(solids) == 1, f"Expected 1 solid for bottom_cover, found {len(solids)} separate solids"
+
+        # 2. No flat horizontal planar shelf faces on the snap ridge (Z = 1.2 or 2.2)
+        planar_shelves = [
+            f
+            for f in cover.part.faces()
+            if f.geom_type == GeomType.PLANE
+            and abs(f.normal_at().Z) > 0.9
+            and any(abs(f.bounding_box().min.Z - z0) < 1e-3 for z0 in (1.2, 2.2))
+        ]
+        assert len(planar_shelves) == 0, (
+            f"Found {len(planar_shelves)} unprintable planar shelves on bottom cover snap ridge"
+        )
+
+        # 3. Outer radius at snap ridge crest matches cover_r + snap_minor
+        cover_r = (
+            provider.settings.bowl_radius - provider.settings.bowl_thickness - provider.settings.bottom_cover_clearance
+        )
+        expected_crest_r = cover_r + provider.settings.bottom_cover_snap_ridge_minor
+        snap_z = provider.settings.bottom_cover_snap_ridge_z
+
+        # Point just inside the snap ridge crest must be solid
+        assert cover.part.is_inside((expected_crest_r - 0.05, 0.0, snap_z)), (
+            "Snap ridge crest must be solid at expected outer radius"
+        )
+        # Point outside the snap ridge crest must not be solid
+        assert not cover.part.is_inside((expected_crest_r + 0.05, 0.0, snap_z)), (
+            "Snap ridge must not extend beyond expected outer radius"
         )

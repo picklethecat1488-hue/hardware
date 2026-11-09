@@ -574,6 +574,25 @@ class ReviewServer(ThreadingHTTPServer):
         self.save_and_sync()
         return {"status": "ok", "merged_files": merged_count, "total_comments": len(self.session.comments)}
 
+    def update_commit_hash(self, orig_commit: str, new_commit: str) -> None:
+        """Update review session and comments from orig_commit to new_commit.
+
+        Args:
+            orig_commit: Original commit hash or 'working'.
+            new_commit: New commit hash to re-key comments to.
+        """
+        with self._lock:
+            if self.session.commit_hash == orig_commit or (not self.session.commit_hash and orig_commit == "working"):
+                self.session.commit_hash = new_commit
+            if orig_commit in self.session.revisions:
+                self.session.revisions = [new_commit if r == orig_commit else r for r in self.session.revisions]
+            for comment in self.session.comments:
+                if comment.commit == orig_commit or (not comment.commit and orig_commit == "working"):
+                    comment.commit = new_commit
+            if self.sqlite_store:
+                self.sqlite_store.update_comment_commit_hash(orig_commit, new_commit)
+            self.save_and_sync()
+
     def save_and_sync(self) -> Path:
         """Persist session to SQLite, export JSON, and render updated Markdown report."""
         with self._lock:
@@ -599,13 +618,19 @@ class ReviewServer(ThreadingHTTPServer):
                             pass
                     res = self.markdown_output
 
-                # Export commit-specific CR_<commit>.md ONLY if there are comments for this commit
+                # Export commit-specific CR_<commit>.md for all relevant commits
+                commits_to_export = {c.commit for c in self.session.comments if c.commit}
                 commit_sha = self.session.commit_hash or self.git_engine.get_head_commit()
                 if commit_sha:
+                    commits_to_export.add(commit_sha)
+                if (self.feedback_dir / "CR_working.md").exists():
+                    commits_to_export.add("working")
+
+                for c_sha in commits_to_export:
                     try:
-                        commit_files = len(self.git_engine.get_changed_files(commit_sha))
+                        commit_files = len(self.git_engine.get_changed_files(c_sha))
                         self.exporter.export_commit_markdown(
-                            self.session, commit_sha, self.feedback_dir, total_repo_files=commit_files
+                            self.session, c_sha, self.feedback_dir, total_repo_files=commit_files
                         )
                     except OSError:
                         pass

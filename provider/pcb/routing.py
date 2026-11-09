@@ -44,7 +44,12 @@ class BuildTraces:
 
         active_pcb = BuildPcb.current()
         if active_pcb is not None:
-            active_pcb.traces.extend(self.traces)
+            existing_keys = {(t.net, t.layer, round(t.width_mm, 4), t.start_mm, t.end_mm) for t in active_pcb.traces}
+            for t in self.traces:
+                k = (t.net, t.layer, round(t.width_mm, 4), t.start_mm, t.end_mm)
+                if k not in existing_keys:
+                    active_pcb.traces.append(t)
+                    existing_keys.add(k)
 
     @classmethod
     def _get_context(cls) -> Optional["BuildTraces"]:
@@ -53,10 +58,13 @@ class BuildTraces:
 
     def add(self, item: Union[TraceSegmentModel, Sequence[TraceSegmentModel]]) -> None:
         """Append one or more trace segment models."""
-        if isinstance(item, TraceSegmentModel):
-            self.traces.append(item)
-        else:
-            self.traces.extend(item)
+        items = [item] if isinstance(item, TraceSegmentModel) else list(item)
+        existing_keys = {(t.net, t.layer, round(t.width_mm, 4), t.start_mm, t.end_mm) for t in self.traces}
+        for t in items:
+            k = (t.net, t.layer, round(t.width_mm, 4), t.start_mm, t.end_mm)
+            if k not in existing_keys:
+                self.traces.append(t)
+                existing_keys.add(k)
 
 
 def _resolve_coord(pt: Any) -> Tuple[float, float]:
@@ -235,7 +243,15 @@ def make_trace(
         target_geom = offset(target_geom, amount=offset_mm, side=resolved_side, closed=False)
 
     edges = []
-    if hasattr(target_geom, "edges"):
+    if hasattr(target_geom, "wires") and target_geom.wires():
+        for w in target_geom.wires():
+            if hasattr(w, "order_edges"):
+                edges.extend(w.order_edges())
+            elif hasattr(w, "edges"):
+                edges.extend(w.edges())
+    elif hasattr(target_geom, "order_edges"):
+        edges = list(target_geom.order_edges())
+    elif hasattr(target_geom, "edges"):
         edges = list(target_geom.edges())
     elif hasattr(target_geom, "__iter__"):
         edges = list(target_geom)
@@ -425,7 +441,29 @@ class BuildVias:
 
         active_pcb = BuildPcb.current()
         if active_pcb is not None:
-            active_pcb.vias.extend(self.vias)
+            existing_via_keys = {
+                (
+                    v.net,
+                    v.position_mm,
+                    v.pad_diameter_mm,
+                    v.drill_diameter_mm,
+                    v.layer_start,
+                    v.layer_end,
+                )
+                for v in active_pcb.vias
+            }
+            for v in self.vias:
+                vk = (
+                    v.net,
+                    v.position_mm,
+                    v.pad_diameter_mm,
+                    v.drill_diameter_mm,
+                    v.layer_start,
+                    v.layer_end,
+                )
+                if vk not in existing_via_keys:
+                    active_pcb.vias.append(v)
+                    existing_via_keys.add(vk)
 
     @classmethod
     def _get_context(cls) -> Optional["BuildVias"]:
@@ -434,10 +472,30 @@ class BuildVias:
 
     def add(self, item: Union[ViaModel, Sequence[ViaModel]]) -> None:
         """Append one or more via models."""
-        if isinstance(item, ViaModel):
-            self.vias.append(item)
-        else:
-            self.vias.extend(item)
+        items = [item] if isinstance(item, ViaModel) else list(item)
+        existing_via_keys = {
+            (
+                v.net,
+                v.position_mm,
+                v.pad_diameter_mm,
+                v.drill_diameter_mm,
+                v.layer_start,
+                v.layer_end,
+            )
+            for v in self.vias
+        }
+        for v in items:
+            vk = (
+                v.net,
+                v.position_mm,
+                v.pad_diameter_mm,
+                v.drill_diameter_mm,
+                v.layer_start,
+                v.layer_end,
+            )
+            if vk not in existing_via_keys:
+                self.vias.append(v)
+                existing_via_keys.add(vk)
 
 
 class Via:

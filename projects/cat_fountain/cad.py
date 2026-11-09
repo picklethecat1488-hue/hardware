@@ -289,7 +289,9 @@ class CatFountainCAD:
                 clearance = 0.2
                 snap_depth = 0.35
                 snap_h = 1.8
-                total_h = standoff_h + pcb_t + 1.0
+                lip_t = self.settings.pcb_clip_detent_lip
+                chamfer_h = 0.3
+                total_h = standoff_h + snap_h + lip_t + chamfer_h
 
                 cutout_margin = self.settings.pcb_snap_socket_cutout_margin
 
@@ -329,7 +331,7 @@ class CatFountainCAD:
                         Box(
                             cutout_x + 0.6,
                             cutout_y + 0.6,
-                            0.3,
+                            chamfer_h,
                             align=(Align.CENTER, Align.CENTER, Align.MIN),
                             mode=Mode.SUBTRACT,
                         )
@@ -507,11 +509,12 @@ class CatFountainCAD:
             # Charging port hole in the outer wall of the dry compartment (back side, y = -r)
             # Centered on the USB port, which is located on the underside of the PCB
             usb_z = floor_z - t - self.settings.charger_standoff_height - 3.2
+            port_depth = self.settings.charger_port_depth
             with Locations((0, -r + t / 2.0, usb_z)):
                 with BuildPart(mode=Mode.PRIVATE) as port_cutout:
                     Box(
                         self.settings.charger_port_width,
-                        10.0,
+                        port_depth,
                         self.settings.charger_port_height,
                         align=(Align.CENTER, Align.CENTER, Align.CENTER),
                     )
@@ -878,16 +881,17 @@ class CatFountainCAD:
         with BuildPart() as cover:
             Cylinder(radius=cover_r, height=4.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
-            # Add a 0.5mm snap-fit annular ring around the perimeter
-            snap_ring_part = make_snap_ring(
-                outer_radius=cover_r + 0.5,
-                inner_radius=cover_r - 2.0,
-                height=1.0,
-                fillet_radius=0.4,
-                align_z=Align.MIN,
-            )
-            with Locations((0, 0, 1.2)):
-                add(snap_ring_part)
+            # Add a 0.5mm snap-fit annular Torus ridge around the perimeter (BUG-CLICKING-LARVA-354)
+            snap_minor = self.settings.bottom_cover_snap_ridge_minor
+            snap_z = self.settings.bottom_cover_snap_ridge_z
+            if snap_minor > 0.0:
+                with Locations((0, 0, snap_z)):
+                    Torus(
+                        major_radius=cover_r,
+                        minor_radius=snap_minor,
+                        align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                        mode=Mode.ADD,
+                    )
 
             # Funnel-shaped top surface to drain water towards the central drain hole
             with Locations((0, 0, 1.5)):
@@ -1276,11 +1280,18 @@ class CatFountainCAD:
                         height=mount_depth,
                         align=(Align.CENTER, Align.CENTER, Align.MIN),
                     )
-                # Annular snap-fit ridge on downward lip to lock tightly into casing recess (BUG-SPECKLED-ROACH-49)
+                # Annular snap-fit ridge on downward lip to lock tightly into casing recess (BUG-SPECKLED-ROACH-49, BUG-GOLDEN-FIREFLY-566)
                 with Locations((0, 0, -self.settings.pump_cover_snap_z_offset)):
+                    ridge_r = snap_r + self.settings.pump_cover_snap_ridge_offset
+                    ridge_minor = self.settings.pump_cover_snap_ridge_minor
+                    Cylinder(
+                        radius=ridge_r,
+                        height=ridge_minor * 2.0,
+                        align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                    )
                     Torus(
-                        major_radius=snap_r + self.settings.pump_cover_snap_ridge_offset,
-                        minor_radius=self.settings.pump_cover_snap_ridge_minor,
+                        major_radius=ridge_r,
+                        minor_radius=ridge_minor,
                     )
 
             # 2. Tube sleeve sliding down the vertical delivery tube
