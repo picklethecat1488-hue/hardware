@@ -18,3 +18,7 @@ Example:
 
 - **Expected**: 3) Open review feedback in CR_working.md should get moved into CR_foo.md
 - **Actual**: 3) Open review feedback stays in CR_working.md
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:b933808b --> Verify working tree code review comments migrate to CR_<commit>.md upon git commit | `python tools/forge.py list-reviews --open`
