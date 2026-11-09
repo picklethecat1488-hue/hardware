@@ -9,18 +9,39 @@
 | **Review Date** | `2026-11-08 11:45:41 UTC` |
 | **Revisions** | `working` |
 | **Overall Verdict** | **`CHANGES_REQUESTED`** |
-| **Review Progress** | `0/11 files reviewed (0%)` |
-| **Total Comments** | `23 findings` |
+| **Review Progress** | `0/17 files reviewed (0%)` |
+| **Total Comments** | `24 findings` |
 
 ## Findings by Severity
 
 | Severity | Count | Meaning |
 | :--- | :---: | :--- |
-| **[MUST FIX]** | 23 | Must be resolved before merge; bugs, defects, or safety regressions. |
+| **[MUST FIX]** | 24 | Must be resolved before merge; bugs, defects, or safety regressions. |
 | **[PROPOSAL]** | 0 | Architecture ideas, design proposals, or optional enhancements. |
 | **[NIT]** | 0 | Minor formatting, naming, or cosmetic cleanups. |
 
 ## File-by-File Review Findings
+
+### [`model/wiring.py`](file:///Users/<username>/gh/hardware/model/wiring.py) — ⏳ `PENDING`
+
+#### **[MUST FIX]** [model/wiring.py:L417-L427](file:///Users/<username>/gh/hardware/model/wiring.py#L417-L427)
+<!-- comment-uuid: 29f34525-045c-4672-861d-cb18bb3ef1d3 -->
+<!-- comment-commit: working -->
+
+```python
+def load_shared_footprints(search_dir: Optional[Path] = None) -> Dict[str, Dict[str, Any]]:
+    """Load standard footprint definitions from provider.footprints declarative primitives."""
+    global _SHARED_FOOTPRINTS_CACHE
+    if _SHARED_FOOTPRINTS_CACHE is not None:
+        return _SHARED_FOOTPRINTS_CACHE
+
+    from provider.footprints import get_shared_footprints
+
+    _SHARED_FOOTPRINTS_CACHE = get_shared_footprints()
+    return _SHARED_FOOTPRINTS_CACHE
+```
+
+> **Reviewer (Reviewer)**: can we remove this?
 
 ### [`projects/carrier_board/cad.py`](file:///Users/<username>/gh/hardware/projects/carrier_board/cad.py) — ⏳ `PENDING`
 
@@ -2944,3 +2965,4 @@ if wiring is None:
 - [x] **[MUST FIX]** [`provider/provider.py:L314-L348`](file:///Users/<username>/gh/hardware/provider/provider.py#L314-L348): let’s remove the wiring_path property and use a provider property for returning wiring for each subassembly. then, all pcb.py has to do is overload the wiring property <!-- uuid:4f134659-55da-4f50-af53-913c1fd58b5f -->
 - [x] **[MUST FIX]** [`provider/provider.py:L351-L369`](file:///Users/<username>/gh/hardware/provider/provider.py#L351-L369): same idea here; we can remove the pcb_manifest_path and only read the pcb manifest from the pcb_config attr <!-- uuid:1e3f05ed-393d-485e-8562-2d7a2694302a -->
 - [x] **[MUST FIX]** [`tools/build.py:L563-L566`](file:///Users/<username>/gh/hardware/tools/build.py#L563-L566): let’s remove the wiring_path fallback logic here <!-- uuid:9c4d7eb9-dbe4-4f4e-97f4-6dc2b3f8216f -->
+- [ ] **[MUST FIX]** [`model/wiring.py:L417-L427`](file:///Users/<username>/gh/hardware/model/wiring.py#L417-L427): can we remove this? <!-- uuid:29f34525-045c-4672-861d-cb18bb3ef1d3 -->
