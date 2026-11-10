@@ -8,7 +8,7 @@
 | :--- | :--- |
 | **Review Date** | `2026-11-08 11:45:41 UTC` |
 | **Revisions** | `working` |
-| **Overall Verdict** | **`APPROVED`** |
+| **Overall Verdict** | **`IN_REVIEW`** |
 | **Review Progress** | `0/4 files reviewed (0%)` |
 | **Total Comments** | `24 findings` |
 
@@ -2942,6 +2942,7 @@ if wiring is None:
 
 ## Action Items Checklist
 
+- [x] **[MUST FIX]** [`model/wiring.py:L417-L427`](file:///Users/<username>/gh/hardware/model/wiring.py#L417-L427): can we remove this? <!-- uuid:29f34525-045c-4672-861d-cb18bb3ef1d3 -->
 - [x] **[MUST FIX]** [`projects/carrier_board/cad.py:L659-L685`](file:///Users/<username>/gh/hardware/projects/carrier_board/cad.py#L659-L685): let’s remove this property, there’s no use case for it <!-- uuid:37285658-901e-48e5-a647-98c029ff4af3 -->
 - [x] **[MUST FIX]** [`projects/carrier_board/carrier_board.py:L1326-L1328`](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L1326-L1328): This seems bad to me, we’re creating a separate BuildPcb CM just for definign the board wiring. We should remove this second definition!! <!-- uuid:98484bb2-40b2-40af-827e-c79ea6f36f68 -->
 - [x] **[MUST FIX]** [`projects/carrier_board/carrier_board.py:L2327-L2349`](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L2327-L2349): We def shouldn’t require the user to manipulate the symbol table in their project code. This should all be handled transparently in the provider module when building the wiring object <!-- uuid:8b65070e-3c35-4017-9cbd-9b4523445f27 -->
@@ -2965,4 +2966,3 @@ if wiring is None:
 - [x] **[MUST FIX]** [`provider/provider.py:L314-L348`](file:///Users/<username>/gh/hardware/provider/provider.py#L314-L348): let’s remove the wiring_path property and use a provider property for returning wiring for each subassembly. then, all pcb.py has to do is overload the wiring property <!-- uuid:4f134659-55da-4f50-af53-913c1fd58b5f -->
 - [x] **[MUST FIX]** [`provider/provider.py:L351-L369`](file:///Users/<username>/gh/hardware/provider/provider.py#L351-L369): same idea here; we can remove the pcb_manifest_path and only read the pcb manifest from the pcb_config attr <!-- uuid:1e3f05ed-393d-485e-8562-2d7a2694302a -->
 - [x] **[MUST FIX]** [`tools/build.py:L563-L566`](file:///Users/<username>/gh/hardware/tools/build.py#L563-L566): let’s remove the wiring_path fallback logic here <!-- uuid:9c4d7eb9-dbe4-4f4e-97f4-6dc2b3f8216f -->
-- [x] **[MUST FIX]** [`model/wiring.py:L417-L427`](file:///Users/<username>/gh/hardware/model/wiring.py#L417-L427): can we remove this? <!-- uuid:29f34525-045c-4672-861d-cb18bb3ef1d3 -->
