@@ -1,0 +1,68 @@
+"""Pre-routed copper traces and interlayer vias for {{ board_name }}.
+
+Generated automatically via templatized routing code generator.
+"""
+
+from typing import List, Tuple
+from build123d import BuildLine, Line, Polyline
+from model.pcb import TraceSegmentModel, ViaModel
+from provider.pcb.routing import BuildTraces, BuildVias, Via, make_trace
+
+
+def get_{{ function_prefix }}_traces() -> List[TraceSegmentModel]:
+    """Return pre-routed copper trace segments for {{ board_name }}."""
+    with BuildTraces(default_layer="{{ default_layer }}", default_width_mm={{ default_width_mm }}) as bt:
+        {% for group in trace_groups %}
+        # Net {{ group.net }} [{{ group.layer }}]
+        with BuildLine():
+            {% for path in group.paths %}
+            {% if path.kind == "polyline" %}
+            Polyline(
+                {% for pt in path.points %}
+                ({{ pt[0] }}, {{ pt[1] }}),
+                {% endfor %}
+            )
+            {% else %}
+            Line(({{ path.points[0][0] }}, {{ path.points[0][1] }}), ({{ path.points[1][0] }}, {{ path.points[1][1] }}))
+            {% endif %}
+            {% endfor %}
+            make_trace("{{ group.net }}"{% if group.layer != default_layer %}, layer="{{ group.layer }}"{% endif %}{% if group.width_mm != default_width_mm %}, width_mm={{ group.width_mm }}{% endif %})
+
+        {% endfor %}
+    return list(bt.traces)
+
+
+def get_{{ function_prefix }}_vias() -> List[ViaModel]:
+    """Return interlayer vias for {{ board_name }}."""
+    with BuildVias(
+        default_layer_start="{{ default_via_start }}",
+        default_layer_end="{{ default_via_end }}",
+        default_drill_mm={{ default_via_drill }},
+        default_pad_mm={{ default_via_pad }},
+    ) as bv:
+        {% for group in via_groups %}
+        # Net {{ group.net }} vias
+        {% for via in group.vias %}
+        Via(
+            "{{ via.net }}",
+            at=({{ via.x }}, {{ via.y }}),
+            {% if via.drill_mm != default_via_drill %}drill_mm={{ via.drill_mm }}, {% endif %}
+            {% if via.pad_mm != default_via_pad %}diameter_mm={{ via.pad_mm }}, {% endif %}
+            {% if via.layer_start != default_via_start %}layer1="{{ via.layer_start }}", {% endif %}
+            {% if via.layer_end != default_via_end %}layer2="{{ via.layer_end }}", {% endif %}
+        )
+        {% endfor %}
+        {% endfor %}
+    return list(bv.vias)
+
+
+def get_{{ function_prefix }}_routing() -> Tuple[List[TraceSegmentModel], List[ViaModel]]:
+    """Return complete pre-routed copper traces and interlayer vias for {{ board_name }}."""
+    return get_{{ function_prefix }}_traces(), get_{{ function_prefix }}_vias()
+
+
+__all__ = [
+    "get_{{ function_prefix }}_traces",
+    "get_{{ function_prefix }}_vias",
+    "get_{{ function_prefix }}_routing",
+]

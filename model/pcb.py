@@ -3,8 +3,8 @@
 import math
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
-from pydantic import BaseModel, Field, model_validator
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # Default relative permittivity (epsilon_r) for standard FR-4 dielectric substrates
 DEFAULT_FR4_DIELECTRIC_PERMITTIVITY: float = 4.2
@@ -35,6 +35,88 @@ class FlexType(StrEnum):
     CONNECTOR = "connector"
     COMPONENT = "component"
     CAPACITIVE = "capacitive"
+
+
+class RouteStyle(StrEnum):
+    """Routing geometry style for manual copper trace routes."""
+
+    STRAIGHT = "straight"
+    CHAMFER_45 = "45_deg"
+    CURVED = "curved"
+    MANHATTAN = "manhattan"
+
+
+class PinSide(StrEnum):
+    """Placement side for a pin label and schematic symbol pin breakout."""
+
+    LEFT = "left"
+    RIGHT = "right"
+    TOP = "top"
+    BOTTOM = "bottom"
+
+
+class PinSideDef(BaseModel):
+    """Pin breakout and side placement specification for a schematic component symbol."""
+
+    left: List[str] = Field(default_factory=list, description="Pins placed on the left side")
+    right: List[str] = Field(default_factory=list, description="Pins placed on the right side")
+    top: List[str] = Field(default_factory=list, description="Pins placed on the top side")
+    bottom: List[str] = Field(default_factory=list, description="Pins placed on the bottom side")
+
+    @field_validator("left", "right", "top", "bottom", mode="before")
+    @classmethod
+    def _normalize_pins(cls, v: Any) -> List[str]:
+        """Normalize pin sequence into a list of strings."""
+        if isinstance(v, (list, tuple)):
+            res = []
+            for x in v:
+                if hasattr(x, "name"):
+                    res.append(str(x.name))
+                elif hasattr(x, "pin_name") and x.pin_name:
+                    res.append(str(x.pin_name))
+                else:
+                    res.append(str(x))
+            return res
+        return v
+
+    def to_side_map(self) -> Dict[str, PinSide]:
+        """Return mapping of pin name to PinSide enum."""
+        res: Dict[str, PinSide] = {}
+        for p in self.left:
+            res[p] = PinSide.LEFT
+        for p in self.right:
+            res[p] = PinSide.RIGHT
+        for p in self.top:
+            res[p] = PinSide.TOP
+        for p in self.bottom:
+            res[p] = PinSide.BOTTOM
+        return res
+
+    def to_breakout_list(self) -> List[str]:
+        """Return unified breakout order list."""
+        return list(self.left + self.right + self.top + self.bottom)
+
+    @classmethod
+    def from_side_map(cls, mapping: Dict[str, Union[PinSide, str]]) -> "PinSideDef":
+        """Construct PinSideDef from a {pin_name: side} mapping."""
+        left: List[str] = []
+        right: List[str] = []
+        top: List[str] = []
+        bottom: List[str] = []
+        for pin, side in mapping.items():
+            side_val = side.value if isinstance(side, PinSide) else str(side).lower()
+            match side_val:
+                case "left":
+                    left.append(str(pin))
+                case "right":
+                    right.append(str(pin))
+                case "top":
+                    top.append(str(pin))
+                case "bottom":
+                    bottom.append(str(pin))
+                case _:
+                    left.append(str(pin))
+        return cls(left=left, right=right, top=top, bottom=bottom)
 
 
 class StackupLayerModel(BaseModel):
@@ -489,6 +571,51 @@ class NetClassModel(BaseModel):
     )
 
 
+class RuleSeverity(StrEnum):
+    """KiCad DRC rule severity level."""
+
+    IGNORE = "ignore"
+    WARNING = "warning"
+    ERROR = "error"
+
+
+class RuleSeveritiesModel(BaseModel):
+    """Strongly typed KiCad DRC rule severity overrides."""
+
+    model_config = ConfigDict(extra="allow")
+
+    hole_to_hole: Optional[RuleSeverity] = None
+    hole_near_hole: Optional[RuleSeverity] = None
+    lib_footprint_issues: Optional[RuleSeverity] = None
+    text_height: Optional[RuleSeverity] = None
+    silk_overlap: Optional[RuleSeverity] = None
+    silk_over_copper: Optional[RuleSeverity] = None
+    track_dangling: Optional[RuleSeverity] = None
+    silk_edge_clearance: Optional[RuleSeverity] = None
+
+    def __contains__(self, item: Any) -> bool:
+        """Check if rule severity override is present and configured."""
+        if not isinstance(item, str):
+            return False
+        val = getattr(self, item, None)
+        if val is not None:
+            return True
+        return bool(self.model_extra and self.model_extra.get(item) is not None)
+
+    def __getitem__(self, item: str) -> Any:
+        """Support dictionary-style key subscripting for rule severities."""
+        val = getattr(self, item, None)
+        if val is None and self.model_extra:
+            val = self.model_extra.get(item)
+        if val is None:
+            raise KeyError(item)
+        return val
+
+    def to_dict(self) -> Dict[str, str]:
+        """Convert rule severities to KiCad design settings dictionary."""
+        return {k: (v.value if hasattr(v, "value") else str(v)) for k, v in self.model_dump(exclude_none=True).items()}
+
+
 class PCBDesignRulesModel(BaseModel):
     """Design rules and manufacturing constraints for PCB routing, clearance, and DRC validation."""
 
@@ -542,10 +669,22 @@ class PCBDesignRulesModel(BaseModel):
     pad_to_mask_clearance_mm: float = Field(
         default=0.0, ge=0.0, description="Solder mask expansion clearance in millimeters"
     )
-    rule_severities: Dict[str, str] = Field(
-        default_factory=dict,
+    rule_severities: Optional[Union[RuleSeveritiesModel, Dict[str, str]]] = Field(
+        default=None,
         description="KiCad DRC rule severity overrides (e.g. {'track_dangling': 'ignore', 'text_height': 'ignore'})",
     )
+
+    @field_validator("rule_severities", mode="before")
+    @classmethod
+    def parse_rule_severities(cls, v: Any) -> Optional[Union[RuleSeveritiesModel, Dict[str, str]]]:
+        """Parse dictionary or model into RuleSeveritiesModel."""
+        if v is None:
+            return None
+        if isinstance(v, RuleSeveritiesModel):
+            return v
+        if isinstance(v, dict):
+            return RuleSeveritiesModel(**v)
+        return v
 
     def to_kicad_pro_rules(self) -> Dict[str, float]:
         """Convert design rules to KiCad .kicad_pro design_settings rules dictionary."""
@@ -593,7 +732,10 @@ class PCBDesignRulesModel(BaseModel):
             "rules": self.to_kicad_pro_rules(),
         }
         if self.rule_severities:
-            design_settings["rule_severities"] = dict(self.rule_severities)
+            if isinstance(self.rule_severities, RuleSeveritiesModel):
+                design_settings["rule_severities"] = self.rule_severities.to_dict()
+            elif isinstance(self.rule_severities, dict):
+                design_settings["rule_severities"] = dict(self.rule_severities)
 
         return {
             "board": {
@@ -653,12 +795,32 @@ class FlexZoneModel(BaseModel):
     )
 
 
+class ElectrodeType(StrEnum):
+    """Capacitive sensing principle."""
+
+    MUTUAL = "mutual"
+    SELF = "self"
+
+
+class ElectrodeShape(StrEnum):
+    """Capacitive electrode geometry."""
+
+    INTERDIGITAL = "interdigital"
+    PAD = "pad"
+    SLIDER = "slider"
+    LOOP = "loop"
+
+
 class CapacitiveElectrodeModel(BaseModel):
     """Configuration for capacitive touch and liquid-level sensing electrodes on flexible or rigid substrates."""
 
     name: str = Field(description="Sensor electrode net or identifier (e.g. SENSE_LEVEL_LOW, TOUCH_PAD_1)")
-    electrode_type: str = Field(default="mutual", description="Capacitive sensing principle: 'self' or 'mutual'")
-    shape: str = Field(default="interdigital", description="Electrode geometry: 'interdigital', 'pad', or 'slider'")
+    electrode_type: Union[ElectrodeType, str] = Field(
+        default=ElectrodeType.MUTUAL, description="Capacitive sensing principle: 'self' or 'mutual'"
+    )
+    shape: Union[ElectrodeShape, str] = Field(
+        default=ElectrodeShape.INTERDIGITAL, description="Electrode geometry: 'interdigital', 'pad', or 'slider'"
+    )
     area_mm: Tuple[float, float] = Field(description="Dimensions (width, length) of the sensor active electrode")
     pitch_mm: float = Field(default=1.0, gt=0.0, description="Interdigital comb finger pitch spacing in millimeters")
     gap_mm: float = Field(default=0.3, gt=0.0, description="Interdigital comb gap between TX and RX fingers")
@@ -692,15 +854,38 @@ class AssemblyTestStepModel(BaseModel):
     """Factory assembly testing step for automated test fixtures (bed-of-nails, flying probe)."""
 
     step_id: str = Field(description="Unique test step identifier (e.g. TEST_IMP_DIFF_100)")
+    subassembly: Optional[str] = Field(
+        default=None, description="Subassembly identifier (e.g. carrier_board, flex_tail)"
+    )
     description: str = Field(description="Test procedure description")
     test_type: str = Field(description="Type of test: continuity, isolation, impedance, capacitance, voltage")
-    net_or_points: List[str] = Field(description="Nets, component pins, or test coupon pads under test")
+    net_or_points: List[str] = Field(
+        default_factory=list, description="Nets, component pins, or test coupon pads under test"
+    )
     expected_nominal: Optional[float] = Field(default=None, description="Nominal expected value")
     tolerance_pct: Optional[float] = Field(
         default=None, ge=0.0, description="Acceptable percentage tolerance (e.g. 10.0 for +/-10%)"
     )
     unit: str = Field(default="", description="Measurement unit (e.g. ohm, pF, V, mA)")
     stimulus: Optional[str] = Field(default=None, description="Optional stimulus signal (e.g. 100kHz 1V RMS)")
+    net_name: Optional[str] = Field(default=None, description="Target net name for continuity or voltage test")
+    pad_a_mm: Optional[Tuple[float, float]] = Field(default=None, description="Probe pad A coordinate (x, y) in mm")
+    pad_b_mm: Optional[Tuple[float, float]] = Field(default=None, description="Probe pad B coordinate (x, y) in mm")
+    nominal: Optional[float] = Field(default=None, description="Nominal expected value alias")
+    measured: Optional[float] = Field(default=None, description="Simulated or measured value")
+
+    @model_validator(mode="after")
+    def sync_nominal(self) -> "AssemblyTestStepModel":
+        """Synchronize nominal with expected_nominal and net_name with net_or_points."""
+        if self.nominal is None and self.expected_nominal is not None:
+            self.nominal = self.expected_nominal
+        elif self.expected_nominal is None and self.nominal is not None:
+            self.expected_nominal = self.nominal
+        if self.net_name and not self.net_or_points:
+            self.net_or_points = [self.net_name]
+        elif not self.net_name and self.net_or_points:
+            self.net_name = self.net_or_points[0]
+        return self
 
 
 class AssemblyTestModel(BaseModel):
@@ -797,6 +982,78 @@ class SchematicSheetModel(BaseModel):
         default_factory=SchematicLayoutModel, description="Layout grid and dimension parameters for this sheet"
     )
 
+    @field_validator("components", mode="before")
+    @classmethod
+    def parse_components(cls, v: Any) -> List[str]:
+        """Normalize component instances or designator strings into string list."""
+        if isinstance(v, (list, tuple)):
+            res = []
+            for item in v:
+                if hasattr(item, "name"):
+                    res.append(str(item.name))
+                else:
+                    res.append(str(item))
+            return res
+        return v
+
+    @field_validator("pin_breakouts", mode="before")
+    @classmethod
+    def parse_pin_breakouts(cls, v: Any) -> Dict[str, List[str]]:
+        """Normalize component keys and pin lists into dict[str, list[str]]."""
+        if isinstance(v, dict):
+            res = {}
+            for k, val in v.items():
+                k_name = k.name if hasattr(k, "name") else str(k)
+                if isinstance(val, PinSideDef):
+                    res[k_name] = val.to_breakout_list()
+                else:
+                    res[k_name] = [str(getattr(x, "name", x)) for x in val]
+            return res
+        return v
+
+    @field_validator("pin_sides", mode="before")
+    @classmethod
+    def parse_pin_sides(cls, v: Any) -> Dict[str, Dict[str, str]]:
+        """Normalize component keys into string dictionary."""
+        if isinstance(v, dict):
+            res = {}
+            for k, val in v.items():
+                k_name = k.name if hasattr(k, "name") else str(k)
+                if isinstance(val, PinSideDef):
+                    res[k_name] = {pk: pv.value for pk, pv in val.to_side_map().items()}
+                elif isinstance(val, dict):
+                    res[k_name] = {str(pk): str(pv) for pk, pv in val.items()}
+                else:
+                    res[k_name] = val
+            return res
+        return v
+
+    def add_component(
+        self,
+        name: str,
+        pin_breakout: Optional[Sequence[str]] = None,
+        pin_sides: Optional[Union[PinSideDef, Dict[str, Any]]] = None,
+    ) -> None:
+        """Register a component designator and its pin breakout/side configuration to this sheet."""
+        comp_name = str(getattr(name, "name", name))
+        if comp_name not in self.components:
+            self.components.append(comp_name)
+        if pin_sides is not None:
+            if isinstance(pin_sides, PinSideDef):
+                self.pin_sides[comp_name] = {k: v.value for k, v in pin_sides.to_side_map().items()}
+                if pin_breakout is None:
+                    pin_breakout = pin_sides.to_breakout_list()
+            elif isinstance(pin_sides, dict):
+                if any(k in pin_sides for k in ("left", "right", "top", "bottom")):
+                    ps_def = PinSideDef(**pin_sides)
+                    self.pin_sides[comp_name] = {k: v.value for k, v in ps_def.to_side_map().items()}
+                    if pin_breakout is None:
+                        pin_breakout = ps_def.to_breakout_list()
+                else:
+                    self.pin_sides[comp_name] = {str(pk): str(pv) for pk, pv in pin_sides.items()}
+        if pin_breakout is not None:
+            self.pin_breakouts[comp_name] = [str(getattr(x, "name", x)) for x in pin_breakout]
+
 
 class TraceSegmentModel(BaseModel):
     """Linear copper trace segment routing a net on a specific layer."""
@@ -870,6 +1127,28 @@ class PCBObstacleModel(BaseModel):
     )
     description: Optional[str] = Field(default=None, description="Human-readable description of obstacle")
     layer: str = Field(default="F.Cu", description="Board layer location ('F.Cu' or 'B.Cu')")
+
+
+class SymbolTableEntry(BaseModel):
+    """Metadata record tracing a component on the schematic/PCB back to its declaring block."""
+
+    designator: str = Field(description="Canonical reference designator (e.g. C1, U2)")
+    block: str = Field(default="default", description="Context manager block name (e.g. power_supply, mcu_core)")
+    subassembly: Optional[str] = Field(default=None, description="Optional subassembly identifier")
+    package: str = Field(description="Footprint package identifier")
+    value: Optional[str] = Field(default=None, description="Component electrical value")
+    mpn: Optional[str] = Field(default=None, description="Manufacturer part number")
+    supplier_pn: Optional[str] = Field(default=None, description="Supplier part number")
+    position_mm: Tuple[float, float, float] = Field(
+        default=(0.0, 0.0, 0.0), description="Absolute component position (x, y, z) in mm"
+    )
+    rotation_deg: Tuple[float, float, float] = Field(
+        default=(0.0, 0.0, 0.0), description="Component orientation (pitch, roll, yaw) in deg"
+    )
+    layer: str = Field(default="F.Cu", description="Placement copper layer ('F.Cu' or 'B.Cu')")
+    source_file: Optional[str] = Field(default=None, description="Source python file")
+    source_line: Optional[int] = Field(default=None, description="Source line number")
+    connected_nets: List[str] = Field(default_factory=list, description="Nets connected to component pins")
 
 
 class PCBConfig(BaseModel):
@@ -951,6 +1230,14 @@ class PCBConfig(BaseModel):
     obstacles: List[PCBObstacleModel] = Field(
         default_factory=list,
         description="Physical component and fixture obstacles for CAD and simulation",
+    )
+    symbol_table: Dict[str, SymbolTableEntry] = Field(
+        default_factory=dict,
+        description="Component symbol table mapping designators to declaring block and metadata",
+    )
+    test_steps: List[AssemblyTestStepModel] = Field(
+        default_factory=list,
+        description="Ordered factory assembly and simulation test steps",
     )
 
     @property

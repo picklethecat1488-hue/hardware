@@ -637,3 +637,26 @@ class SQLiteReviewStore:
                 resolved=bool(row["resolved"]),
                 commit=c_commit,
             )
+
+    def update_comment_commit_hash(self, orig_commit: str, new_commit: str) -> int:
+        """Update commit_hash for comments matching orig_commit to new_commit.
+
+        Args:
+            orig_commit: Original commit hash or 'working'.
+            new_commit: New commit hash to re-key comments to.
+
+        Returns:
+            Number of comments updated.
+        """
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "UPDATE comments SET commit_hash = ? WHERE commit_hash = ? OR (commit_hash = '' AND ? = 'working')",
+                (new_commit, orig_commit, orig_commit),
+            )
+            count = cursor.rowcount
+            conn.execute(
+                "UPDATE metadata SET value = ? WHERE key = 'commit_hash' AND (value = ? OR (value = '' AND ? = 'working'))",
+                (new_commit, orig_commit, orig_commit),
+            )
+            conn.commit()
+            return count

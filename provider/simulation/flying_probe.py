@@ -130,10 +130,8 @@ def verify_signal_lines_isolation(
         pcb_cfg = getattr(provider, "pcb_config", None)
         if pcb_cfg and getattr(pcb_cfg, "wiring", None):
             wiring = pcb_cfg.wiring
-        elif hasattr(provider, "wiring_path") and Path(provider.wiring_path).exists():
-            from model.wiring import Wiring
-
-            wiring = Wiring(Path(provider.wiring_path))
+        elif hasattr(provider, "wiring"):
+            wiring = provider.wiring
 
     if not wiring or not hasattr(wiring, "nets"):
         return {
@@ -256,10 +254,8 @@ def verify_diff_pair_compliance(
         pcb_cfg = getattr(provider, "pcb_config", None)
         if pcb_cfg and getattr(pcb_cfg, "wiring", None):
             wiring = pcb_cfg.wiring
-        elif hasattr(provider, "wiring_path") and Path(provider.wiring_path).exists():
-            from model.wiring import Wiring
-
-            wiring = Wiring(Path(provider.wiring_path))
+        elif hasattr(provider, "wiring"):
+            wiring = provider.wiring
 
     net_names = {net.name for net in wiring.nets} if wiring and hasattr(wiring, "nets") else set()
 
@@ -579,6 +575,35 @@ def render_markdown_test_report(
     return template.render(**model.model_dump())
 
 
+def resolve_test_steps_from_provider(provider: Any, target_name: str) -> List[TestStepSpec]:
+    """Extract TestStepSpec instances from declarative provider tests."""
+    asm_tests = None
+    if "flex" in target_name.lower():
+        asm_tests = getattr(provider, "flex_tail_tests", None)
+    if asm_tests is None:
+        asm_tests = getattr(provider, "tests", None)
+
+    if asm_tests and getattr(asm_tests, "instructions", None):
+        return [
+            TestStepSpec(
+                step_id=step.step_id,
+                description=step.description,
+                test_type=step.test_type,
+                net_name=step.net_name or "",
+                pad_a_mm=step.pad_a_mm or (0.0, 0.0),
+                pad_b_mm=step.pad_b_mm or (0.0, 0.0),
+                nominal=float(step.nominal or 0.0),
+                tolerance_pct=float(step.tolerance_pct or 0.0),
+                unit=step.unit or "",
+                stimulus=step.stimulus or "",
+                measured=float(step.measured or 0.0),
+            )
+            for step in asm_tests.instructions
+            if not step.subassembly or step.subassembly in target_name or target_name in step.subassembly
+        ]
+    return []
+
+
 def create_flying_probe_hooks(
     provider: Any,
     sim_name: str,
@@ -596,16 +621,9 @@ def create_flying_probe_hooks(
     """
     target_label = sim_name.split("/")[-1] if "/" in sim_name else sim_name
 
-    # Resolve test steps yaml path
-    if test_steps_path is None:
-        p_root = getattr(provider, "root", None)
-        if p_root is None and hasattr(provider, "wiring_path"):
-            p_root = Path(provider.wiring_path).parent
-        if p_root:
-            test_steps_path = Path(p_root) / "pcb_test_steps.yaml"
-
-    test_steps: List[TestStepSpec] = []
-    if test_steps_path and Path(test_steps_path).exists():
+    # Prefer declarative test steps from provider models
+    test_steps: List[TestStepSpec] = resolve_test_steps_from_provider(provider, target_label)
+    if not test_steps and test_steps_path and Path(test_steps_path).exists():
         test_steps = load_test_steps_from_yaml(test_steps_path, target_label)
 
     # Perform automated signal line power and ground isolation verification
@@ -618,10 +636,6 @@ def create_flying_probe_hooks(
     # Synthesize physical flying probe test steps for all signal line isolation checks
     # so the flying probes physically navigate to and probe every signal line against GND/power
     wiring = getattr(provider, "wiring", None)
-    if wiring is None and hasattr(provider, "wiring_path") and Path(provider.wiring_path).exists():
-        from model.wiring import Wiring
-
-        wiring = Wiring(Path(provider.wiring_path))
 
     pcb_cfg = getattr(provider, "pcb_config", None)
 

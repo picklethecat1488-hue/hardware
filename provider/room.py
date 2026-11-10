@@ -199,11 +199,13 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                 # Setting the label allows visualization tools like ocp_vscode to identify parts.
                 setattr(obj, "label", name)
                 # Setting the color metadata for visualization and STEP export.
+                col = Color(*rgba) if isinstance(rgba, (tuple, list)) and len(rgba) == 4 else rgba
                 if hasattr(obj, "color"):
-                    if isinstance(rgba, (tuple, list)) and len(rgba) == 4:
-                        setattr(obj, "color", Color(*rgba))
-                    elif isinstance(rgba, Color):
-                        setattr(obj, "color", rgba)
+                    setattr(obj, "color", col)
+                if hasattr(obj, "children"):
+                    for child in obj.children:
+                        if hasattr(child, "color"):
+                            setattr(child, "color", col)
                 children.append(obj)
             else:
                 raise ValueError(f"Item '{name}' in Room could not be converted to a build123d object.")

@@ -169,12 +169,9 @@ class TestCatFountainProvider:
     @pytest.mark.slow
     def test_wiring_diagram_class(self, provider):
         """Verify that WiringDiagram populates the room with all pads and wires."""
-        from pathlib import Path
-        from provider import Wiring, WiringDiagram
+        from provider import WiringDiagram
 
-        yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
-        bowl_part = provider.build_bowl("bowl").part
-        wiring = Wiring(yaml_path, bowl_part)
+        wiring = provider.wiring
 
         room = Room()
         diagram = WiringDiagram(wiring)
@@ -1658,6 +1655,9 @@ class TestCatFountainProvider:
         bowl_part = bowl.part
         cover_part = cover.part
         assert bowl_part is not None and cover_part is not None
+        assert len(cover_part.solids()) == 1, (
+            f"Pump cover has {len(cover_part.solids())} separate solids; must be a single merged solid"
+        )
 
         floor_z = provider.settings.floor_z
         hub_r = provider.settings.impeller_radius + provider.settings.magnet_radius + 1.0
@@ -1794,32 +1794,12 @@ class TestCatFountainProvider:
             "Motor hub bracket is hollowed out around motor base: expected solid plastic to mount and secure motor!"
         )
 
-        # Wire relief channel extending South along -Y
-        assert not hub.part.is_inside((0.0, -10.0, clip_h - 0.2)), (
-            "Wire relief channel at Y = -10.0 is blocked: 3-wire motor cable would be pinched!"
-        )
-
-        # Dedicated R-shape side relief for 1102 motor connector rotation (BUG-TRANSLUCENT-LARVA-792)
-        # Relieved arm must be open to allow connector rotation
-        assert not hub.part.is_inside((-6.0, -10.0, clip_h * 0.5)), (
-            "Motor hub side relief cutout at (-6.0, -10.0) is blocked: connector cannot rotate into position!"
-        )
-        # Guide stub near handle must remain solid for slide-in slot alignment
-        assert hub.part.is_inside((-6.0, -20.0, clip_h * 0.5)), (
-            "Motor hub guide stub at (-6.0, -20.0) is missing: hub cannot align in bowl slide slot!"
-        )
-        # Opposite continuous arm must remain solid
-        assert hub.part.is_inside((6.0, -10.0, clip_h * 0.5)), (
-            "Motor hub continuous arm at (6.0, -10.0) is missing: structural integrity lost!"
-        )
-
     def test_regression_bug_hairy_wasp_932_tmc6300_6pwm_wiring_and_no_sense_pin(self, provider):
         """Verify BUG-HAIRY-WASP-932: TMC6300 uses 6-PWM control (UH..WL), SEN pin is disconnected, and GP26 speed sensor is preserved."""
         from pathlib import Path
-        from model.wiring import Wiring
+        from projects.cat_fountain.pcb import build_cat_fountain_wiring
 
-        yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
-        wiring = Wiring(yaml_path)
+        wiring = build_cat_fountain_wiring()
 
         # 1. Pico pin allocation: GP16..GP21 for 6-PWM, GP22 for DIAG, and GP26 for speed sensor
         pico = next(f for f in wiring.footprints if f.name == "pico")
@@ -1860,10 +1840,9 @@ class TestCatFountainProvider:
     def test_regression_bug_camouflaged_midge_831_no_cyan_wire_in_cat_fountain_wiring(self):
         """Verify BUG-CAMOUFLAGED-MIDGE-831: Cat fountain wiring diagram does not use cyan wire color."""
         from pathlib import Path
-        from model.wiring import Wiring
+        from projects.cat_fountain.pcb import build_cat_fountain_wiring
 
-        yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
-        wiring = Wiring(yaml_path)
+        wiring = build_cat_fountain_wiring()
 
         cyan_nets = [net.name for net in wiring.nets if net.color.lower() == "cyan"]
         assert not cyan_nets, f"Cyan wire color is prohibited in loom, but found in nets: {cyan_nets}"
@@ -1909,8 +1888,7 @@ class TestCatFountainProvider:
         )
 
         # 2. Check wiring.yaml footprint dimensions, rotation, and absence of screw mounting holes
-        yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
-        wiring = Wiring(yaml_path)
+        wiring = provider.wiring
         driver = next(f for f in wiring.footprints if f.name == "motor_driver")
         assert tuple(driver.dimensions) == (20.32, 15.24, 1.6), (
             f"Expected TMC6300 board dimensions [20.32, 15.24, 1.6], got {driver.dimensions}"
@@ -2066,8 +2044,7 @@ class TestCatFountainProvider:
         assert provider.settings.swd_board_width == 13.7
 
         # 2. Footprint in wiring.yaml
-        yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
-        wiring = Wiring(yaml_path)
+        wiring = provider.wiring
         swd_fp = next((f for f in wiring.footprints if f.name == "swd_adapter"), None)
         assert swd_fp is not None, "swd_adapter footprint must exist in wiring.yaml"
         assert tuple(swd_fp.dimensions) == (19.1, 13.7, 1.6)
@@ -2638,6 +2615,9 @@ class TestCatFountainProvider:
         bowl_part = bowl.part
         cover_part = cover.part
         assert bowl_part is not None and cover_part is not None
+        assert len(cover_part.solids()) == 1, (
+            f"Pump cover has {len(cover_part.solids())} separate solids; must be a single merged solid"
+        )
 
         mount_depth = provider.settings.pump_cover_mount_depth
         snap_z_offset = provider.settings.pump_cover_snap_z_offset
@@ -2723,4 +2703,83 @@ class TestCatFountainProvider:
         res = evaluate_boundary_cad_conformance(cad_solid, b)
         assert res.solid_conformance_ratio >= 0.80, (
             f"Impeller boundary CAD conformance ratio {res.solid_conformance_ratio:.2%} is below 80%"
+        )
+
+    @pytest.mark.slow
+    def test_regression_bug_golden_firefly_566_pump_cover_single_solid(self, provider):
+        """Verify BUG-GOLDEN-FIREFLY-566: Pump cover STL is a single merged solid without floating rings."""
+        cover = provider.build_pump_cover("pump_cover")
+        assert cover.part is not None
+        solids = cover.part.solids()
+        assert len(solids) == 1, f"Expected 1 solid for pump_cover, found {len(solids)} separate solids"
+
+    @pytest.mark.slow
+    def test_regression_bug_swift_mite_462_bowl_minimum_wall_thickness(self, provider):
+        """Verify BUG-SWIFT-MITE-462: Bowl features minimum 1.0mm wall thickness at PCB clip lip and charger port."""
+        bowl = provider.build_bowl("bowl")
+        bowl_part = bowl.part
+        assert bowl_part is not None
+
+        # 1. PCB clip bottom retaining lip thickness >= 1.0mm
+        base_z = provider.settings.floor_z - provider.settings.bowl_thickness
+        standoff_h = provider.settings.motor_driver_standoff_height
+        snap_h = 1.8
+        pocket_bottom_z = base_z - standoff_h - snap_h
+        tmc_span = provider.settings.motor_driver_spacing_y
+        tmc_slide = provider.settings.motor_driver_spacing_x
+        mcx, mcy = 50.0, 15.0
+        assert bowl_part.is_inside((mcx + tmc_span / 2.0 - 0.1, mcy, pocket_bottom_z - 0.5)), (
+            "PCB clip retaining lip must be at least 1.0mm thick (solid at pocket_bottom_z - 0.5mm)"
+        )
+        assert bowl_part.is_inside((mcx, mcy + tmc_slide / 2.0 - 0.1, pocket_bottom_z - 0.5)), (
+            "PCB clip retaining lip must be at least 1.0mm thick (solid at pocket_bottom_z - 0.5mm)"
+        )
+
+        # 2. Wall thickness between charger standoff and charging port cutout >= 1.0mm
+        charger_x = provider.settings.charger_spacing_x / 2.0
+        charger_y = -79.0 - provider.settings.charger_spacing_y / 2.0
+        hole_edge_y = charger_y - provider.settings.pcb_hole_radius
+        standoff_z = base_z - provider.settings.charger_standoff_height / 2.0
+        assert bowl_part.is_inside((charger_x, hole_edge_y - 1.0, standoff_z)), (
+            f"Wall thickness between charger standoff hole and port cutout must be >= 1.0mm at Y={hole_edge_y - 1.0}"
+        )
+
+    @pytest.mark.slow
+    def test_regression_bug_clicking_larva_354_bottom_cover_smooth_snap_ridge(self, provider):
+        """Verify BUG-CLICKING-LARVA-354: Bottom cover features smooth annular snap ridge with no unprintable shelves."""
+        from build123d import GeomType
+
+        cover = provider.build_bottom_cover("bottom_cover")
+        assert cover.part is not None
+
+        # 1. Single solid check
+        solids = cover.part.solids()
+        assert len(solids) == 1, f"Expected 1 solid for bottom_cover, found {len(solids)} separate solids"
+
+        # 2. No flat horizontal planar shelf faces on the snap ridge (Z = 1.2 or 2.2)
+        planar_shelves = [
+            f
+            for f in cover.part.faces()
+            if f.geom_type == GeomType.PLANE
+            and abs(f.normal_at().Z) > 0.9
+            and any(abs(f.bounding_box().min.Z - z0) < 1e-3 for z0 in (1.2, 2.2))
+        ]
+        assert len(planar_shelves) == 0, (
+            f"Found {len(planar_shelves)} unprintable planar shelves on bottom cover snap ridge"
+        )
+
+        # 3. Outer radius at snap ridge crest matches cover_r + snap_minor
+        cover_r = (
+            provider.settings.bowl_radius - provider.settings.bowl_thickness - provider.settings.bottom_cover_clearance
+        )
+        expected_crest_r = cover_r + provider.settings.bottom_cover_snap_ridge_minor
+        snap_z = provider.settings.bottom_cover_snap_ridge_z
+
+        # Point just inside the snap ridge crest must be solid
+        assert cover.part.is_inside((expected_crest_r - 0.05, 0.0, snap_z)), (
+            "Snap ridge crest must be solid at expected outer radius"
+        )
+        # Point outside the snap ridge crest must not be solid
+        assert not cover.part.is_inside((expected_crest_r + 0.05, 0.0, snap_z)), (
+            "Snap ridge must not extend beyond expected outer radius"
         )

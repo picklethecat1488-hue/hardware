@@ -189,7 +189,7 @@ class Viewer:
             from provider.pcb.exporter import PCBExporter
 
             subassembly = TargetParser.split_target(target)[1]
-            wiring = Wiring(provider.wiring_path) if os.path.exists(provider.wiring_path) else None
+            wiring = provider.wiring
 
             solid = None
             sub_pcb_config = None
@@ -248,9 +248,27 @@ class Viewer:
                     "white": (0.90, 0.90, 0.90),
                     "purple": (0.45, 0.15, 0.55),
                 }
-                item_color = color_map.get(pcb_cfg.stackup.soldermask_color.lower(), (0.08, 0.40, 0.20))
+                item_color = color_map.get(
+                    pcb_cfg.stackup.soldermask_color.lower()
+                    if pcb_cfg.stackup and getattr(pcb_cfg.stackup, "soldermask_color", None)
+                    else "green",
+                    (0.08, 0.40, 0.20),
+                )
 
-            items.append((solid, item_name, item_color, 1.0))
+            from provider.pcb.cad_assembler import PCB3DAssembler
+
+            assembler = PCB3DAssembler(
+                pcb_config=pcb_cfg,
+                wiring=wiring,
+                substrate=solid,
+                substrate_color=item_color,
+                pcb_name=item_name,
+            )
+            layer_items = assembler.get_display_items(prefix=item_name)
+            if layer_items:
+                items.extend(layer_items)
+            else:
+                items.append((solid, item_name, item_color, 1.0))
 
             if not no_gui:
                 self.launch_pcb_viewer(kicad_pcb_path, no_gui=no_gui)
@@ -348,6 +366,24 @@ class Viewer:
                     continue
 
         if not display_items:
+            candidates: list[str] = []
+            manifest_keys = list(self.target_parser.router.manifest.keys())
+            for t in input_targets:
+                base = TargetParser.get_base_target(t)
+                prefix_matches = [k for k in manifest_keys if k.startswith(base)]
+                if prefix_matches:
+                    candidates.extend(prefix_matches)
+                else:
+                    import difflib
+
+                    close = difflib.get_close_matches(base, manifest_keys, n=3, cutoff=0.5)
+                    candidates.extend(close)
+            if candidates:
+                unique = sorted(set(candidates))
+                raise ValueError(
+                    f"No geometry generated for the specified targets: {list(input_targets)}. "
+                    f"Did you mean: {', '.join(unique[:5])}?"
+                )
             raise ValueError("No geometry generated for the specified targets.")
 
         room = Room(config=self.manager.config, is_simulate=is_simulate)

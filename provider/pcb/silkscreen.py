@@ -46,11 +46,31 @@ class BuildSilkscreen:
             for g in self.graphics:
                 if hasattr(active_pcb, "silkscreen_graphics") and g not in active_pcb.silkscreen_graphics:
                     active_pcb.silkscreen_graphics.append(g)
+            if getattr(active_pcb, "wiring", None) is not None:
+                for fp in getattr(active_pcb.wiring, "footprints", []):
+                    if getattr(fp, "show_designator", True) is False or getattr(fp, "omit_silkscreen", False) is True:
+                        if fp.name not in active_pcb.omitted_silkscreen_designators:
+                            active_pcb.omitted_silkscreen_designators.append(str(fp.name))
+
+    @classmethod
+    def current(cls) -> Optional["BuildSilkscreen"]:
+        """Retrieve active silkscreen builder context if present."""
+        return _current_silkscreen.get()
 
     @classmethod
     def _get_context(cls) -> Optional["BuildSilkscreen"]:
         """Retrieve active silkscreen builder context if present."""
         return _current_silkscreen.get()
+
+    def omit_designators(self, designators: Sequence[str]) -> None:
+        """Add reference designators to omit from manufacturing silkscreen layer."""
+        from provider.pcb.board import BuildPcb
+
+        active_pcb = BuildPcb.current()
+        if active_pcb is not None:
+            for des in designators:
+                if des not in active_pcb.omitted_silkscreen_designators:
+                    active_pcb.omitted_silkscreen_designators.append(str(des))
 
     def add(
         self,

@@ -138,11 +138,11 @@ from model.pcb import FlexType
 from .pcb.routing import (
     BuildTraces,
     Trace,
+    make_trace,
     BuildVias,
     Via,
     BuildCopperRegions,
     CopperRegion,
-    CopperZone,
     BuildTestPoints,
     TestPoint,
 )
