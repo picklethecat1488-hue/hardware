@@ -16,12 +16,6 @@ The height of the protruding feature is too small to print.
 
 —This looks like a defect introduced by conversion of BREP CAD objects into STL meshes. Can you take a look/fix this?
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1794248529568_wddvz.png](attachments/BUG-CLICKING-LARVA-354/screenshot_paste_1794248529568_wddvz.png) | Pasted screenshot screenshot_paste_1794248529568_wddvz.png |
-
 #### Attached Commits
 
 - `89249441`

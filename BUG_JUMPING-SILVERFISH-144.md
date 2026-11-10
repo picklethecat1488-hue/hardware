@@ -20,12 +20,6 @@ The vias I circled on the bottom right of the carrier board appear unnecessary; 
 python tools/view.py footprints/040
 ```
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1794265655729_eo4n6.png](attachments/BUG-JUMPING-SILVERFISH-144/screenshot_paste_1794265655729_eo4n6.png) | Pasted screenshot screenshot_paste_1794265655729_eo4n6.png |
-
 #### Attached Commits
 
 - `3120b5c6`
