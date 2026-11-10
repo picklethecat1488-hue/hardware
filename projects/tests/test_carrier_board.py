@@ -3460,3 +3460,90 @@ def test_regression_bug_translucent_cricket_767_flex_tail_footprint_scoping() ->
     assert len(c_comps.children) == 65
     assert c_pads is not None
     assert len(c_pads.children) == 534
+
+
+def test_regression_bug_punctate_instar_79_carrier_board_components_and_traces_alignment() -> None:
+    """Verify BUG-PUNCTATE-INSTAR-79: PCB components and copper traces are properly aligned and not clipping through substrate.
+
+    1. Substrate bounding box spans Z = [-0.800, +0.800] mm (1.6mm nominal thickness).
+    2. Copper traces sit proud on the outer board surfaces:
+       - Top traces (F.Cu) sit at Z in [0.800, 0.835] mm (not submerged inside substrate).
+       - Bottom traces (B.Cu) sit at Z in [-0.835, -0.800] mm.
+    3. Component package bodies sit proud of the copper pads/substrate:
+       - Top components sit at Z >= 0.800 mm.
+       - Zero components penetrate inside or clip through the bottom of the PCB substrate.
+    4. Top and bottom silkscreen elements sit proud of the traces/substrate:
+       - Top silkscreen sits at Z >= 0.800 mm.
+       - Bottom silkscreen sits at Z <= -0.800 mm.
+    """
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider.pcb.cad_assembler import PCB3DAssembler
+
+    provider = CarrierBoardProvider()
+    carrier_pcb = provider.carrier_board("carrier_board", None, Mode.DEFAULT)
+    carrier_cfg = carrier_pcb.to_pcb_config()
+    assembler = PCB3DAssembler(
+        pcb_config=carrier_cfg,
+        wiring=provider.wiring,
+        substrate=carrier_pcb.part,
+        pcb_name="carrier_board",
+    )
+
+    # 1. Check substrate vertical bounds
+    sub = assembler.build_substrate()
+    assert sub is not None
+    sub_bb = sub.bounding_box()
+    assert pytest.approx(sub_bb.min.Z, abs=1e-3) == -0.800
+    assert pytest.approx(sub_bb.max.Z, abs=1e-3) == 0.800
+
+    # 2. Check copper traces sit on top / bottom of substrate
+    traces_top = assembler.build_traces("F.Cu")
+    assert traces_top is not None
+    top_bb = traces_top.bounding_box()
+    assert top_bb.min.Z >= 0.799, f"Top traces submerged inside substrate: min.Z = {top_bb.min.Z}"
+    assert top_bb.max.Z <= 0.840, f"Top traces too high: max.Z = {top_bb.max.Z}"
+
+    traces_bot = assembler.build_traces("B.Cu")
+    assert traces_bot is not None
+    bot_bb = traces_bot.bounding_box()
+    assert bot_bb.max.Z <= -0.799, f"Bottom traces submerged inside substrate: max.Z = {bot_bb.max.Z}"
+    assert bot_bb.min.Z >= -0.840, f"Bottom traces too low: min.Z = {bot_bb.min.Z}"
+
+    # 3. Check components and pads
+    comps, pads = assembler.build_components_and_pads()
+    assert comps is not None
+    assert pads is not None
+    # Pads must span full thickness plus copper thickness
+    pads_bb = pads.bounding_box()
+    assert pads_bb.max.Z >= 0.830
+    assert pads_bb.min.Z <= -0.830
+
+    # Component package bodies: none should penetrate through the bottom of the PCB substrate
+    # Bottom of substrate is at -0.800 mm. Components on bottom can extend down to -1.435 mm (e.g. J4 contact pads)
+    # but top components must have min.Z >= 0.800 mm.
+    # Furthermore, verify that no top component penetrates into the substrate [-0.800, 0.800].
+    penetrating_comps = []
+    for child in comps.children:
+        c_bb = child.bounding_box()
+        # If component is mounted on top, its bottom should sit on or above top copper (>= 0.800)
+        # If component is mounted on bottom, its top should sit on or below bottom copper (<= -0.800)
+        is_top = c_bb.max.Z > 0.800
+        if is_top and c_bb.min.Z < 0.799:
+            penetrating_comps.append((c_bb.min.Z, c_bb.max.Z))
+        elif not is_top and c_bb.max.Z > -0.799:
+            penetrating_comps.append((c_bb.min.Z, c_bb.max.Z))
+
+    assert len(penetrating_comps) == 0, (
+        f"{len(penetrating_comps)} components are penetrating into or clipping through the substrate: {penetrating_comps[:5]}"
+    )
+
+    # 4. Check silkscreen bounds
+    silk_top = assembler.build_silkscreen("F.SilkS")
+    assert silk_top is not None
+    st_bb = silk_top.bounding_box()
+    assert st_bb.min.Z >= 0.800, f"Top silkscreen submerged: min.Z = {st_bb.min.Z}"
+
+    silk_bot = assembler.build_silkscreen("B.SilkS")
+    assert silk_bot is not None
+    sb_bb = silk_bot.bounding_box()
+    assert sb_bb.max.Z <= -0.800, f"Bottom silkscreen submerged: max.Z = {sb_bb.max.Z}"

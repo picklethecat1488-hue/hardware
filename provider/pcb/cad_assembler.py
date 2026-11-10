@@ -64,10 +64,24 @@ class PCB3DAssembler:
         self.pcb_name = pcb_name or pcb_config.name or "board"
 
         # Determine board thickness and vertical bounds
-        self.total_thickness = self._resolve_board_thickness()
-        self.z_top = self.total_thickness / 2.0
-        self.z_bottom = -self.total_thickness / 2.0
-        self.z_mid = 0.0
+        if self.substrate is not None:
+            part = getattr(self.substrate, "part", self.substrate)
+            if hasattr(part, "bounding_box"):
+                bb = part.bounding_box()
+                self.z_top = bb.max.Z
+                self.z_bottom = bb.min.Z
+                self.z_mid = (self.z_top + self.z_bottom) / 2.0
+                self.total_thickness = bb.size.Z
+            else:
+                self.total_thickness = self._resolve_board_thickness()
+                self.z_top = self.total_thickness / 2.0
+                self.z_bottom = -self.total_thickness / 2.0
+                self.z_mid = 0.0
+        else:
+            self.total_thickness = self._resolve_board_thickness()
+            self.z_top = self.total_thickness / 2.0
+            self.z_bottom = -self.total_thickness / 2.0
+            self.z_mid = 0.0
 
         # Resolve soldermask color
         if substrate_color is not None:
@@ -99,10 +113,10 @@ class PCB3DAssembler:
 
     def _resolve_board_thickness(self) -> float:
         """Derive physical board substrate thickness in mm."""
-        if self.pcb_config.stackup and self.pcb_config.stackup.total_thickness_mm:
-            return float(self.pcb_config.stackup.total_thickness_mm)
         if self.pcb_config.dimensions_mm and len(self.pcb_config.dimensions_mm) > 2:
             return float(self.pcb_config.dimensions_mm[2])
+        if self.pcb_config.stackup and self.pcb_config.stackup.total_thickness_mm:
+            return float(self.pcb_config.stackup.total_thickness_mm)
         return 1.6
 
     @classmethod
@@ -277,10 +291,14 @@ class PCB3DAssembler:
                 fp_inst = fp_factory()
                 if fp_inst.part is not None:
                     body = fp_inst.part
+                    body_bb = body.bounding_box()
+                    z_mount = self.z_top + self.cu_thickness if not is_bottom else self.z_bottom - self.cu_thickness
                     if is_bottom:
-                        loc = Location((cx, cy, cz), (180.0, 0.0, -yaw))
+                        comp_z = z_mount + body_bb.min.Z
+                        loc = Location((cx, cy, comp_z), (180.0, 0.0, -yaw))
                     else:
-                        loc = Location((cx, cy, cz), (0.0, 0.0, yaw))
+                        comp_z = z_mount - body_bb.min.Z
+                        loc = Location((cx, cy, comp_z), (0.0, 0.0, yaw))
                     body.locate(loc)
                     comp_solids.append(body)
 
@@ -301,7 +319,8 @@ class PCB3DAssembler:
             else:
                 dims = getattr(c, "dimensions", None) or (5.0, 5.0, 1.0)
                 dx, dy, dz = dims[0], dims[1], dims[2]
-                box_z = cz + (dz / 2.0 if not is_bottom else -dz / 2.0)
+                z_mount = self.z_top + self.cu_thickness if not is_bottom else self.z_bottom - self.cu_thickness
+                box_z = (z_mount + dz / 2.0) if not is_bottom else (z_mount - dz / 2.0)
                 body = Box(dx, dy, dz)
                 body.locate(Location((cx, cy, box_z), (0.0, 0.0, yaw)))
                 comp_solids.append(body)
@@ -361,9 +380,11 @@ class PCB3DAssembler:
         t_silk = 0.02
         # Position silkscreen slightly proud of copper foil to prevent visual z-fighting
         if not is_bottom:
-            z_silk = self.z_top + self.cu_thickness + t_silk / 2.0 + 0.005
+            z_base = self.z_top + self.cu_thickness + 0.005
+            z_center = z_base + t_silk / 2.0
         else:
-            z_silk = self.z_bottom - self.cu_thickness - t_silk / 2.0 - 0.005
+            z_base = self.z_bottom - self.cu_thickness - 0.005
+            z_center = z_base - t_silk / 2.0
 
         solids: List[Shape] = []
 
@@ -375,9 +396,9 @@ class PCB3DAssembler:
             s = extrude(txt, t_silk)
             yaw = st.rotation
             if not is_bottom:
-                s.locate(Location((st.position[0], st.position[1], z_silk), (0.0, 0.0, yaw)))
+                s.locate(Location((st.position[0], st.position[1], z_base), (0.0, 0.0, yaw)))
             else:
-                s.locate(Location((st.position[0], st.position[1], z_silk), (180.0, 0.0, -yaw)))
+                s.locate(Location((st.position[0], st.position[1], z_base), (180.0, 0.0, -yaw)))
             solids.append(s)
 
         # 2. Silkscreen vector graphics (rectangles/frames, lines, polygons)
@@ -391,17 +412,17 @@ class PCB3DAssembler:
                 case "rect":
                     if sg.fill:
                         b = Box(w, h, t_silk)
-                        b.locate(Location((cx, cy, z_silk)))
+                        b.locate(Location((cx, cy, z_center)))
                         solids.append(b)
                     else:
                         b_top = Box(w, th, t_silk)
-                        b_top.locate(Location((cx, cy + h / 2.0, z_silk)))
+                        b_top.locate(Location((cx, cy + h / 2.0, z_center)))
                         b_bot = Box(w, th, t_silk)
-                        b_bot.locate(Location((cx, cy - h / 2.0, z_silk)))
+                        b_bot.locate(Location((cx, cy - h / 2.0, z_center)))
                         b_left = Box(th, h, t_silk)
-                        b_left.locate(Location((cx - w / 2.0, cy, z_silk)))
+                        b_left.locate(Location((cx - w / 2.0, cy, z_center)))
                         b_right = Box(th, h, t_silk)
-                        b_right.locate(Location((cx + w / 2.0, cy, z_silk)))
+                        b_right.locate(Location((cx + w / 2.0, cy, z_center)))
                         solids.extend([b_top, b_bot, b_left, b_right])
                 case "line":
                     if sg.points and len(sg.points) >= 2:
@@ -417,14 +438,17 @@ class PCB3DAssembler:
                         angle = math.degrees(math.atan2(dy, dx))
                         mx, my = (x1 + x2) / 2.0, (y1 + y2) / 2.0
                         b = Box(length, th, t_silk)
-                        b.locate(Location((mx, my, z_silk), (0.0, 0.0, angle)))
+                        b.locate(Location((mx, my, z_center), (0.0, 0.0, angle)))
                         solids.append(b)
                 case "polygon":
                     if sg.points and len(sg.points) >= 3:
                         pts = [(pt[0], pt[1]) for pt in sg.points]
                         poly = Polygon(*pts)
                         s = extrude(poly, t_silk)
-                        s.locate(Location((0.0, 0.0, z_silk)))
+                        if not is_bottom:
+                            s.locate(Location((0.0, 0.0, z_base)))
+                        else:
+                            s.locate(Location((0.0, 0.0, z_base), (180.0, 0.0, 0.0)))
                         solids.append(s)
 
         # 3. Component reference designators (for footprints on this layer without explicit silkscreen text)
@@ -461,9 +485,9 @@ class PCB3DAssembler:
             txt = Text(fp_name, font_size=0.8)
             s = extrude(txt, t_silk)
             if not is_bottom:
-                s.locate(Location((cx, cy + 1.5, z_silk)))
+                s.locate(Location((cx, cy + 1.5, z_base)))
             else:
-                s.locate(Location((cx, cy + 1.5, z_silk), (180.0, 0.0, 0.0)))
+                s.locate(Location((cx, cy + 1.5, z_base), (180.0, 0.0, 0.0)))
             solids.append(s)
 
         if not solids:
