@@ -5,11 +5,16 @@
 - **Status**: `OPEN`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
+- **Component**: `carrier_board`
 - **Created**: `2026-11-10 00:37:19 UTC`
 
 #### Description
 
 Carrier board PCB components are misaligned and clipping through the bottom of the PCB
+
+#### Reproduction Steps
+
+1. $ python tools/view.py carrier_board/carrier_board:pcb
 
 #### Attachments & References
 
