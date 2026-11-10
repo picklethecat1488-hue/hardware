@@ -29,3 +29,4 @@ For order C-E71W908185A, the height of the protruding feature is still not enoug
 
 - [ ] <!-- task:152ac737 --> Verify customer reply document for 3D print engineering query | `cat attachments/BUG-BRIGHT-WOODBORER-114/customer_reply.md`
 - [ ] <!-- task:0f49750e --> Compile pump cover, bowl, and bottom cover parts into 3D models | `python tools/build.py cat_fountain/pump_cover cat_fountain/bowl cat_fountain/bottom_cover`
+- [ ] <!-- task:b29ffac1 --> Visualize bowl and pump cover snap assembly in 3D viewer | `python tools/view.py cat_fountain/bowl cat_fountain/pump_cover --no-gui`
