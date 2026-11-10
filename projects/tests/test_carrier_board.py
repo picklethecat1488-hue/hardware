@@ -3409,3 +3409,54 @@ def test_regression_bug_open_003_eq_gerber_standard_impedance_copper_balance() -
     texts = [t.text for t in provider.silkscreen]
     assert any("TG150" in t for t in texts), "Silkscreen must specify TG150"
     assert any("W=0.12mm" in t for t in texts), "Silkscreen must specify W=0.12mm"
+
+
+def test_regression_bug_translucent_cricket_767_flex_tail_footprint_scoping() -> None:
+    """Verify flex tail 3D PCB CAD model only includes flex tail geometry and zero carrier board footprints."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider.pcb.cad_assembler import PCB3DAssembler
+
+    provider = CarrierBoardProvider()
+    tail_pcb = provider.flex_tail("flex_tail", None, Mode.DEFAULT)
+    tail_cfg = tail_pcb.to_pcb_config()
+
+    assembler = PCB3DAssembler(
+        pcb_config=tail_cfg,
+        wiring=provider.wiring,
+        substrate=tail_pcb.part,
+        pcb_name="flex_tail",
+    )
+
+    comps, pads = assembler.build_components_and_pads()
+    # Flex tail has only J4 (FPC contact interface) and zero carrier board components (MCU, sensors, passives)
+    assert comps is not None
+    assert len(comps.children) == 1, f"Flex tail should only have J4 FPC connector, got {len(comps.children)}"
+
+    # Flex tail has 39 pads (32 for J4 FPC + 7 capacitive sensor pads), not the 500+ carrier board pads
+    assert pads is not None
+    assert len(pads.children) == 39, f"Expected 39 pads on flex tail (J4 + 7 cap pads), got {len(pads.children)}"
+
+    # Ensure get_display_items contains flex tail layers
+    display_items = assembler.get_display_items(prefix="flex_tail")
+    layer_names = {name for _, name, _, _ in display_items}
+    assert "flex_tail_substrate" in layer_names
+    assert "flex_tail_pads" in layer_names
+    assert "flex_tail_traces_top" in layer_names
+    assert "flex_tail_silkscreen_top" in layer_names
+    assert "flex_tail_silkscreen_bottom" in layer_names
+    assert "flex_tail_components" in layer_names
+
+    # Check that carrier board includes its 65 components and 534 pads (and zero flex tail cap pads)
+    carrier_pcb = provider.carrier_board("carrier_board", None, Mode.DEFAULT)
+    carrier_cfg = carrier_pcb.to_pcb_config()
+    carrier_assembler = PCB3DAssembler(
+        pcb_config=carrier_cfg,
+        wiring=provider.wiring,
+        substrate=carrier_pcb.part,
+        pcb_name="carrier_board",
+    )
+    c_comps, c_pads = carrier_assembler.build_components_and_pads()
+    assert c_comps is not None
+    assert len(c_comps.children) == 65
+    assert c_pads is not None
+    assert len(c_pads.children) == 534

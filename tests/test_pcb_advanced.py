@@ -343,7 +343,7 @@ def test_carrier_board_provider_cad_and_assembly():
     # Check assembly test instructions from manifest/pcb.yaml
     assert provider.pcb_config.assembly_test is not None
     assert provider.pcb_config.assembly_test.test_fixture == "flying_probe"
-    assert len(provider.pcb_config.assembly_test.instructions) == 6
+    assert len(provider.pcb_config.assembly_test.instructions) == 7
     step0 = provider.pcb_config.assembly_test.instructions[0]
     assert step0.step_id == "TEST_CONTINUITY_GND"
     assert step0.test_type == "continuity"

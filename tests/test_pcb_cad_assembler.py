@@ -123,6 +123,60 @@ def test_build_pcb_populate_room_and_to_cad_assembly():
     assert len(assembly.children) >= 1
 
 
+def test_pcb_cad_assembler_silkscreen_and_colors():
+    """Verify silkscreen text and graphics synthesis and canonical layer colors."""
+    from model.pcb import LayerType, SilkscreenGraphicModel, SilkscreenTextModel, StackupLayerModel
+
+    cfg = PCBConfig(
+        name="silk_board",
+        dimensions_mm=(40.0, 40.0, 1.6),
+        stackup=StackupModel(
+            layers=[
+                StackupLayerModel(name="F.Cu", layer_type=LayerType.SIGNAL, thickness_mm=0.035, material="copper"),
+                StackupLayerModel(name="Core", layer_type=LayerType.DIELECTRIC, thickness_mm=1.53, material="FR4"),
+                StackupLayerModel(name="B.Cu", layer_type=LayerType.SIGNAL, thickness_mm=0.035, material="copper"),
+            ],
+            finish="ENIG",
+            soldermask_color="blue",
+            silkscreen_color="white",
+        ),
+        silkscreen_texts=[
+            SilkscreenTextModel(text="CANONICAL", layer="F.SilkS", position=(0.0, 5.0), font_size=1.0),
+            SilkscreenTextModel(text="REV 1.0", layer="B.SilkS", position=(0.0, -5.0), font_size=0.8),
+        ],
+        silkscreen_graphics=[
+            SilkscreenGraphicModel(shape="rect", layer="F.SilkS", position=(0.0, 0.0), dimensions=(10.0, 10.0)),
+            SilkscreenGraphicModel(
+                shape="line", layer="F.SilkS", position=(0.0, 0.0), points=[(-5.0, 0.0), (5.0, 0.0)]
+            ),
+            SilkscreenGraphicModel(shape="polygon", layer="B.SilkS", points=[(0.0, 0.0), (2.0, 0.0), (1.0, 2.0)]),
+        ],
+    )
+
+    assembler = PCB3DAssembler(cfg)
+    assert assembler.substrate_color == assembler.SOLDERMASK_COLORS["blue"]
+    assert assembler.silkscreen_color == (0.95, 0.95, 0.95)
+
+    silk_top = assembler.build_silkscreen("F.SilkS")
+    assert silk_top is not None
+    assert isinstance(silk_top, Compound)
+    # 1 text + 4 rect border boxes + 1 line = 6 shapes
+    assert len(silk_top.children) == 6
+
+    silk_bot = assembler.build_silkscreen("B.SilkS")
+    assert silk_bot is not None
+    assert isinstance(silk_bot, Compound)
+    # 1 text + 1 polygon = 2 shapes
+    assert len(silk_bot.children) == 2
+
+    display_items = assembler.get_display_items(prefix="silk_board")
+    item_dict = {name: (geom, color, alpha) for geom, name, color, alpha in display_items}
+    assert "silk_board_silkscreen_top" in item_dict
+    assert "silk_board_silkscreen_bottom" in item_dict
+    assert item_dict["silk_board_silkscreen_top"][1] == (0.95, 0.95, 0.95)
+    assert item_dict["silk_board_substrate"][1] == (0.10, 0.35, 0.65)
+
+
 @pytest.mark.slow
 def test_carrier_board_pcb_3d_assembler_performance():
     """Verify real carrier board 3D CAD assembly synthesizes in under 5.0 seconds."""
