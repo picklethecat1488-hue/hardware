@@ -79,20 +79,39 @@ Guidelines for schematic capture, routing engines, DRC checks, headless KiCad to
   python tools/view.py footprints/USB-C-16P
   ```
 
-## 6. PCB Routing & DRC Invariants
+## 6. Native 3D PCB CAD Viewing & Multi-Layer Inspection
+* **Declarative PCB 3D CAD Synthesizer (`PCB3DAssembler`)**: Complete 3D PCB assemblies are synthesized using `PCB3DAssembler` (exported from `provider.pcb`), transforming board outlines, components, copper pads, trace ribbons, and vias into native build123d CAD solids:
+  - Substrate solid (`{name}_substrate`): Formed from the board outline extrusion and mounting hole cutouts, styled with soldermask colors (green, matte black, purple, etc.).
+  - 3D Component bodies (`{name}_components`): Vectorized batch compound of component package solids positioned and rotated across top/bottom board surfaces.
+  - Copper pads (`{name}_pads`): SMD, through-hole, and capacitive sensor copper pads elevated on surface planes with copper finish styling.
+  - Copper trace ribbons (`{name}_traces_top`, `{name}_traces_bottom`): Front (`F.Cu`) and back (`B.Cu`) traces synthesized as rotated rectangular planar ribbons using vectorized batch compounding (< 0.3s for > 1,500 traces).
+  - Through-hole vias (`{name}_vias`): Annular copper cylinders and drill holes penetrating the substrate stackup.
+* **Toggable Layers in OCP CAD Viewer**: `BuildPcb.populate_room(room, prefix)` populates distinct layer items into `Room`. In `ocp_vscode` (the interactive CAD viewer), each layer renders with an independent tree node and checkbox, enabling engineers to toggle layers on and off independently (e.g. hiding components to inspect inner traces, or isolating top vs bottom routing).
+* **Project Integration API**: Projects access the 3D assembler directly via `pcb.populate_room(room, prefix)` and `pcb.to_cad_assembly()`:
+  ```python
+  def view_carrier_board(self, room: Room, mode: Mode) -> None:
+      carrier = self.carrier_board("carrier_board", None, mode)
+      if mode == Mode.SIMULATE or getattr(room, "is_simulate", False):
+          room.add("carrier_board", carrier.part, color=self.CARRIER_BOARD_COLOR, alpha=1.0)
+      else:
+          carrier.populate_room(room, prefix="carrier_board")
+  ```
+* **Physics & URDF Link Invariance**: In physics simulation and URDF compilation (`mode == Mode.SIMULATE` or `room.is_simulate == True`), the view action MUST add a single rigid body link to `Room` with `urdf_label` rather than multiple separate root layers, preserving PyBullet and URDF kinematic tree integrity.
+
+## 7. PCB Routing & DRC Invariants
 * **Planar Flex Routing**: Flexible PCB tails and ribbons must maintain planar single-layer routing without trace crossovers, ensure non-overlapping capacitive electrode traces with generous keepouts ($\ge 1.5$ mm clearance to flex outline edges), and provide silkscreen channel callouts directly on the substrate.
 * **Auto-Router Grid & Clearance Parity**: The PCB A* auto-router and DRC clearance definitions must maintain mathematical parity: trace widths and obstacle expansion margins must ensure adjacent grid corridors do not violate trace-to-trace spacing constraints ($s \ge (w_1 + w_2)/2 + \text{clearance}$). Stitching vias to internal power/ground planes and escape corridors must be generated dynamically from netlist graph topology.
 * **Net Escape Prioritization**: In high-density or mixed-signal PCB layouts, local pin-dense escape nets (MCU crystal oscillators, reset lines, boot controls) MUST be scheduled and routed before wide global multi-drop buses (PCIe, MIPI).
 * **Edge-Mounted Connector DRC Exemption**: Receptacle connectors intended to mate with external plugs (USB-C, card-edge, FPC sockets) must be permitted to sit flush with or slightly overhang board edges. DRC board boundary containment rules must exempt edge-facing connectors whose bounding center falls within the board outline.
 * **Subassembly Netlist Scoping & Antenna Termination**: Multi-subassembly projects sharing a top-level wiring declaration must scope connectivity DRC checks strictly to nets having two or more terminals on the specific subassembly. Antenna/stub detection algorithms must recognize non-pad copper structures (such as capacitive touch electrodes) as valid termination nodes to avoid false positive antenna violations.
 
-## 7. Schematic Router Invariants & Detour Rules
+## 8. Schematic Router Invariants & Detour Rules
 * **No Collinear Overlaps**: Parallel signal wires and dogleg corridor segments must never share collinear coordinates. Staggered doglegs must be sorted directionally (step-down vs step-up) so that vertical transitions occur at distinct coordinates with clean jumper bridge crossings.
 * **Corridor Boundary Clearance**: Vertical dogleg corridors must be strictly constrained to the channel interior ($x_v \in [x_{\text{left}} + 10.0, x_{\text{right}} - 10.0]$) to ensure wire stubs extending from component symbols have sufficient clearance and never run on top of connector/IC symbols or pin labels.
 * **Channel Passive Spacing**: Shunt and pull-up/pull-down passives residing in the same inter-component channel must be grouped together across overlapping channel spans and spaced with a generous pitch ($\ge 20.0$ mm pitch, minimum separation $\ge 16.0$ mm) to prevent text collisions.
 * **Concentric Detour Routing**: On-sheet wire detours around IC footprints must be sorted concentrically by pin coordinates to guarantee nested routing with zero wire crossings and no off-sheet connectors.
 
-## 8. Component Selection & Bare-Metal Firmware Co-Design
+## 9. Component Selection & Bare-Metal Firmware Co-Design
 * **Target Firmware Environment**: Downstream target execution environment is bare-metal Rust (`no_std`, Embassy asynchronous executor, `embedded-hal` driver abstractions, `defmt` logging, stack-based zero-allocation concurrency).
 * **Authoritative Datasheet Grounding**: ALWAYS obtain connector, IC, and peripheral information directly from the official manufacturer documentation archived in `docs/datasheets/`. Never trust third-party summaries or synthetic pin assignments.
 * **Programmable Component Qualification**: Active components integrated into designs must meet:

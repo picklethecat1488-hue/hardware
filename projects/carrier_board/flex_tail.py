@@ -506,8 +506,11 @@ class FlexTailPCBListing:
     def view_flex_tail(self, room: Room, mode: Mode) -> None:
         """Assemble flex tail PCB with sensor pads and test points for inspection and simulation."""
         tail = self.flex_tail("flex_tail", None, mode)
-        coverlay_col = getattr(self, "FLEX_TAIL_COVERLAY_COLOR", (0.12, 0.12, 0.12))
-        room.add("flex_tail", tail.part, color=coverlay_col, alpha=0.9)
+        if mode == Mode.SIMULATE or getattr(room, "is_simulate", False):
+            coverlay_col = getattr(self, "FLEX_TAIL_COVERLAY_COLOR", (0.12, 0.12, 0.12))
+            room.add("flex_tail", tail.part, color=coverlay_col, alpha=0.9)
+        else:
+            tail.populate_room(room, prefix="flex_tail")
 
 
 __all__ = [

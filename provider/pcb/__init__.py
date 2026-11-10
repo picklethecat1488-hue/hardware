@@ -46,6 +46,7 @@ from .rules import (
     BuildObstacles,
     BuildCapacitiveSensors,
 )
+from .cad_assembler import PCB3DAssembler
 from .metadata import PcbMetadata
 from .footprint import (
     BuildFootprint,
@@ -114,6 +115,7 @@ __all__ = [
     "BuildObstacles",
     "BuildCapacitiveSensors",
     "PcbMetadata",
+    "PCB3DAssembler",
     "BuildComponents",
     "Component",
     "Pin",

@@ -711,9 +711,12 @@ class CarrierBoardPCBListing:
         return pcb
 
     def view_carrier_board(self, room: Room, mode: Mode) -> None:
-        """Assemble rigid carrier PCB with component obstacles and test points for inspection and simulation."""
+        """Assemble rigid carrier PCB with component obstacles, copper pads, traces, and vias for inspection."""
         carrier = self.carrier_board("carrier_board", None, mode)
-        room.add("carrier_board", carrier.part, color=self.CARRIER_BOARD_COLOR, alpha=1.0)
+        if mode == Mode.SIMULATE or getattr(room, "is_simulate", False):
+            room.add("carrier_board", carrier.part, color=self.CARRIER_BOARD_COLOR, alpha=1.0)
+        else:
+            carrier.populate_room(room, prefix="carrier_board")
 
     @property
     def copper_regions(self) -> BuildCopperRegions:

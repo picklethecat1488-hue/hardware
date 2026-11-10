@@ -260,6 +260,20 @@ class BuildPcb(BuildPart):
             assembly_test=assembly_test,
         )
 
+    def to_cad_assembly(self) -> Any:
+        """Synthesize a complete 3D CAD Compound assembly containing all active PCB layers."""
+        from provider.pcb.cad_assembler import PCB3DAssembler
+
+        assembler = PCB3DAssembler.from_build_pcb(self)
+        return assembler.to_cad_assembly()
+
+    def populate_room(self, room: Any, prefix: Optional[str] = None) -> None:
+        """Populate distinct CAD layers directly into a Room object for interactive CAD viewing."""
+        from provider.pcb.cad_assembler import PCB3DAssembler
+
+        assembler = PCB3DAssembler.from_build_pcb(self)
+        assembler.populate_room(room, prefix=prefix or self.name)
+
     @classmethod
     def current(cls) -> Optional["BuildPcb"]:
         """Return the active ambient BuildPcb context if set."""
