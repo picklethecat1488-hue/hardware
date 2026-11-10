@@ -21,8 +21,6 @@ There are feedbacks on our Gerber’s (see attached), can you please fill out th
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1794082544131_e1kse.png](attachments/BUG-OPEN-003/screenshot_paste_1794082544131_e1kse.png) | Pasted screenshot screenshot_paste_1794082544131_e1kse.png |
-| `screenshot` | [screenshot_paste_1794082551994_w6s3q.png](attachments/BUG-OPEN-003/screenshot_paste_1794082551994_w6s3q.png) | Pasted screenshot screenshot_paste_1794082551994_w6s3q.png |
 | `screenshot` | [screenshot_paste_1794082558274_doxkv.png](attachments/BUG-OPEN-003/screenshot_paste_1794082558274_doxkv.png) | Pasted screenshot screenshot_paste_1794082558274_doxkv.png |
 | `screenshot` | [screenshot_paste_1794082565048_ucixy.png](attachments/BUG-OPEN-003/screenshot_paste_1794082565048_ucixy.png) | Pasted screenshot screenshot_paste_1794082565048_ucixy.png |
 | `screenshot` | [screenshot_paste_1794082590749_zorq7.png](attachments/BUG-OPEN-003/screenshot_paste_1794082590749_zorq7.png) | Pasted screenshot screenshot_paste_1794082590749_zorq7.png |
