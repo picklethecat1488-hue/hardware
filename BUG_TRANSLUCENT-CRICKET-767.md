@@ -2,12 +2,13 @@
 
 - **UUID**: `9b47e3f1-cd09-4506-ad2a-7bbe4fed8319`
 - **ID**: `BUG-TRANSLUCENT-CRICKET-767`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-10 00:34:39 UTC`
 - **Resolved**: `2026-11-10 14:11:33 UTC`
+- **Accepted**: `2026-11-10 14:11:38 UTC`
 
 #### Reproduction Steps
 
