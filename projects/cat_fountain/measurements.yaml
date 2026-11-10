@@ -8,8 +8,10 @@ floor_z: 41.0
 target_volume: 0.0010
 bottom_cover_clearance: 0.2
 bottom_cover_drain_radius: 8.0
-bottom_cover_snap_ridge_minor: 0.5
+bottom_cover_snap_ridge_minor: 0.75
 bottom_cover_snap_ridge_z: 1.7
+bottom_cover_snap_ridge_height: 1.2
+bottom_cover_snap_ridge_chamfer: 0.35
 rubber_feet_count: 4
 rubber_feet_radius: 5.5
 rubber_feet_depth: 1.0
@@ -202,6 +204,7 @@ magnet_ring_radius: 9.0
 # Volute Casing & Well Geometry
 pump_well_depth: 10.0
 pump_well_wall: 2.0
+pump_casing_wall: 2.6
 pump_inlet_radius: 6.0
 pump_inlet_width: 12.0
 pump_inlet_height: 5.0
@@ -212,8 +215,8 @@ pump_cover_snap_clearance: 0.45
 pump_cover_lip_thickness: 1.5
 pump_cover_internal_clearance: 0.40
 pump_cover_clip_opening_width: 10.5
-pump_cover_snap_groove_minor: 0.4
-pump_cover_snap_ridge_minor: 0.35
+pump_cover_snap_groove_minor: 0.52
+pump_cover_snap_ridge_minor: 0.5
 pump_cover_snap_ridge_offset: -0.15
 pump_cover_mount_depth: 2.5
 pump_cover_snap_z_offset: 1.5

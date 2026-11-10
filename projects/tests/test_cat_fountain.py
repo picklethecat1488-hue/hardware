@@ -2783,3 +2783,98 @@ class TestCatFountainProvider:
         assert not cover.part.is_inside((expected_crest_r + 0.05, 0.0, snap_z)), (
             "Snap ridge must not extend beyond expected outer radius"
         )
+
+    @pytest.mark.slow
+    def test_regression_bug_bright_woodborer_114_order_eq_3d_print_thickness_and_features(self, provider):
+        """Verify BUG-BRIGHT-WOODBORER-114: Resolves 3D print order engineering queries across orders.
+
+        1. Order C-E77W908185A (pump_cover.stl):
+           - Annular snap-fit ridge vertical thickness is >= 1.0mm (ridge_minor >= 0.50mm).
+           - Single merged solid with no separate unmerged parts.
+        2. Order C-E72W908185A (bowl.stl):
+           - Pump casing outer wall thickness at snap recess and snap groove is >= 1.0mm (casing_wall >= 2.5mm).
+           - Assembled pump cover and bowl have zero interference volume.
+        3. Order C-E71W908185A (bottom_cover.stl):
+           - Annular snap-fit ridge protrusion height is >= 0.75mm with lead-in chamfers (no 0.06mm knife-edges).
+           - Single merged solid with zero seated interference in bowl.
+        """
+        from build123d import Location
+
+        # --- 1. Order C-E77W908185A: pump_cover.stl ---
+        cover = provider.build_pump_cover("pump_cover")
+        cover_part = cover.part
+        assert cover_part is not None
+        assert len(cover_part.solids()) == 1, "Pump cover must remain a single contiguous merged solid"
+
+        ridge_minor = provider.settings.pump_cover_snap_ridge_minor
+        snap_z = provider.settings.pump_cover_snap_z_offset
+        assert ridge_minor >= 0.50, f"Pump cover snap ridge minor must be >= 0.50mm (1.0mm total), got {ridge_minor}"
+        # Total ridge vertical span is >= 1.0mm
+        hub_r = provider.settings.impeller_radius + provider.settings.magnet_radius + 1.0
+        impeller_r = hub_r + 4.0
+        chamber_r = impeller_r + provider.settings.pump_casing_clearance
+        snap_r = chamber_r + 1.0
+        ridge_outer_r = snap_r + provider.settings.pump_cover_snap_ridge_offset + ridge_minor
+        # Verify solid thickness across full 1.0mm vertical band at ridge
+        assert cover_part.is_inside((ridge_outer_r - 0.05, 0.0, -snap_z)), "Ridge center must be solid"
+        assert cover_part.is_inside((ridge_outer_r - 0.25, 0.0, -snap_z + (ridge_minor - 0.1))), (
+            "Ridge upper region must be solid"
+        )
+        assert cover_part.is_inside((ridge_outer_r - 0.25, 0.0, -snap_z - (ridge_minor - 0.1))), (
+            "Ridge lower region must be solid"
+        )
+
+        # --- 2. Order C-E72W908185A: bowl.stl ---
+        bowl = provider.build_bowl("bowl")
+        bowl_part = bowl.part
+        assert bowl_part is not None
+        casing_wall = provider.settings.pump_casing_wall or provider.settings.pump_well_wall
+        assert casing_wall >= 2.5, f"Pump casing wall thickness must be >= 2.5mm, got {casing_wall}"
+        casing_r = chamber_r + casing_wall
+        floor_z = provider.settings.floor_z
+        groove_z = floor_z + 10.0 - snap_z
+
+        # Outer casing wall at groove height must be solid out to casing_r - 0.05mm
+        assert bowl_part.is_inside((casing_r - 0.05, 0.0, groove_z)), (
+            f"Pump casing outer wall must be solid at radius {casing_r - 0.05} at groove height"
+        )
+        # Inside the snap groove must be open
+        assert not bowl_part.is_inside((snap_r + 0.2, 0.0, groove_z)), "Pump casing groove must be hollow"
+
+        # Verify minimum wall thickness between snap groove outer depth and casing outer radius >= 1.0mm
+        groove_max_r = snap_r + provider.settings.pump_cover_snap_groove_minor
+        wall_at_groove = casing_r - groove_max_r
+        assert wall_at_groove >= 1.0, f"Wall thickness at snap groove must be >= 1.0mm, got {wall_at_groove:.2f}mm"
+
+        # Verify zero interference when pump cover is assembled into bowl
+        seat_loc = Location((0, 0, floor_z + 10.0))
+        cover_snapped = cover_part.located(seat_loc)
+        inter = bowl_part.intersect(cover_snapped)
+        vol = sum(s.volume for s in inter.solids()) if inter else 0.0
+        assert vol < 0.2, f"Interference between bowl and pump cover: {vol:.4f} mm3"
+
+        # --- 3. Order C-E71W908185A: bottom_cover.stl ---
+        bottom_cover = provider.build_bottom_cover("bottom_cover")
+        bcover_part = bottom_cover.part
+        assert bcover_part is not None
+        assert len(bcover_part.solids()) == 1, "Bottom cover must be a single merged solid"
+
+        snap_protrusion = provider.settings.bottom_cover_snap_ridge_minor
+        assert snap_protrusion >= 0.75, (
+            f"Bottom cover snap protrusion height must be >= 0.75mm to resolve small feature EQ, got {snap_protrusion}"
+        )
+        bcover_r = (
+            provider.settings.bowl_radius - provider.settings.bowl_thickness - provider.settings.bottom_cover_clearance
+        )
+        crest_r = bcover_r + snap_protrusion
+        bz = provider.settings.bottom_cover_snap_ridge_z
+
+        # Protruding crest must be solid and empty just outside
+        assert bcover_part.is_inside((crest_r - 0.05, 0.0, bz)), "Bottom cover snap ridge crest must be solid"
+        assert not bcover_part.is_inside((crest_r + 0.05, 0.0, bz)), "Outside bottom cover snap ridge must be empty"
+
+        # Seated assembly into bowl has zero interference
+        bowl_part.joints["cover_seat"].connect_to(bcover_part.joints["mount"])
+        inter_bottom = bowl_part.intersect(bcover_part)
+        vol_bottom = sum(s.volume for s in inter_bottom.solids()) if inter_bottom else 0.0
+        assert vol_bottom < 0.2, f"Interference between bowl and bottom cover: {vol_bottom:.4f} mm3"

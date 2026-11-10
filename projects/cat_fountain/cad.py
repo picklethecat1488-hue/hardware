@@ -137,7 +137,8 @@ class CatFountainCAD:
             hub_r = self.settings.impeller_radius + self.settings.magnet_radius + 1.0
             impeller_r = hub_r + 4.0
             chamber_r = impeller_r + self.settings.pump_casing_clearance
-            casing_r = chamber_r + self.settings.pump_well_wall
+            casing_wall = self.settings.pump_casing_wall or self.settings.pump_well_wall
+            casing_r = chamber_r + casing_wall
             snap_r = chamber_r + 1.0
 
             # 1. Casing & Tube outer solid geometries
@@ -363,7 +364,7 @@ class CatFountainCAD:
                 with BuildSketch() as label_sketch:
                     Text(label, font_size=4.5, align=(Align.CENTER, Align.CENTER))
                 mirrored_sketch = label_sketch.sketch.mirror(Plane.YZ)
-                ext_text = extrude(mirrored_sketch, amount=1.5, mode=Mode.PRIVATE)
+                ext_text = extrude(mirrored_sketch, amount=0.8, mode=Mode.PRIVATE)
                 bowl.part -= Location((center_x, center_y + label_y_offset, floor_z - t)) * ext_text
 
             # Helper function to generate standoff posts or press-fit clip mounts on the ceiling
@@ -433,7 +434,7 @@ class CatFountainCAD:
                     Text(label, font_size=4.5, align=(Align.CENTER, Align.CENTER))
                 # Mirror the sketch horizontally so it reads correctly from below (looking up)
                 mirrored_sketch = label_sketch.sketch.mirror(Plane.YZ)
-                ext_text = extrude(mirrored_sketch, amount=1.5, mode=Mode.PRIVATE)
+                ext_text = extrude(mirrored_sketch, amount=0.8, mode=Mode.PRIVATE)
                 bowl.part -= Location((center_x, center_y + label_y_offset, floor_z - t)) * ext_text  # type: ignore
 
             # Mount all PCBs in the dry compartment (standard boards use standoffs, TMC6300 uses slide-in guide)
@@ -881,17 +882,26 @@ class CatFountainCAD:
         with BuildPart() as cover:
             Cylinder(radius=cover_r, height=4.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
-            # Add a 0.5mm snap-fit annular Torus ridge around the perimeter (BUG-CLICKING-LARVA-354)
-            snap_minor = self.settings.bottom_cover_snap_ridge_minor
+            # Add annular snap-fit ridge around the perimeter with lead-in chamfers (BUG-CLICKING-LARVA-354, BUG-BRIGHT-WOODBORER-114)
+            snap_protrusion = self.settings.bottom_cover_snap_ridge_minor
             snap_z = self.settings.bottom_cover_snap_ridge_z
-            if snap_minor > 0.0:
-                with Locations((0, 0, snap_z)):
-                    Torus(
-                        major_radius=cover_r,
-                        minor_radius=snap_minor,
-                        align=(Align.CENTER, Align.CENTER, Align.CENTER),
+            snap_h = self.settings.bottom_cover_snap_ridge_height or 1.2
+            chamfer_val = self.settings.bottom_cover_snap_ridge_chamfer or 0.35
+            if snap_protrusion > 0.0:
+                with Locations((0, 0, snap_z - snap_h / 2.0)):
+                    Cylinder(
+                        radius=cover_r + snap_protrusion,
+                        height=snap_h,
+                        align=(Align.CENTER, Align.CENTER, Align.MIN),
                         mode=Mode.ADD,
                     )
+                outer_edges = (
+                    cover.part.edges()
+                    .filter_by(GeomType.CIRCLE)
+                    .filter_by(lambda e: abs(e.radius - (cover_r + snap_protrusion)) < 1e-3)
+                )
+                if outer_edges:
+                    chamfer(outer_edges, length=chamfer_val)
 
             # Funnel-shaped top surface to drain water towards the central drain hole
             with Locations((0, 0, 1.5)):
@@ -1254,7 +1264,8 @@ class CatFountainCAD:
         impeller_r = hub_r + 4.0
         chamber_r = impeller_r + self.settings.pump_casing_clearance
         pump_well_wall = self.settings.pump_well_wall
-        casing_r = chamber_r + pump_well_wall
+        casing_wall = self.settings.pump_casing_wall or pump_well_wall
+        casing_r = chamber_r + casing_wall
         snap_r = chamber_r + 1.0
         snap_clearance = self.settings.pump_cover_snap_clearance
         internal_clearance = self.settings.pump_cover_internal_clearance
@@ -1369,7 +1380,7 @@ class CatFountainCAD:
                     link_type=LinkType.PUMP_COVER,
                     shape=ShapeType.CYLINDER,
                     type=BoundaryType.CAVITY,
-                    thickness=pump_well_wall * 0.001,
+                    thickness=casing_wall * 0.001,
                     is_submerged=True,
                 ):
                     IntakePort(

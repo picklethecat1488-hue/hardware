@@ -394,6 +394,16 @@ class CatFountainConfig(BaseModel):
         return float(self._raw_data.get("bottom_cover_snap_ridge_z", 0.0))
 
     @cached_property
+    def bottom_cover_snap_ridge_height(self) -> float:
+        """Return the vertical cylindrical height of the bottom cover annular snap-fit ridge."""
+        return float(self._raw_data.get("bottom_cover_snap_ridge_height", 0.0))
+
+    @cached_property
+    def bottom_cover_snap_ridge_chamfer(self) -> float:
+        """Return the lead-in chamfer length for the bottom cover annular snap-fit ridge."""
+        return float(self._raw_data.get("bottom_cover_snap_ridge_chamfer", 0.0))
+
+    @cached_property
     def rubber_feet_count(self) -> int:
         """Return the number of rubber feet depressions on the bottom cover."""
         return int(self._raw_data.get("rubber_feet_count", 4))
@@ -824,6 +834,11 @@ class CatFountainConfig(BaseModel):
     def pump_well_wall(self) -> float:
         """Return the wall thickness of the central isolation pump well."""
         return float(self._raw_data.get("pump_well_wall", 2.0))
+
+    @cached_property
+    def pump_casing_wall(self) -> float:
+        """Return the outer wall thickness of the volute pump casing."""
+        return float(self._raw_data.get("pump_casing_wall", 0.0))
 
     @cached_property
     def pump_inlet_radius(self) -> float:
