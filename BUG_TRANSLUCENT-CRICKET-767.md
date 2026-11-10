@@ -19,6 +19,10 @@
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1794270902078_nny6n.png](attachments/BUG-TRANSLUCENT-CRICKET-767/screenshot_paste_1794270902078_nny6n.png) | Pasted screenshot screenshot_paste_1794270902078_nny6n.png |
 
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:ad89be04 --> Verify flex tail contains only J4 and capacitive electrodes in 3D CAD viewer | `python tools/view.py carrier_board/flex_tail:pcb --no-gui`
+
 #### Resolution Notes
 
 Scoped footprints, capacitive sensors, and test points in PCB3DAssembler to target shape_ref and board_type; added silkscreen rendering with canonical layer colors
