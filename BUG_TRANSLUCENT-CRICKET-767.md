@@ -19,6 +19,10 @@
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1794270902078_nny6n.png](attachments/BUG-TRANSLUCENT-CRICKET-767/screenshot_paste_1794270902078_nny6n.png) | Pasted screenshot screenshot_paste_1794270902078_nny6n.png |
 
+#### Attached Commits
+
+- `ffa55f5717b6f5bd97a60b7b94a5935e75797559`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:ad89be04 --> Verify flex tail contains only J4 and capacitive electrodes in 3D CAD viewer | `python tools/view.py carrier_board/flex_tail:pcb --no-gui`
