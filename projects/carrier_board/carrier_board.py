@@ -711,9 +711,12 @@ class CarrierBoardPCBListing:
         return pcb
 
     def view_carrier_board(self, room: Room, mode: Mode) -> None:
-        """Assemble rigid carrier PCB with component obstacles and test points for inspection and simulation."""
+        """Assemble rigid carrier PCB with component obstacles, copper pads, traces, and vias for inspection."""
         carrier = self.carrier_board("carrier_board", None, mode)
-        room.add("carrier_board", carrier.part, color=self.CARRIER_BOARD_COLOR, alpha=1.0)
+        if mode == Mode.SIMULATE or getattr(room, "is_simulate", False):
+            room.add("carrier_board", carrier.part, color=self.CARRIER_BOARD_COLOR, alpha=1.0)
+        else:
+            carrier.populate_room(room, prefix="carrier_board")
 
     @property
     def copper_regions(self) -> BuildCopperRegions:
@@ -1239,7 +1242,7 @@ def build_carrier_board_wiring(
                 )
             r5, r6 = r_boot[0], r_boot[1]
 
-            # Autoincrementing Capacitors C4..C17
+            # Autoincrementing Capacitors C4..C14
             with Locations([(8.0, 8.0, 0.8), (-6.0, -9.0, 0.8)]):
                 c_bulk = Component(
                     "C",
@@ -1346,44 +1349,6 @@ def build_carrier_board_wiring(
                 pin_sides=PinSideDef(left=["1"], right=["2"]),
             )
 
-            c15 = Component(
-                "C",
-                package="0603",
-                position=(13.0, 29.0, -0.8),
-                rotation=(0.0, 0.0, 0.0),
-                mpn="GRM188R61A106KE69D",
-                supplier_pn="490-10uF-0603-ND",
-                layer="B.Cu",
-                value="10uF",
-                sheet="Peripheral Power Regulation & Gating",
-                pin_sides=PinSideDef(left=["1"], right=["2"]),
-            )
-            c16 = Component(
-                "C",
-                package="0603",
-                position=(16.0, 29.0, -0.8),
-                rotation=(0.0, 0.0, 0.0),
-                mpn="GRM188R61A106KE69D",
-                supplier_pn="490-10uF-0603-ND",
-                layer="B.Cu",
-                value="10uF",
-                sheet="USB-C Power & Battery Interface",
-                pin_sides=PinSideDef(left=["1"], right=["2"]),
-            )
-
-            c17 = Component(
-                "C",
-                package="0402",
-                position=(13.0, 32.0, -0.8),
-                rotation=(0.0, 0.0, 0.0),
-                mpn="CC0402KRX7R9BB104",
-                supplier_pn="311-1438-1-ND",
-                layer="B.Cu",
-                value="0.1uF",
-                sheet="External Serial NAND Storage Subsystem",
-                pin_sides=PinSideDef(left=["1"], right=["2"]),
-            )
-
             j3 = Component(
                 name="J3",
                 package="USB-C-16P",
@@ -1439,18 +1404,6 @@ def build_carrier_board_wiring(
                 supplier_pn="XC1842CT-ND",
                 sheet="Microcontroller Core, Clock & Reset",
                 pin_sides=PinSideDef(left=["1", "3"], right=["2", "4"]),
-            )
-            d8 = Component(
-                name="D8",
-                package="SOD-123",
-                position=(16.0, 32.0, -0.8),
-                rotation=(0.0, 0.0, 0.0),
-                mpn="SMF05CT1G",
-                supplier_pn="ONSEMI-SMF05C-ND",
-                layer="B.Cu",
-                value="TVS_3V3",
-                sheet="Peripheral Power Regulation & Gating",
-                pin_sides=PinSideDef(left=["1"], right=["2"]),
             )
             j5 = Component(
                 name="J5",
@@ -1784,10 +1737,6 @@ def build_carrier_board_wiring(
                 j2.pin("GND"),
                 j2.pin("MP1"),
                 j2.pin("MP2"),
-                c15.pin("2"),
-                c16.pin("2"),
-                c17.pin("2"),
-                d8.pin("2"),
                 c18.pin("2"),
                 c19.pin("2"),
                 j15.pin("3"),
@@ -1881,10 +1830,6 @@ def build_carrier_board_wiring(
                 c1.pin("1"),
                 c2.pin("1"),
                 c3.pin("1"),
-                c15.pin("1"),
-                c16.pin("1"),
-                c17.pin("1"),
-                d8.pin("1"),
                 u3.pin("5"),
                 c7.pin("1"),
                 u4.pin("VDD"),

@@ -24,10 +24,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
         # Net 3V3 [B.Cu]
         with BuildLine():
             Line((7.6, -21.0), (9.23, -21.0))
-            Line((12.2, 29.0), (12.2, 29.6))
-            Line((15.2, 29.0), (15.2, 29.6))
-            Line((12.5, 32.0), (12.5, 32.6))
-            Line((14.6, 32.0), (14.6, 32.8))
             make_trace("3V3", layer="B.Cu", width_mm=0.15)
 
         # Net 3V3 [F.Cu]
@@ -1619,14 +1615,6 @@ def get_carrier_board_traces() -> List[TraceSegmentModel]:
             Line((13.5, -10.0), (13.75, -10.25))
             Line((-22.0, 20.75), (-20.0, 20.75))
             make_trace("GND", layer="B.Cu")
-
-        # Net GND [B.Cu]
-        with BuildLine():
-            Line((13.8, 29.0), (13.8, 29.6))
-            Line((16.8, 29.0), (16.8, 29.6))
-            Line((13.5, 32.0), (13.5, 32.6))
-            Line((17.4, 32.0), (17.4, 32.8))
-            make_trace("GND", layer="B.Cu", width_mm=0.15)
 
         # Net GND [F.Cu]
         with BuildLine():
@@ -3544,22 +3532,7 @@ def get_carrier_board_vias() -> List[ViaModel]:
             at=(-4.8, -38.6),
             layer2="In3.Cu",
         )
-        Via(
-            "3V3",
-            at=(12.2, 29.6),
-        )
-        Via(
-            "3V3",
-            at=(15.2, 29.6),
-        )
-        Via(
-            "3V3",
-            at=(12.5, 32.6),
-        )
-        Via(
-            "3V3",
-            at=(14.6, 32.8),
-        )
+
         Via(
             "3V3",
             at=(2.4, -13.0),
@@ -4526,22 +4499,7 @@ def get_carrier_board_vias() -> List[ViaModel]:
             at=(-13.1, -35.5),
             layer2="In1.Cu",
         )
-        Via(
-            "GND",
-            at=(13.8, 29.6),
-        )
-        Via(
-            "GND",
-            at=(16.8, 29.6),
-        )
-        Via(
-            "GND",
-            at=(13.5, 32.6),
-        )
-        Via(
-            "GND",
-            at=(17.4, 32.8),
-        )
+
         Via(
             "GND",
             at=(5.8, -36.25),

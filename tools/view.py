@@ -248,9 +248,27 @@ class Viewer:
                     "white": (0.90, 0.90, 0.90),
                     "purple": (0.45, 0.15, 0.55),
                 }
-                item_color = color_map.get(pcb_cfg.stackup.soldermask_color.lower(), (0.08, 0.40, 0.20))
+                item_color = color_map.get(
+                    pcb_cfg.stackup.soldermask_color.lower()
+                    if pcb_cfg.stackup and getattr(pcb_cfg.stackup, "soldermask_color", None)
+                    else "green",
+                    (0.08, 0.40, 0.20),
+                )
 
-            items.append((solid, item_name, item_color, 1.0))
+            from provider.pcb.cad_assembler import PCB3DAssembler
+
+            assembler = PCB3DAssembler(
+                pcb_config=pcb_cfg,
+                wiring=wiring,
+                substrate=solid,
+                substrate_color=item_color,
+                pcb_name=item_name,
+            )
+            layer_items = assembler.get_display_items(prefix=item_name)
+            if layer_items:
+                items.extend(layer_items)
+            else:
+                items.append((solid, item_name, item_color, 1.0))
 
             if not no_gui:
                 self.launch_pcb_viewer(kicad_pcb_path, no_gui=no_gui)

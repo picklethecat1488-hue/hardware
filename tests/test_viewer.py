@@ -959,6 +959,59 @@ class TestViewer:
             assert kicad_file_arg.name == "flex_tail.kicad_pcb"
             mock_show.assert_called_once()
 
+    @patch("view.show")
+    def test_show_view_pcb_multi_layer_items(self, mock_show, viewer, tmp_path):
+        """Verify show_view populates distinct CAD layers (substrate, components, traces, vias) into Room."""
+        from model.pcb import PCBConfig, TraceSegmentModel, ViaModel
+        from model.wiring import FootprintModel, Wiring
+
+        target_name = "carrier_board/carrier_pcb:pcb"
+        mock_provider = MagicMock()
+        mock_provider.name = "carrier_board"
+        mock_provider.part = {}
+        mock_provider.pcb_config = PCBConfig(
+            name="carrier_pcb",
+            dimensions_mm=(50.0, 50.0, 1.6),
+            traces=[
+                TraceSegmentModel(
+                    start_mm=(-5.0, 0.0),
+                    end_mm=(5.0, 0.0),
+                    width_mm=0.2,
+                    layer="F.Cu",
+                    net="NET1",
+                )
+            ],
+            vias=[ViaModel(position_mm=(0.0, 0.0), net="NET1")],
+        )
+        mock_provider.wiring = Wiring.from_models(
+            footprints=[
+                FootprintModel(
+                    name="C1",
+                    package="0402",
+                    position=(0.0, 0.0, 0.8),
+                    rotation=(0.0, 0.0, 0.0),
+                    dimensions=(1.0, 0.5, 0.35),
+                    layer="F.Cu",
+                )
+            ],
+            nets=[],
+        )
+        viewer.manager.router.providers = [mock_provider]
+
+        with (
+            patch("view.ProviderResolver.resolve", return_value=mock_provider),
+            patch("provider.pcb.exporter.PCBExporter.build_solid", return_value=Box(10, 10, 1.6)),
+            patch("provider.pcb.exporter.PCBExporter.export_board"),
+            patch("provider.pcb.exporter.PCBExporter.export_kicad_sch"),
+        ):
+            viewer.show_view([target_name], build_dir=str(tmp_path), no_gui=False)
+            assert mock_show.called
+            assy = mock_show.call_args[0][0]
+            child_names = [getattr(c, "label", "") for c in assy.children]
+            assert any("substrate" in str(n) for n in child_names)
+            assert any("traces_top" in str(n) for n in child_names)
+            assert any("vias" in str(n) for n in child_names)
+
     @patch.object(Viewer, "launch_pcb_viewer")
     def test_show_view_direct_kicad_file(self, mock_launch_pcb, viewer, tmp_path):
         """Verify passing a direct .kicad_pcb file invokes launch_pcb_viewer directly without manifest lookup."""

@@ -84,7 +84,7 @@ class BuildFootprint(BuildPart):
         return _current_build_footprint.get()
 
     def to_dict(self) -> Dict[str, Any]:
-        """Export footprint dictionary representation matching load_shared_footprints schema."""
+        """Export footprint dictionary representation matching shared footprints schema."""
         pins_data: List[Dict[str, Any]] = []
         for p in self.pins:
             p_dict: Dict[str, Any] = {

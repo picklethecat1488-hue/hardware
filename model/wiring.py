@@ -410,32 +410,18 @@ class NetModel(BaseModel):
     )
 
 
-# Shared Footprint Library Cache
-_SHARED_FOOTPRINTS_CACHE: Optional[Dict[str, Dict[str, Any]]] = None
-
-
-def load_shared_footprints(search_dir: Optional[Path] = None) -> Dict[str, Dict[str, Any]]:
-    """Load standard footprint definitions from provider.footprints declarative primitives."""
-    global _SHARED_FOOTPRINTS_CACHE
-    if _SHARED_FOOTPRINTS_CACHE is not None:
-        return _SHARED_FOOTPRINTS_CACHE
-
-    from provider.footprints import get_shared_footprints
-
-    _SHARED_FOOTPRINTS_CACHE = get_shared_footprints()
-    return _SHARED_FOOTPRINTS_CACHE
-
-
 class Wiring:
     """Class encapsulating wiring layout, component footprints, and net connections."""
 
     @validate_call
     def __init__(self, yaml_path: Optional[Union[str, Path]] = None, parent_part: Optional[Any] = None):
         """Initialize the Wiring configuration container and load components/nets."""
+        from provider.footprints import get_shared_footprints
+
         self.yaml_path = Path(yaml_path) if yaml_path is not None else None
         self.parent_part = parent_part
         self.config = {}
-        self.shared_footprints = dict(load_shared_footprints())
+        self.shared_footprints = dict(get_shared_footprints())
         self.symbol_table: Dict[str, Any] = {}
 
         if self.yaml_path is not None:
@@ -491,7 +477,10 @@ class Wiring:
         inst = cls.__new__(cls)
         inst.yaml_path = None
         inst.parent_part = parent_part
-        inst.shared_footprints = dict(load_shared_footprints())
+
+        from provider.footprints import get_shared_footprints
+
+        inst.shared_footprints = dict(get_shared_footprints())
 
         # Synthesize symbol table transparently from footprints and nets
         from model.pcb import SymbolTableEntry
