@@ -5,6 +5,7 @@
 - **Status**: `OPEN`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
+- **Component**: `carrier_board`
 - **Created**: `2026-11-10 00:34:39 UTC`
 
 #### Reproduction Steps
