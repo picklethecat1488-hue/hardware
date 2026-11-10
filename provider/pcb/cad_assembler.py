@@ -3,9 +3,9 @@
 import math
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
-from build123d import Box, Compound, Cylinder, Location, Part, Shape, Solid
+from build123d import Box, Compound, Cylinder, Location, Part, Polygon, Shape, Solid, Text, extrude
 
-from model.pcb import PCBConfig, StackupModel
+from model.pcb import BoardType, PCBConfig, StackupModel
 from model.wiring import Wiring
 from provider.footprints import FOOTPRINT_REGISTRY
 
@@ -14,25 +14,28 @@ class PCB3DAssembler:
     """High-performance 3D CAD assembly synthesizer for declarative PCB designs.
 
     Vectorizes construction of board substrate, component package bodies, copper pads,
-    top/bottom routing traces, and via barrels into distinct CAD layers ready for interactive
-    inspection in ocp_vscode or integration into mechanical CAD assemblies.
+    top/bottom routing traces, plated via barrels, and silkscreen markings into distinct
+    CAD layers ready for interactive inspection in ocp_vscode or integration into
+    mechanical CAD assemblies.
     """
 
-    DEFAULT_SOLDERMASK_COLOR = (0.08, 0.40, 0.20)  # Standard dark green soldermask
-    DEFAULT_COMPONENT_COLOR = (0.20, 0.20, 0.22)  # Molded epoxy IC / passive black
-    DEFAULT_PAD_COLOR = (0.85, 0.55, 0.15)  # ENIG gold / bare copper
-    DEFAULT_TOP_TRACE_COLOR = (0.80, 0.50, 0.15)  # F.Cu copper ribbon
-    DEFAULT_BOTTOM_TRACE_COLOR = (0.30, 0.50, 0.80)  # B.Cu contrasting blue/copper ribbon
-    DEFAULT_VIA_COLOR = (0.70, 0.70, 0.75)  # Tinned copper / silver barrel
+    DEFAULT_SOLDERMASK_COLOR = (0.08, 0.45, 0.18)  # Standard dark green soldermask
+    DEFAULT_COMPONENT_COLOR = (0.20, 0.20, 0.22)  # Molded epoxy IC / passive dark charcoal
+    DEFAULT_PAD_COLOR = (0.90, 0.72, 0.22)  # ENIG gold surface finish
+    DEFAULT_TOP_TRACE_COLOR = (0.85, 0.55, 0.18)  # F.Cu warm copper foil ribbon
+    DEFAULT_BOTTOM_TRACE_COLOR = (0.28, 0.55, 0.85)  # B.Cu contrasting blue/copper ribbon
+    DEFAULT_VIA_COLOR = (0.75, 0.75, 0.80)  # Tinned through-hole via barrels
+    DEFAULT_SILKSCREEN_COLOR = (0.95, 0.95, 0.95)  # High-contrast crisp white silkscreen legend
 
     SOLDERMASK_COLORS: Dict[str, Tuple[float, float, float]] = {
-        "matte_black": (0.12, 0.12, 0.12),
-        "black": (0.12, 0.12, 0.12),
-        "green": (0.08, 0.40, 0.20),
-        "blue": (0.10, 0.25, 0.65),
-        "red": (0.65, 0.10, 0.10),
-        "white": (0.90, 0.90, 0.90),
-        "purple": (0.45, 0.15, 0.55),
+        "matte_black": (0.12, 0.12, 0.14),
+        "black": (0.12, 0.12, 0.14),
+        "green": (0.08, 0.45, 0.18),
+        "blue": (0.10, 0.35, 0.65),
+        "red": (0.65, 0.12, 0.12),
+        "white": (0.92, 0.92, 0.92),
+        "purple": (0.40, 0.15, 0.55),
+        "yellow": (0.85, 0.70, 0.10),
     }
 
     def __init__(
@@ -61,17 +64,31 @@ class PCB3DAssembler:
         self.pcb_name = pcb_name or pcb_config.name or "board"
 
         # Determine board thickness and vertical bounds
-        self.total_thickness = self._resolve_board_thickness()
-        self.z_top = self.total_thickness / 2.0
-        self.z_bottom = -self.total_thickness / 2.0
-        self.z_mid = 0.0
+        if self.substrate is not None:
+            part = getattr(self.substrate, "part", self.substrate)
+            if hasattr(part, "bounding_box"):
+                bb = part.bounding_box()
+                self.z_top = bb.max.Z
+                self.z_bottom = bb.min.Z
+                self.z_mid = (self.z_top + self.z_bottom) / 2.0
+                self.total_thickness = bb.size.Z
+            else:
+                self.total_thickness = self._resolve_board_thickness()
+                self.z_top = self.total_thickness / 2.0
+                self.z_bottom = -self.total_thickness / 2.0
+                self.z_mid = 0.0
+        else:
+            self.total_thickness = self._resolve_board_thickness()
+            self.z_top = self.total_thickness / 2.0
+            self.z_bottom = -self.total_thickness / 2.0
+            self.z_mid = 0.0
 
         # Resolve soldermask color
         if substrate_color is not None:
             self.substrate_color = substrate_color
         elif self.pcb_config.coverlay_color:
             self.substrate_color = self.SOLDERMASK_COLORS.get(
-                self.pcb_config.coverlay_color.lower(), (0.12, 0.12, 0.12)
+                self.pcb_config.coverlay_color.lower(), (0.12, 0.12, 0.14)
             )
         elif self.pcb_config.stackup and self.pcb_config.stackup.soldermask_color:
             self.substrate_color = self.SOLDERMASK_COLORS.get(
@@ -80,12 +97,26 @@ class PCB3DAssembler:
         else:
             self.substrate_color = self.DEFAULT_SOLDERMASK_COLOR
 
+        # Resolve silkscreen color
+        if self.pcb_config.stackup and self.pcb_config.stackup.silkscreen_color:
+            silk_col_name = self.pcb_config.stackup.silkscreen_color.lower()
+            if silk_col_name in ("black", "matte_black"):
+                self.silkscreen_color = (0.10, 0.10, 0.10)
+            elif silk_col_name == "yellow":
+                self.silkscreen_color = (0.90, 0.85, 0.15)
+            else:
+                self.silkscreen_color = self.DEFAULT_SILKSCREEN_COLOR
+        elif self.substrate_color == (0.92, 0.92, 0.92):  # White soldermask -> black silkscreen
+            self.silkscreen_color = (0.10, 0.10, 0.10)
+        else:
+            self.silkscreen_color = self.DEFAULT_SILKSCREEN_COLOR
+
     def _resolve_board_thickness(self) -> float:
         """Derive physical board substrate thickness in mm."""
-        if self.pcb_config.stackup and self.pcb_config.stackup.total_thickness_mm:
-            return float(self.pcb_config.stackup.total_thickness_mm)
         if self.pcb_config.dimensions_mm and len(self.pcb_config.dimensions_mm) > 2:
             return float(self.pcb_config.dimensions_mm[2])
+        if self.pcb_config.stackup and self.pcb_config.stackup.total_thickness_mm:
+            return float(self.pcb_config.stackup.total_thickness_mm)
         return 1.6
 
     @classmethod
@@ -218,11 +249,27 @@ class PCB3DAssembler:
 
     def build_components_and_pads(self) -> Tuple[Optional[Compound], Optional[Compound]]:
         """Construct Compounds of 3D component package bodies and copper pads."""
+        target_ref = getattr(self.pcb_config, "shape_ref", None)
+        is_flex = getattr(self.pcb_config, "board_type", None) == BoardType.FLEX or "flex" in self.pcb_name.lower()
+
         footprints = []
         if self.wiring and hasattr(self.wiring, "footprints") and self.wiring.footprints:
-            footprints = list(self.wiring.footprints)
+            all_fps = list(self.wiring.footprints)
         elif hasattr(self.pcb_config, "footprints") and getattr(self.pcb_config, "footprints", None):
-            footprints = list(self.pcb_config.footprints)
+            all_fps = list(self.pcb_config.footprints)
+        else:
+            all_fps = []
+
+        for fp in all_fps:
+            fp_shape = getattr(fp, "shape_ref", None)
+            if target_ref:
+                if fp_shape == target_ref:
+                    footprints.append(fp)
+                elif not fp_shape and not is_flex:
+                    footprints.append(fp)
+            else:
+                if not is_flex or fp_shape:
+                    footprints.append(fp)
 
         comp_solids: List[Shape] = []
         pad_solids: List[Shape] = []
@@ -244,10 +291,14 @@ class PCB3DAssembler:
                 fp_inst = fp_factory()
                 if fp_inst.part is not None:
                     body = fp_inst.part
+                    body_bb = body.bounding_box()
+                    z_mount = self.z_top + self.cu_thickness if not is_bottom else self.z_bottom - self.cu_thickness
                     if is_bottom:
-                        loc = Location((cx, cy, cz), (180.0, 0.0, -yaw))
+                        comp_z = z_mount + body_bb.min.Z
+                        loc = Location((cx, cy, comp_z), (180.0, 0.0, -yaw))
                     else:
-                        loc = Location((cx, cy, cz), (0.0, 0.0, yaw))
+                        comp_z = z_mount - body_bb.min.Z
+                        loc = Location((cx, cy, comp_z), (0.0, 0.0, yaw))
                     body.locate(loc)
                     comp_solids.append(body)
 
@@ -268,13 +319,21 @@ class PCB3DAssembler:
             else:
                 dims = getattr(c, "dimensions", None) or (5.0, 5.0, 1.0)
                 dx, dy, dz = dims[0], dims[1], dims[2]
-                box_z = cz + (dz / 2.0 if not is_bottom else -dz / 2.0)
+                z_mount = self.z_top + self.cu_thickness if not is_bottom else self.z_bottom - self.cu_thickness
+                box_z = (z_mount + dz / 2.0) if not is_bottom else (z_mount - dz / 2.0)
                 body = Box(dx, dy, dz)
                 body.locate(Location((cx, cy, box_z), (0.0, 0.0, yaw)))
                 comp_solids.append(body)
 
-        # Include capacitive sensor electrodes in copper pads
+        # Include capacitive sensor electrodes in copper pads (scoped to target subassembly)
         for cap in self.pcb_config.capacitive_sensors:
+            cap_shape = getattr(cap, "shape_ref", None)
+            if target_ref:
+                if cap_shape != target_ref and (cap_shape or is_flex):
+                    continue
+            elif is_flex and not cap_shape:
+                continue
+
             center = cap.center_mm or (0.0, 0.0)
             ex, ey = center[0], center[1]
             ew, eh = cap.area_mm[0], cap.area_mm[1]
@@ -282,8 +341,15 @@ class PCB3DAssembler:
             pad.locate(Location((ex, ey, self.z_top + self.cu_thickness / 2.0)))
             pad_solids.append(pad)
 
-        # Include test points in copper pads
+        # Include test points in copper pads (scoped to target subassembly)
         for tp in self.pcb_config.test_points:
+            tp_shape = getattr(tp, "shape_ref", None)
+            if target_ref:
+                if tp_shape != target_ref and (tp_shape or is_flex):
+                    continue
+            elif is_flex and not tp_shape:
+                continue
+
             tpx, tpy = tp.position_mm[0], tp.position_mm[1]
             dia = tp.pad_diameter_mm
             tp_is_bottom = getattr(tp, "layer", "F.Cu") == "B.Cu"
@@ -300,6 +366,134 @@ class PCB3DAssembler:
         pads_cmp = Compound(children=pad_solids) if pad_solids else None
 
         return comps_cmp, pads_cmp
+
+    def build_silkscreen(self, layer: str = "F.SilkS") -> Optional[Compound]:
+        """Construct a Compound of 3D extruded silkscreen graphics and text annotations.
+
+        Args:
+            layer: Target silkscreen layer ('F.SilkS' for top, 'B.SilkS' for bottom).
+
+        Returns:
+            Compound containing 3D silkscreen solid primitives, or None if layer is empty.
+        """
+        is_bottom = layer == "B.SilkS"
+        t_silk = 0.02
+        # Position silkscreen slightly proud of copper foil to prevent visual z-fighting
+        if not is_bottom:
+            z_base = self.z_top + self.cu_thickness + 0.005
+            z_center = z_base + t_silk / 2.0
+        else:
+            z_base = self.z_bottom - self.cu_thickness - 0.005
+            z_center = z_base - t_silk / 2.0
+
+        solids: List[Shape] = []
+
+        # 1. Silkscreen text annotations from PCBConfig
+        for st in self.pcb_config.silkscreen_texts:
+            if st.layer != layer:
+                continue
+            txt = Text(st.text, font_size=st.font_size)
+            s = extrude(txt, t_silk)
+            yaw = st.rotation
+            if not is_bottom:
+                s.locate(Location((st.position[0], st.position[1], z_base), (0.0, 0.0, yaw)))
+            else:
+                s.locate(Location((st.position[0], st.position[1], z_base), (180.0, 0.0, -yaw)))
+            solids.append(s)
+
+        # 2. Silkscreen vector graphics (rectangles/frames, lines, polygons)
+        for sg in self.pcb_config.silkscreen_graphics:
+            if sg.layer != layer:
+                continue
+            cx, cy = sg.position
+            w, h = sg.dimensions
+            th = sg.thickness
+            match sg.shape:
+                case "rect":
+                    if sg.fill:
+                        b = Box(w, h, t_silk)
+                        b.locate(Location((cx, cy, z_center)))
+                        solids.append(b)
+                    else:
+                        b_top = Box(w, th, t_silk)
+                        b_top.locate(Location((cx, cy + h / 2.0, z_center)))
+                        b_bot = Box(w, th, t_silk)
+                        b_bot.locate(Location((cx, cy - h / 2.0, z_center)))
+                        b_left = Box(th, h, t_silk)
+                        b_left.locate(Location((cx - w / 2.0, cy, z_center)))
+                        b_right = Box(th, h, t_silk)
+                        b_right.locate(Location((cx + w / 2.0, cy, z_center)))
+                        solids.extend([b_top, b_bot, b_left, b_right])
+                case "line":
+                    if sg.points and len(sg.points) >= 2:
+                        x1, y1 = sg.points[0]
+                        x2, y2 = sg.points[1]
+                    else:
+                        x1, y1 = cx - w / 2.0, cy - h / 2.0
+                        x2, y2 = cx + w / 2.0, cy + h / 2.0
+                    dx = x2 - x1
+                    dy = y2 - y1
+                    length = math.hypot(dx, dy)
+                    if length > 1e-4:
+                        angle = math.degrees(math.atan2(dy, dx))
+                        mx, my = (x1 + x2) / 2.0, (y1 + y2) / 2.0
+                        b = Box(length, th, t_silk)
+                        b.locate(Location((mx, my, z_center), (0.0, 0.0, angle)))
+                        solids.append(b)
+                case "polygon":
+                    if sg.points and len(sg.points) >= 3:
+                        pts = [(pt[0], pt[1]) for pt in sg.points]
+                        poly = Polygon(*pts)
+                        s = extrude(poly, t_silk)
+                        if not is_bottom:
+                            s.locate(Location((0.0, 0.0, z_base)))
+                        else:
+                            s.locate(Location((0.0, 0.0, z_base), (180.0, 0.0, 0.0)))
+                        solids.append(s)
+
+        # 3. Component reference designators (for footprints on this layer without explicit silkscreen text)
+        existing_texts = {st.text for st in self.pcb_config.silkscreen_texts if st.layer == layer}
+        omitted = set(self.pcb_config.omitted_silkscreen_designators)
+        target_ref = getattr(self.pcb_config, "shape_ref", None)
+        is_flex = getattr(self.pcb_config, "board_type", None) == BoardType.FLEX or "flex" in self.pcb_name.lower()
+
+        footprints = []
+        if self.wiring and hasattr(self.wiring, "footprints") and self.wiring.footprints:
+            all_fps = list(self.wiring.footprints)
+        elif hasattr(self.pcb_config, "footprints") and getattr(self.pcb_config, "footprints", None):
+            all_fps = list(self.pcb_config.footprints)
+        else:
+            all_fps = []
+
+        for fp in all_fps:
+            fp_shape = getattr(fp, "shape_ref", None)
+            if target_ref:
+                if fp_shape != target_ref and (fp_shape or is_flex):
+                    continue
+            elif is_flex and not fp_shape:
+                continue
+
+            fp_name = getattr(fp, "name", None)
+            if not fp_name or fp_name in existing_texts or fp_name in omitted:
+                continue
+
+            fp_is_bottom = (getattr(fp, "layer", "F.Cu") == "B.Cu") or (fp.position[2] < 0.0)
+            if fp_is_bottom != is_bottom:
+                continue
+
+            cx, cy, _ = fp.position
+            txt = Text(fp_name, font_size=0.8)
+            s = extrude(txt, t_silk)
+            if not is_bottom:
+                s.locate(Location((cx, cy + 1.5, z_base)))
+            else:
+                s.locate(Location((cx, cy + 1.5, z_base), (180.0, 0.0, 0.0)))
+            solids.append(s)
+
+        if not solids:
+            return None
+
+        return Compound(children=solids)
 
     def get_display_items(
         self, prefix: Optional[str] = None
@@ -336,6 +530,16 @@ class PCB3DAssembler:
         vias = self.build_vias()
         if vias is not None:
             items.append((vias, f"{pfx}_vias", self.DEFAULT_VIA_COLOR, 1.0))
+
+        # 7. Front Silkscreen (F.SilkS)
+        silk_top = self.build_silkscreen("F.SilkS")
+        if silk_top is not None:
+            items.append((silk_top, f"{pfx}_silkscreen_top", self.silkscreen_color, 1.0))
+
+        # 8. Back Silkscreen (B.SilkS)
+        silk_bottom = self.build_silkscreen("B.SilkS")
+        if silk_bottom is not None:
+            items.append((silk_bottom, f"{pfx}_silkscreen_bottom", self.silkscreen_color, 1.0))
 
         return items
 
