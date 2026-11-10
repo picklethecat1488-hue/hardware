@@ -17,6 +17,10 @@ Carrier board PCB components are misaligned and clipping through the bottom of t
 
 1. $ python tools/view.py carrier_board/carrier_board:pcb
 
+#### Attached Commits
+
+- `7306d322149deb5db864bbd70d2aab8b9e541bfe`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:174dda99 --> Verify carrier board components and copper traces are visible and not clipping in 3D CAD viewer | `python tools/view.py carrier_board/carrier_board:pcb --no-gui`
