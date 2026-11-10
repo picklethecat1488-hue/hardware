@@ -17,14 +17,6 @@ There are feedbacks on our Gerber’s (see attached), can you please fill out th
 6) We can provide whatever feedback or updates are necessary
 7) Please correct our impedence info in the design files and I will send updated Gerbers back to them
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1794082565048_ucixy.png](attachments/BUG-OPEN-003/screenshot_paste_1794082565048_ucixy.png) | Pasted screenshot screenshot_paste_1794082565048_ucixy.png |
-| `screenshot` | [screenshot_paste_1794082590749_zorq7.png](attachments/BUG-OPEN-003/screenshot_paste_1794082590749_zorq7.png) | Pasted screenshot screenshot_paste_1794082590749_zorq7.png |
-| `screenshot` | [screenshot_paste_1794082597850_8j2oo.png](attachments/BUG-OPEN-003/screenshot_paste_1794082597850_8j2oo.png) | Pasted screenshot screenshot_paste_1794082597850_8j2oo.png |
-
 #### Attached Commits
 
 - `f647928d`

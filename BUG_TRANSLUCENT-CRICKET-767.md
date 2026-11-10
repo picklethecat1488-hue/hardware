@@ -14,12 +14,6 @@
 
 1. $ python tools/view.py carrier_board/flex_tail:pcb
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1794270902078_nny6n.png](attachments/BUG-TRANSLUCENT-CRICKET-767/screenshot_paste_1794270902078_nny6n.png) | Pasted screenshot screenshot_paste_1794270902078_nny6n.png |
-
 #### Attached Commits
 
 - `ffa55f5717b6f5bd97a60b7b94a5935e75797559`
