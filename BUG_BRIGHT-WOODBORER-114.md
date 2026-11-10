@@ -1,12 +1,13 @@
-# 🔴 `[BUG-BRIGHT-WOODBORER-114]` Re : Re: The engineering question of your 3D print order#C-E77W908185A C-E72W908185A C-E71W908185A
+# 🟢 `[BUG-BRIGHT-WOODBORER-114]` Re : Re: The engineering question of your 3D print order#C-E77W908185A C-E72W908185A C-E71W908185A
 
 - **UUID**: `2ae46cbe-de50-44bc-a93e-71e4496dc58a`
 - **ID**: `BUG-BRIGHT-WOODBORER-114`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-10 14:11:40 UTC`
+- **Resolved**: `2026-11-10 15:00:47 UTC`
 
 #### Description
 
@@ -30,3 +31,7 @@ For order C-E71W908185A, the height of the protruding feature is still not enoug
 - [ ] <!-- task:152ac737 --> Verify customer reply document for 3D print engineering query | `cat attachments/BUG-BRIGHT-WOODBORER-114/customer_reply.md`
 - [ ] <!-- task:0f49750e --> Compile pump cover, bowl, and bottom cover parts into 3D models | `python tools/build.py cat_fountain/pump_cover cat_fountain/bowl cat_fountain/bottom_cover`
 - [ ] <!-- task:b29ffac1 --> Visualize bowl and pump cover snap assembly in 3D viewer | `python tools/view.py cat_fountain/bowl cat_fountain/pump_cover --no-gui`
+
+#### Resolution Notes
+
+Resolved 3D print engineering query for orders C-E77W908185A, C-E72W908185A, C-E71W908185A: increased pump cover snap ridge thickness to 1.0mm, thickened pump casing wall to 2.6mm ensuring >= 1.0mm wall thickness at snap recess and groove, redesigned bottom cover snap ridge with 0.75mm protrusion and lead-in chamfers, and accepted risk for minor text engraving breakage
