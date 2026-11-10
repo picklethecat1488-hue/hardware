@@ -7,6 +7,10 @@
 - **Category**: `PCB`
 - **Created**: `2026-11-10 00:34:39 UTC`
 
+#### Reproduction Steps
+
+1. $ python tools/view.py carrier_board/flex_tail:pcb
+
 #### Attachments & References
 
 | Type | Filename | Description |
