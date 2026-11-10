@@ -2,12 +2,13 @@
 
 - **UUID**: `4bd7e7a9-4df6-45eb-b509-a609b8a6008c`
 - **ID**: `BUG-JUMPING-SILVERFISH-144`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-09 23:07:13 UTC`
 - **Resolved**: `2026-11-10 00:34:19 UTC`
+- **Accepted**: `2026-11-10 00:34:25 UTC`
 
 #### Description
 
