@@ -2,12 +2,13 @@
 
 - **UUID**: `2f789c96-5392-40df-a65e-2820923aa80a`
 - **ID**: `BUG-PLUMED-TREEHOPPER-556`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 00:16:24 UTC`
 - **Resolved**: `2026-11-11 18:11:31 UTC`
+- **Accepted**: `2026-11-11 18:11:40 UTC`
 
 #### Description
 
