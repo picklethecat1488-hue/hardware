@@ -1,11 +1,12 @@
-# 🔴 `[BUG-LUMINESCENT-SPRINGTAIL-8]` scope.py fails to populate projects 
+# 🟢 `[BUG-LUMINESCENT-SPRINGTAIL-8]` scope.py fails to populate projects
 
 - **UUID**: `9924af8a-064b-4056-89f2-62cd713a63cf`
 - **ID**: `BUG-LUMINESCENT-SPRINGTAIL-8`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-11-11 19:46:58 UTC`
+- **Resolved**: `2026-11-11 19:51:54 UTC`
 
 #### Description
 
@@ -250,3 +251,7 @@ Desktop window closed; shutting down scope server...
 2026-11-11 11:45:47 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 11:45:47] "GET /static/three-cad-viewer.esm.js HTTP/1.1" 200 -
 2026-11-11 11:45:47 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 11:45:47] "GET /static/scope-icon.svg HTTP/1.1" 200 -
 ```
+
+#### Resolution Notes
+
+Fix unrendered Viewer getter in three-cad-viewer to return null instead of throwing, guard resizeCadView dimensions update, and add safe try/catch in resizeViewport in scope.html.j2 so Scope populates projects cleanly on startup
