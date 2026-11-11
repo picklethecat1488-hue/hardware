@@ -18,6 +18,12 @@ The play button does not work when I switch to “Simulate” mode. No fountain 
 
 1. python tools/scope.py cat_fountain/simulation:simulate
 
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [screenshot_paste_1794434475191_82foj.png](attachments/BUG-LUSTROUS-MANTIS-333/screenshot_paste_1794434475191_82foj.png) | Pasted screenshot screenshot_paste_1794434475191_82foj.png |
+
 #### Attached Commits
 
 - `84e9c3d4`

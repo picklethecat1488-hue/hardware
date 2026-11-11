@@ -18,6 +18,14 @@ Net highlighting does not work. We should also use a high contrast color scheme 
 
 1. python tools/scope.py carrier_board/carrier_board:pcb
 
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [screenshot_paste_1794434113716_f0sw8.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794434113716_f0sw8.png) | Pasted screenshot screenshot_paste_1794434113716_f0sw8.png |
+| `screenshot` | [screenshot_paste_1794434209020_bde4d.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794434209020_bde4d.png) | Pasted screenshot screenshot_paste_1794434209020_bde4d.png |
+| `screenshot` | [screenshot_paste_1794434388241_j5k2b.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794434388241_j5k2b.png) | Pasted screenshot screenshot_paste_1794434388241_j5k2b.png |
+
 #### Attached Commits
 
 - `84e9c3d4`

@@ -14,6 +14,12 @@
 
 The horizontal scrollbar under the header is not themed (screenshot attached)
 
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [screenshot_paste_1794421688344_hbpe0.png](attachments/BUG-QUICK-GRUB-512/screenshot_paste_1794421688344_hbpe0.png) | Pasted screenshot screenshot_paste_1794421688344_hbpe0.png |
+
 #### Attached Commits
 
 - `1d9bc62d917d5cb498c939e3d561108177318d3b`
