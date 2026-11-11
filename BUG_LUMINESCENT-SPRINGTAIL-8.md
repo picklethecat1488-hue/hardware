@@ -252,6 +252,10 @@ Desktop window closed; shutting down scope server...
 2026-11-11 11:45:47 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 11:45:47] "GET /static/scope-icon.svg HTTP/1.1" 200 -
 ```
 
+#### Attached Commits
+
+- `7b5bbd30`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:94a76c3d --> Verify Scope workstation startup and project population without unrendered error | `python tools/scope.py`
