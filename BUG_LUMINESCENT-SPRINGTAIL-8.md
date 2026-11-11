@@ -252,6 +252,10 @@ Desktop window closed; shutting down scope server...
 2026-11-11 11:45:47 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 11:45:47] "GET /static/scope-icon.svg HTTP/1.1" 200 -
 ```
 
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:94a76c3d --> Verify Scope workstation startup and project population without unrendered error | `python tools/scope.py`
+
 #### Resolution Notes
 
 Fix unrendered Viewer getter in three-cad-viewer to return null instead of throwing, guard resizeCadView dimensions update, and add safe try/catch in resizeViewport in scope.html.j2 so Scope populates projects cleanly on startup
