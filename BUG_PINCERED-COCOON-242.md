@@ -1,0 +1,23 @@
+# 🔴 `[BUG-PINCERED-COCOON-242]` [cat_fountain/product] Defect in CAD view
+
+- **UUID**: `dc6c7bfd-3af5-4efd-9b95-ceec2ba25b4c`
+- **ID**: `BUG-PINCERED-COCOON-242`
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `CAD`
+- **Component**: `cat_fountain`
+- **Created**: `2026-11-11 14:02:32 UTC`
+
+#### Description
+
+Inspect panel doesn’t work/selecting a face or object doesn’t do anything.
+
+#### Reproduction Steps
+
+1. python tools/scope.py cat_fountain/product:cad
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `image/png` | [snapshot.png](attachments/BUG-PINCERED-COCOON-242/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
