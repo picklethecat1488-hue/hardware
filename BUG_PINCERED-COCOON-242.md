@@ -2,12 +2,13 @@
 
 - **UUID**: `dc6c7bfd-3af5-4efd-9b95-ceec2ba25b4c`
 - **ID**: `BUG-PINCERED-COCOON-242`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 14:02:32 UTC`
 - **Resolved**: `2026-11-11 18:23:37 UTC`
+- **Accepted**: `2026-11-11 18:23:46 UTC`
 
 #### Description
 
