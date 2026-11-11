@@ -1,12 +1,13 @@
-# 🔴 `[BUG-SEGMENTED-MOTH-70]` New Bug Report
+# 🟢 `[BUG-SEGMENTED-MOTH-70]` New Bug Report
 
 - **UUID**: `2b254ab4-aaab-4a35-8d14-7aee1b2d1a5f`
 - **ID**: `BUG-SEGMENTED-MOTH-70`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `Scope`
 - **Created**: `2026-11-11 00:17:25 UTC`
+- **Resolved**: `2026-11-11 00:39:46 UTC`
 
 #### Description
 
@@ -27,3 +28,7 @@ pybullet build time: Oct 20 2025 08:05:00
 ⠹ Building...Desktop window closed; shutting down viewer server...
 (cq)
 ```
+
+#### Resolution Notes
+
+Added terminal detaching by default with --no-detach and --foreground flags and stop command matching forge.py.
