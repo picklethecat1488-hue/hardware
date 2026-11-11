@@ -2,12 +2,13 @@
 
 - **UUID**: `37a3ee75-19a5-428e-a618-b1c71af0f4bd`
 - **ID**: `BUG-ANTENNAL-FIREBUG-841`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 13:54:05 UTC`
 - **Resolved**: `2026-11-11 21:52:31 UTC`
+- **Accepted**: `2026-11-11 21:52:38 UTC`
 - **Rejected**: `2026-11-11 18:15:54 UTC`
 
 #### Description
