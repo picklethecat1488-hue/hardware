@@ -17,6 +17,10 @@ The viewport doesn’t cover the bottom 2/3 of my browser window
 
 1. python tools/scope.py cat_fountain/product:cad
 
+#### Attached Commits
+
+- `84e9c3d4`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:114cb954 --> Verify CAD viewport dynamically expands to fill 100% of browser window upon resize | `python tools/scope.py cat_fountain/product:cad`
