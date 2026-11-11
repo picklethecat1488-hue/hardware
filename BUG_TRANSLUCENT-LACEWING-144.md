@@ -7,7 +7,7 @@
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-11 13:59:20 UTC`
-- **Resolved**: `2026-11-11 18:17:49 UTC`
+- **Resolved**: `2026-11-11 18:19:57 UTC`
 
 #### Description
 
@@ -34,3 +34,9 @@ Net highlighting does not work. We should also use a high contrast color scheme 
 #### Resolution Notes
 
 Updated PCB layer colors to KiCad palette and added active net pad/trace glow in 3D viewer
+
+-Net highlighting still does not work, but the net colors look correct. 
+-The PCB is still not in a high contrast color scheme (attached screenshot)
+-Selecting/deselecting layers doesn’t do anything
+-We are missing the quickbar on the right to change PCB views that is present in the CAD view
+-The inspect view should give info about the highlighted component/net/trace/via in addition to CAD info
