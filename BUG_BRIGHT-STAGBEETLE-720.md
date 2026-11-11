@@ -21,6 +21,7 @@ The CAD controls in the CAD viewer widget show in PCB view. We should hide those
 #### Attached Commits
 
 - `84e9c3d4`
+- `b418d50f04087b84dc59786ae7618385dbf035f9`
 
 #### Review Tasks & Functional Checklist
 
