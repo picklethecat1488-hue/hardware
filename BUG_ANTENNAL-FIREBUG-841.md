@@ -7,7 +7,7 @@
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 13:54:05 UTC`
-- **Resolved**: `2026-11-11 14:26:20 UTC`
+- **Resolved**: `2026-11-11 18:15:37 UTC`
 
 #### Description
 
@@ -16,6 +16,12 @@ The viewport doesn’t cover the bottom 2/3 of my browser window
 #### Reproduction Steps
 
 1. python tools/scope.py cat_fountain/product:cad
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [screenshot_paste_1794420937200_iuskk.png](attachments/BUG-ANTENNAL-FIREBUG-841/screenshot_paste_1794420937200_iuskk.png) | Pasted screenshot screenshot_paste_1794420937200_iuskk.png |
 
 #### Attached Commits
 
@@ -28,3 +34,5 @@ The viewport doesn’t cover the bottom 2/3 of my browser window
 #### Resolution Notes
 
 Added Viewer.resize method to three-cad-viewer.esm.js and wired ResizeObserver auto-fitting in scope.html.j2
+
+- This still doesn’t work. Attaching a screenshot
