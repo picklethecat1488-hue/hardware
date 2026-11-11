@@ -2,12 +2,13 @@
 
 - **UUID**: `02986800-0ef0-4a22-a6ed-b55f7082736c`
 - **ID**: `BUG-QUICK-GRUB-512`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `Scope`
 - **Created**: `2026-11-11 18:27:19 UTC`
 - **Resolved**: `2026-11-11 19:45:21 UTC`
+- **Accepted**: `2026-11-11 19:45:27 UTC`
 
 #### Description
 
