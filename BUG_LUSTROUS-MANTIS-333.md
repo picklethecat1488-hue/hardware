@@ -7,7 +7,7 @@
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 13:57:40 UTC`
-- **Resolved**: `2026-11-11 18:57:11 UTC`
+- **Resolved**: `2026-11-11 22:01:15 UTC`
 - **Rejected**: `2026-11-11 18:13:25 UTC`
 
 #### Description
@@ -17,6 +17,12 @@ The play button does not work when I switch to “Simulate” mode. No fountain 
 #### Reproduction Steps
 
 1. python tools/scope.py cat_fountain/simulation:simulate
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [screenshot_paste_1794434475191_82foj.png](attachments/BUG-LUSTROUS-MANTIS-333/screenshot_paste_1794434475191_82foj.png) | Pasted screenshot screenshot_paste_1794434475191_82foj.png |
 
 #### Attached Commits
 
