@@ -2,12 +2,13 @@
 
 - **UUID**: `f3f7eee9-b90f-42b0-94ce-40a40f317991`
 - **ID**: `BUG-LUSTROUS-MANTIS-333`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 13:57:40 UTC`
 - **Resolved**: `2026-11-11 23:21:19 UTC`
+- **Accepted**: `2026-11-11 23:21:30 UTC`
 - **Rejected**: `2026-11-11 22:02:10 UTC`
 
 #### Description
