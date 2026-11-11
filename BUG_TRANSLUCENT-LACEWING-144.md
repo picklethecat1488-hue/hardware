@@ -24,6 +24,7 @@ Net highlighting does not work. We should also use a high contrast color scheme 
 - `caafb7a1`
 - `5919a5dd`
 - `d3e08b55`
+- `7b5bbd30`
 
 #### Review Tasks & Functional Checklist
 
