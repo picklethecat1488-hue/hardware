@@ -1,12 +1,13 @@
-# 🔴 `[BUG-BRIGHT-STAGBEETLE-720]` Hide CAD viewer widget controls in all modes and move navigation, tree, and ruler to sidebar
+# 🟢 `[BUG-BRIGHT-STAGBEETLE-720]` Hide CAD viewer widget controls in all modes and move navigation, tree, and ruler to sidebar
 
 - **UUID**: `c4361ee2-b0f3-4f96-8e31-335d3d9c87af`
 - **ID**: `BUG-BRIGHT-STAGBEETLE-720`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-11 14:01:07 UTC`
+- **Resolved**: `2026-11-11 18:51:38 UTC`
 - **Rejected**: `2026-11-11 18:22:38 UTC`
 
 #### Description
@@ -28,12 +29,7 @@ The CAD controls in the CAD viewer widget show in PCB view. We should hide those
 
 #### Resolution Notes
 
-Hid CAD viewer controls overlay in PCB mode and added Display controls to sidebar panel
-
-- Rejected, we should hide the CAD viewer controls in the CAD and simulate modes as well
-- Update the Tree view to show/hide individual layers and components like the Tree view does in the VAD Viewer widget does
-- Add a ruler (mm) to the quicker
-- Maintain the Axis indicator, when we hide the CAD controls
+Hidden CAD controls across all modes, preserved RGB axis indicator, added tree visibility toggles, and added ruler to quickbar
 
 #### Rejection Feedback
 
