@@ -7,7 +7,7 @@
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 13:57:40 UTC`
-- **Resolved**: `2026-11-11 22:01:15 UTC`
+- **Resolved**: `2026-11-11 22:02:03 UTC`
 - **Rejected**: `2026-11-11 18:13:25 UTC`
 
 #### Description
@@ -40,6 +40,8 @@ The play button does not work when I switch to “Simulate” mode. No fountain 
 #### Resolution Notes
 
 Added fountain fluid particle simulation, rotating impeller animation, force repaint update loop, and clickable Rerun timeline log markers with live flow metrics
+
+Rejected-I dstill don’t think this is working right. The physics particles appear incorrectly offset from the CAD geometry
 
 #### Rejection Feedback
 
