@@ -7,7 +7,7 @@
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-11 13:59:20 UTC`
-- **Resolved**: `2026-11-11 14:26:58 UTC`
+- **Resolved**: `2026-11-11 18:17:49 UTC`
 
 #### Description
 
@@ -16,6 +16,12 @@ Net highlighting does not work. We should also use a high contrast color scheme 
 #### Reproduction Steps
 
 1. python tools/scope.py carrier_board/carrier_board:pcb
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [screenshot_paste_1794421069036_kjvhz.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794421069036_kjvhz.png) | Pasted screenshot screenshot_paste_1794421069036_kjvhz.png |
 
 #### Attached Commits
 
