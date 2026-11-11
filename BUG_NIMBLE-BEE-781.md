@@ -522,6 +522,10 @@ face 46 ignored
 2026-11-11 13:50:07 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 13:50:07] "GET /api/scope/load?project=cat_fountain&target=product&subassembly=&mode=CAD HTTP/1.1" 200 -
 ```
 
+#### Attached Commits
+
+- `b3594b22`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:fd325d61 --> Inspect cat fountain assembled CAD view and verify bottom cover fully occludes internal PCB footprints from below | `python tools/scope.py cat_fountain/product:cad`
