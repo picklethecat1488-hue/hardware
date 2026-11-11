@@ -29,6 +29,10 @@ pybullet build time: Oct 20 2025 08:05:00
 (cq)
 ```
 
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:4905b55c --> Verify Scope CLI detaches from terminal when launched and terminates cleanly with stop | `python tools/scope.py --help`
+
 #### Resolution Notes
 
 Added terminal detaching by default with --no-detach and --foreground flags and stop command matching forge.py.
