@@ -20,6 +20,10 @@ I don’t actually see the product view opening up
 
 1. python src/view.py cat_fountain/product
 
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:33f23969 --> Verify 3D instanced CAD geometry renders in Scope viewport | `python tools/scope.py cat_fountain/product --no-app --no-detach`
+
 #### Resolution Notes
 
 Imported decodeInstancedFormat and isInstancedFormat in scope.html.j2 to resolve instanced shape buffers and set config.reset_camera to RESET in pipeline.py.
