@@ -17,6 +17,10 @@ The viewport snapshot is not showing the model. Rotating the model is also notic
 
 1. python tools/scope.py cat_fountain/product:cad
 
+#### Attached Commits
+
+- `84e9c3d4`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:db38baf2 --> Verify Target Bug snapshot captures rendered 3D model and rotation responds with 60 FPS fluidity | `python tools/scope.py cat_fountain/product:cad`
