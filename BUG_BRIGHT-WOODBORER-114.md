@@ -17,12 +17,6 @@ Pls fix as much of this as possible-we can accept the risk of breakage for the r
 For orders C-E77W908185A and C-E72W908185A, there is still a risk of breakage due to the red-indicated thin thickness. Do you accept this risk or want to increase the thickness to 1 mm?
 For order C-E71W908185A, the height of the protruding feature is still not enough. Would you like to take this risk or want to redesign your file?
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1794320001277_60qmk.png](attachments/BUG-BRIGHT-WOODBORER-114/screenshot_paste_1794320001277_60qmk.png) | Pasted screenshot screenshot_paste_1794320001277_60qmk.png |
-
 #### Attached Commits
 
 - `8c8953467007256d57295120b57580346df9eb92`
