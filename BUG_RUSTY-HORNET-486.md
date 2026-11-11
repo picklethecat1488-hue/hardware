@@ -2,12 +2,13 @@
 
 - **UUID**: `49c3ab3e-6eb3-4772-baa2-92d432595530`
 - **ID**: `BUG-RUSTY-HORNET-486`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-11 00:19:56 UTC`
 - **Resolved**: `2026-11-11 00:44:17 UTC`
+- **Accepted**: `2026-11-11 00:44:24 UTC`
 
 #### Description
 
