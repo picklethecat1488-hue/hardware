@@ -7,7 +7,7 @@
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-11 13:59:20 UTC`
-- **Resolved**: `2026-11-11 19:11:29 UTC`
+- **Resolved**: `2026-11-11 21:55:13 UTC`
 - **Rejected**: `2026-11-11 18:20:11 UTC`
 
 #### Description
@@ -17,6 +17,12 @@ Net highlighting does not work. We should also use a high contrast color scheme 
 #### Reproduction Steps
 
 1. python tools/scope.py carrier_board/carrier_board:pcb
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [screenshot_paste_1794434113716_f0sw8.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794434113716_f0sw8.png) | Pasted screenshot screenshot_paste_1794434113716_f0sw8.png |
 
 #### Attached Commits
 
@@ -34,6 +40,9 @@ Net highlighting does not work. We should also use a high contrast color scheme 
 #### Resolution Notes
 
 Implemented KiCad high-contrast PCB color scheme, interactive layer checkboxes and solo toggling, 3D glowing net highlighting with background dimming and canvas repaint, PCB camera quickbar buttons (Top, Bot, Flip, HC), and rich PCB entity inspection for traces, vias, pads, and components
+
+Rejected:
+-The high contrast mode doesn’t really work the way I expect (attached a screenshot showing the kicad viewer’s contrasting colors)
 
 #### Rejection Feedback
 
