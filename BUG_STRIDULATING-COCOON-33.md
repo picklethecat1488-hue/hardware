@@ -2,12 +2,13 @@
 
 - **UUID**: `e513aac7-441d-4ac7-bb8d-1ae418306589`
 - **ID**: `BUG-STRIDULATING-COCOON-33`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-11 13:59:41 UTC`
 - **Resolved**: `2026-11-11 18:20:28 UTC`
+- **Accepted**: `2026-11-11 18:20:34 UTC`
 
 #### Description
 
