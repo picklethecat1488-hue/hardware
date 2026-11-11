@@ -2,12 +2,13 @@
 
 - **UUID**: `d2938749-7c9f-47df-a757-fe094df7b58a`
 - **ID**: `BUG-HOVERING-TIGERBEETLE-411`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `exhaust_manifolds`
 - **Created**: `2026-11-11 22:03:40 UTC`
 - **Resolved**: `2026-11-11 23:14:36 UTC`
+- **Accepted**: `2026-11-11 23:14:44 UTC`
 
 #### Description
 
