@@ -16,10 +16,6 @@ Annotations:
 - Pin #1: I am holding the mouse here
 - Pin #2: This is the element being highlighted
 
-### Spatial 3D Annotations
-- **Pin #1** `(360.00, 303.00, 0.00)`: I am holding the mouse here
-- **Pin #2** `(565.00, 572.00, 0.00)`: This is the element being highlighted
-
 #### Reproduction Steps
 
 1. python tools/scope.py carrier_board/product:cad
