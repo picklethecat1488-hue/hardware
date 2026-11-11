@@ -2,11 +2,12 @@
 
 - **UUID**: `9924af8a-064b-4056-89f2-62cd713a63cf`
 - **ID**: `BUG-LUMINESCENT-SPRINGTAIL-8`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-11-11 19:46:58 UTC`
 - **Resolved**: `2026-11-11 21:51:04 UTC`
+- **Accepted**: `2026-11-11 21:51:11 UTC`
 
 #### Description
 
