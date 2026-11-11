@@ -1,6 +1,6 @@
 # 🟢 `[BUG-ANTENNAL-ROVEBEETLE-450]` Regression tests are not useful
 
-- **UUID**: `6b8e5cc6-b1d4-4cb0-8508-534f4637cbe6`
+- **UUID**: `93410060-1aef-474d-bc6e-83079e74cef7`
 - **ID**: `BUG-ANTENNAL-ROVEBEETLE-450`
 - **Status**: `CLOSED`
 - **Severity**: `HIGH`
