@@ -2,12 +2,13 @@
 
 - **UUID**: `c4361ee2-b0f3-4f96-8e31-335d3d9c87af`
 - **ID**: `BUG-BRIGHT-STAGBEETLE-720`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-11 14:01:07 UTC`
 - **Resolved**: `2026-11-11 21:52:15 UTC`
+- **Accepted**: `2026-11-11 21:52:22 UTC`
 - **Rejected**: `2026-11-11 18:22:38 UTC`
 
 #### Description
