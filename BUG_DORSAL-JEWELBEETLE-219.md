@@ -2,12 +2,13 @@
 
 - **UUID**: `e6ee3e8d-ecd1-45ff-bbef-04322be48dc3`
 - **ID**: `BUG-DORSAL-JEWELBEETLE-219`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 14:02:00 UTC`
 - **Resolved**: `2026-11-11 21:51:47 UTC`
+- **Accepted**: `2026-11-11 21:51:54 UTC`
 - **Rejected**: `2026-11-11 18:23:29 UTC`
 
 #### Description
