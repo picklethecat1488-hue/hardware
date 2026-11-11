@@ -2,12 +2,13 @@
 
 - **UUID**: `9bfe7c94-8152-4469-8ba0-7ced48a27a38`
 - **ID**: `BUG-BUZZING-CADDISFLY-645`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 00:15:49 UTC`
 - **Resolved**: `2026-11-11 18:10:35 UTC`
+- **Accepted**: `2026-11-11 18:10:42 UTC`
 
 #### Description
 
