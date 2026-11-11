@@ -1,12 +1,13 @@
-# 🔴 `[BUG-RUSTY-HORNET-486]` [carrier_board/carrier_board] Defect in PCB view
+# 🟢 `[BUG-RUSTY-HORNET-486]` [carrier_board/carrier_board] Defect in PCB view
 
 - **UUID**: `49c3ab3e-6eb3-4772-baa2-92d432595530`
 - **ID**: `BUG-RUSTY-HORNET-486`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-11 00:19:56 UTC`
+- **Resolved**: `2026-11-11 00:33:22 UTC`
 
 #### Description
 
@@ -21,3 +22,7 @@ When syncing for loading viewer.py with a target, we should show a modal progres
 | Type | Filename | Description |
 | :--- | :--- | :--- |
 | `image/png` | [snapshot.png](attachments/BUG-RUSTY-HORNET-486/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
+
+#### Resolution Notes
+
+Added staged modal progress bar UI during workstation sync, target switching, and geometry loading.
