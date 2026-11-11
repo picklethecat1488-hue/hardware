@@ -1,4 +1,4 @@
-# 🔴 `[BUG-JUMPING-INSTAR-950]` [cat_fountain/product] Defect in SIMULATE view
+# 🔴 `[BUG-JUMPING-INSTAR-950]` Simulate view lacks max steps selection, physics object inspection, and rerun log queries (cat_fountain)
 
 - **UUID**: `f9bfa2d4-b45b-4fec-849a-c63b9ce5e153`
 - **ID**: `BUG-JUMPING-INSTAR-950`

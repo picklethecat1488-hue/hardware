@@ -1,4 +1,4 @@
-# 🔴 `[BUG-LUSTROUS-MANTIS-333]` Simulate mode play button does not run PyBullet physics simulation or timeline logs
+# 🔴 `[BUG-LUSTROUS-MANTIS-333]` Simulate mode play button does not play physics simulation and timeline lacks clickable rerun logs (cat_fountain)
 
 - **UUID**: `f3f7eee9-b90f-42b0-94ce-40a40f317991`
 - **ID**: `BUG-LUSTROUS-MANTIS-333`
@@ -16,12 +16,6 @@ The play button does not work when I switch to “Simulate” mode. No fountain 
 #### Reproduction Steps
 
 1. python tools/scope.py cat_fountain/simulation:simulate
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1794434475191_82foj.png](attachments/BUG-LUSTROUS-MANTIS-333/screenshot_paste_1794434475191_82foj.png) | Pasted screenshot screenshot_paste_1794434475191_82foj.png |
 
 #### Attached Commits
 

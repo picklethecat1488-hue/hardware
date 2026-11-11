@@ -1,4 +1,4 @@
-# 🔴 `[BUG-NIMBLE-BEE-781]` [cat_fountain/product] Defect in CAD view
+# 🔴 `[BUG-NIMBLE-BEE-781]` Footprints render in front of bottom cover due to CAD view Z-ordering (cat_fountain)
 
 - **UUID**: `934eb8ac-a282-42da-a0ee-a6fc6c4f876b`
 - **ID**: `BUG-NIMBLE-BEE-781`
@@ -521,9 +521,6 @@ face 46 ignored
 2026-11-11 13:50:07 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 13:50:07] "GET /api/scope/load?project=cat_fountain&target=product&subassembly=&mode=CAD HTTP/1.1" 200 -
 ```
 
-#### Attachments & References
+#### Review Tasks & Functional Checklist
 
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-NIMBLE-BEE-781/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
-| `text/plain` | [scope.log](attachments/BUG-NIMBLE-BEE-781/scope.log) | Scope workstation execution logs |
+- [ ] <!-- task:fd325d61 --> Inspect cat fountain assembled CAD view and verify bottom cover fully occludes internal PCB footprints from below | `python tools/scope.py cat_fountain/product:cad`

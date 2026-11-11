@@ -1,4 +1,4 @@
-# 🔴 `[BUG-HOVERING-TIGERBEETLE-411]` [exhaust_manifolds/part_positions] Defect in CAD view
+# 🔴 `[BUG-HOVERING-TIGERBEETLE-411]` CAD Objects tree view lacks hierarchical group organization (exhaust_manifolds)
 
 - **UUID**: `d2938749-7c9f-47df-a757-fe094df7b58a`
 - **ID**: `BUG-HOVERING-TIGERBEETLE-411`
@@ -520,10 +520,3 @@ face 46 ignored
 2026-11-11 14:03:07 [INFO] scope: Successfully loaded geometry for exhaust_manifolds/part_positions [CAD] in 5.64s
 2026-11-11 14:03:07 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 14:03:07] "GET /api/scope/load?project=exhaust_manifolds&target=part_positions&subassembly=&mode=CAD HTTP/1.1" 200 -
 ```
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-HOVERING-TIGERBEETLE-411/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
-| `text/plain` | [scope.log](attachments/BUG-HOVERING-TIGERBEETLE-411/scope.log) | Scope workstation execution logs |

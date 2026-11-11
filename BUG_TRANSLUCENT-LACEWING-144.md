@@ -1,4 +1,4 @@
-# 🔴 `[BUG-TRANSLUCENT-LACEWING-144]` PCB view lacks net highlighting, high contrast theme, layer toggles, and PCB quickbar
+# 🔴 `[BUG-TRANSLUCENT-LACEWING-144]` PCB view net highlighting is non-functional and requires KiCad high-contrast theme (carrier_board)
 
 - **UUID**: `cf9a924c-9c73-4e4c-b249-6be0475c8f46`
 - **ID**: `BUG-TRANSLUCENT-LACEWING-144`
@@ -21,8 +21,6 @@ Net highlighting does not work. We should also use a high contrast color scheme 
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1794434113716_f0sw8.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794434113716_f0sw8.png) | Pasted screenshot screenshot_paste_1794434113716_f0sw8.png |
-| `screenshot` | [screenshot_paste_1794434209020_bde4d.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794434209020_bde4d.png) | Pasted screenshot screenshot_paste_1794434209020_bde4d.png |
 | `screenshot` | [screenshot_paste_1794434388241_j5k2b.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794434388241_j5k2b.png) | Pasted screenshot screenshot_paste_1794434388241_j5k2b.png |
 
 #### Attached Commits
