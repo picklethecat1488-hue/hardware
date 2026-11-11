@@ -16,8 +16,6 @@ Net highlighting does not work. We should also use a high contrast color scheme 
 
 1. python tools/scope.py carrier_board/carrier_board:pcb
 
-#### Attachments & References
+#### Review Tasks & Functional Checklist
 
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-TRANSLUCENT-LACEWING-144/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
+- [ ] <!-- task:cbd6bdbb --> Verify PCB copper layers use KiCad high-contrast palette and active nets illuminate on click | `python tools/scope.py carrier_board/carrier_board:pcb`
