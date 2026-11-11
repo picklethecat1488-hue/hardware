@@ -33,6 +33,8 @@ from model.vcs import (
 from provider.sanitizer import elide_commit_author, elide_commit_email, elide_personal_info
 
 MAX_DIFF_LINE_LENGTH: int = 1000
+MAX_DIFF_FILE_SIZE_BYTES: int = 500 * 1024  # 500 KB limit for generating line-by-line diffs
+MAX_DIFF_LINES: int = 4500  # 4,500 lines limit for full side-by-side matching
 IGNORED_REVIEW_FILES: frozenset[str] = frozenset({"BUGS.md", "BUGS.txt", "CR.md"})
 
 
@@ -2077,6 +2079,60 @@ class GitEngine:
         if commit == "working":
             old_content = self.get_file_content("working", file_path, parent=True)
             new_content = self.get_file_content("working", file_path, parent=False)
+        else:
+            old_content = self.get_file_content(commit, file_path, parent=True)
+            new_content = self.get_file_content(commit, file_path, parent=False)
+
+        # Check for oversized content that could hang difflib or browser rendering
+        file_size = max(
+            len(old_content.encode("utf-8", errors="replace")),
+            len(new_content.encode("utf-8", errors="replace")),
+        )
+        old_lines_count = old_content.count("\n") + (1 if old_content else 0)
+        new_lines_count = new_content.count("\n") + (1 if new_content else 0)
+        is_oversized = (
+            file_size > MAX_DIFF_FILE_SIZE_BYTES or old_lines_count > MAX_DIFF_LINES or new_lines_count > MAX_DIFF_LINES
+        )
+
+        if is_oversized:
+            status = "M"
+            if not old_content and new_content:
+                status = "A"
+            elif old_content and not new_content:
+                status = "D"
+
+            size_kb = file_size / 1024
+            line_count = max(old_lines_count, new_lines_count)
+            summary_msg = (
+                f"File diff is too large to render ({size_kb:.1f} KB, {line_count:,} lines). "
+                f"Interactive syntax highlighting and side-by-side diff are collapsed to preserve performance."
+            )
+            raw_diff_summary = (
+                f"--- a/{file_path}\n+++ b/{file_path}\n@@ -0,0 +0,0 @@\n [Oversized file diff: {summary_msg}]\n"
+            )
+
+            diff_model = FileDiffModel(
+                file_path=file_path,
+                old_path=file_path,
+                new_path=file_path,
+                status=status,
+                is_binary=False,
+                is_lfs=is_lfs,
+                is_oversized=True,
+                additions=new_lines_count if status == "A" else 0,
+                deletions=old_lines_count if status == "D" else 0,
+                hunks=[],
+                side_by_side=[],
+                full_content=summary_msg,
+                old_content="",
+                new_content="",
+                raw_diff=raw_diff_summary,
+            )
+            if commit != "working":
+                self._file_diff_cache[cache_key] = diff_model
+            return diff_model
+
+        if commit == "working":
             if staged_only:
                 try:
                     raw_diff = run_git_command(["diff", "--cached", "--", file_path], cwd=self.repo_root)
@@ -2093,8 +2149,6 @@ class GitEngine:
                     f"+{l}" for l in lines
                 )
         else:
-            old_content = self.get_file_content(commit, file_path, parent=True)
-            new_content = self.get_file_content(commit, file_path, parent=False)
             try:
                 raw_diff = run_git_command(
                     ["diff-tree", "-p", "--no-commit-id", commit, "--", file_path], cwd=self.repo_root

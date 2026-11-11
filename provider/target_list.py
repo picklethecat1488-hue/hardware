@@ -8,6 +8,41 @@ if TYPE_CHECKING:
     from .provider_router import ProviderRouter
 
 
+def parse_target_string(target_str: Optional[str]) -> tuple[str, str, Optional[str], str]:
+    """Parse project, target, subassembly, and visualization mode from target string."""
+    if not target_str:
+        return "", "", None, "CAD"
+
+    mode = "CAD"
+    clean_target = target_str
+
+    if clean_target.endswith(":pcb") or "/pcb" in clean_target:
+        mode = "PCB"
+        clean_target = clean_target.replace(":pcb", "").replace("/pcb", "")
+    elif clean_target.endswith(":simulate") or "/simulate" in clean_target:
+        mode = "SIMULATE"
+        clean_target = clean_target.replace(":simulate", "").replace("/simulate", "")
+    elif clean_target.endswith(":diagram") or "/diagram" in clean_target:
+        mode = "DIAGRAM"
+        clean_target = clean_target.replace(":diagram", "").replace("/diagram", "")
+
+    # Strip action specifiers like :view or :part
+    if clean_target.endswith(":view") or "/view" in clean_target:
+        clean_target = clean_target.replace(":view", "").replace("/view", "")
+    elif clean_target.endswith(":part") or "/part" in clean_target:
+        clean_target = clean_target.replace(":part", "").replace("/part", "")
+
+    subassembly = None
+    if ":" in clean_target:
+        clean_target, subassembly = clean_target.split(":", 1)
+
+    base = clean_target.split(":", 1)[0]
+    project = base.split("/", 1)[0] if "/" in base else ""
+    target = base.split("/", 1)[1] if "/" in base else ""
+
+    return project, target, subassembly, mode
+
+
 class TargetList(list[str]):
     """A specialized list for manifold build targets."""
 

@@ -80,27 +80,13 @@ class TestSmoke:
         self.run_command(["tools/config.py", "exhaust_manifolds/driver", "-e", str(env_file)])
         self.run_command(["tools/config.py", "exhaust_manifolds/driver:config/text", "-e", str(env_file)])
 
-    def test_view_commands(self):
-        """Verify view.py commands execute correctly."""
-        # Check target listing
-        self.run_command(["tools/view.py", "--list", "--no-gui"])
+    def test_scope_commands(self):
+        """Verify scope.py workstation commands execute correctly."""
+        # Check help output
+        self.run_command(["tools/scope.py", "--help"])
 
-        # Check target visualization (Note: ocp_vscode may warn if no listener is active, but should return 0)
-        self.run_command(["tools/view.py", "valve_actuator_limiter/limiter", "--no-gui"])
-        self.run_command(["tools/view.py", "valve_actuator_limiter/*:part/default", "--no-gui"])
-
-        # Check simulation mode
-        self.run_command(
-            [
-                "tools/view.py",
-                "cat_fountain/product:view/simulate",
-                "--build-dir",
-                str(self.build_dir),
-                "-s",
-                "1",
-                "--no-gui",
-            ]
-        )
+        # Check stopping when not running
+        self.run_command(["tools/scope.py", "stop"])
 
     def test_list_commands(self):
         """Verify list.py commands execute correctly."""

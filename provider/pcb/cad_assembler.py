@@ -19,18 +19,18 @@ class PCB3DAssembler:
     mechanical CAD assemblies.
     """
 
-    DEFAULT_SOLDERMASK_COLOR = (0.08, 0.45, 0.18)  # Standard dark green soldermask
-    DEFAULT_COMPONENT_COLOR = (0.20, 0.20, 0.22)  # Molded epoxy IC / passive dark charcoal
-    DEFAULT_PAD_COLOR = (0.90, 0.72, 0.22)  # ENIG gold surface finish
-    DEFAULT_TOP_TRACE_COLOR = (0.85, 0.55, 0.18)  # F.Cu warm copper foil ribbon
-    DEFAULT_BOTTOM_TRACE_COLOR = (0.28, 0.55, 0.85)  # B.Cu contrasting blue/copper ribbon
-    DEFAULT_VIA_COLOR = (0.75, 0.75, 0.80)  # Tinned through-hole via barrels
+    DEFAULT_SOLDERMASK_COLOR = (0.04, 0.18, 0.08)  # KiCad rich dark green soldermask
+    DEFAULT_COMPONENT_COLOR = (0.12, 0.13, 0.16)  # Molded epoxy IC / passive dark charcoal
+    DEFAULT_PAD_COLOR = (1.0, 0.82, 0.15)  # Brilliant ENIG gold surface finish
+    DEFAULT_TOP_TRACE_COLOR = (0.92, 0.20, 0.20)  # F.Cu KiCad vivid red copper ribbon
+    DEFAULT_BOTTOM_TRACE_COLOR = (0.18, 0.50, 0.95)  # B.Cu KiCad contrasting vivid blue ribbon
+    DEFAULT_VIA_COLOR = (0.88, 0.75, 0.35)  # Copper/gold through-hole via barrels
     DEFAULT_SILKSCREEN_COLOR = (0.95, 0.95, 0.95)  # High-contrast crisp white silkscreen legend
 
     SOLDERMASK_COLORS: Dict[str, Tuple[float, float, float]] = {
-        "matte_black": (0.12, 0.12, 0.14),
-        "black": (0.12, 0.12, 0.14),
-        "green": (0.08, 0.45, 0.18),
+        "matte_black": (0.06, 0.08, 0.07),
+        "black": (0.06, 0.08, 0.07),
+        "green": (0.04, 0.18, 0.08),
         "blue": (0.10, 0.35, 0.65),
         "red": (0.65, 0.12, 0.12),
         "white": (0.92, 0.92, 0.92),
@@ -205,7 +205,7 @@ class PCB3DAssembler:
         else:
             z_pos = self.z_mid
 
-        boxes = []
+        solids: List[Shape] = []
         for t in matching_traces:
             x1, y1 = t.start_mm
             x2, y2 = t.end_mm
@@ -221,12 +221,21 @@ class PCB3DAssembler:
 
             b = Box(length, t.width_mm, self.cu_thickness)
             b.locate(Location((mx, my, z_pos), (0.0, 0.0, angle_deg)))
-            boxes.append(b)
+            b.label = f"trace_{t.net}"
+            solids.append(b)
 
-        if not boxes:
+            # Add round end caps to trace vertices for continuous, seamless KiCad-style trace routing
+            r = t.width_mm / 2.0
+            c1 = Cylinder(radius=r, height=self.cu_thickness)
+            c1.locate(Location((x1, y1, z_pos)))
+            c2 = Cylinder(radius=r, height=self.cu_thickness)
+            c2.locate(Location((x2, y2, z_pos)))
+            solids.extend([c1, c2])
+
+        if not solids:
             return None
 
-        return Compound(children=boxes)
+        return Compound(children=solids)
 
     def build_vias(self) -> Optional[Compound]:
         """Construct a Compound of plated through-hole via barrel cylinders."""
@@ -240,6 +249,7 @@ class PCB3DAssembler:
             dia = v.pad_diameter_mm
             c = Cylinder(radius=dia / 2.0, height=via_height)
             c.locate(Location((vx, vy, self.z_mid)))
+            c.label = f"via_{v.net}"
             cylinders.append(c)
 
         if not cylinders:
@@ -300,6 +310,7 @@ class PCB3DAssembler:
                         comp_z = z_mount - body_bb.min.Z
                         loc = Location((cx, cy, comp_z), (0.0, 0.0, yaw))
                     body.locate(loc)
+                    body.label = f"comp_{c.name}"
                     comp_solids.append(body)
 
                 for p in fp_inst.pins:
@@ -315,6 +326,7 @@ class PCB3DAssembler:
                     else:
                         pad = Box(pw, ph, self.cu_thickness)
                         pad.locate(Location((wx, wy, pad_z), (0.0, 0.0, yaw)))
+                    pad.label = f"pad_{c.name}_{p.name}"
                     pad_solids.append(pad)
             else:
                 dims = getattr(c, "dimensions", None) or (5.0, 5.0, 1.0)
@@ -323,6 +335,7 @@ class PCB3DAssembler:
                 box_z = (z_mount + dz / 2.0) if not is_bottom else (z_mount - dz / 2.0)
                 body = Box(dx, dy, dz)
                 body.locate(Location((cx, cy, box_z), (0.0, 0.0, yaw)))
+                body.label = f"comp_{c.name}"
                 comp_solids.append(body)
 
         # Include capacitive sensor electrodes in copper pads (scoped to target subassembly)

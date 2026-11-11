@@ -2541,6 +2541,28 @@
         return;
       }
 
+      if (state.currentDiff.is_oversized) {
+        const commit = state.selectedCommit || "working";
+        const file = state.selectedFile || "";
+        const newUrl = `/api/raw?commit=${encodeURIComponent(commit)}&file=${encodeURIComponent(file)}&side=new`;
+        container.innerHTML = `
+          <div class="binary-diff-view" style="padding: 60px 20px; text-align: center;">
+            <div class="binary-diff-card" style="max-width: 540px; margin: 0 auto;">
+              <span class="binary-diff-badge" style="background: rgba(255, 170, 0, 0.2); color: var(--quake-gold); border: 1px solid var(--quake-gold);">⚠️ LARGE FILE COLLAPSED</span>
+              <div class="binary-diff-title" style="font-weight: 700; font-size: 12px; color: var(--quake-gold); margin-top: 8px;">${escapeHtml(file)}</div>
+              <div class="binary-diff-msg" style="margin: 10px 0 16px; line-height: 1.6;">
+                ${escapeHtml(state.currentDiff.full_content || "This file exceeds the interactive diff limit.")}
+                <br>Interactive syntax highlighting and side-by-side diff are collapsed to prevent browser freeze.
+              </div>
+              <div class="binary-diff-links" style="justify-content: center;">
+                <a href="${newUrl}" target="_blank" class="binary-diff-link" style="color: var(--quake-cyan); border-color: var(--quake-cyan);">📄 View Raw File</a>
+              </div>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
       if (state.diffMode === "side_by_side") {
         renderSideBySide(container);
       } else if (state.diffMode === "unified") {

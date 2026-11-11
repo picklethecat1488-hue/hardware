@@ -62,3 +62,10 @@ from .pcb import (
     resolve_subassembly_pcb_config,
 )
 from .simulation import FlyingProbeReportModel, FlyingProbeStepReportModel
+from .scope import (
+    ScopeAnnotationModel,
+    ScopeMarkupModel,
+    ScopeProjectModel,
+    ScopeTargetBugRequest,
+    ScopeTargetModel,
+)

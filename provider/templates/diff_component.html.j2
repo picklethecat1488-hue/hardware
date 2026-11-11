@@ -514,7 +514,7 @@
     highlightFullDocument(code, lang) {
       if (!code) return [];
       const lines = code.split(/\r?\n/).map(l => this.truncateLine(l));
-      if (typeof hljs === "undefined") {
+      if (typeof hljs === "undefined" || lines.length > 3000 || code.length > 300000) {
         return lines.map(l => this.escapeHtml(l));
       }
       try {
@@ -561,6 +561,11 @@
 
       if (diffData.is_binary) {
         this.renderBinary(container, diffData);
+        return;
+      }
+
+      if (diffData.is_oversized) {
+        this.renderOversized(container, diffData);
         return;
       }
 
@@ -706,6 +711,28 @@
             <a href="/api/raw?commit=${encodeURIComponent(diffData.commit || 'HEAD')}&file=${encodeURIComponent(filePath)}&parent=false" download class="quake-btn quake-btn-gold">Download New</a>
           </div>
           ${previewHtml}
+        </div>
+      `;
+    },
+
+    renderOversized(container, diffData) {
+      const filePath = diffData.file_path;
+      container.innerHTML = `
+        <div class="diff-oversized-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; text-align: center; background: var(--quake-bg, #0d0f14);">
+          <div style="font-size: 32px; margin-bottom: 12px;">⚠️</div>
+          <div style="color: var(--quake-gold, #ffaa00); font-weight: 700; font-size: 14px; margin-bottom: 8px; letter-spacing: 0.5px;">
+            LARGE FILE DIFF COLLAPSED
+          </div>
+          <div style="color: var(--quake-text-muted, #94a3b8); font-size: 11px; max-width: 520px; margin: 0 auto 18px; line-height: 1.6;">
+            ${this.escapeHtml(diffData.full_content || "This file exceeds the interactive diff limit.")}
+            <br>
+            Interactive syntax highlighting and side-by-side rendering are collapsed to prevent browser freeze.
+          </div>
+          <div style="display: flex; gap: 10px; justify-content: center;">
+            <a href="/api/raw?commit=${encodeURIComponent(diffData.commit || 'working')}&file=${encodeURIComponent(filePath)}&side=new" target="_blank" class="quake-btn quake-btn-gold quake-btn-sm" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px;">
+              📄 View Raw File
+            </a>
+          </div>
         </div>
       `;
     },

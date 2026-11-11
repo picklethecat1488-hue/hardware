@@ -895,7 +895,7 @@
         </div>
         <div class="col">
           <label>Reproduction Steps (one per line)</label>
-          <textarea id="bug-steps" placeholder="1. python tools/view.py carrier_board:pcb&#10;2. Inspect net NRST&#10;3. Observe collision"></textarea>
+          <textarea id="bug-steps" placeholder="1. python tools/scope.py carrier_board/carrier_board:pcb&#10;2. Inspect net NRST&#10;3. Observe collision"></textarea>
         </div>
         <div class="row">
           <div class="col">
@@ -972,7 +972,7 @@
         </div>
         <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
           <input type="text" id="input-task-title" placeholder="Task title / verification requirement..." style="flex:2; min-width:200px;">
-          <input type="text" id="input-task-command" placeholder="Demo command (e.g. python tools/view.py cat_fountain:pcb)..." style="flex:3; min-width:250px; font-family:var(--font-mono);">
+          <input type="text" id="input-task-command" placeholder="Demo command (e.g. python tools/scope.py cat_fountain/product:simulate)..." style="flex:3; min-width:250px; font-family:var(--font-mono);">
           <button class="quake-btn quake-btn-default" onclick="addTaskToActiveBug()">+ Add Task</button>
         </div>
         <div id="review-tasks-list" class="tasks-list"></div>

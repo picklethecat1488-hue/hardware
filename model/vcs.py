@@ -65,6 +65,7 @@ class FileDiffModel(BaseModel):
     status: str = "M"  # M, A, D, R, ??, etc.
     is_binary: bool = False
     is_lfs: bool = False
+    is_oversized: bool = False
     additions: int = 0
     deletions: int = 0
     hunks: List[DiffHunk] = Field(default_factory=list)

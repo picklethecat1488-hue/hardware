@@ -436,7 +436,6 @@ class DaemonServer:
                             sig = inspect.signature(main_func)
 
                             if len(sig.parameters) == 0:
-                                # view.py main takes no arguments
                                 main_func()
                             else:
                                 # build.py and config.py main take (logger, args)
@@ -502,7 +501,7 @@ class DaemonServer:
 
 
 class DaemonClient:
-    """Client wrapper used by build.py, view.py, and config.py."""
+    """Client wrapper used by build.py, scope.py, and config.py."""
 
     @validate_call(config={"arbitrary_types_allowed": True})
     def __init__(self, socket_path: Path = SOCKET_PATH):

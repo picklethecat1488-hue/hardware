@@ -1723,3 +1723,30 @@ def test_git_engine_file_diff_caching(tmp_path: Path) -> None:
     # clear_diff_cache clears the cache
     engine.clear_diff_cache()
     assert (target_sha, target_file) not in engine._file_diff_cache
+
+
+def test_oversized_diff_handling_three_cad_viewer(tmp_path: Path) -> None:
+    """Verify that oversized/bundled vendor files (>500KB or >3000 lines) collapse without hanging diff viewer."""
+    repo_dir = tmp_path / "oversized_repo"
+    repo_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=repo_dir, check=True, capture_output=True)
+
+    # Initial commit
+    (repo_dir / "README.md").write_text("# Project\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=repo_dir, check=True, capture_output=True)
+
+    # Create large untracked JS file simulating three-cad-viewer.esm.js (e.g. 5,000 lines, >600KB)
+    large_js = repo_dir / "three-cad-viewer.esm.js"
+    large_js.write_text("console.log('line');\n" * 5000, encoding="utf-8")
+
+    engine = GitEngine(repo_root=repo_dir)
+    diff = engine.get_file_diff("working", "three-cad-viewer.esm.js")
+
+    assert diff.is_oversized is True
+    assert diff.side_by_side == []
+    assert diff.hunks == []
+    assert "File diff is too large to render" in diff.full_content

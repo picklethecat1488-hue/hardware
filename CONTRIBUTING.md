@@ -4,7 +4,7 @@
 
  - **tools/build.py** - Orchestrates the generation and export of 3D-printable geometry.
  - **tools/config.py** - Automated utility for part placement and geometry optimization.
- - **tools/view.py** - Interactive CAD visualization tool for inspection and debugging.
+ - **tools/scope.py** - Interactive CAD/PCB Scope workstation for 3D inspection and debugging.
  - **tools/forge.py** - Unified Quake-themed workstation integrating VCS Diff Viewer, Smartlog DAG tree, Code Review, and Bug Tracker.
  - **model/** - Core application data models and configuration schemas.
  - **provider/** - Framework for geometry generation and build orchestration.
@@ -263,13 +263,10 @@ pcb_materials.yaml imports -> manifest.yaml -> .kicad_pcb / .kicad_sch targets -
 
 ### 3. Viewing & Inspecting Board Files
 - **In VS Code (KiCode)**: Install the recommended [KiCode](https://marketplace.visualstudio.com/items?itemName=SajadGhorbani.KiCode) (`sajadghorbani.kicode`) extension (powered by KiCanvas). Opening any `.kicad_pcb` or `.kicad_sch` file opens an interactive webview tab with layer toggling, zoom/pan, net highlighting, and component inspection directly in VS Code.
-- **Interactive Viewer CLI (`view.py`)**:
+- **Interactive Scope Workstation (`tools/scope.py`)**:
   ```bash
-  # View PCB target (opens KiCode tab in VS Code and renders 3D substrate in ocp_vscode):
-  python tools/view.py carrier_board:pcb
-
-  # View a direct board or schematic file:
-  python tools/view.py build/board/carrier_board/carrier_board.kicad_pcb
+  # View PCB target in Scope workstation:
+  python tools/scope.py carrier_board/carrier_board:pcb
   ```
 - **In-Browser Gerber Viewers**: Drag the `build/board/<project>/` folder into open-source [tracespace.io/view](https://tracespace.io/view/) or online fab viewers (JLCPCB, PCBWay).
 - **Vector Schematics**: Open `build/schematics/<project>/<project>_schematic.svg` in any browser or SVG editor.

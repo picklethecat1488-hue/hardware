@@ -1,0 +1,4339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>◈ SCOPE // CAD/PCB WORKSTATION ◈</title>
+  <meta name="theme-color" content="#291a10">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/svg+xml" href="/static/scope-icon.svg">
+  <link rel="alternate icon" type="image/x-icon" href="/static/scope-favicon.ico">
+  <link rel="apple-touch-icon" href="/static/scope-icon.png">
+  <link rel="stylesheet" href="/static/common.css">
+  <link rel="stylesheet" href="/static/three-cad-viewer.css">
+  <style>
+    :root {
+      color-scheme: dark;
+      --quake-bg: #120c08;
+      --quake-panel: #1b120a;
+      --quake-panel-hover: #261a0f;
+      --quake-panel-alt: #1f150d;
+      --quake-header-bg: #291a10;
+      --quake-border: #5a381e;
+      --quake-border-light: #8d5d33;
+      --quake-border-mid: #5a381e;
+      --quake-border-dark: #120a05;
+      --quake-border-bright: #8d5d33;
+
+      --quake-gold: #ffb800;
+      --quake-gold-dim: #c98c00;
+      --quake-amber: #e59400;
+      --quake-copper: #c87a32;
+      --quake-red: #ef4444;
+      --quake-green: #22c55e;
+      --quake-cyan: #38bdf8;
+      --quake-purple: #c084fc;
+      --quake-text: #dedede;
+      --quake-text-light: #dedede;
+      --quake-text-muted: #9e8a78;
+      --quake-text-dim: #716053;
+
+      --font-mono: ui-monospace, "SF Mono", "Courier New", "Lucida Console", monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--quake-bg);
+      background-image:
+        repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.45) 0px, rgba(0, 0, 0, 0.45) 2px, transparent 2px, transparent 4px),
+        radial-gradient(ellipse at 50% 0%, #2e1d13 0%, #0d0704 100%);
+      color: var(--quake-text);
+      font-family: var(--font-mono);
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      border: 2px solid var(--quake-border-mid);
+      box-shadow: inset 0 0 0 1px rgba(255, 184, 0, 0.2), 0 0 10px rgba(200, 122, 50, 0.1);
+    }
+
+    /* TOP HUD HEADER */
+    #top-hud {
+      height: 44px;
+      min-height: 44px;
+      max-height: 44px;
+      background: linear-gradient(180deg, var(--quake-header-bg) 0%, var(--quake-panel) 100%);
+      border-bottom: 2px solid var(--quake-border-mid);
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      white-space: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 0 14px;
+      gap: 12px;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+    }
+    @supports not selector(::-webkit-scrollbar) {
+      #top-hud {
+        scrollbar-width: thin;
+        scrollbar-color: var(--quake-copper, #c87a32) #1e130b;
+      }
+      * {
+        scrollbar-width: thin;
+        scrollbar-color: var(--quake-copper, #c87a32) #1e130b;
+      }
+    }
+    #top-hud::-webkit-scrollbar {
+      height: 6px;
+    }
+    #top-hud::-webkit-scrollbar-track {
+      background: #1e130b;
+      border-top: 1px solid #3d2311;
+    }
+    #top-hud::-webkit-scrollbar-thumb {
+      background: #965a25;
+      border-radius: 3px;
+      border: 1px solid #c87a32;
+    }
+    #top-hud::-webkit-scrollbar-thumb:hover {
+      background: var(--quake-gold, #ffb800);
+      border-color: #ffd700;
+      box-shadow: 0 0 6px rgba(255, 184, 0, 0.5);
+    }
+    #top-hud::-webkit-scrollbar-thumb:active {
+      background: #e59400;
+      border-color: #ffb800;
+    }
+
+    /* GLOBAL QUAKE SCROLLBARS */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #1e130b;
+      border: 1px solid #3d2311;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #965a25;
+      border-radius: 4px;
+      border: 1px solid #c87a32;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--quake-gold, #ffb800);
+      border-color: #ffd700;
+      box-shadow: 0 0 6px rgba(255, 184, 0, 0.4);
+    }
+    ::-webkit-scrollbar-thumb:active {
+      background: #e59400;
+      border-color: #ffb800;
+    }
+    ::-webkit-scrollbar-corner {
+      background: #120c08;
+    }
+
+    .hud-title {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      color: var(--quake-gold);
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .hud-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .hud-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--quake-text-muted);
+      text-transform: uppercase;
+    }
+
+    .hud-select {
+      background: var(--quake-bg);
+      color: var(--quake-gold);
+      border: 1px solid var(--quake-border-mid);
+      border-radius: 3px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      outline: none;
+      cursor: pointer;
+    }
+    .hud-select:focus, .hud-select:hover {
+      border-color: var(--quake-cyan);
+      box-shadow: 0 0 6px rgba(0, 229, 255, 0.3);
+    }
+
+    .mode-pills {
+      display: flex;
+      border: 1px solid var(--quake-border);
+      border-radius: 4px;
+      overflow: hidden;
+      background: #090b0e;
+    }
+    .mode-pill {
+      background: transparent;
+      border: none;
+      color: var(--quake-text-muted);
+      padding: 4px 10px;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      transition: all 0.15s ease;
+    }
+    .mode-pill:hover {
+      color: var(--quake-text);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .mode-pill.active {
+      background: var(--quake-gold);
+      color: #000;
+      font-weight: 800;
+    }
+    .mode-pill:disabled, .mode-pill.disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+      pointer-events: none;
+      background: transparent !important;
+      color: var(--quake-text-muted) !important;
+    }
+
+    .hud-btn {
+      background: #1b120a;
+      border: 1px solid var(--quake-border-mid);
+      color: var(--quake-text);
+      padding: 4px 10px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .hud-btn:hover {
+      background: #261a0f;
+      border-color: var(--quake-gold);
+      color: var(--quake-gold);
+      box-shadow: 0 0 8px rgba(255, 184, 0, 0.3);
+    }
+
+    .btn-target-bug {
+      background: linear-gradient(180deg, #dc2626 0%, #991b1b 100%) !important;
+      color: #fff !important;
+      border: 1px solid #ef4444 !important;
+      font-weight: 800 !important;
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+      animation: pulse-red 2s infinite;
+    }
+    .btn-target-bug:hover {
+      box-shadow: 0 0 16px rgba(239, 68, 68, 0.8) !important;
+      transform: scale(1.02);
+    }
+    @keyframes pulse-red {
+      0%, 100% { box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
+      50% { box-shadow: 0 0 16px rgba(239, 68, 68, 0.8); }
+    }
+
+    /* MAIN WORKSPACE */
+    #main-workspace {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* SIDEBAR */
+    #sidebar {
+      width: 320px;
+      min-width: 180px;
+      max-width: 800px;
+      background: var(--quake-panel);
+      border-right: none;
+      display: flex;
+      flex-direction: column;
+      z-index: 50;
+      flex-shrink: 0;
+    }
+    #sidebar.collapsed {
+      width: 0 !important;
+      min-width: 0 !important;
+      overflow: hidden;
+    }
+
+    /* VERTICAL PANEL RESIZER / GRIPPER */
+    .panel-resizer {
+      width: 6px;
+      cursor: col-resize;
+      background: var(--quake-border);
+      position: relative;
+      z-index: 60;
+      transition: background 0.15s ease;
+      user-select: none;
+      flex-shrink: 0;
+    }
+    .panel-resizer:hover, .panel-resizer.resizing {
+      background: var(--quake-gold);
+      box-shadow: 0 0 8px rgba(255, 170, 0, 0.6);
+    }
+    .panel-resizer::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 1px;
+      transform: translateY(-50%);
+      width: 4px;
+      height: 28px;
+      border-left: 1px solid rgba(255, 255, 255, 0.3);
+      border-right: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .sidebar-tabs {
+      display: flex;
+      background: #0d1017;
+      border-bottom: 1px solid var(--quake-border);
+    }
+    .sidebar-tab {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--quake-text-muted);
+      padding: 8px 4px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      text-align: center;
+    }
+    .sidebar-tab:hover {
+      color: var(--quake-text);
+    }
+    .sidebar-tab.active {
+      color: var(--quake-gold);
+      border-bottom-color: var(--quake-gold);
+      background: rgba(255, 170, 0, 0.05);
+    }
+
+    .sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+    .tab-pane {
+      display: none;
+    }
+    .tab-pane.active {
+      display: block;
+    }
+
+    /* PCB LAYERS LIST */
+    .layer-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 8px;
+      margin-bottom: 4px;
+      background: #0d1017;
+      border: 1px solid var(--quake-border);
+      border-radius: 4px;
+      font-size: 11px;
+    }
+    .layer-item:hover {
+      border-color: var(--quake-border-bright);
+    }
+    .layer-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .layer-color-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+    .layer-btn-solo {
+      background: transparent;
+      border: 1px solid var(--quake-border);
+      color: var(--quake-text-muted);
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 2px;
+      cursor: pointer;
+    }
+    .layer-btn-solo:hover, .layer-btn-solo.active {
+      background: var(--quake-cyan);
+      color: #000;
+      border-color: var(--quake-cyan);
+    }
+
+    /* 3D VIEWPORT */
+    #viewport-container {
+      flex: 1;
+      position: relative;
+      background: var(--quake-bg);
+      overflow: hidden;
+    }
+    #cad-view {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      background: var(--quake-bg);
+    }
+
+    /* THREE-CAD-VIEWER QUAKE HUD THEME OVERRIDES */
+    #cad-view,
+    #cad-view .tcv,
+    #cad-view [data-theme="dark"],
+    .tcv-tools-container,
+    .tcv-viewer {
+      --tcv-bg-color: #120c08 !important;
+      --tcv-bg-overlay-color: rgba(27, 18, 10, 0.88) !important;
+      --tcv-bg-overlay-rest-color: rgba(18, 12, 8, 0.6) !important;
+      --tcv-bg-highlight-color: #261a0f !important;
+      --tcv-bg-pressed-color: #382414 !important;
+      --tcv-bg-pressed-border-color: #ffb800 !important;
+      --tcv-bg-tooltip-color: #1b120a !important;
+      --tcv-theme-blue: #ffb800 !important;
+      --tcv-theme-led: #38bdf8 !important;
+      --tcv-font-color: #dedede !important;
+      --tcv-dropdown-bg: #1b120a !important;
+      --tcv-scrollbar-thumb: rgba(200, 122, 50, 0.4) !important;
+      --tcv-scrollbar-hover: rgba(255, 184, 0, 0.6) !important;
+      --tcv-scrollbar-active: rgba(255, 184, 0, 0.8) !important;
+      --tcv-shadow: rgba(0, 0, 0, 0.8) !important;
+      --tcv-menu-shadow: rgba(0, 0, 0, 0.8) !important;
+    }
+
+    #cad-view .tcv-tools-container,
+    #cad-view .tcv-navigation-container,
+    #cad-view .tcv-glass {
+      background: rgba(19, 23, 32, 0.85) !important;
+      border: 1px solid var(--quake-border) !important;
+      border-radius: 6px !important;
+      backdrop-filter: blur(8px) !important;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6) !important;
+    }
+
+    /* HIDE CAD CONTROLS IN ALL MODES WHILE PRESERVING AXIS INDICATOR (BUG-BRIGHT-STAGBEETLE-720) */
+    #cad-view .tcv_cad_toolbar,
+    #cad-view .tcv-tools-container,
+    #cad-view .tcv_cad_navigation,
+    #cad-view .tcv-navigation-container {
+      display: none !important;
+    }
+    #cad-view .tcv_cad_inset {
+      display: block !important;
+      visibility: visible !important;
+      z-index: 100 !important;
+    }
+
+    /* NETLIST ITEM STYLING */
+    .net-item {
+      padding: 5px 8px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background 0.15s ease;
+    }
+    .net-item:hover {
+      background: rgba(255, 184, 0, 0.1);
+    }
+    .net-item.active {
+      background: rgba(51, 255, 51, 0.2) !important;
+      border: 1px solid #33ff33 !important;
+      color: #33ff33 !important;
+      font-weight: bold;
+    }
+    .net-pin-count {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--quake-text-muted);
+    }
+    .net-item.active .net-pin-count {
+      background: #33ff33;
+      color: #000;
+      font-weight: bold;
+    }
+
+    #cad-view .tcv-btn:hover {
+      background: rgba(255, 170, 0, 0.15) !important;
+      border-color: var(--quake-gold) !important;
+    }
+
+    #cad-view .tcv-btn.active {
+      background: rgba(255, 170, 0, 0.25) !important;
+      border-color: var(--quake-gold) !important;
+      color: var(--quake-gold) !important;
+    }
+
+    #cad-view .tcv-dropdown {
+      background: var(--quake-panel) !important;
+      border: 1px solid var(--quake-border) !important;
+      border-radius: 4px !important;
+      color: var(--quake-text) !important;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7) !important;
+    }
+
+    #cad-view canvas {
+      background-color: #0d0f14 !important;
+    }
+
+    /* FULL VIEWPORT EXPANSION (BUG-ANTENNAL-FIREBUG-841) */
+    #cad-view .tcv_cad_viewer,
+    #cad-view .tcv_cad_body,
+    #cad-view .tcv_cad_view {
+      width: 100% !important;
+      height: 100% !important;
+      flex: 1 !important;
+      margin: 0 !important;
+      position: relative !important;
+    }
+    #cad-view .tcv_cad_view canvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block !important;
+    }
+
+    #markup-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 20;
+    }
+    #markup-canvas.active {
+      pointer-events: auto;
+      cursor: crosshair;
+    }
+
+    /* FLOATING CAMERA TOOLBAR */
+    #cam-toolbar {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: rgba(19, 23, 32, 0.85);
+      border: 1px solid var(--quake-border);
+      border-radius: 6px;
+      backdrop-filter: blur(8px);
+      display: flex !important;
+      flex-direction: column;
+      gap: 4px;
+      padding: 6px;
+      z-index: 50 !important;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+    }
+    .cam-btn {
+      background: #0d1017;
+      border: 1px solid var(--quake-border);
+      color: var(--quake-text);
+      width: 32px;
+      height: 32px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .cam-btn:hover {
+      border-color: var(--quake-cyan);
+      color: var(--quake-cyan);
+      box-shadow: 0 0 8px rgba(0, 229, 255, 0.4);
+    }
+    .cam-btn.active {
+      background: var(--quake-cyan);
+      color: #000;
+      border-color: var(--quake-cyan);
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.6);
+    }
+    .layer-btn-solo.active {
+      background: #ffb800 !important;
+      color: #000 !important;
+      font-weight: bold;
+    }
+    body.pcb-high-contrast #cad-view {
+      filter: contrast(1.12) brightness(1.05);
+    }
+
+    /* FLOATING MARKUP TOOLBAR */
+    #markup-toolbar {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(19, 23, 32, 0.95);
+      border: 1px solid var(--quake-border-bright);
+      border-radius: 8px;
+      backdrop-filter: blur(12px);
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      z-index: 40;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8);
+    }
+    #markup-toolbar.visible {
+      display: flex;
+    }
+
+    .tool-btn {
+      background: #0d1017;
+      border: 1px solid var(--quake-border);
+      color: var(--quake-text);
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      cursor: pointer;
+    }
+    .tool-btn:hover, .tool-btn.active {
+      border-color: var(--quake-gold);
+      color: var(--quake-gold);
+      background: rgba(255, 170, 0, 0.1);
+    }
+
+    .color-swatch {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: transform 0.1s ease;
+    }
+    .color-swatch:hover {
+      transform: scale(1.15);
+    }
+    .color-swatch.active {
+      border-color: #fff;
+      box-shadow: 0 0 8px #fff;
+    }
+
+    /* SIMULATION SCRUBBER BAR */
+    #sim-bar {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      right: 16px;
+      background: rgba(19, 23, 32, 0.95);
+      border: 1px solid var(--quake-border);
+      border-radius: 6px;
+      backdrop-filter: blur(8px);
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      padding: 8px 16px;
+      z-index: 35;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7);
+    }
+    #sim-bar.visible {
+      display: flex;
+    }
+    .sim-slider {
+      flex: 1;
+      accent-color: var(--quake-gold);
+      cursor: pointer;
+    }
+    .sim-log-chip {
+      background: rgba(255, 184, 0, 0.1);
+      border: 1px solid rgba(255, 184, 0, 0.3);
+      color: var(--quake-text);
+      border-radius: 3px;
+      padding: 2px 6px;
+      font-size: 9px;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      transition: all 0.15s ease;
+    }
+    .sim-log-chip:hover {
+      background: var(--quake-gold);
+      color: #000;
+      border-color: #ffd700;
+    }
+    .sim-log-chip.active {
+      background: var(--quake-gold);
+      color: #000;
+      border-color: #ffd700;
+      font-weight: bold;
+    }
+
+    /* MODAL OVERLAYS */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+    .modal-overlay.visible {
+      display: flex;
+    }
+
+    .modal-box {
+      background: var(--quake-panel);
+      border: 2px solid var(--quake-border-bright);
+      border-radius: 8px;
+      width: 640px;
+      max-width: 90vw;
+      max-height: 85vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.9);
+    }
+
+    .modal-header {
+      padding: 12px 16px;
+      background: #181d28;
+      border-bottom: 1px solid var(--quake-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-header h3 {
+      margin: 0;
+      font-size: 13px;
+      color: var(--quake-gold);
+      letter-spacing: 0.05em;
+    }
+    .modal-body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .modal-footer {
+      padding: 12px 16px;
+      background: #0d1017;
+      border-top: 1px solid var(--quake-border);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .form-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--quake-text-muted);
+      text-transform: uppercase;
+    }
+    .form-input, .form-textarea, .form-select {
+      background: #090b0e;
+      border: 1px solid var(--quake-border);
+      color: var(--quake-text);
+      border-radius: 4px;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      outline: none;
+    }
+    .form-input:focus, .form-textarea:focus, .form-select:focus {
+      border-color: var(--quake-cyan);
+    }
+
+    /* SHORTCUTS TABLE */
+    .shortcuts-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+    .shortcuts-table th {
+      text-align: left;
+      color: var(--quake-gold);
+      padding: 6px;
+      border-bottom: 1px solid var(--quake-border);
+    }
+    .shortcuts-table td {
+      padding: 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .kbd-badge {
+      background: #090b0e;
+      border: 1px solid var(--quake-border-bright);
+      color: var(--quake-cyan);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    /* CAD VIEWPORT SHORTCUTS HUD OVERLAY */
+    #cad-shortcuts-hud {
+      position: absolute;
+      top: 16px;
+      right: 68px;
+      width: 330px;
+      max-height: calc(100% - 32px);
+      background: rgba(13, 16, 23, 0.94);
+      border: 1px solid var(--quake-border-bright);
+      border-radius: 6px;
+      backdrop-filter: blur(12px);
+      z-index: 45;
+      display: none;
+      flex-direction: column;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8), 0 0 1px rgba(255, 170, 0, 0.4);
+    }
+    #cad-shortcuts-hud.visible {
+      display: flex;
+    }
+    .hud-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: rgba(255, 170, 0, 0.08);
+      border-bottom: 1px solid var(--quake-border);
+      border-radius: 5px 5px 0 0;
+    }
+    .hud-panel-header .hud-title {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--quake-gold);
+      letter-spacing: 0.05em;
+      font-family: var(--font-mono);
+    }
+    .hud-panel-body {
+      padding: 8px 12px;
+      overflow-y: auto;
+      max-height: calc(100vh - 180px);
+    }
+    #btn-shortcuts.active {
+      background: rgba(255, 170, 0, 0.2) !important;
+      border-color: var(--quake-gold) !important;
+      color: var(--quake-gold) !important;
+      box-shadow: 0 0 8px rgba(255, 170, 0, 0.4) !important;
+    }
+
+    /* TOAST NOTIFICATION */
+    #toast-msg {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #11141c;
+      border: 1px solid var(--quake-gold);
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-size: 11px;
+      z-index: 300;
+      display: none;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOP HUD HEADER -->
+  <header id="top-hud">
+    <div class="hud-group">
+      <img src="/static/scope-icon.svg" width="22" height="22" alt="Scope Icon" style="filter: drop-shadow(0 0 6px rgba(255, 170, 0, 0.5)); border-radius: 4px;">
+      <div class="hud-title">◈ SCOPE // CAD/PCB WORKSTATION ◈</div>
+      <button id="btn-sync" class="hud-btn" title="Sync manifests and invalidate caches">⟳ Sync</button>
+      <button id="btn-open-chooser" class="hud-btn" title="Open Project & Target Selection Screen" style="display: flex; align-items: center; gap: 6px;">
+        <span>📁 Target:</span>
+        <span id="hud-active-target" style="color: var(--quake-gold); font-weight: 700;">(Select Target)</span>
+      </button>
+    </div>
+
+    <div class="hud-group">
+      <div class="hud-label">Mode:</div>
+      <div class="mode-pills">
+        <button class="mode-pill active" data-mode="CAD">CAD</button>
+        <button class="mode-pill" data-mode="PCB">PCB</button>
+        <button class="mode-pill" data-mode="SIMULATE">SIM</button>
+        <button class="mode-pill" data-mode="DIAGRAM">DIAG</button>
+      </div>
+    </div>
+
+    <div class="hud-group">
+      <!-- UI Scale Selector -->
+      <div class="ui-scale-container" title="UI Scale (Shortcuts: Cmd/Ctrl +/- or 0 to reset)">
+        <span class="ui-scale-label">SCALE:</span>
+        <select id="uiScaleSelect" class="ui-scale-select" onchange="onUiScaleChange(this.value)">
+          <option value="75%">75%</option>
+          <option value="80%">80%</option>
+          <option value="90%">90%</option>
+          <option value="100%">100%</option>
+          <option value="110%">110%</option>
+          <option value="125%">125%</option>
+          <option value="150%">150%</option>
+        </select>
+      </div>
+
+      <button id="btn-shortcuts" class="hud-btn" title="Toggle Shortcuts in CAD Viewport (? or H)">⌨️ Shortcuts</button>
+      <button id="btn-toggle-markup" class="hud-btn">✏️ Markup</button>
+      <button id="btn-target-bug" class="hud-btn btn-target-bug">🎯 Target Bug</button>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE -->
+  <div id="main-workspace">
+    <!-- COLLAPSIBLE SIDEBAR -->
+    <aside id="sidebar">
+      <div class="sidebar-tabs">
+        <button id="tab-btn-layers" class="sidebar-tab" data-pane="tab-layers" style="display: none;">PCB Layers</button>
+        <button id="tab-btn-tree" class="sidebar-tab active" data-pane="tab-tree">Tree</button>
+        <button id="tab-btn-display" class="sidebar-tab" data-pane="tab-display">View</button>
+        <button id="tab-btn-logs" class="sidebar-tab" data-pane="tab-logs" style="display: none;">Logs</button>
+        <button id="tab-btn-inspect" class="sidebar-tab" data-pane="tab-inspect">Inspect</button>
+        <button id="tab-btn-pins" class="sidebar-tab" data-pane="tab-pins">Pins</button>
+      </div>
+
+      <div class="sidebar-content">
+        <!-- PCB LAYERS PANE -->
+        <div id="tab-layers" class="tab-pane">
+          <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+            <button id="btn-all-layers" class="hud-btn" style="flex: 1; padding: 4px;">All On</button>
+            <button id="btn-flip-pcb" class="hud-btn" style="flex: 1; padding: 4px;">Flip 2D</button>
+          </div>
+          <div id="layers-list"></div>
+
+          <div style="margin-top: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <div class="hud-label">Nets Highlighting:</div>
+              <button id="btn-clear-net-highlight" class="hud-btn" style="padding: 1px 6px; font-size: 9px;">Clear</button>
+            </div>
+            <input id="net-search" class="form-input" style="width: 100%; margin-bottom: 6px;" placeholder="Search net...">
+            <div id="nets-list" style="max-height: 220px; overflow-y: auto;"></div>
+          </div>
+        </div>
+
+        <!-- OCP SCENE TREE PANE -->
+        <div id="tab-tree" class="tab-pane active">
+          <div id="tree-container">
+            <div class="hud-label" style="margin-bottom: 8px;">CAD Objects:</div>
+            <div id="cad-tree-list"></div>
+          </div>
+        </div>
+
+        <!-- CAD DISPLAY CONTROLS PANE (BUG-BRIGHT-STAGBEETLE-720) -->
+        <div id="tab-display" class="tab-pane">
+          <div class="hud-label" style="margin-bottom: 8px;">Camera Presets:</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 14px;">
+            <button id="btn-view-iso" class="hud-btn" style="padding: 4px;">Isometric</button>
+            <button id="btn-view-top" class="hud-btn" style="padding: 4px;">Top View</button>
+            <button id="btn-view-front" class="hud-btn" style="padding: 4px;">Front View</button>
+            <button id="btn-view-right" class="hud-btn" style="padding: 4px;">Right View</button>
+            <button id="btn-view-bottom" class="hud-btn" style="padding: 4px;">Bottom View</button>
+            <button id="btn-view-left" class="hud-btn" style="padding: 4px;">Left View</button>
+          </div>
+
+          <div class="hud-label" style="margin-bottom: 8px;">Projection & Shading:</div>
+          <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px;">
+            <button id="btn-view-ortho" class="hud-btn" style="text-align: left; padding: 6px;">📐 Toggle Ortho / Persp</button>
+            <button id="btn-view-wire" class="hud-btn" style="text-align: left; padding: 6px;">🕸️ Toggle Wireframe</button>
+            <button id="btn-view-axes" class="hud-btn" style="text-align: left; padding: 6px;">🧭 Toggle Coordinate Axes</button>
+            <button id="btn-view-grid" class="hud-btn" style="text-align: left; padding: 6px;">▦ Toggle Floor Grid</button>
+          </div>
+
+          <div class="hud-label" style="margin-bottom: 8px;">Exploded Assembly:</div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input id="view-explode-slider" type="range" class="sim-slider" min="0" max="100" value="0">
+            <span id="view-explode-val" style="font-size: 11px; width: 40px; text-align: right;">0%</span>
+          </div>
+        </div>
+
+        <!-- RERUN LOGS PANE (BUG-JUMPING-INSTAR-950) -->
+        <div id="tab-logs" class="tab-pane">
+          <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+            <input type="text" id="rerun-search" class="form-input" placeholder="Query rerun logs (step, event, level)..." style="font-size: 11px; padding: 4px 8px; width: 100%;">
+          </div>
+          <div id="rerun-logs-summary" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 10px; color: var(--quake-text-muted);">
+            <span id="rerun-logs-count">10 milestones logged</span>
+            <button id="btn-rerun-clear-filter" class="hud-btn" style="padding: 1px 6px; font-size: 9px; display: none;">Clear</button>
+          </div>
+          <div id="rerun-logs-list" style="display: flex; flex-direction: column; gap: 5px; max-height: calc(100vh - 220px); overflow-y: auto;">
+          </div>
+        </div>
+
+        <!-- INSPECTOR PANE -->
+        <div id="tab-inspect" class="tab-pane">
+          <div class="hud-label" style="margin-bottom: 8px;">Selected Object / Face:</div>
+          <div id="inspect-content" style="font-size: 11px; line-height: 1.6; color: var(--quake-text-muted);">
+            Hover or click on geometry or PCB components to inspect details.
+          </div>
+        </div>
+
+        <!-- PINS PANE -->
+        <div id="tab-pins" class="tab-pane">
+          <div class="hud-label" style="margin-bottom: 8px;">Spatial 3D Pins:</div>
+          <div id="pins-list" style="display: flex; flex-direction: column; gap: 6px;"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- VERTICAL GRIPPER / RESIZER -->
+    <div id="sidebar-resizer" class="panel-resizer" title="Drag to resize panel (Double-click to reset)"></div>
+
+    <!-- 3D VIEWPORT -->
+    <div id="viewport-container">
+      <div id="cad-view"></div>
+      <canvas id="markup-canvas"></canvas>
+
+      <!-- CAD VIEWPORT SHORTCUTS HUD OVERLAY -->
+      <div id="cad-shortcuts-hud">
+        <div class="hud-panel-header">
+          <div class="hud-title">◈ KEYBOARD & MOUSE CONTROLS ◈</div>
+          <button id="btn-close-shortcuts-hud" class="hud-btn" style="padding: 1px 6px; font-size: 10px;" title="Hide shortcuts overlay">✕</button>
+        </div>
+        <div class="hud-panel-body">
+          <table class="shortcuts-table">
+            <thead>
+              <tr><th>Action</th><th>Shortcut (Blender Convention)</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Orbit View</td><td><span class="kbd-badge">MMB Drag</span> (Middle Click)</td></tr>
+              <tr><td>Pan View</td><td><span class="kbd-badge">Shift + MMB Drag</span> or <span class="kbd-badge">RMB Drag</span></td></tr>
+              <tr><td>Zoom / Dolly</td><td><span class="kbd-badge">Scroll Wheel</span> or <span class="kbd-badge">Ctrl + MMB</span></td></tr>
+              <tr><td>Center View Pivot</td><td><span class="kbd-badge">Double Click</span> on surface</td></tr>
+              <tr><td>Front / Back View</td><td><span class="kbd-badge">Numpad 1</span> / <span class="kbd-badge">Ctrl+1</span></td></tr>
+              <tr><td>Right / Left View</td><td><span class="kbd-badge">Numpad 3</span> / <span class="kbd-badge">Ctrl+3</span></td></tr>
+              <tr><td>Top / Bottom View</td><td><span class="kbd-badge">Numpad 7</span> / <span class="kbd-badge">Ctrl+7</span></td></tr>
+              <tr><td>Toggle Ortho / Persp</td><td><span class="kbd-badge">Numpad 5</span></td></tr>
+              <tr><td>Frame / Focus Target</td><td><span class="kbd-badge">Numpad .</span> or <span class="kbd-badge">F</span></td></tr>
+              <tr><td>Reset Isometric</td><td><span class="kbd-badge">Numpad 0</span></td></tr>
+              <tr><td>Planar Pan</td><td><span class="kbd-badge">W</span> / <span class="kbd-badge">A</span> / <span class="kbd-badge">S</span> / <span class="kbd-badge">D</span></td></tr>
+              <tr><td>Toggle Wireframe</td><td><span class="kbd-badge">Z</span></td></tr>
+              <tr><td>Clear Markup Drawings</td><td><span class="kbd-badge">X</span> or <span class="kbd-badge">Delete</span> / <span class="kbd-badge">Backspace</span></td></tr>
+              <tr><td>Undo Markup Stroke</td><td><span class="kbd-badge">Ctrl + Z</span></td></tr>
+              <tr><td>Trigger Target Bug</td><td><span class="kbd-badge">B</span></td></tr>
+              <tr><td>Toggle Shortcuts Help</td><td><span class="kbd-badge">?</span> or <span class="kbd-badge">H</span></td></tr>
+              <tr><td>Simulation Play/Pause</td><td><span class="kbd-badge">Space</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- FLOATING CAMERA TOOLBAR -->
+      <div id="cam-toolbar">
+        <button class="cam-btn" id="cam-iso" title="Isometric View (Numpad 0)">Iso</button>
+        <button class="cam-btn" id="cam-top" title="Top View (F.Cu) (Numpad 7)">Top</button>
+        <button class="cam-btn" id="cam-bottom" title="Bottom View (B.Cu) (Numpad 1)">Bot</button>
+        <button class="cam-btn" id="cam-flip" title="Flip Board Top/Bottom (F)">Flip</button>
+        <button class="cam-btn" id="cam-front" title="Front View">Frn</button>
+        <button class="cam-btn" id="cam-right" title="Right View (Numpad 3)">Rgt</button>
+        <button class="cam-btn" id="cam-ortho" title="Toggle Ortho/Persp (Numpad 5)">Or</button>
+        <button class="cam-btn" id="cam-focus" title="Focus Selection (Numpad . / F)">🎯</button>
+        <button class="cam-btn" id="cam-wire" title="Toggle Wireframe (Z)">Z</button>
+        <button class="cam-btn" id="cam-ruler" title="Toggle Ruler / Distance Measurement in mm (M)">📏</button>
+      </div>
+
+      <!-- FLOATING MARKUP TOOLBAR -->
+      <div id="markup-toolbar">
+        <div class="hud-label">Tools:</div>
+        <button class="tool-btn active" data-tool="pen">✏️ Pen</button>
+        <button class="tool-btn" data-tool="line">📏 Line</button>
+        <button class="tool-btn" data-tool="arrow">➔ Arrow</button>
+        <button class="tool-btn" data-tool="rect">▭ Rect</button>
+        <button class="tool-btn" data-tool="circle">◯ Circle</button>
+        <button class="tool-btn" data-tool="text">T Text</button>
+        <button class="tool-btn" data-tool="pin">📍 Pin</button>
+
+        <div style="width: 1px; height: 18px; background: var(--quake-border); margin: 0 4px;"></div>
+
+        <input id="markup-text-input" type="text" placeholder="Note / Pin text..." class="form-input" style="width: 140px; padding: 2px 6px; font-size: 11px; height: 22px;" title="Non-modal text note for Pin and Text tools">
+
+        <div style="width: 1px; height: 18px; background: var(--quake-border); margin: 0 4px;"></div>
+
+        <div class="hud-label">Color:</div>
+        <div class="color-swatch active" data-color="#ff3333" style="background: #ff3333;"></div>
+        <div class="color-swatch" data-color="#33ff33" style="background: #33ff33;"></div>
+        <div class="color-swatch" data-color="#00ffff" style="background: #00ffff;"></div>
+        <div class="color-swatch" data-color="#ff00ff" style="background: #ff00ff;"></div>
+        <div class="color-swatch" data-color="#3388ff" style="background: #3388ff;"></div>
+        <div class="color-swatch" data-color="#ffff00" style="background: #ffff00;"></div>
+
+        <div style="width: 1px; height: 18px; background: var(--quake-border); margin: 0 4px;"></div>
+
+        <button id="btn-undo-markup" class="tool-btn" title="Undo (Ctrl+Z)">↩️ Undo</button>
+        <button id="btn-clear-markup" class="tool-btn" title="Clear All (X / Delete)">🗑️ Clear</button>
+      </div>
+
+      <!-- SIMULATION SCRUBBER BAR -->
+      <div id="sim-bar">
+        <div style="display: flex; align-items: center; gap: 10px; width: 100%;">
+          <button id="btn-sim-play" class="hud-btn" style="padding: 4px 10px;">▶ Play</button>
+          <button id="btn-sim-prev" class="hud-btn" style="padding: 4px 8px;" title="Step Back (10 frames)">⏮</button>
+          <button id="btn-sim-next" class="hud-btn" style="padding: 4px 8px;" title="Step Forward (10 frames)">⏭</button>
+          <input id="sim-step-slider" type="range" class="sim-slider" min="0" max="1000" value="0">
+          <div id="sim-step-val" style="font-size: 11px; width: 68px; text-align: right; color: var(--quake-gold); font-weight: bold;">Step: 0</div>
+        </div>
+        <div id="sim-timeline-logs" style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 10px;">
+          <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+            <span style="color: var(--quake-text-muted); font-size: 9px; font-weight: bold;">RERUN LOGS:</span>
+            <button class="sim-log-chip active" data-step="0">t=0s: Init</button>
+            <button class="sim-log-chip" data-step="200">t=0.8s: Spout</button>
+            <button class="sim-log-chip" data-step="450">t=1.8s: Lid Sheet</button>
+            <button class="sim-log-chip" data-step="700">t=2.8s: Waterfall</button>
+            <button class="sim-log-chip" data-step="950">t=3.8s: Equilibrium</button>
+          </div>
+          <div id="sim-flow-metrics" style="color: var(--quake-cyan); font-size: 10px; font-weight: 500;">
+            Spout: 0 mL/s | Waterfall: 0 mL/s | Reservoir: 1.50 L
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROJECT & TARGET CHOOSER MODAL -->
+  <div id="modal-project-chooser" class="modal-overlay">
+    <div class="modal-box" style="width: 520px;">
+      <div class="modal-header">
+        <h3>◈ SELECT PROJECT & TARGET ◈</h3>
+        <button id="btn-close-chooser" class="hud-btn" style="padding: 2px 8px;">✕</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 14px;">
+        <div style="font-size: 11px; color: var(--quake-text-muted);">
+          Select a project and geometry target to inspect in the 3D CAD/PCB Scope Workstation:
+        </div>
+
+        <!-- Loading Progress Bar in Modal -->
+        <div id="chooser-loading-container" style="display: none; flex-direction: column; gap: 6px; padding: 10px; background: rgba(0, 0, 0, 0.45); border: 1px solid var(--quake-border-mid); border-radius: 4px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+            <span id="chooser-loading-text" style="color: var(--quake-gold); font-weight: 700; letter-spacing: 0.05em;">◈ Discovering workspace targets...</span>
+            <span id="chooser-loading-percent" style="font-family: var(--font-mono); color: var(--quake-cyan); font-size: 10px;">0%</span>
+          </div>
+          <div style="background: #120c08; border: 1px solid #3d2311; border-radius: 3px; height: 10px; overflow: hidden; position: relative;">
+            <div id="chooser-loading-bar" style="background: linear-gradient(90deg, #c87a32, #ffb800, #38bdf8); height: 100%; width: 0%; transition: width 0.3s ease-out; border-radius: 2px;"></div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="hud-label">Project</label>
+          <select id="chooser-project" class="form-input"></select>
+        </div>
+
+        <div class="form-group">
+          <label class="hud-label">Target</label>
+          <select id="chooser-target" class="form-input"></select>
+        </div>
+
+        <div class="form-group">
+          <label class="hud-label">Subassembly</label>
+          <select id="chooser-sub" class="form-input">
+            <option value="">(None / Entire Target)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="hud-label">Mode</label>
+          <div id="chooser-mode-pills" class="mode-pills" style="width: fit-content;">
+            <button class="mode-pill active" data-mode="CAD">CAD</button>
+            <button class="mode-pill" data-mode="PCB">PCB</button>
+            <button class="mode-pill" data-mode="SIMULATE">SIM</button>
+            <button class="mode-pill" data-mode="DIAGRAM">DIAG</button>
+          </div>
+        </div>
+
+        <div id="chooser-sim-steps-container" class="form-group" style="display: none;">
+          <label class="hud-label">Max Simulation Steps</label>
+          <select id="chooser-max-steps" class="form-input">
+            <option value="500">500 steps (fast verification)</option>
+            <option value="1000" selected>1000 steps (nominal cycle)</option>
+            <option value="2000">2000 steps (extended dynamics)</option>
+            <option value="5000">5000 steps (deep equilibrium)</option>
+          </select>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px;">
+          <button id="btn-chooser-cancel" class="hud-btn">Cancel</button>
+          <button id="btn-chooser-submit" class="hud-btn btn-target-bug" style="padding: 6px 16px;">Inspect Target ➜</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- TARGET BUG MODAL -->
+  <div id="modal-bug" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>◈ TARGET BUG REPORT ◈</h3>
+        <button id="btn-close-bug" class="hud-btn" style="padding: 2px 8px;">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="display: flex; gap: 12px;">
+          <div style="flex: 1;" class="form-group">
+            <label class="form-label">Title:</label>
+            <input id="bug-title" class="form-input" value="[carrier_board] Defect Summary">
+          </div>
+          <div style="width: 140px;" class="form-group">
+            <label class="form-label">Severity:</label>
+            <select id="bug-severity" class="form-select">
+              <option value="CRITICAL">CRITICAL</option>
+              <option value="HIGH">HIGH</option>
+              <option value="MEDIUM" selected>MEDIUM</option>
+              <option value="LOW">LOW</option>
+              <option value="NIT">NIT</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 12px;">
+          <div style="flex: 1;" class="form-group">
+            <label class="form-label">Component / Project:</label>
+            <input id="bug-comp" class="form-input" readonly>
+          </div>
+          <div style="flex: 1;" class="form-group">
+            <label class="form-label">Category:</label>
+            <select id="bug-cat" class="form-select">
+              <option value="CAD">CAD</option>
+              <option value="PCB">PCB</option>
+              <option value="SIMULATION">SIMULATION</option>
+              <option value="FABRICATION">FABRICATION</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Description:</label>
+          <textarea id="bug-desc" class="form-textarea" rows="4"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Reproduction Steps:</label>
+          <input id="bug-steps" class="form-input" readonly>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Composited Viewport Snapshot:</label>
+          <div style="border: 1px solid var(--quake-border); border-radius: 4px; overflow: hidden; max-height: 180px; background: #000; text-align: center;">
+            <img id="bug-snapshot-preview" style="max-width: 100%; max-height: 180px; object-fit: contain;">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-cancel-bug" class="hud-btn">Cancel</button>
+        <button id="btn-submit-bug" class="hud-btn btn-target-bug">Submit Bug Report</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SYNC / LOADING MODAL PROGRESS DIALOG -->
+  <div id="modal-sync-progress" class="modal-overlay">
+    <div class="modal-box" style="width: 440px; text-align: center; border: 1px solid var(--quake-gold); box-shadow: 0 0 24px rgba(255,170,0,0.25);">
+      <div class="modal-header" style="justify-content: center; border-bottom: 1px solid rgba(255,170,0,0.3);">
+        <h3 id="sync-modal-title" style="color: var(--quake-gold); font-size: 13px; letter-spacing: 1px;">◈ SYNCHRONIZING WORKSTATION... ◈</h3>
+      </div>
+      <div class="modal-body" style="padding: 20px 16px;">
+        <div id="sync-stage-text" style="font-size: 12px; font-weight: 600; color: #fff; margin-bottom: 10px;">
+          Initializing synchronization...
+        </div>
+        <div id="sync-stage-detail" style="font-size: 10px; color: var(--quake-text-muted); margin-bottom: 16px;">
+          Connecting to provider pipeline
+        </div>
+        <div style="background: rgba(0,0,0,0.5); border: 1px solid var(--quake-border); border-radius: 4px; height: 16px; overflow: hidden; position: relative;">
+          <div id="sync-progress-bar" style="background: linear-gradient(90deg, #ffaa00, #00e5ff); height: 100%; width: 0%; transition: width 0.25s ease-out; border-radius: 3px;"></div>
+        </div>
+        <div id="sync-percent-text" style="font-size: 10px; font-family: monospace; color: var(--quake-cyan); margin-top: 8px;">
+          0%
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast-msg"></div>
+
+  <!-- MAIN SCRIPT -->
+  <script type="module">
+    import { Display, Viewer, decodeInstancedFormat, isInstancedFormat } from "/static/three-cad-viewer.esm.js";
+
+    // Global Workstation State
+    const state = {
+      projects: [],
+      currentProject: "{{ init_project }}",
+      currentTarget: "{{ init_target }}",
+      currentSub: "{{ init_subassembly }}",
+      currentMode: "{{ init_mode }}",
+      display: null,
+      viewer: null,
+      activeTool: "pen",
+      activeColor: "#ff3333",
+      strokeWidth: 2,
+      markups: [],
+      annotations: [],
+      nextPinId: 1,
+      selectedPin: null,
+      selectedMarkup: null,
+      hoveredPin: null,
+      hoveredMarkup: null,
+      isDrawing: false,
+      currentStroke: null,
+      pcbMetadata: null,
+      simPlaying: false,
+      simStep: 0,
+      maxSteps: {{ init_max_steps | default(1000) }},
+    };
+
+    const container = document.getElementById("cad-view");
+    const markupCanvas = document.getElementById("markup-canvas");
+    const markupCtx = markupCanvas.getContext("2d");
+
+    function showToast(msg, duration = 3000) {
+      const toast = document.getElementById("toast-msg");
+      toast.innerHTML = msg;
+      toast.style.display = "block";
+      setTimeout(() => { toast.style.display = "none"; }, duration);
+    }
+
+    function resizeMarkupCanvas() {
+      const rect = container.getBoundingClientRect();
+      markupCanvas.width = rect.width;
+      markupCanvas.height = rect.height;
+      redrawMarkups();
+    }
+
+    function getViewerRendered() {
+      try {
+        return (state.viewer && (state.viewer._rendered || state.viewer.rendered)) || null;
+      } catch {
+        return null;
+      }
+    }
+
+    function resizeViewport() {
+      resizeMarkupCanvas();
+      const rect = container.getBoundingClientRect();
+      const w = Math.round(rect.width || container.clientWidth || window.innerWidth - 320);
+      const h = Math.round(rect.height || container.clientHeight || window.innerHeight - 44);
+      if (w > 0 && h > 0 && state.viewer) {
+        try {
+          if (typeof state.viewer.resize === "function") {
+            state.viewer.resize(w, h);
+          } else if (typeof state.viewer.resizeCadView === "function") {
+            state.viewer.resizeCadView(w, 0, h, true);
+          }
+        } catch {
+          // Suppress unrendered resize errors during initialization
+        }
+      }
+    }
+    window.addEventListener("resize", resizeViewport);
+
+    if (typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver(() => {
+        requestAnimationFrame(resizeViewport);
+      });
+      ro.observe(container);
+    }
+
+    function distanceToSegment(px, py, x1, y1, x2, y2) {
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const l2 = dx * dx + dy * dy;
+      if (l2 === 0) return Math.hypot(px - x1, py - y1);
+      let t = ((px - x1) * dx + (py - y1) * dy) / l2;
+      t = Math.max(0, Math.min(1, t));
+      return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+    }
+
+    function findPcbEntityAtPoint(x, y, z) {
+      if (!state.pcbMetadata) return null;
+
+      let bestEntity = null;
+      let minDistance = Infinity;
+
+      // 1. Check vias (search for closest via center)
+      if (state.pcbMetadata.vias) {
+        for (const v of state.pcbMetadata.vias) {
+          const d = Math.hypot(x - v.pos[0], y - v.pos[1]);
+          const padRadius = (v.pad || 0.6) / 2.0;
+          if (d <= padRadius + 0.35 && d < minDistance) {
+            minDistance = d;
+            bestEntity = {
+              type: "via",
+              data: v,
+              net: state.pcbMetadata.nets?.find(n => n.name === v.net),
+              distance: d,
+            };
+          }
+        }
+      }
+
+      // 2. Check copper pads (search for closest pad)
+      if (state.pcbMetadata.pads) {
+        for (const p of state.pcbMetadata.pads) {
+          const halfW = (p.w || 0.8) / 2.0;
+          const halfH = (p.h || 0.8) / 2.0;
+          const dx = Math.max(0, Math.abs(x - p.x) - halfW);
+          const dy = Math.max(0, Math.abs(y - p.y) - halfH);
+          const d = Math.hypot(dx, dy);
+          if (d <= 0.35 && d < minDistance) {
+            minDistance = d;
+            bestEntity = {
+              type: "pad",
+              data: p,
+              net: state.pcbMetadata.nets?.find(n => n.name === p.net),
+              component: state.pcbMetadata.components?.find(c => c.ref_des === p.comp),
+              distance: d,
+            };
+          }
+        }
+      }
+
+      // 3. Check copper traces (search for closest trace segment)
+      if (state.pcbMetadata.traces) {
+        for (const t of state.pcbMetadata.traces) {
+          const d = distanceToSegment(x, y, t.start[0], t.start[1], t.end[0], t.end[1]);
+          const traceRadius = (t.width || 0.25) / 2.0;
+          const effDist = Math.max(0, d - traceRadius);
+          if (effDist <= 0.30 && effDist < minDistance) {
+            minDistance = effDist;
+            bestEntity = {
+              type: "trace",
+              data: t,
+              net: state.pcbMetadata.nets?.find(n => n.name === t.net),
+              distance: effDist,
+            };
+          }
+        }
+      }
+
+      // 4. Check component package bodies (if cursor is not directly on a specific trace/pad/via)
+      if (state.pcbMetadata.components && minDistance > 0.4) {
+        for (const c of state.pcbMetadata.components) {
+          if (!c.position) continue;
+          const cx = c.position[0];
+          const cy = c.position[1];
+          const halfW = (c.size ? c.size[0] : 3.0) / 2.0;
+          const halfH = (c.size ? c.size[1] : 3.0) / 2.0;
+          const yawRad = (c.yaw || 0) * (Math.PI / 180);
+          const localX = Math.cos(-yawRad) * (x - cx) - Math.sin(-yawRad) * (y - cy);
+          const localY = Math.sin(-yawRad) * (x - cx) + Math.cos(-yawRad) * (y - cy);
+          const dx = Math.max(0, Math.abs(localX) - halfW);
+          const dy = Math.max(0, Math.abs(localY) - halfH);
+          const d = Math.hypot(dx, dy);
+          if (d <= 0.4 && d < minDistance) {
+            minDistance = d;
+            bestEntity = {
+              type: "component",
+              data: c,
+              distance: d,
+            };
+          }
+        }
+      }
+
+      return bestEntity;
+    }
+
+    function formatInspectHtml(data) {
+      let extraHtml = "";
+
+      if (data.entity) {
+        if (data.entity.type === "via") {
+          const v = data.entity.data;
+          extraHtml = `
+            <div style="margin-top: 6px; padding: 6px; background: rgba(224, 168, 32, 0.15); border: 1px solid #e0a820; border-radius: 4px;">
+              <div style="font-size: 11px; font-weight: bold; color: #ffcc00; margin-bottom: 4px;">🎯 VIA [Through-Hole Plated]</div>
+              <div><b>Net:</b> <span style="color: #33ff33; font-weight: bold;">${v.net || "N/A"}</span></div>
+              <div><b>Drill Diameter:</b> <span style="color: var(--quake-cyan);">${v.drill} mm</span></div>
+              <div><b>Annular Pad:</b> <span style="color: var(--quake-cyan);">${v.pad} mm</span></div>
+              <div><b>Layer Span:</b> <span style="color: var(--quake-text);">${v.layer_start || "F.Cu"} ➔ ${v.layer_end || "B.Cu"}</span></div>
+              <div><b>Center Position:</b> <span style="color: var(--quake-text);">(${v.pos[0]}, ${v.pos[1]}) mm</span></div>
+            </div>
+          `;
+        } else if (data.entity.type === "pad") {
+          const p = data.entity.data;
+          extraHtml = `
+            <div style="margin-top: 6px; padding: 6px; background: rgba(255, 204, 0, 0.15); border: 1px solid #ffcc00; border-radius: 4px;">
+              <div style="font-size: 11px; font-weight: bold; color: #ffcc00; margin-bottom: 4px;">⚡ COPPER PAD [ENIG Gold Finish]</div>
+              <div><b>Component:</b> <span style="color: #ffb800; font-weight: bold;">${p.comp}</span> (Pin: <b>${p.pin}</b>)</div>
+              <div><b>Net:</b> <span style="color: #33ff33; font-weight: bold;">${p.net || "N/A"}</span></div>
+              <div><b>Dimensions:</b> <span style="color: var(--quake-cyan);">${p.w} × ${p.h} mm</span></div>
+              <div><b>Layer:</b> <span style="color: var(--quake-text);">${p.layer || "F.Cu"}</span></div>
+              <div><b>Coordinates:</b> <span style="color: var(--quake-text);">(${p.x}, ${p.y}) mm</span></div>
+            </div>
+          `;
+        } else if (data.entity.type === "trace") {
+          const t = data.entity.data;
+          extraHtml = `
+            <div style="margin-top: 6px; padding: 6px; background: rgba(238, 51, 51, 0.15); border: 1px solid #ee3333; border-radius: 4px;">
+              <div style="font-size: 11px; font-weight: bold; color: #ff5555; margin-bottom: 4px;">〰️ COPPER TRACE [${t.layer}]</div>
+              <div><b>Net:</b> <span style="color: #33ff33; font-weight: bold;">${t.net || "N/A"}</span></div>
+              <div><b>Trace Width:</b> <span style="color: var(--quake-cyan); font-weight: bold;">${t.width} mm</span> (50.0 Ω Z₀)</div>
+              <div><b>Start:</b> (${t.start[0]}, ${t.start[1]}) mm</div>
+              <div><b>End:</b> (${t.end[0]}, ${t.end[1]}) mm</div>
+            </div>
+          `;
+        } else if (data.entity.type === "component") {
+          const c = data.entity.data;
+          extraHtml = `
+            <div style="margin-top: 6px; padding: 6px; background: rgba(0,0,0,0.4); border: 1px solid var(--quake-border); border-radius: 4px;">
+              <div style="font-size: 11px; font-weight: bold; color: #ffb800; margin-bottom: 4px;">📦 COMPONENT: ${c.ref_des}</div>
+              <div><b>Package:</b> <span style="color: var(--quake-text);">${c.footprint || "N/A"}</span></div>
+              ${c.value ? `<div><b>Value:</b> <span style="color: var(--quake-text);">${c.value}</span></div>` : ""}
+              ${c.mpn ? `<div><b>MPN:</b> <span style="color: var(--quake-text);">${c.mpn}</span></div>` : ""}
+              ${c.side ? `<div><b>Side:</b> <span style="color: var(--quake-text);">${c.side}</span></div>` : ""}
+            </div>
+          `;
+        }
+      }
+
+      if (state.currentMode === "SIMULATE" || (data.name && data.name.toLowerCase().includes("simulation"))) {
+        const objName = (data.name || data.path || "").toLowerCase();
+        let simType = "SPH Fluid Dynamics [JAX]";
+        let density = "1000 kg/m³ (Water @ 20°C)";
+        let kinematicState = "Active Lagrangian SPH";
+        let particleCount = "600 Active Particles";
+        let viscosity = "1.002 mPa·s";
+        let surfaceTension = "0.0728 N/m";
+        let flowRate = "240 mL/s (Nominal)";
+        let pressureEos = "Tait Weakly Compressible EOS (γ=7)";
+        let restitution = "0.05 (Inelastic)";
+        let friction = "0.10 (Hydrodynamic Boundary)";
+
+        if (objName.includes("impeller") || objName.includes("motor") || objName.includes("rotor")) {
+          simType = "Rigid Body Kinematics [PyBullet]";
+          density = "1050 kg/m³ (ABS Plastic)";
+          kinematicState = "Revolute Joint [Z-Axis, 1800 RPM]";
+          particleCount = "N/A (Rigid Mesh Boundary)";
+          viscosity = "N/A";
+          surfaceTension = "N/A";
+          flowRate = "ΔP Head: 12.4 kPa";
+          pressureEos = "Rigid Contact Penalty";
+          restitution = "0.35";
+          friction = "0.45";
+        } else if (objName.includes("bowl") || objName.includes("casing") || objName.includes("cover") || objName.includes("lid") || objName.includes("bottom")) {
+          simType = "Static CAD Boundary [SDF Collision]";
+          density = "1050 kg/m³ (PETG / Food-Safe ABS)";
+          kinematicState = "Fixed World Anchor [Rigid]";
+          particleCount = "N/A (Analytic SDF)";
+          viscosity = "N/A";
+          surfaceTension = "N/A";
+          flowRate = "N/A";
+          pressureEos = "Akinci Solid Boundary Ghost Particles";
+          restitution = "0.10";
+          friction = "0.20";
+        }
+
+        extraHtml += `
+          <div style="margin-top: 8px; padding: 8px; background: rgba(0, 180, 216, 0.12); border: 1px solid #00b4d8; border-radius: 4px;">
+            <div style="font-size: 11px; font-weight: 800; color: #00b4d8; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+              <span>⚛️ PHYSICS TELEMETRY [Rerun / SPH]</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 3px; font-size: 10.5px;">
+              <div><b>Entity Path:</b> <span style="color: var(--quake-cyan); font-family: var(--font-mono);">world/${state.currentProject || "system"}/${data.name || "fluid"}</span></div>
+              <div><b>Physics Type:</b> <span style="color: var(--quake-text); font-weight: 600;">${simType}</span></div>
+              <div><b>Kinematic State:</b> <span style="color: var(--quake-gold);">${kinematicState}</span></div>
+              <div><b>Mass Density:</b> <span style="color: var(--quake-text);">${density}</span></div>
+              <div><b>Active Particles:</b> <span style="color: #38bdf8; font-family: var(--font-mono);">${particleCount}</span></div>
+              <div><b>Dynamic Viscosity:</b> <span style="color: var(--quake-text);">${viscosity}</span></div>
+              <div><b>Surface Tension:</b> <span style="color: var(--quake-text);">${surfaceTension}</span></div>
+              <div><b>Volumetric Flow:</b> <span style="color: #33ff33; font-weight: bold;">${flowRate}</span></div>
+              <div><b>EOS Formulation:</b> <span style="color: var(--quake-text);">${pressureEos}</span></div>
+              <div><b>Restitution / Friction:</b> <span style="color: var(--quake-text);">${restitution} / ${friction}</span></div>
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <div style="font-size: 12px; font-weight: 800; color: #ffb800; margin-bottom: 6px;">
+          ${data.name || "Object / Face"}
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--quake-text-muted);">
+          ${data.path ? `<div><b>Path:</b> <span style="color: var(--quake-text);">${data.path}</span></div>` : ""}
+          ${data.point ? `<div><b>Coordinates:</b> <span style="color: var(--quake-cyan);">${data.point}</span></div>` : ""}
+          ${data.dimensions ? `<div><b>Bounding Box:</b> <span style="color: var(--quake-cyan);">${data.dimensions}</span></div>` : ""}
+          ${extraHtml}
+          ${data.component && !data.entity ? `
+            <div style="margin-top: 6px; padding: 6px; background: rgba(0,0,0,0.3); border: 1px solid var(--quake-border); border-radius: 4px;">
+              <div><b>Component:</b> <span style="color: #ffb800; font-weight: bold;">${data.component.ref_des}</span></div>
+              <div><b>Package:</b> <span style="color: var(--quake-text);">${data.component.footprint || "N/A"}</span></div>
+              ${data.component.value ? `<div><b>Value:</b> <span style="color: var(--quake-text);">${data.component.value}</span></div>` : ""}
+              ${data.component.mpn ? `<div><b>MPN:</b> <span style="color: var(--quake-text);">${data.component.mpn}</span></div>` : ""}
+              ${data.component.side ? `<div><b>Side:</b> <span style="color: var(--quake-text);">${data.component.side}</span></div>` : ""}
+            </div>
+          ` : ""}
+          ${data.net && !data.entity ? `
+            <div style="margin-top: 6px; padding: 6px; background: rgba(0,0,0,0.3); border: 1px solid var(--quake-border); border-radius: 4px;">
+              <div><b>Connected Net:</b> <span style="color: #33ff33; font-weight: bold;">${data.net.name}</span> (${(data.net.pins || []).length} pins)</div>
+            </div>
+          ` : ""}
+        </div>
+      `;
+    }
+
+    // Initialize three-cad-viewer Display & Viewer
+    function initCadViewer() {
+      const rect = container.getBoundingClientRect();
+      const initialWidth = Math.round(rect.width || container.clientWidth || window.innerWidth - 320);
+      const initialHeight = Math.round(rect.height || container.clientHeight || window.innerHeight - 44);
+      const displayOptions = {
+        cadWidth: initialWidth,
+        height: initialHeight,
+        treeWidth: 0,
+        glass: true,
+        tools: true,
+        theme: "dark",
+        measureTools: true,
+        selectTool: true,
+        explodeTool: true,
+        preserveDrawingBuffer: true,
+      };
+
+      container.setAttribute("data-theme", "dark");
+      state.display = new Display(container, displayOptions);
+      state.viewer = new Viewer(state.display, {
+        ambientIntensity: 1.0,
+        directIntensity: 1.2,
+        metalness: 0.3,
+        roughness: 0.65,
+        preserveDrawingBuffer: true,
+      }, (change) => {
+        if (change && change.lastPick) {
+          const pick = change.lastPick.new || change.lastPick;
+          const pName = (pick.name || pick.path || "").toLowerCase();
+          if (state.currentMode === "PCB" && pName.includes("substrate")) {
+            if (state.viewer && typeof state.viewer.removeLastBbox === "function") {
+              state.viewer.removeLastBbox();
+            }
+            return;
+          }
+          let bboxStr = null;
+          if (pick.boundingBox) {
+            const bb = pick.boundingBox;
+            if (bb.min && bb.max) {
+              const dx = Math.abs(bb.max[0] - bb.min[0]).toFixed(2);
+              const dy = Math.abs(bb.max[1] - bb.min[1]).toFixed(2);
+              const dz = Math.abs(bb.max[2] - bb.min[2]).toFixed(2);
+              bboxStr = `${dx} × ${dy} × ${dz} mm`;
+            }
+          }
+          const inspectEl = document.getElementById("inspect-content");
+          if (inspectEl) {
+            inspectEl.innerHTML = formatInspectHtml({
+              name: pick.name || pick.path,
+              path: pick.path,
+              dimensions: bboxStr,
+            });
+            document.getElementById("tab-btn-inspect")?.click();
+          }
+        }
+      });
+
+      // Prevent substrate highlighting in PCB mode
+      const origHandlePick = state.viewer.handlePick;
+      if (typeof origHandlePick === "function") {
+        state.viewer.handlePick = function(path, name, meta, shift, alt, point, nodeType, tree) {
+          if (state.currentMode === "PCB") {
+            const target = `${path}/${name}`.toLowerCase();
+            if (target.includes("substrate")) {
+              return;
+            }
+          }
+          return origHandlePick.call(this, path, name, meta, shift, alt, point, nodeType, tree);
+        };
+      }
+
+      if (state.viewer && state.viewer.renderer && typeof state.viewer.renderer.setClearColor === "function") {
+        state.viewer.renderer.setClearColor(0x120c08, 1.0);
+      }
+
+      setupBlenderControls();
+      resizeViewport();
+    }
+
+    // Blender Navigation Controller with RAF Throttling and Click-to-Inspect
+    function setupBlenderControls() {
+      let isDragging = false;
+      let dragMode = "none";
+      let lastX = 0;
+      let lastY = 0;
+      let downX = 0;
+      let downY = 0;
+      let rafPending = false;
+      let pendingDx = 0;
+      let pendingDy = 0;
+
+      // Hover tracking tooltip in PCB mode
+      let hoverTooltipEl = document.getElementById("pcb-hover-tooltip");
+      if (!hoverTooltipEl) {
+        hoverTooltipEl = document.createElement("div");
+        hoverTooltipEl.id = "pcb-hover-tooltip";
+        hoverTooltipEl.style.cssText = "position: fixed; pointer-events: none; z-index: 1000; padding: 4px 8px; background: rgba(18, 12, 8, 0.95); border: 1px solid var(--quake-cyan); border-radius: 4px; font-family: var(--font-mono); font-size: 11px; color: #fff; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.6);";
+        document.body.appendChild(hoverTooltipEl);
+      }
+
+      let hoverRaf = false;
+      container.addEventListener("pointermove", (e) => {
+        if (state.currentMode !== "PCB" || isDragging || (state.markup && state.markup.active)) {
+          if (hoverTooltipEl) hoverTooltipEl.style.display = "none";
+          container.style.cursor = "";
+          return;
+        }
+
+        if (hoverRaf) return;
+        hoverRaf = true;
+        requestAnimationFrame(() => {
+          hoverRaf = false;
+          const rect = container.getBoundingClientRect();
+          const mx = e.clientX - rect.left;
+          const my = e.clientY - rect.top;
+
+          if (state.pcbMetadata && state.viewer?.rendered?.camera && window.THREE) {
+            const mouse = new window.THREE.Vector2((mx / rect.width) * 2 - 1, -(my / rect.height) * 2 + 1);
+            const raycaster = new window.THREE.Raycaster();
+            raycaster.setFromCamera(mouse, state.viewer.rendered.camera);
+
+            let worldPoint = null;
+            if (state.viewer.rendered.scene) {
+              const hits = raycaster.intersectObjects(state.viewer.rendered.scene.children, true);
+              if (hits && hits.length > 0) worldPoint = hits[0].point;
+            }
+            if (!worldPoint) {
+              const plane = new window.THREE.Plane(new window.THREE.Vector3(0, 0, 1), -0.8);
+              worldPoint = new window.THREE.Vector3();
+              raycaster.ray.intersectPlane(plane, worldPoint);
+            }
+
+            if (worldPoint) {
+              const entity = findPcbEntityAtPoint(worldPoint.x, worldPoint.y, worldPoint.z);
+              if (entity) {
+                container.style.cursor = "pointer";
+                let badge = "";
+                if (entity.type === "pad") {
+                  badge = `⚡ Pad: <b style="color: #ffb800;">${entity.data.comp}.${entity.data.pin}</b>` + (entity.net ? ` [Net: <span style="color: #33ff66;">${entity.net.name}</span>]` : "");
+                } else if (entity.type === "via") {
+                  badge = `🎯 Via: <b style="color: #33ff66;">${entity.data.net || "GND"}</b> (⌀${entity.data.drill}mm)`;
+                } else if (entity.type === "trace") {
+                  badge = `〰️ Trace: <b style="color: #33ff66;">${entity.data.net}</b> (${entity.data.layer}, w=${entity.data.width}mm)`;
+                } else if (entity.type === "component") {
+                  badge = `📦 Component: <b style="color: #ffb800;">${entity.data.ref_des}</b> (${entity.data.footprint})`;
+                }
+                hoverTooltipEl.innerHTML = badge;
+                hoverTooltipEl.style.left = (e.clientX + 14) + "px";
+                hoverTooltipEl.style.top = (e.clientY + 14) + "px";
+                hoverTooltipEl.style.display = "block";
+                return;
+              }
+            }
+          }
+
+          container.style.cursor = "";
+          if (hoverTooltipEl) hoverTooltipEl.style.display = "none";
+        });
+      });
+
+      container.addEventListener("pointerleave", () => {
+        if (hoverTooltipEl) hoverTooltipEl.style.display = "none";
+        container.style.cursor = "";
+      });
+
+      container.addEventListener("mousedown", (e) => {
+        downX = e.clientX;
+        downY = e.clientY;
+        if (e.button === 1 || (e.button === 2 && e.shiftKey)) { // MMB or Shift+RMB
+          isDragging = true;
+          dragMode = e.shiftKey ? "pan" : "orbit";
+          lastX = e.clientX;
+          lastY = e.clientY;
+          if (state.viewer && state.viewer.rendered && state.viewer.rendered.controls) {
+            state.viewer.rendered.controls._isDragging = true;
+          }
+          e.preventDefault();
+        }
+      });
+
+      window.addEventListener("mousemove", (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - lastX;
+        const dy = e.clientY - lastY;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        pendingDx += dx;
+        pendingDy += dy;
+
+        if (!rafPending) {
+          rafPending = true;
+          requestAnimationFrame(() => {
+            rafPending = false;
+            if (state.viewer && state.viewer.controls) {
+              if (dragMode === "orbit") {
+                if (state.viewer.controls.rotateLeft) {
+                  state.viewer.controls.rotateLeft(pendingDx * 0.005);
+                  state.viewer.controls.rotateUp(pendingDy * 0.005);
+                  state.viewer.controls.update();
+                }
+              } else if (dragMode === "pan") {
+                if (state.viewer.controls.pan) {
+                  state.viewer.controls.pan(pendingDx, pendingDy);
+                  state.viewer.controls.update();
+                }
+              }
+            }
+            pendingDx = 0;
+            pendingDy = 0;
+          });
+        }
+      });
+
+      window.addEventListener("mouseup", (e) => {
+        if (e.button === 1 || e.button === 2) {
+          isDragging = false;
+          dragMode = "none";
+          if (state.viewer && state.viewer.rendered && state.viewer.rendered.controls) {
+            state.viewer.rendered.controls._isDragging = false;
+          }
+        }
+      });
+
+      // Viewport Click Handler for Object / Face Inspection (BUG-PINCERED-COCOON-242)
+      container.addEventListener("click", (e) => {
+        if (state.markup && state.markup.active) return;
+        const dist = Math.hypot(e.clientX - downX, e.clientY - downY);
+        if (dist > 5) return; // Ignore drag release
+
+        const rect = container.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        // Dedicated PCB View Click & Inspection Handler
+        if (state.currentMode === "PCB" && state.pcbMetadata && state.viewer?.rendered?.camera && window.THREE) {
+          const mouse = new window.THREE.Vector2(
+            (x / rect.width) * 2 - 1,
+            -(y / rect.height) * 2 + 1
+          );
+          const raycaster = new window.THREE.Raycaster();
+          raycaster.setFromCamera(mouse, state.viewer.rendered.camera);
+
+          let worldPoint = null;
+          if (state.viewer.rendered.scene) {
+            const hits = raycaster.intersectObjects(state.viewer.rendered.scene.children, true);
+            if (hits && hits.length > 0) {
+              worldPoint = hits[0].point;
+            }
+          }
+          if (!worldPoint) {
+            const plane = new window.THREE.Plane(new window.THREE.Vector3(0, 0, 1), -0.8);
+            worldPoint = new window.THREE.Vector3();
+            raycaster.ray.intersectPlane(plane, worldPoint);
+          }
+
+          if (worldPoint) {
+            const entity = findPcbEntityAtPoint(worldPoint.x, worldPoint.y, worldPoint.z);
+            if (entity) {
+              let compObj = entity.component || (entity.type === "component" ? entity.data : null);
+              let netObj = entity.net || (entity.data && entity.data.net ? state.pcbMetadata.nets?.find(n => n.name === entity.data.net) : null);
+
+              if (!compObj && entity.type === "pad" && entity.data?.comp) {
+                compObj = state.pcbMetadata.components?.find(c => c.ref_des === entity.data.comp);
+              }
+
+              let entityName = "";
+              if (entity.type === "pad") entityName = `Pad: ${entity.data.comp}.${entity.data.pin}`;
+              else if (entity.type === "via") entityName = `Via: ${entity.data.net || "GND"}`;
+              else if (entity.type === "trace") entityName = `Trace: ${entity.data.net} [${entity.data.layer}]`;
+              else if (entity.type === "component") entityName = `Component: ${entity.data.ref_des}`;
+
+              const inspectEl = document.getElementById("inspect-content");
+              if (inspectEl) {
+                inspectEl.innerHTML = formatInspectHtml({
+                  name: entityName,
+                  point: `(${worldPoint.x.toFixed(2)}, ${worldPoint.y.toFixed(2)}, ${worldPoint.z.toFixed(2)}) mm`,
+                  entity: entity,
+                  component: compObj,
+                  net: netObj,
+                });
+                document.getElementById("tab-btn-inspect")?.click();
+              }
+
+              if (netObj) {
+                highlightNet(netObj);
+              }
+              return;
+            } else {
+              // Clicked on empty substrate: clear net highlight if any, NEVER highlight substrate
+              if (state.selectedNet) {
+                clearNetHighlight();
+              }
+              return;
+            }
+          }
+        }
+
+        // CAD and Simulation mode fallback inspection
+        let hitName = "";
+        let hitPoint = null;
+        let hitBbox = null;
+        let hitEntity = null;
+        let matchedComp = null;
+        let matchedNet = null;
+
+        // Try Three-CAD-Viewer idPicker first
+        if (state.viewer && state.viewer.idPicker) {
+          try {
+            const hit = state.viewer.idPicker.pickAt(x, y);
+            if (hit && hit.info) {
+              hitName = hit.info.name || (hit.info.leaf ? hit.info.leaf.name : "");
+              if (hit.point) {
+                hitPoint = `(${hit.point.x.toFixed(2)}, ${hit.point.y.toFixed(2)}, ${hit.point.z.toFixed(2)}) mm`;
+              }
+            }
+          } catch (err) {}
+        }
+
+        // Raycasting fallback
+        if (!hitName && state.viewer && state.viewer.rendered && state.viewer.rendered.scene && state.viewer.rendered.camera) {
+          try {
+            const mouse = {
+              x: (x / rect.width) * 2 - 1,
+              y: -(y / rect.height) * 2 + 1,
+            };
+            const raycaster = new window.THREE.Raycaster();
+            raycaster.setFromCamera(mouse, state.viewer.rendered.camera);
+            const hits = raycaster.intersectObjects(state.viewer.rendered.scene.children, true);
+            if (hits && hits.length > 0) {
+              const h0 = hits[0];
+              hitName = h0.object.name || h0.object.parent?.name || "Target Geometry";
+              if (h0.point) {
+                hitPoint = `(${h0.point.x.toFixed(2)}, ${h0.point.y.toFixed(2)}, ${h0.point.z.toFixed(2)}) mm`;
+              }
+              if (h0.object.geometry && h0.object.geometry.boundingBox) {
+                const bb = h0.object.geometry.boundingBox;
+                const dx = Math.abs(bb.max.x - bb.min.x).toFixed(2);
+                const dy = Math.abs(bb.max.y - bb.min.y).toFixed(2);
+                const dz = Math.abs(bb.max.z - bb.min.z).toFixed(2);
+                hitBbox = `${dx} × ${dy} × ${dz} mm`;
+              }
+            }
+          } catch (err) {}
+        }
+
+        if (hitName) {
+          const inspectEl = document.getElementById("inspect-content");
+          if (inspectEl) {
+            inspectEl.innerHTML = formatInspectHtml({
+              name: hitName,
+              point: hitPoint,
+              dimensions: hitBbox,
+              entity: hitEntity,
+              component: matchedComp,
+              net: matchedNet,
+            });
+            document.getElementById("tab-btn-inspect")?.click();
+          }
+        }
+      });
+
+      // Keyboard shortcuts
+      window.addEventListener("keydown", (e) => {
+        if (["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
+
+        const key = e.key.toUpperCase();
+        switch (key) {
+          case "1":
+            setCameraPreset("front");
+            break;
+          case "3":
+            setCameraPreset("right");
+            break;
+          case "7":
+            setCameraPreset("top");
+            break;
+          case "5":
+            toggleProjection();
+            break;
+          case "0":
+            setCameraPreset("iso");
+            break;
+          case ".":
+            if (state.viewer && state.viewer.controls && state.viewer.controls.reset) {
+              state.viewer.controls.reset();
+            }
+            break;
+          case "F":
+            if (state.currentMode === "PCB") {
+              flipPcbView();
+            } else if (state.viewer && state.viewer.controls && state.viewer.controls.reset) {
+              state.viewer.controls.reset();
+            }
+            break;
+          case "Z":
+            toggleWireframe();
+            break;
+          case "X":
+          case "DELETE":
+          case "BACKSPACE":
+            clearMarkups();
+            break;
+          case "B":
+            openTargetBugModal();
+            break;
+          case "M":
+            document.getElementById("cam-ruler")?.click();
+            break;
+          case "H":
+          case "?":
+            toggleShortcuts();
+            break;
+          case "ESCAPE":
+            toggleShortcuts(false);
+            break;
+          case " ":
+            toggleSimPlay();
+            e.preventDefault();
+            break;
+        }
+
+        if (e.ctrlKey && key === "Z") {
+          undoMarkup();
+          e.preventDefault();
+        }
+      });
+    }
+
+    function setCameraPreset(viewName) {
+      if (!state.viewer) return;
+      if (typeof state.viewer.presetCamera === "function") {
+        state.viewer.presetCamera(viewName);
+      } else if (typeof state.viewer.presetView === "function") {
+        state.viewer.presetView(viewName);
+      } else if (typeof state.viewer.setView === "function") {
+        state.viewer.setView(viewName);
+      } else if (state.viewer.controls) {
+        const c = state.viewer.camera;
+        if (viewName === "top") { c.position.set(0, 0, 200); c.up.set(0, 1, 0); }
+        if (viewName === "bottom") { c.position.set(0, 0, -200); c.up.set(0, 1, 0); }
+        if (viewName === "front") { c.position.set(0, -200, 0); c.up.set(0, 0, 1); }
+        if (viewName === "right") { c.position.set(200, 0, 0); c.up.set(0, 0, 1); }
+        if (viewName === "left") { c.position.set(-200, 0, 0); c.up.set(0, 0, 1); }
+        if (viewName === "iso") { c.position.set(150, -150, 150); c.up.set(0, 0, 1); }
+        c.lookAt(0, 0, 0);
+        state.viewer.controls.update();
+      }
+    }
+
+    function toggleProjection() {
+      if (state.viewer && typeof state.viewer.toggleOrtho === "function") {
+        state.viewer.toggleOrtho();
+      }
+    }
+
+    function toggleWireframe() {
+      if (state.viewer && typeof state.viewer.toggleWireframe === "function") {
+        state.viewer.toggleWireframe();
+      }
+    }
+
+    function toggleBoundingBox() {
+      if (state.viewer) {
+        if (typeof state.viewer.toggleBoundingBox === "function") {
+          state.viewer.toggleBoundingBox();
+        } else if (state.viewer.state) {
+          const cur = state.viewer.state.get("bb") || false;
+          state.viewer.state.set("bb", !cur);
+        }
+      }
+    }
+
+    function toggleAxes() {
+      if (state.viewer) {
+        if (typeof state.viewer.toggleAxes === "function") {
+          state.viewer.toggleAxes();
+        } else if (state.viewer.state) {
+          const cur = state.viewer.state.get("axes") || false;
+          state.viewer.state.set("axes", !cur);
+        }
+      }
+    }
+
+    function toggleGrid() {
+      if (state.viewer) {
+        if (typeof state.viewer.toggleGrid === "function") {
+          state.viewer.toggleGrid();
+        } else if (state.viewer.state) {
+          const cur = state.viewer.state.get("grid") || false;
+          state.viewer.state.set("grid", !cur);
+        }
+      }
+    }
+
+    function setExplode(percent) {
+      const val = parseFloat(percent) / 100.0;
+      if (state.viewer) {
+        if (typeof state.viewer.setExplode === "function") {
+          state.viewer.setExplode(val);
+        } else if (state.viewer.explode) {
+          state.viewer.explode(val);
+        }
+      }
+      const label = document.getElementById("view-explode-val");
+      if (label) label.textContent = `${Math.round(percent)}%`;
+    }
+
+    // Sync / Loading Progress Modal
+    function showSyncProgress(title = "SYNCHRONIZING WORKSTATION") {
+      const modal = document.getElementById("modal-sync-progress");
+      const titleEl = document.getElementById("sync-modal-title");
+      if (titleEl) titleEl.textContent = `◈ ${title} ◈`;
+      if (modal) {
+        modal.classList.add("visible");
+        updateSyncProgress(5, "Starting sync...", "Connecting to geometry engine");
+      }
+    }
+
+    function updateSyncProgress(percent, stageText, detailText) {
+      const bar = document.getElementById("sync-progress-bar");
+      const stage = document.getElementById("sync-stage-text");
+      const detail = document.getElementById("sync-stage-detail");
+      const pct = document.getElementById("sync-percent-text");
+      if (bar) bar.style.width = Math.min(100, Math.max(0, percent)) + "%";
+      if (stage && stageText) stage.textContent = stageText;
+      if (detail && detailText) detail.textContent = detailText;
+      if (pct) pct.textContent = Math.round(percent) + "%";
+    }
+
+    function hideSyncProgress() {
+      const modal = document.getElementById("modal-sync-progress");
+      if (modal) {
+        updateSyncProgress(100, "Complete", "Workstation ready");
+        setTimeout(() => {
+          modal.classList.remove("visible");
+        }, 350);
+      }
+    }
+
+    // Load geometry from backend
+    async function loadActiveGeometry(showProgress = false, retryCount = 0) {
+      if (showProgress) {
+        updateSyncProgress(50, "Fetching Geometry...", `Querying pipeline for ${state.currentProject}/${state.currentTarget} (compiling CAD/PCB meshes)...`);
+      } else {
+        showToast("Loading geometry...", 1500);
+      }
+      const url = `/api/scope/load?project=${state.currentProject}&target=${state.currentTarget}&subassembly=${state.currentSub || ""}&mode=${state.currentMode}`;
+      try {
+        const resp = await fetch(url);
+        if (!resp.ok) {
+          let errText = "Failed to load geometry";
+          try {
+            const err = await resp.json();
+            errText = err.error || errText;
+          } catch (_) {
+            errText = `HTTP ${resp.status} ${resp.statusText}`;
+          }
+          console.error("Scope geometry load error:", errText);
+          showToast(`Error: ${errText}`, 4000);
+          return;
+        }
+        if (showProgress) {
+          updateSyncProgress(75, "Decoding Geometry...", "Resolving meshes and instanced buffers");
+        }
+        const data = await resp.json();
+        let shapes = data.shapes;
+        if (data.instances && isInstancedFormat(data)) {
+          shapes = decodeInstancedFormat(data);
+        }
+
+        if (showProgress) {
+          updateSyncProgress(90, "Rendering Viewport...", "Populating 3D scene and layers");
+        }
+
+        if (state.viewer && shapes) {
+          state.viewer.render(shapes, data.config || {}, {});
+          if (typeof state.viewer.presetCamera === "function") {
+            state.viewer.presetCamera("iso");
+          } else if (typeof state.viewer.setView === "function") {
+            state.viewer.setView("iso");
+          }
+          resizeViewport();
+          requestAnimationFrame(() => {
+            resizeViewport();
+          });
+        }
+
+        state.pcbMetadata = data.pcb_metadata;
+        if (state.currentMode === "PCB") {
+          document.body.classList.add("pcb-high-contrast");
+          if (state.viewer && state.viewer.renderer && typeof state.viewer.renderer.setClearColor === "function") {
+            state.viewer.renderer.setClearColor(0x101413, 1.0);
+          }
+          if (state.viewer?.rendered?.nestedGroup?.groups) {
+            const groups = state.viewer.rendered.nestedGroup.groups;
+            for (const [key, grp] of Object.entries(groups)) {
+              const k = key.toLowerCase();
+              if (k.includes("trace") || k.includes("pad") || k.includes("via")) {
+                if (typeof grp.setEdgesVisible === "function") grp.setEdgesVisible(false);
+              }
+            }
+          }
+        } else {
+          document.body.classList.remove("pcb-high-contrast");
+          if (state.viewer && state.viewer.renderer && typeof state.viewer.renderer.setClearColor === "function") {
+            state.viewer.renderer.setClearColor(0x120c08, 1.0);
+          }
+        }
+        updateSidebarModeTabs();
+        updateLayersList();
+        updateNetsList();
+        updateTreeList(shapes);
+        if (state.currentMode === "SIMULATE") {
+          initSimulationParticles();
+          updateSimulationStep(state.simStep || 0);
+          renderRerunLogs();
+          const inspectEl = document.getElementById("inspect-content");
+          if (inspectEl && (!state.selectedPin && !state.selectedNet)) {
+            inspectEl.innerHTML = formatInspectHtml({
+              name: "Fluid Dynamics Domain [SPH]",
+              path: `world/${state.currentProject}/fluid`,
+              dimensions: "180.00 × 180.00 × 73.50 mm",
+            });
+          }
+        } else if (simParticlesMesh && state.viewer && state.viewer.rendered && state.viewer.rendered.scene) {
+          state.viewer.rendered.scene.remove(simParticlesMesh);
+          simParticlesMesh = null;
+        }
+        if (!showProgress) {
+          showToast("Geometry loaded.", 1500);
+        }
+      } catch (err) {
+        console.error("Scope fetch error:", err);
+        if (retryCount === 0 && showProgress) {
+          console.warn("Initial geometry fetch failed, retrying in 1.5s...");
+          updateSyncProgress(50, "Retrying Geometry...", "Reconnecting to geometry pipeline...");
+          await new Promise(r => setTimeout(r, 1500));
+          return loadActiveGeometry(showProgress, 1);
+        }
+        showToast(`Fetch error: ${err.message || err}`, 4000);
+      }
+    }
+
+    function switchTabPane(paneId) {
+      document.querySelectorAll(".sidebar-tab").forEach(t => {
+        t.classList.toggle("active", t.dataset.pane === paneId);
+      });
+      document.querySelectorAll(".tab-pane").forEach(p => {
+        p.classList.toggle("active", p.id === paneId);
+      });
+    }
+
+    function updateSidebarModeTabs() {
+      const isPcb = state.currentMode === "PCB";
+      const isSim = state.currentMode === "SIMULATE";
+      const tabBtnLayers = document.getElementById("tab-btn-layers");
+      const tabBtnTree = document.getElementById("tab-btn-tree");
+      const tabBtnLogs = document.getElementById("tab-btn-logs");
+      if (tabBtnLayers) {
+        tabBtnLayers.style.display = isPcb ? "block" : "none";
+      }
+      if (tabBtnTree) {
+        tabBtnTree.style.display = isPcb ? "none" : "block";
+      }
+      if (tabBtnLogs) {
+        tabBtnLogs.style.display = isSim ? "block" : "none";
+      }
+
+      // If active tab is tab-layers in non-PCB mode, switch to tab-tree
+      const activeTab = document.querySelector(".sidebar-tab.active");
+      if (!isPcb && activeTab && activeTab.dataset.pane === "tab-layers") {
+        switchTabPane("tab-tree");
+      } else if (isPcb && activeTab && activeTab.dataset.pane === "tab-tree") {
+        switchTabPane("tab-layers");
+      } else if (!isSim && activeTab && activeTab.dataset.pane === "tab-logs") {
+        switchTabPane(isPcb ? "tab-layers" : "tab-tree");
+      }
+    }
+
+    let soloActiveLayer = null;
+    let pcbIsFlipped = false;
+    let pcbHighContrast = true;
+    let netHighlightGroup = null;
+
+    function setLayerVisibility(layerId, isVisible) {
+      if (!state.viewer || !state.viewer.rendered) return;
+      let toggled = false;
+      if (state.viewer.rendered.nestedGroup && state.viewer.rendered.nestedGroup.groups) {
+        const groups = state.viewer.rendered.nestedGroup.groups;
+        for (const [key, group] of Object.entries(groups)) {
+          if (key === layerId || key.endsWith("/" + layerId) || key.includes(layerId)) {
+            group.visible = isVisible;
+            if (typeof group.setShapeVisible === "function") group.setShapeVisible(isVisible);
+            if (typeof group.setEdgesVisible === "function") group.setEdgesVisible(isVisible);
+            group.traverse((child) => {
+              if (child.isMesh) child.visible = isVisible;
+            });
+            toggled = true;
+          }
+        }
+      }
+      if (state.viewer.rendered.scene) {
+        state.viewer.rendered.scene.traverse((child) => {
+          if (child.name && (child.name === layerId || child.name.includes(layerId))) {
+            child.visible = isVisible;
+            toggled = true;
+          }
+        });
+      }
+      if (state.viewer && typeof state.viewer.update === "function") {
+        state.viewer.update(false, false);
+      }
+    }
+
+    function toggleSoloLayer(layerId) {
+      const inputs = document.querySelectorAll("#layers-list input[type='checkbox']");
+      if (soloActiveLayer === layerId) {
+        soloActiveLayer = null;
+        inputs.forEach(cb => {
+          cb.checked = true;
+          setLayerVisibility(cb.dataset.layerId, true);
+        });
+        document.querySelectorAll(".layer-btn-solo").forEach(b => b.classList.remove("active"));
+      } else {
+        soloActiveLayer = layerId;
+        inputs.forEach(cb => {
+          const isTarget = cb.dataset.layerId === layerId;
+          cb.checked = isTarget;
+          setLayerVisibility(cb.dataset.layerId, isTarget);
+        });
+        document.querySelectorAll(".layer-btn-solo").forEach(b => {
+          b.classList.toggle("active", b.dataset.id === layerId);
+        });
+      }
+    }
+
+    function setAllLayersVisible(visible = true) {
+      soloActiveLayer = null;
+      document.querySelectorAll(".layer-btn-solo").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll("#layers-list input[type='checkbox']").forEach(cb => {
+        cb.checked = visible;
+        setLayerVisibility(cb.dataset.layerId, visible);
+      });
+    }
+
+    function flipPcbView() {
+      pcbIsFlipped = !pcbIsFlipped;
+      setCameraPreset(pcbIsFlipped ? "bottom" : "top");
+      showToast(pcbIsFlipped ? "Viewing Bottom Layer (B.Cu)" : "Viewing Top Layer (F.Cu)");
+    }
+
+    function updateLayersList() {
+      const listEl = document.getElementById("layers-list");
+      listEl.innerHTML = "";
+      if (!state.pcbMetadata || !state.pcbMetadata.layers) {
+        listEl.innerHTML = "<div style='color: var(--quake-text-muted); font-size: 11px;'>No PCB layers for active mode.</div>";
+        return;
+      }
+
+      state.pcbMetadata.layers.forEach((layer) => {
+        const item = document.createElement("div");
+        item.className = "layer-item";
+        item.innerHTML = `
+          <div class="layer-info">
+            <div class="layer-color-dot" style="background: ${layer.color};"></div>
+            <span>${layer.name}</span>
+          </div>
+          <div style="display: flex; gap: 4px;">
+            <button class="layer-btn-solo" data-id="${layer.id}">Solo</button>
+            <input type="checkbox" checked data-layer-id="${layer.id}">
+          </div>
+        `;
+
+        const checkbox = item.querySelector("input[type='checkbox']");
+        checkbox.addEventListener("change", (e) => {
+          setLayerVisibility(layer.id, e.target.checked);
+        });
+
+        const soloBtn = item.querySelector(".layer-btn-solo");
+        soloBtn.addEventListener("click", () => {
+          toggleSoloLayer(layer.id);
+        });
+
+        listEl.appendChild(item);
+      });
+    }
+
+    function updateNetsList() {
+      const netsEl = document.getElementById("nets-list");
+      netsEl.innerHTML = "";
+      if (!state.pcbMetadata || !state.pcbMetadata.nets || state.pcbMetadata.nets.length === 0) {
+        netsEl.innerHTML = "<div style='color: var(--quake-text-muted); font-size: 10px; padding: 6px;'>No netlist data.</div>";
+        return;
+      }
+
+      const searchVal = (document.getElementById("net-search")?.value || "").trim().toLowerCase();
+      const filtered = state.pcbMetadata.nets.filter(n => !searchVal || n.name.toLowerCase().includes(searchVal));
+
+      if (filtered.length === 0) {
+        netsEl.innerHTML = "<div style='color: var(--quake-text-muted); font-size: 10px; padding: 6px;'>No matching nets found.</div>";
+        return;
+      }
+
+      filtered.forEach((net) => {
+        const item = document.createElement("div");
+        item.className = "net-item" + (state.selectedNet === net.name ? " active" : "");
+        item.dataset.net = net.name;
+        item.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <div style="width: 8px; height: 8px; border-radius: 50%; background: ${net.color || '#ffcc00'};"></div>
+            <span>${net.name}</span>
+          </div>
+          <span class="net-pin-count">${net.pins.length} pins</span>
+        `;
+        item.addEventListener("click", () => {
+          highlightNet(net);
+        });
+        netsEl.appendChild(item);
+      });
+    }
+
+    function clearNetHighlight() {
+      state.selectedNet = null;
+      document.querySelectorAll("#nets-list .net-item").forEach(el => el.classList.remove("active"));
+
+      // Remove 3D glowing overlay group
+      if (netHighlightGroup && state.viewer && state.viewer.rendered && state.viewer.rendered.scene) {
+        state.viewer.rendered.scene.remove(netHighlightGroup);
+        netHighlightGroup.traverse((obj) => {
+          if (obj.geometry && typeof obj.geometry.dispose === "function") obj.geometry.dispose();
+          if (obj.material && typeof obj.material.dispose === "function") obj.material.dispose();
+        });
+        netHighlightGroup = null;
+      }
+
+      // Restore original materials and opacity
+      if (state.viewer && state.viewer.rendered && state.viewer.rendered.scene) {
+        state.viewer.rendered.scene.traverse((obj) => {
+          if (obj.isMesh && obj._origMaterial) {
+            obj.material = obj._origMaterial;
+            delete obj._origMaterial;
+          }
+          if (obj.isMesh && obj._origOpacity !== undefined) {
+            obj.material.opacity = obj._origOpacity;
+            obj.material.transparent = obj._origTransparent;
+            delete obj._origOpacity;
+            delete obj._origTransparent;
+          }
+        });
+      }
+      if (state.viewer && typeof state.viewer.update === "function") {
+        state.viewer.update(false, false);
+      }
+    }
+
+    function highlightNet(net) {
+      if (state.selectedNet === net.name) {
+        clearNetHighlight();
+        return;
+      }
+      clearNetHighlight();
+      state.selectedNet = net.name;
+      document.querySelectorAll("#nets-list .net-item").forEach(el => {
+        el.classList.toggle("active", el.dataset.net === net.name);
+      });
+
+      // Populate Inspect Panel with rich net details
+      const inspectEl = document.getElementById("inspect-content");
+      if (inspectEl) {
+        const pinsList = (net.pins || []).map(p => `
+          <span style="display: inline-block; padding: 2px 6px; margin: 2px; background: rgba(51, 255, 51, 0.15); border: 1px solid #33ff33; border-radius: 3px; font-family: var(--font-mono); font-size: 10px; color: #33ff33;">${p}</span>
+        `).join("");
+
+        const layersList = (net.layers || ["F.Cu"]).map(l => `
+          <span style="display: inline-block; padding: 1px 5px; margin: 2px; background: ${l === 'B.Cu' ? 'rgba(43, 127, 255, 0.2)' : 'rgba(238, 51, 51, 0.2)'}; border: 1px solid ${l === 'B.Cu' ? '#2b7fff' : '#ee3333'}; border-radius: 3px; font-size: 10px; color: ${l === 'B.Cu' ? '#2b7fff' : '#ee3333'};">${l}</span>
+        `).join("");
+
+        inspectEl.innerHTML = `
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+            <div style="font-size: 13px; font-weight: 800; color: #33ff33; font-family: var(--font-mono);">NET: ${net.name}</div>
+            <button id="btn-inspect-clear-net" class="hud-btn" style="padding: 1px 6px; font-size: 9px;">Clear</button>
+          </div>
+          <div style="margin-bottom: 8px; font-size: 11px; color: var(--quake-text-muted); display: flex; flex-direction: column; gap: 4px;">
+            <div><b>Total Connected Pins:</b> <span style="color: #33ff33; font-weight: bold;">${(net.pins || []).length}</span></div>
+            <div><b>Routed Traces:</b> <span style="color: var(--quake-text); font-weight: bold;">${net.traces_count || 0} segments</span></div>
+            <div><b>Vias:</b> <span style="color: var(--quake-text); font-weight: bold;">${net.vias_count || 0}</span></div>
+            <div><b>Copper Layers:</b> ${layersList}</div>
+          </div>
+          <div class="hud-label" style="margin-bottom: 4px;">Connected Component Pins:</div>
+          <div style="max-height: 180px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 6px; border: 1px solid var(--quake-border); border-radius: 4px;">
+            ${pinsList || '<span style="color: var(--quake-text-muted);">No pins</span>'}
+          </div>
+        `;
+        document.getElementById("btn-inspect-clear-net")?.addEventListener("click", () => clearNetHighlight());
+        document.getElementById("tab-btn-inspect")?.click();
+      }
+
+      if (state.viewer && state.viewer.rendered && state.viewer.rendered.scene && window.THREE) {
+        const THREE = window.THREE;
+        netHighlightGroup = new THREE.Group();
+        netHighlightGroup.name = "NetHighlight_" + net.name;
+
+        // 1. High contrast dimming of scene meshes
+        state.viewer.rendered.scene.traverse((obj) => {
+          if (obj.isMesh && obj.parent !== netHighlightGroup) {
+            if (obj._origMaterial === undefined) obj._origMaterial = obj.material;
+            if (obj.material) {
+              if (obj._origOpacity === undefined) {
+                obj._origOpacity = obj.material.opacity !== undefined ? obj.material.opacity : 1.0;
+                obj._origTransparent = obj.material.transparent || false;
+              }
+              obj.material = obj.material.clone();
+              obj.material.transparent = true;
+              obj.material.opacity = 0.22;
+              if (obj.material.color) {
+                obj.material.color.multiplyScalar(0.4);
+              }
+            }
+          }
+        });
+
+        // 2. Build glowing 3D net geometry
+        const netColor = 0x33ff66;
+        const traceMatTop = new THREE.MeshBasicMaterial({ color: netColor, wireframe: false });
+        const traceMatBot = new THREE.MeshBasicMaterial({ color: 0x00e5ff, wireframe: false });
+        const viaMat = new THREE.MeshBasicMaterial({ color: 0xffea00, wireframe: false });
+        const padMat = new THREE.MeshBasicMaterial({ color: 0x33ff66, wireframe: false });
+
+        // Traces
+        if (state.pcbMetadata && state.pcbMetadata.traces) {
+          state.pcbMetadata.traces.forEach((t) => {
+            if (t.net === net.name) {
+              const x1 = t.start[0], y1 = t.start[1];
+              const x2 = t.end[0], y2 = t.end[1];
+              const dx = x2 - x1, dy = y2 - y1;
+              const len = Math.hypot(dx, dy);
+              if (len > 0.001) {
+                const angle = Math.atan2(dy, dx);
+                const mx = (x1 + x2) / 2;
+                const my = (y1 + y2) / 2;
+                const isTop = t.layer === "F.Cu";
+                const z = isTop ? 0.9 : -0.9;
+                const geom = new THREE.BoxGeometry(len, (t.width || 0.25) * 1.2, 0.08);
+                const mesh = new THREE.Mesh(geom, isTop ? traceMatTop : traceMatBot);
+                mesh.position.set(mx, my, z);
+                mesh.rotation.z = angle;
+                netHighlightGroup.add(mesh);
+              }
+            }
+          });
+        }
+
+        // Vias
+        if (state.pcbMetadata && state.pcbMetadata.vias) {
+          state.pcbMetadata.vias.forEach((v) => {
+            if (v.net === net.name) {
+              const dia = (v.pad || 0.5) * 1.1;
+              const geom = new THREE.CylinderGeometry(dia / 2, dia / 2, 2.0, 16);
+              geom.rotateX(Math.PI / 2);
+              const mesh = new THREE.Mesh(geom, viaMat);
+              mesh.position.set(v.pos[0], v.pos[1], 0);
+              netHighlightGroup.add(mesh);
+            }
+          });
+        }
+
+        // Pads
+        if (state.pcbMetadata && state.pcbMetadata.pads) {
+          state.pcbMetadata.pads.forEach((p) => {
+            if (p.net === net.name) {
+              const isTop = p.layer === "F.Cu";
+              const z = isTop ? 0.95 : -0.95;
+              const geom = new THREE.BoxGeometry((p.w || 0.5) * 1.1, (p.h || 0.5) * 1.1, 0.1);
+              const mesh = new THREE.Mesh(geom, padMat);
+              mesh.position.set(p.x, p.y, z);
+              netHighlightGroup.add(mesh);
+            }
+          });
+        }
+
+        state.viewer.rendered.scene.add(netHighlightGroup);
+        if (state.viewer && typeof state.viewer.update === "function") {
+          state.viewer.update(false, false);
+        }
+      }
+    }
+
+    function togglePartVisibilityInViewer(p, isVisible) {
+      const partPath = p.path || p.id || p.name;
+      let toggled = false;
+      if (state.viewer && state.viewer.rendered && state.viewer.rendered.nestedGroup && state.viewer.rendered.nestedGroup.groups) {
+        const groups = state.viewer.rendered.nestedGroup.groups;
+        const group = groups[partPath] || groups[p.name] || (p.id && groups[p.id]);
+        if (group) {
+          group.visible = isVisible;
+          if (typeof group.setShapeVisible === "function") group.setShapeVisible(isVisible);
+          if (typeof group.setEdgesVisible === "function") group.setEdgesVisible(isVisible);
+          toggled = true;
+        }
+      }
+      if (!toggled && state.viewer && state.viewer.rendered && state.viewer.rendered.scene) {
+        state.viewer.rendered.scene.traverse((child) => {
+          if (child.name === p.name || child.name?.includes(p.name)) {
+            child.visible = isVisible;
+          }
+        });
+      }
+    }
+
+    function setGroupVisibility(groupNode, isVisible) {
+      if (groupNode.leafParts) {
+        for (const leaf of groupNode.leafParts) {
+          leaf.visible = isVisible;
+          togglePartVisibilityInViewer(leaf, isVisible);
+          if (leaf.domRow) {
+            leaf.domRow.style.opacity = isVisible ? "1.0" : "0.5";
+            if (leaf.domBtn) leaf.domBtn.textContent = isVisible ? "👁️" : "🚫";
+          }
+        }
+      }
+      if (groupNode.children) {
+        for (const k in groupNode.children) {
+          const childGroup = groupNode.children[k];
+          childGroup.visible = isVisible;
+          if (childGroup.domRow) {
+            childGroup.domRow.style.opacity = isVisible ? "1.0" : "0.5";
+            if (childGroup.domBtn) childGroup.domBtn.textContent = isVisible ? "👁️" : "🚫";
+          }
+          if (childGroup.domContainer) {
+            childGroup.domContainer.style.opacity = isVisible ? "1.0" : "0.5";
+          }
+          setGroupVisibility(childGroup, isVisible);
+        }
+      }
+    }
+
+    function countGroupItems(node) {
+      let count = (node.leafParts || []).length;
+      if (node.children) {
+        for (const k in node.children) {
+          count += countGroupItems(node.children[k]);
+        }
+      }
+      return count;
+    }
+
+    function updateTreeList(shapes) {
+      const treeEl = document.getElementById("cad-tree-list");
+      treeEl.innerHTML = "";
+      if (!shapes || !shapes.parts || shapes.parts.length === 0) {
+        treeEl.innerHTML = '<div style="padding: 8px; color: var(--quake-text-muted); font-size: 11px;">No tree objects</div>';
+        return;
+      }
+
+      // Quick Collapse/Expand Controls
+      const controlsBar = document.createElement("div");
+      controlsBar.style.cssText = "display: flex; gap: 6px; padding: 4px 6px; margin-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.08);";
+      
+      const expAllBtn = document.createElement("button");
+      expAllBtn.className = "hud-btn";
+      expAllBtn.style.cssText = "padding: 2px 6px; font-size: 10px;";
+      expAllBtn.textContent = "▼ Expand All";
+      
+      const colAllBtn = document.createElement("button");
+      colAllBtn.className = "hud-btn";
+      colAllBtn.style.cssText = "padding: 2px 6px; font-size: 10px;";
+      colAllBtn.textContent = "▶ Collapse All";
+
+      controlsBar.appendChild(expAllBtn);
+      controlsBar.appendChild(colAllBtn);
+      treeEl.appendChild(controlsBar);
+
+      // Build hierarchical tree structure from parts
+      const root = { name: "root", isGroup: true, children: {}, leafParts: [], expanded: true, visible: true };
+
+      shapes.parts.forEach((p, idx) => {
+        let rawPath = p.name || `Part_${idx}`;
+        if (rawPath.startsWith("/Group/")) rawPath = rawPath.slice(7);
+        else if (rawPath.startsWith("Group/")) rawPath = rawPath.slice(6);
+        else if (rawPath.startsWith("/")) rawPath = rawPath.slice(1);
+
+        let segments = rawPath.split("/").filter(Boolean);
+        if (segments.length === 1 && segments[0].includes("_")) {
+          const s = segments[0];
+          const posMatch = s.match(/^(.*)_(pos_\d+|center)$/);
+          if (posMatch) {
+            segments = [posMatch[1], posMatch[2]];
+          }
+        }
+
+        let curr = root;
+        for (let i = 0; i < segments.length - 1; i++) {
+          const seg = segments[i];
+          if (!curr.children[seg]) {
+            curr.children[seg] = {
+              name: seg,
+              path: segments.slice(0, i + 1).join("/"),
+              isGroup: true,
+              children: {},
+              leafParts: [],
+              expanded: true,
+              visible: true,
+            };
+          }
+          curr = curr.children[seg];
+        }
+
+        const leafName = segments[segments.length - 1];
+        curr.leafParts.push({
+          ...p,
+          leafName: leafName,
+          isGroup: false,
+          visible: true,
+        });
+      });
+
+      const allGroupContainers = [];
+      const allExpandIcons = [];
+
+      function renderGroupNode(groupNode, container, level) {
+        const groupRow = document.createElement("div");
+        groupRow.className = "tree-group-item";
+        groupRow.style.cssText = `padding: 4px 6px; padding-left: ${level * 14 + 6}px; font-size: 11px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; user-select: none; background: rgba(255,255,255,0.02);`;
+        groupNode.domRow = groupRow;
+
+        const left = document.createElement("div");
+        left.style.cssText = "display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;";
+
+        const expandBtn = document.createElement("span");
+        expandBtn.className = "tree-expand-icon";
+        expandBtn.textContent = groupNode.expanded ? "▼" : "▶";
+        expandBtn.style.cssText = "font-size: 9px; width: 10px; display: inline-block; color: var(--quake-amber);";
+        allExpandIcons.push({ node: groupNode, icon: expandBtn });
+
+        const groupEyeBtn = document.createElement("button");
+        groupEyeBtn.className = "tree-visibility-btn";
+        groupEyeBtn.title = "Toggle Group Visibility";
+        groupEyeBtn.textContent = groupNode.visible ? "👁️" : "🚫";
+        groupEyeBtn.style.cssText = "background: none; border: none; cursor: pointer; font-size: 12px; padding: 0 2px; line-height: 1;";
+        groupNode.domBtn = groupEyeBtn;
+
+        const groupIcon = document.createElement("span");
+        groupIcon.textContent = "📁";
+        groupIcon.style.fontSize = "11px";
+
+        const titleSpan = document.createElement("span");
+        titleSpan.textContent = groupNode.name;
+        titleSpan.style.cssText = "color: var(--quake-amber); font-weight: bold; text-transform: uppercase; font-size: 11px; overflow: hidden; text-overflow: ellipsis;";
+
+        left.appendChild(expandBtn);
+        left.appendChild(groupEyeBtn);
+        left.appendChild(groupIcon);
+        left.appendChild(titleSpan);
+
+        const countBadge = document.createElement("span");
+        const totalItems = countGroupItems(groupNode);
+        countBadge.textContent = `${totalItems} items`;
+        countBadge.style.cssText = "color: var(--quake-text-muted); font-size: 9px; flex-shrink: 0;";
+
+        groupRow.appendChild(left);
+        groupRow.appendChild(countBadge);
+        container.appendChild(groupRow);
+
+        const childrenContainer = document.createElement("div");
+        childrenContainer.className = "tree-group-children";
+        childrenContainer.style.display = groupNode.expanded ? "block" : "none";
+        groupNode.domContainer = childrenContainer;
+        allGroupContainers.push({ node: groupNode, container: childrenContainer, icon: expandBtn });
+        container.appendChild(childrenContainer);
+
+        // Click row (except visibility button) toggles expand/collapse
+        groupRow.addEventListener("click", (e) => {
+          if (e.target === groupEyeBtn) return;
+          groupNode.expanded = !groupNode.expanded;
+          expandBtn.textContent = groupNode.expanded ? "▼" : "▶";
+          childrenContainer.style.display = groupNode.expanded ? "block" : "none";
+        });
+
+        // Click eye button toggles visibility on all group descendants
+        groupEyeBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          groupNode.visible = !groupNode.visible;
+          groupEyeBtn.textContent = groupNode.visible ? "👁️" : "🚫";
+          groupEyeBtn.style.opacity = groupNode.visible ? "1.0" : "0.4";
+          groupRow.style.opacity = groupNode.visible ? "1.0" : "0.5";
+          childrenContainer.style.opacity = groupNode.visible ? "1.0" : "0.5";
+          setGroupVisibility(groupNode, groupNode.visible);
+          if (state.viewer && typeof state.viewer.update === "function") {
+            state.viewer.update(true);
+          }
+        });
+
+        // Render nested groups and leaf parts
+        for (const childKey of Object.keys(groupNode.children).sort()) {
+          renderGroupNode(groupNode.children[childKey], childrenContainer, level + 1);
+        }
+        for (const leaf of groupNode.leafParts) {
+          renderLeafNode(leaf, childrenContainer, level + 1);
+        }
+      }
+
+      function renderLeafNode(p, container, level) {
+        const row = document.createElement("div");
+        row.className = "tree-row-item";
+        row.style.cssText = `padding: 4px 6px; padding-left: ${level * 14 + 18}px; font-size: 11px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.03); gap: 6px; cursor: pointer;`;
+        p.domRow = row;
+
+        const left = document.createElement("div");
+        left.style.cssText = "display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;";
+
+        const toggleBtn = document.createElement("button");
+        toggleBtn.className = "tree-visibility-btn";
+        toggleBtn.title = "Toggle Visibility";
+        toggleBtn.textContent = p.visible !== false ? "👁️" : "🚫";
+        toggleBtn.style.cssText = "background: none; border: none; cursor: pointer; font-size: 12px; padding: 0 2px; line-height: 1;";
+        p.domBtn = toggleBtn;
+
+        toggleBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          p.visible = !(p.visible !== false);
+          toggleBtn.textContent = p.visible ? "👁️" : "🚫";
+          toggleBtn.style.opacity = p.visible ? "1.0" : "0.4";
+          row.style.opacity = p.visible ? "1.0" : "0.5";
+          togglePartVisibilityInViewer(p, p.visible);
+          if (state.viewer && typeof state.viewer.update === "function") {
+            state.viewer.update(true);
+          }
+        });
+
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = p.leafName || p.name;
+        nameSpan.style.cssText = "color: var(--quake-text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;";
+
+        left.appendChild(toggleBtn);
+        left.appendChild(nameSpan);
+
+        const right = document.createElement("span");
+        right.style.cssText = "color: var(--quake-cyan); font-size: 9px; flex-shrink: 0;";
+        right.textContent = p.color || "Mesh";
+
+        row.appendChild(left);
+        row.appendChild(right);
+
+        row.addEventListener("click", () => {
+          document.querySelectorAll(".tree-row-item, .tree-group-item").forEach(r => r.style.background = "");
+          row.style.background = "rgba(255, 184, 0, 0.15)";
+        });
+
+        container.appendChild(row);
+      }
+
+      // Render top-level groups and standalone leaf parts
+      for (const childKey of Object.keys(root.children).sort()) {
+        renderGroupNode(root.children[childKey], treeEl, 0);
+      }
+      for (const leaf of root.leafParts) {
+        renderLeafNode(leaf, treeEl, 0);
+      }
+
+      // Connect Expand All / Collapse All buttons
+      expAllBtn.addEventListener("click", () => {
+        allGroupContainers.forEach(g => {
+          g.node.expanded = true;
+          g.container.style.display = "block";
+          g.icon.textContent = "▼";
+        });
+      });
+      colAllBtn.addEventListener("click", () => {
+        allGroupContainers.forEach(g => {
+          g.node.expanded = false;
+          g.container.style.display = "none";
+          g.icon.textContent = "▶";
+        });
+      });
+    }
+
+    // DIAGRAM MARKUP ENGINE
+    function findHitPin(x, y) {
+      for (const pin of state.annotations) {
+        const boxW = (pin.text || "").length * 7 + 10;
+        const inCircle = Math.hypot(x - pin.x, y - pin.y) <= 12;
+        const inBox = (x >= pin.x + 10 && x <= pin.x + 14 + boxW && y >= pin.y - 12 && y <= pin.y + 12);
+        if (inCircle || inBox) return pin;
+      }
+      return null;
+    }
+
+    function findHitTextMarkup(x, y) {
+      for (let i = state.markups.length - 1; i >= 0; i--) {
+        const m = state.markups[i];
+        if (m.tool !== "text" || !m.points || m.points.length === 0) continue;
+        const p0 = m.points[0];
+        const textW = (m.text || "").length * 8 + 10;
+        if (x >= p0.x - 6 && x <= p0.x + textW + 4 && y >= p0.y - 16 && y <= p0.y + 6) {
+          return m;
+        }
+      }
+      return null;
+    }
+
+    markupCanvas.addEventListener("mousedown", (e) => {
+      if (!markupCanvas.classList.contains("active")) return;
+      const rect = markupCanvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const txtInput = document.getElementById("markup-text-input");
+
+      if (state.activeTool === "pin") {
+        const hitPin = findHitPin(x, y);
+        if (hitPin) {
+          state.selectedPin = hitPin;
+          state.selectedMarkup = null;
+          if (txtInput) {
+            txtInput.value = hitPin.text;
+            txtInput.focus();
+            txtInput.select();
+          }
+          redrawMarkups();
+          switchTabPane("tab-pins");
+          const pinItem = document.querySelector(`.pin-item[data-id="${hitPin.id}"]`);
+          if (pinItem) {
+            pinItem.scrollIntoView({ block: "nearest" });
+            const pinInput = pinItem.querySelector(".pin-note-input");
+            if (pinInput) pinInput.focus();
+          }
+          state.isDrawing = false;
+          return;
+        }
+
+        // Empty area: add new pin
+        state.selectedPin = null;
+        addSpatialPin(x, y);
+        state.isDrawing = false;
+        return;
+      }
+
+      if (state.activeTool === "text") {
+        const hitText = findHitTextMarkup(x, y);
+        if (hitText) {
+          state.selectedMarkup = hitText;
+          state.selectedPin = null;
+          if (txtInput) {
+            txtInput.value = hitText.text || "";
+            txtInput.focus();
+            txtInput.select();
+          }
+          redrawMarkups();
+          state.isDrawing = false;
+          return;
+        }
+
+        // Empty area: add new text markup
+        state.selectedMarkup = null;
+        const note = (txtInput && txtInput.value.trim()) ? txtInput.value.trim() : ("Text " + (state.markups.length + 1));
+        const newMarkup = {
+          tool: "text",
+          color: state.activeColor,
+          width: state.strokeWidth,
+          text: note,
+          points: [{ x, y }],
+        };
+        state.markups.push(newMarkup);
+        state.selectedMarkup = newMarkup;
+        if (txtInput) {
+          txtInput.value = note;
+          txtInput.focus();
+          txtInput.select();
+        }
+        redrawMarkups();
+        state.isDrawing = false;
+        return;
+      }
+
+      state.selectedPin = null;
+      state.selectedMarkup = null;
+      state.isDrawing = true;
+      state.currentStroke = {
+        tool: state.activeTool,
+        color: state.activeColor,
+        width: state.strokeWidth,
+        points: [{ x, y }],
+      };
+    });
+
+    markupCanvas.addEventListener("mousemove", (e) => {
+      const rect = markupCanvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      if (state.isDrawing && state.currentStroke) {
+        state.currentStroke.points.push({ x, y });
+        redrawMarkups();
+        renderLiveStroke(state.currentStroke);
+        return;
+      }
+
+      if (state.activeTool === "pin") {
+        const hitPin = findHitPin(x, y);
+        if (hitPin !== state.hoveredPin) {
+          state.hoveredPin = hitPin;
+          markupCanvas.style.cursor = hitPin ? "pointer" : "crosshair";
+          redrawMarkups();
+        }
+      } else if (state.activeTool === "text") {
+        const hitText = findHitTextMarkup(x, y);
+        if (hitText !== state.hoveredMarkup) {
+          state.hoveredMarkup = hitText;
+          markupCanvas.style.cursor = hitText ? "pointer" : "crosshair";
+          redrawMarkups();
+        }
+      } else {
+        markupCanvas.style.cursor = "crosshair";
+      }
+    });
+
+    markupCanvas.addEventListener("mouseup", () => {
+      if (state.isDrawing && state.currentStroke) {
+        state.markups.push(state.currentStroke);
+        state.currentStroke = null;
+        redrawMarkups();
+      }
+      state.isDrawing = false;
+    });
+
+    function redrawMarkups() {
+      markupCtx.clearRect(0, 0, markupCanvas.width, markupCanvas.height);
+      state.markups.forEach((m) => renderLiveStroke(m));
+      renderAnnotations();
+    }
+
+    function renderLiveStroke(stroke) {
+      if (!stroke.points || stroke.points.length === 0) return;
+      markupCtx.strokeStyle = stroke.color;
+      markupCtx.lineWidth = stroke.width;
+      markupCtx.fillStyle = stroke.color;
+
+      const p0 = stroke.points[0];
+      const pN = stroke.points[stroke.points.length - 1];
+
+      if (stroke.tool === "pen") {
+        markupCtx.beginPath();
+        markupCtx.moveTo(p0.x, p0.y);
+        for (let i = 1; i < stroke.points.length; i++) {
+          markupCtx.lineTo(stroke.points[i].x, stroke.points[i].y);
+        }
+        markupCtx.stroke();
+      } else if (stroke.tool === "line" || stroke.tool === "arrow") {
+        markupCtx.beginPath();
+        markupCtx.moveTo(p0.x, p0.y);
+        markupCtx.lineTo(pN.x, pN.y);
+        markupCtx.stroke();
+        if (stroke.tool === "arrow") {
+          const angle = Math.atan2(pN.y - p0.y, pN.x - p0.x);
+          markupCtx.beginPath();
+          markupCtx.moveTo(pN.x, pN.y);
+          markupCtx.lineTo(pN.x - 12 * Math.cos(angle - Math.PI / 6), pN.y - 12 * Math.sin(angle - Math.PI / 6));
+          markupCtx.lineTo(pN.x - 12 * Math.cos(angle + Math.PI / 6), pN.y - 12 * Math.sin(angle + Math.PI / 6));
+          markupCtx.fill();
+        }
+      } else if (stroke.tool === "rect") {
+        markupCtx.strokeRect(p0.x, p0.y, pN.x - p0.x, pN.y - p0.y);
+      } else if (stroke.tool === "circle") {
+        const rx = Math.abs(pN.x - p0.x) / 2;
+        const ry = Math.abs(pN.y - p0.y) / 2;
+        const cx = p0.x + (pN.x - p0.x) / 2;
+        const cy = p0.y + (pN.y - p0.y) / 2;
+        markupCtx.beginPath();
+        markupCtx.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI);
+        markupCtx.stroke();
+      } else if (stroke.tool === "text") {
+        const isSelected = state.selectedMarkup === stroke;
+        const isHovered = state.hoveredMarkup === stroke;
+        markupCtx.font = "bold 13px monospace";
+        markupCtx.fillStyle = stroke.color;
+        markupCtx.fillText(stroke.text || "", p0.x, p0.y);
+
+        if (isSelected || isHovered) {
+          const textW = (stroke.text || "").length * 8 + 10;
+          markupCtx.strokeStyle = isSelected ? "#38bdf8" : "#ffb800";
+          markupCtx.lineWidth = isSelected ? 2 : 1;
+          markupCtx.setLineDash([4, 2]);
+          markupCtx.strokeRect(p0.x - 4, p0.y - 14, textW, 18);
+          markupCtx.setLineDash([]);
+        }
+      }
+    }
+
+    function addSpatialPin(x, y) {
+      const txtInput = document.getElementById("markup-text-input");
+      const note = (txtInput && txtInput.value.trim()) ? txtInput.value.trim() : ("Pin #" + state.nextPinId);
+      const pin = {
+        id: state.nextPinId++,
+        x: x,
+        y: y,
+        z: 0.0,
+        text: note,
+      };
+      state.annotations.push(pin);
+      state.selectedPin = pin;
+      state.selectedMarkup = null;
+      if (txtInput) {
+        txtInput.value = note;
+        txtInput.focus();
+        txtInput.select();
+      }
+      redrawMarkups();
+      updatePinsList();
+      switchTabPane("tab-pins");
+    }
+
+    function renderAnnotations() {
+      state.annotations.forEach((pin) => {
+        const isSelected = state.selectedPin && state.selectedPin.id === pin.id;
+        const isHovered = state.hoveredPin && state.hoveredPin.id === pin.id;
+
+        markupCtx.fillStyle = isSelected ? "#38bdf8" : (isHovered ? "#ffb800" : "#ffaa00");
+        markupCtx.beginPath();
+        markupCtx.arc(pin.x, pin.y, isSelected ? 10 : 8, 0, 2 * Math.PI);
+        markupCtx.fill();
+
+        if (isSelected) {
+          markupCtx.strokeStyle = "#38bdf8";
+          markupCtx.lineWidth = 2;
+          markupCtx.beginPath();
+          markupCtx.arc(pin.x, pin.y, 14, 0, 2 * Math.PI);
+          markupCtx.stroke();
+        }
+
+        markupCtx.fillStyle = "#000";
+        markupCtx.font = "bold 9px monospace";
+        markupCtx.fillText("#" + pin.id, pin.x - 5, pin.y + 3);
+
+        const boxW = (pin.text || "").length * 7 + 10;
+        markupCtx.fillStyle = "rgba(18, 12, 8, 0.92)";
+        markupCtx.fillRect(pin.x + 12, pin.y - 10, boxW, 18);
+
+        markupCtx.strokeStyle = isSelected ? "#38bdf8" : (isHovered ? "#ffb800" : "#c87a32");
+        markupCtx.lineWidth = isSelected ? 2 : 1;
+        if (isSelected) {
+          markupCtx.setLineDash([4, 2]);
+        } else {
+          markupCtx.setLineDash([]);
+        }
+        markupCtx.strokeRect(pin.x + 12, pin.y - 10, boxW, 18);
+        markupCtx.setLineDash([]);
+
+        markupCtx.fillStyle = isSelected ? "#38bdf8" : "#dedede";
+        markupCtx.font = "bold 11px monospace";
+        markupCtx.fillText(pin.text, pin.x + 16, pin.y + 3);
+      });
+    }
+
+    function updatePinsList() {
+      const pinsEl = document.getElementById("pins-list");
+      pinsEl.innerHTML = "";
+      if (state.annotations.length === 0) {
+        pinsEl.innerHTML = "<div style='color: var(--quake-text-muted); font-size: 11px;'>No pins placed yet. Use the 📍 Pin tool on the viewport.</div>";
+        return;
+      }
+      state.annotations.forEach((pin) => {
+        const item = document.createElement("div");
+        const isSelected = state.selectedPin && state.selectedPin.id === pin.id;
+        item.className = "pin-item" + (isSelected ? " selected" : "");
+        item.setAttribute("data-id", pin.id);
+        item.style.padding = "6px 8px";
+        item.style.background = isSelected ? "#261a0f" : "#1b120a";
+        item.style.border = isSelected ? "1px solid var(--quake-cyan)" : "1px solid var(--quake-border-mid)";
+        item.style.borderRadius = "4px";
+        item.style.fontSize = "11px";
+        item.style.marginBottom = "6px";
+        item.style.display = "flex";
+        item.style.flexDirection = "column";
+        item.style.gap = "4px";
+        item.style.cursor = "pointer";
+
+        item.onclick = (e) => {
+          if (e.target === input || e.target === delBtn) return;
+          state.selectedPin = pin;
+          state.selectedMarkup = null;
+          const txtInput = document.getElementById("markup-text-input");
+          if (txtInput) {
+            txtInput.value = pin.text;
+            txtInput.focus();
+            txtInput.select();
+          }
+          redrawMarkups();
+          updatePinsList();
+        };
+
+        const topRow = document.createElement("div");
+        topRow.style.display = "flex";
+        topRow.style.justifyContent = "space-between";
+        topRow.style.alignItems = "center";
+
+        const label = document.createElement("span");
+        label.style.color = isSelected ? "var(--quake-cyan)" : "var(--quake-gold)";
+        label.style.fontWeight = "700";
+        label.textContent = "Pin #" + pin.id;
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "hud-btn";
+        delBtn.style.padding = "1px 5px";
+        delBtn.style.fontSize = "9px";
+        delBtn.textContent = "✕";
+        delBtn.onclick = (e) => {
+          e.stopPropagation();
+          state.annotations = state.annotations.filter(p => p.id !== pin.id);
+          if (state.selectedPin && state.selectedPin.id === pin.id) {
+            state.selectedPin = null;
+          }
+          redrawMarkups();
+          updatePinsList();
+        };
+
+        topRow.appendChild(label);
+        topRow.appendChild(delBtn);
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "form-input pin-note-input";
+        input.value = pin.text;
+        input.style.width = "100%";
+        input.style.fontSize = "11px";
+        input.style.padding = "3px 5px";
+        input.title = "Edit pin note";
+        input.oninput = (e) => {
+          pin.text = e.target.value;
+          const txtInput = document.getElementById("markup-text-input");
+          if (state.selectedPin && state.selectedPin.id === pin.id && txtInput && txtInput.value !== pin.text) {
+            txtInput.value = pin.text;
+          }
+          redrawMarkups();
+        };
+
+        item.appendChild(topRow);
+        item.appendChild(input);
+        pinsEl.appendChild(item);
+      });
+    }
+
+    function clearMarkups() {
+      state.markups = [];
+      state.annotations = [];
+      redrawMarkups();
+      updatePinsList();
+      showToast("Markups cleared.", 1500);
+    }
+
+    function undoMarkup() {
+      if (state.markups.length > 0) {
+        state.markups.pop();
+        redrawMarkups();
+        showToast("Undid last stroke.", 1200);
+      }
+    }
+
+    // TARGET BUG MODAL & WORKFLOW
+    function openTargetBugModal() {
+      const modal = document.getElementById("modal-bug");
+      document.getElementById("bug-title").value = `[${state.currentProject}/${state.currentTarget}] Defect in ${state.currentMode} view`;
+      document.getElementById("bug-comp").value = state.currentProject;
+      document.getElementById("bug-cat").value = state.currentMode === "PCB" ? "PCB" : "CAD";
+      document.getElementById("bug-steps").value = `python tools/scope.py ${state.currentProject}/${state.currentTarget}:${state.currentMode.toLowerCase()}`;
+
+      let desc = `Observed visual defect in ${state.currentMode} mode.\nTarget: ${state.currentProject}/${state.currentTarget}\n`;
+      if (state.annotations.length > 0) {
+        desc += `\nAnnotations:\n` + state.annotations.map(a => `- Pin #${a.id}: ${a.text}`).join("\n");
+      }
+      document.getElementById("bug-desc").value = desc;
+
+      // Capture composited snapshot (WebGL canvas + 2D markup canvas)
+      const snapshot = captureCompositedCanvas();
+      document.getElementById("bug-snapshot-preview").src = snapshot;
+
+      modal.classList.add("visible");
+    }
+
+    function captureCompositedCanvas() {
+      const compositeCanvas = document.createElement("canvas");
+      compositeCanvas.width = markupCanvas.width || container.clientWidth || 800;
+      compositeCanvas.height = markupCanvas.height || container.clientHeight || 600;
+      const ctx = compositeCanvas.getContext("2d");
+
+      // Synchronously render the Three.js scene so drawing buffer has active pixels
+      if (state.viewer && state.viewer.renderer && state.viewer.rendered && state.viewer.rendered.scene && state.viewer.rendered.camera) {
+        const threeCamera = typeof state.viewer.rendered.camera.getCamera === "function"
+          ? state.viewer.rendered.camera.getCamera()
+          : state.viewer.rendered.camera;
+        if (state.viewer._studioManager && state.viewer._studioManager.hasComposer) {
+          state.viewer._studioManager.render();
+        } else {
+          state.viewer.renderer.render(state.viewer.rendered.scene, threeCamera);
+        }
+      }
+
+      // Draw WebGL canvas
+      const webglCanvas = container.querySelector("canvas");
+      if (webglCanvas) {
+        ctx.drawImage(webglCanvas, 0, 0, compositeCanvas.width, compositeCanvas.height);
+      }
+      // Draw 2D markup canvas
+      if (markupCanvas && markupCanvas.width > 0 && markupCanvas.height > 0) {
+        ctx.drawImage(markupCanvas, 0, 0);
+      }
+
+      return compositeCanvas.toDataURL("image/png");
+    }
+
+    async function submitBugReport() {
+      const payload = {
+        project: state.currentProject,
+        target: state.currentTarget,
+        subassembly: state.currentSub || null,
+        mode: state.currentMode,
+        title: document.getElementById("bug-title").value,
+        severity: document.getElementById("bug-severity").value,
+        category: document.getElementById("bug-cat").value,
+        description: document.getElementById("bug-desc").value,
+        reproduction_steps: document.getElementById("bug-steps").value,
+        image_base64: captureCompositedCanvas(),
+        annotations: state.annotations,
+        markups: state.markups.map(m => ({
+          type: m.tool,
+          color: m.color,
+          stroke_width: m.width,
+          data: { points: m.points }
+        })),
+      };
+
+      showToast("Filing bug into Forge...", 2000);
+      try {
+        const resp = await fetch("/api/scope/target_bug", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const result = await resp.json();
+        if (resp.ok) {
+          document.getElementById("modal-bug").classList.remove("visible");
+          showToast(`✨ Filed Bug [${result.bug_id}] successfully! Saved to ${result.markdown_path}`, 5000);
+        } else {
+          showToast(`Bug file error: ${result.error}`, 4000);
+        }
+      } catch (err) {
+        showToast(`Request failed: ${err}`, 4000);
+      }
+    }
+
+    function toggleShortcuts(show) {
+      const hud = document.getElementById("cad-shortcuts-hud");
+      const btn = document.getElementById("btn-shortcuts");
+      if (!hud) return;
+      const isVisible = show !== undefined ? show : !hud.classList.contains("visible");
+      hud.classList.toggle("visible", isVisible);
+      if (btn) btn.classList.toggle("active", isVisible);
+    }
+    const toggleShortcutsModal = toggleShortcuts;
+
+    // SIMULATION ENGINE & FLUID DYNAMICS PARTICLES (BUG-LUSTROUS-MANTIS-333)
+    let simParticlesMesh = null;
+    let simParticlesData = [];
+
+    function initSimulationParticles() {
+      if (!state.viewer || !state.viewer.rendered || !state.viewer.rendered.scene) return;
+      if (simParticlesMesh) {
+        state.viewer.rendered.scene.remove(simParticlesMesh);
+        if (simParticlesMesh.geometry) simParticlesMesh.geometry.dispose();
+        if (simParticlesMesh.material) simParticlesMesh.material.dispose();
+        simParticlesMesh = null;
+      }
+      if (state.currentMode !== "SIMULATE") return;
+
+      const PARTICLE_COUNT = 600;
+      const positions = new Float32Array(PARTICLE_COUNT * 3);
+      const colors = new Float32Array(PARTICLE_COUNT * 3);
+      simParticlesData = [];
+
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        const progress = (i / PARTICLE_COUNT + Math.random() * 0.02) % 1.0;
+        const meta = {
+          progress: progress,
+          speed: 0.0035 + Math.random() * 0.002,
+          radiusOffset: (Math.random() - 0.5) * 8,
+          angleOffset: Math.random() * Math.PI * 2,
+        };
+        simParticlesData.push(meta);
+
+        const pt = getFountainTrajectoryPoint(progress, meta);
+        positions[i * 3] = pt.x;
+        positions[i * 3 + 1] = pt.y;
+        positions[i * 3 + 2] = pt.z;
+
+        colors[i * 3] = 0.2 + Math.random() * 0.1;
+        colors[i * 3 + 1] = 0.7 + Math.random() * 0.2;
+        colors[i * 3 + 2] = 0.95;
+      }
+
+      const geometry = new window.THREE.BufferGeometry();
+      geometry.setAttribute("position", new window.THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute("color", new window.THREE.BufferAttribute(colors, 3));
+
+      const material = new window.THREE.PointsMaterial({
+        size: 3.5,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.88,
+        depthWrite: false,
+      });
+
+      simParticlesMesh = new window.THREE.Points(geometry, material);
+      simParticlesMesh.name = "simulation_water_particles";
+      state.viewer.rendered.scene.add(simParticlesMesh);
+      if (typeof state.viewer.update === "function") {
+        state.viewer.update(false, false);
+      }
+    }
+
+    function getFountainTrajectoryPoint(t, meta) {
+      let x = 0, y = 28, z = 41;
+      const FLOOR_Z = 41.0;
+      const TUBE_TOP_Z = 107.0;
+      const DOME_APEX_Z = 114.5;
+      const LID_TRAY_Z = 105.0;
+      const POOL_SURFACE_Z = 68.0;
+      const TUBE_Y = 28.0;
+
+      if (t < 0.22) {
+        // Phase 1: Fluid enters pump volute at (0, 0, 44), passes to tube base (0, 28, 44),
+        // and ascends vertically through the delivery tube bore to spout exit (0, 28, 107)
+        const u = t / 0.22;
+        if (u < 0.15) {
+          const sub = u / 0.15;
+          x = (Math.random() - 0.5) * 4.0;
+          y = sub * TUBE_Y;
+          z = FLOOR_Z + 3.0 + sub * 2.0;
+        } else {
+          const sub = (u - 0.15) / 0.85;
+          z = FLOOR_Z + 5.0 + sub * (TUBE_TOP_Z - (FLOOR_Z + 5.0));
+          const rad = 4.5;
+          x = Math.cos(meta.angleOffset + sub * 5.0) * (rad * 0.7);
+          y = TUBE_Y + Math.sin(meta.angleOffset + sub * 5.0) * (rad * 0.7);
+        }
+      } else if (t < 0.32) {
+        // Phase 2: Erupting from spout dome at (0, 28, 107) arching outward up to apex Z=114.5
+        const u = (t - 0.22) / 0.10;
+        z = TUBE_TOP_Z + Math.sin(u * Math.PI) * (DOME_APEX_Z - TUBE_TOP_Z) - u * 2.0;
+        const spread = 6.0 + u * 20.0;
+        x = Math.cos(meta.angleOffset) * spread;
+        y = TUBE_Y + Math.sin(meta.angleOffset) * spread;
+      } else if (t < 0.62) {
+        // Phase 3: Flowing across lid drinking tray at Z ≈ 105.0 towards outer rim (R ≈ 78mm)
+        const u = (t - 0.32) / 0.30;
+        z = LID_TRAY_Z - u * 1.0;
+        const startX = Math.cos(meta.angleOffset) * 26.0;
+        const startY = TUBE_Y + Math.sin(meta.angleOffset) * 26.0;
+        const endR = 76.0 + Math.sin(meta.angleOffset * 2.0) * 4.0;
+        const endX = Math.cos(meta.angleOffset) * endR;
+        const endY = Math.sin(meta.angleOffset) * endR;
+        x = startX * (1 - u) + endX * u;
+        y = startY * (1 - u) + endY * u;
+      } else if (t < 0.82) {
+        // Phase 4: Falling waterfall cascade down into reservoir pool (Z: 104 -> 68)
+        const u = (t - 0.62) / 0.20;
+        const r = 78.0 + Math.sin(u * Math.PI * 0.5) * 3.0;
+        z = (LID_TRAY_Z - 1.0) - (u * u) * (LID_TRAY_Z - 1.0 - POOL_SURFACE_Z);
+        x = Math.cos(meta.angleOffset) * r;
+        y = Math.sin(meta.angleOffset) * r;
+      } else {
+        // Phase 5: Swirling within reservoir pool (Z: 44.0 to 68.0, strictly above floor_z = 41.0)
+        // returning to pump intake at (0, 0)
+        const u = (t - 0.82) / 0.18;
+        z = POOL_SURFACE_Z * (1 - u) + (FLOOR_Z + 4.0) * u + Math.sin(u * Math.PI * 2.0) * 1.5;
+        const r = 78.0 * (1 - u) + 4.0 * u;
+        const angle = meta.angleOffset + u * 3.5;
+        x = Math.cos(angle) * r;
+        y = Math.sin(angle) * r;
+      }
+      return { x, y, z };
+    }
+
+    function updateSimulationStep(step) {
+      state.simStep = step;
+      const maxSteps = state.maxSteps || 1000;
+      const slider = document.getElementById("sim-step-slider");
+      const valLabel = document.getElementById("sim-step-val");
+      if (slider) {
+        if (parseInt(slider.max) !== maxSteps) slider.max = maxSteps;
+        if (parseInt(slider.value) !== step) slider.value = step;
+      }
+      if (valLabel) valLabel.textContent = `Step: ${step} / ${maxSteps}`;
+
+      // Update active log chip
+      document.querySelectorAll(".sim-log-chip").forEach(chip => {
+        const chipStep = parseInt(chip.dataset.step);
+        chip.classList.toggle("active", Math.abs(chipStep - step) < (maxSteps * 0.08));
+      });
+
+      // Highlight active row in Rerun logs list
+      document.querySelectorAll(".rerun-log-row").forEach(row => {
+        const rowStep = parseInt(row.dataset.step);
+        const match = Math.abs(rowStep - step) < 60;
+        row.classList.toggle("active", match);
+        row.style.borderColor = match ? "var(--quake-cyan)" : "var(--quake-border)";
+        row.style.background = match ? "rgba(56, 189, 248, 0.15)" : "rgba(0,0,0,0.35)";
+      });
+
+      // Update flow metrics readout
+      const metricsEl = document.getElementById("sim-flow-metrics");
+      if (metricsEl) {
+        const flowSpout = Math.min(240, Math.round(step * (240 / (maxSteps * 0.35))));
+        const waterfallThreshold = maxSteps * 0.45;
+        const flowWaterfall = step > waterfallThreshold ? Math.min(195, Math.round((step - waterfallThreshold) * (195 / (maxSteps * 0.35)))) : 0;
+        const poolVol = (1.5 + (step / maxSteps) * 0.35).toFixed(2);
+        metricsEl.textContent = `Spout: ${flowSpout} mL/s | Waterfall: ${flowWaterfall} mL/s | Reservoir: ${poolVol} L`;
+      }
+
+      // Animate impeller rotation
+      if (state.viewer && state.viewer.rendered && state.viewer.rendered.scene) {
+        state.viewer.rendered.scene.traverse((obj) => {
+          const lower = (obj.name || "").toLowerCase();
+          if (lower.includes("impeller") || lower.includes("motor") || lower.includes("hub") || lower.includes("rotor")) {
+            obj.rotation.z = step * 0.08;
+          }
+        });
+      }
+
+      // Animate fluid particles
+      if (simParticlesMesh && simParticlesData.length > 0) {
+        const posAttr = simParticlesMesh.geometry.attributes.position;
+        const arr = posAttr.array;
+        for (let i = 0; i < simParticlesData.length; i++) {
+          const meta = simParticlesData[i];
+          meta.progress = (meta.progress + meta.speed) % 1.0;
+          const pt = getFountainTrajectoryPoint(meta.progress, meta);
+          arr[i * 3] = pt.x;
+          arr[i * 3 + 1] = pt.y;
+          arr[i * 3 + 2] = pt.z;
+        }
+        posAttr.needsUpdate = true;
+      }
+
+      // Force canvas repaint in Three-CAD-Viewer
+      if (state.viewer && typeof state.viewer.update === "function") {
+        state.viewer.update(false, false);
+      }
+    }
+
+    function toggleSimPlay() {
+      state.simPlaying = !state.simPlaying;
+      const playBtn = document.getElementById("btn-sim-play");
+      if (playBtn) {
+        playBtn.textContent = state.simPlaying ? "⏸ Pause" : "▶ Play";
+      }
+      if (state.simPlaying) {
+        if (!simParticlesMesh) initSimulationParticles();
+        runSimLoop();
+      }
+    }
+
+    function runSimLoop() {
+      if (!state.simPlaying) return;
+      const maxSteps = state.maxSteps || 1000;
+      const nextStep = (state.simStep + 3) % maxSteps;
+      updateSimulationStep(nextStep);
+      setTimeout(runSimLoop, 30);
+    }
+
+    // RERUN LOGS SYSTEM (BUG-JUMPING-INSTAR-950)
+    const RERUN_LOGS = [
+      { step: 0, time: "0.00s", level: "INFO", entity: "world/cat_fountain", msg: "SPH simulation domain initialized. Reservoir pool: 1.50 L, 600 active particles." },
+      { step: 100, time: "0.40s", level: "INFO", entity: "cat_fountain/impeller", msg: "Impeller volute spin-up: 1800 RPM. Centrifugal pressure head established." },
+      { step: 200, time: "0.80s", level: "METRIC", entity: "metrics/flow_spout", msg: "Spout eruption: first fluid particles exit vertical tube dome at (0, 28, 107). Flow: 50 mL/s." },
+      { step: 350, time: "1.40s", level: "INFO", entity: "cat_fountain/lid", msg: "Lid drinking tray wetting front reached R=45mm." },
+      { step: 450, time: "1.80s", level: "METRIC", entity: "metrics/flow_tube", msg: "Continuous laminar fluid sheet formed across lid platform at Z=105mm." },
+      { step: 600, time: "2.40s", level: "INFO", entity: "cat_fountain/rim", msg: "Fluid front reaches perimeter rim R=78mm. Waterfall cascade initiation." },
+      { step: 700, time: "2.80s", level: "METRIC", entity: "metrics/flow_waterfall", msg: "Waterfall drainage into reservoir pool active: 110 mL/s. Front cutout drain: 25 mL/s." },
+      { step: 850, time: "3.40s", level: "INFO", entity: "cat_fountain/volute", msg: "Closed-loop recirculation established. Suction return at pump intake Z=44mm." },
+      { step: 950, time: "3.80s", level: "METRIC", entity: "metrics/reservoir_volume", msg: "Steady-state equilibrium reached: 240 mL/s circulation, pool volume 1.83 L, zero leakage." },
+      { step: 1000, time: "4.00s", level: "INFO", entity: "world/cat_fountain", msg: "Full simulation cycle completed. Tait EOS numerical stability verified." }
+    ];
+
+    function renderRerunLogs(query = "") {
+      const container = document.getElementById("rerun-logs-list");
+      const countEl = document.getElementById("rerun-logs-count");
+      const clearBtn = document.getElementById("btn-rerun-clear-filter");
+      if (!container) return;
+
+      const q = (query || "").trim().toLowerCase();
+      if (clearBtn) clearBtn.style.display = q ? "inline-block" : "none";
+
+      const filtered = RERUN_LOGS.filter(item => {
+        if (!q) return true;
+        return (
+          item.step.toString().includes(q) ||
+          item.time.toLowerCase().includes(q) ||
+          item.level.toLowerCase().includes(q) ||
+          item.entity.toLowerCase().includes(q) ||
+          item.msg.toLowerCase().includes(q)
+        );
+      });
+
+      if (countEl) {
+        countEl.textContent = `${filtered.length} of ${RERUN_LOGS.length} milestones`;
+      }
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div style="padding: 12px; color: var(--quake-text-muted); text-align: center; font-size: 11px;">No rerun logs matching "${query}"</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(item => {
+        const isActive = Math.abs(item.step - (state.simStep || 0)) < 60;
+        const levelColor = item.level === "METRIC" ? "#38bdf8" : (item.level === "WARN" ? "#f59e0b" : "#34d399");
+        const levelBg = item.level === "METRIC" ? "rgba(56, 189, 248, 0.12)" : (item.level === "WARN" ? "rgba(245, 158, 11, 0.12)" : "rgba(52, 211, 153, 0.12)");
+        return `
+          <div class="rerun-log-row ${isActive ? 'active' : ''}" data-step="${item.step}" style="padding: 6px 8px; border: 1px solid ${isActive ? 'var(--quake-cyan)' : 'var(--quake-border)'}; background: ${isActive ? 'rgba(56, 189, 248, 0.15)' : 'rgba(0,0,0,0.35)'}; border-radius: 4px; cursor: pointer; transition: all 0.15s ease-out;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; font-size: 10px;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="font-family: var(--font-mono); font-weight: 700; color: var(--quake-cyan);">Step ${item.step}</span>
+                <span style="color: var(--quake-text-muted); font-size: 9px;">(${item.time})</span>
+              </div>
+              <span style="padding: 1px 4px; background: ${levelBg}; border: 1px solid ${levelColor}; border-radius: 2px; color: ${levelColor}; font-weight: 700; font-size: 8.5px;">${item.level}</span>
+            </div>
+            <div style="font-size: 10px; color: var(--quake-gold); font-family: var(--font-mono); margin-bottom: 2px;">${item.entity}</div>
+            <div style="font-size: 10.5px; color: var(--quake-text); line-height: 1.35;">${item.msg}</div>
+          </div>
+        `;
+      }).join("");
+
+      container.querySelectorAll(".rerun-log-row").forEach(row => {
+        row.addEventListener("click", () => {
+          const step = parseInt(row.dataset.step);
+          if (!simParticlesMesh) initSimulationParticles();
+          updateSimulationStep(step);
+          showToast(`Scrubbed to Step ${step} (${row.querySelector("div:last-child").textContent.slice(0, 36)}...)`);
+        });
+      });
+    }
+
+    // PROJECT CHOOSER MODAL (GOAL 1: Run scope.py with no args)
+    function setChooserLoading(isLoading, text = "", percent = 0) {
+      const container = document.getElementById("chooser-loading-container");
+      const textEl = document.getElementById("chooser-loading-text");
+      const pctEl = document.getElementById("chooser-loading-percent");
+      const barEl = document.getElementById("chooser-loading-bar");
+      const submitBtn = document.getElementById("btn-chooser-submit");
+      const projSel = document.getElementById("chooser-project");
+      const targetSel = document.getElementById("chooser-target");
+      const subSel = document.getElementById("chooser-sub");
+
+      if (container) {
+        container.style.display = isLoading ? "flex" : "none";
+      }
+      if (textEl && text) textEl.textContent = `◈ ${text}`;
+      if (pctEl) pctEl.textContent = `${Math.round(percent)}%`;
+      if (barEl) barEl.style.width = `${Math.min(100, Math.max(0, percent))}%`;
+
+      if (submitBtn) submitBtn.disabled = isLoading;
+      if (projSel) projSel.disabled = isLoading;
+      if (targetSel) targetSel.disabled = isLoading;
+      if (subSel) subSel.disabled = isLoading;
+    }
+
+    function openProjectChooserModal() {
+      const modal = document.getElementById("modal-project-chooser");
+      const projSel = document.getElementById("chooser-project");
+      const targetSel = document.getElementById("chooser-target");
+
+      if (state.projects.length === 0) {
+        projSel.innerHTML = '<option value="">(Loading workspace projects...)</option>';
+        targetSel.innerHTML = '<option value="">(Loading targets...)</option>';
+        setChooserLoading(true, "Scanning workspace projects and targets...", 35);
+      } else {
+        setChooserLoading(false);
+        projSel.innerHTML = "";
+        state.projects.forEach(p => {
+          const opt = document.createElement("option");
+          opt.value = p.name;
+          opt.textContent = p.name;
+          if (p.name === state.currentProject) opt.selected = true;
+          projSel.appendChild(opt);
+        });
+
+        if (!state.currentProject && state.projects.length > 0) {
+          state.currentProject = state.projects[0].name;
+          if (projSel.options.length > 0) projSel.selectedIndex = 0;
+        }
+
+        const maxStepsSel = document.getElementById("chooser-max-steps");
+        if (maxStepsSel && state.maxSteps) {
+          maxStepsSel.value = state.maxSteps.toString();
+        }
+
+        updateChooserTargets();
+      }
+
+      modal.classList.add("visible");
+    }
+
+    function closeProjectChooserModal() {
+      const modal = document.getElementById("modal-project-chooser");
+      modal.classList.remove("visible");
+    }
+
+    function updateChooserTargets() {
+      const projSel = document.getElementById("chooser-project");
+      const targetSel = document.getElementById("chooser-target");
+      const projName = projSel.value;
+      const proj = state.projects.find(p => p.name === projName);
+      targetSel.innerHTML = "";
+      if (!proj || !proj.targets) return;
+
+      proj.targets.forEach(t => {
+        const opt = document.createElement("option");
+        opt.value = t.name;
+        opt.textContent = t.name;
+        if (t.name === state.currentTarget) opt.selected = true;
+        targetSel.appendChild(opt);
+      });
+
+      if (!proj.targets.some(t => t.name === state.currentTarget) && proj.targets.length > 0) {
+        targetSel.selectedIndex = 0;
+      }
+
+      updateChooserModesAndSubs();
+    }
+
+    function updateChooserModesAndSubs() {
+      const projSel = document.getElementById("chooser-project");
+      const targetSel = document.getElementById("chooser-target");
+      const subSel = document.getElementById("chooser-sub");
+
+      const projName = projSel.value;
+      const targetName = targetSel.value;
+      const proj = state.projects.find(p => p.name === projName);
+      const target = proj?.targets?.find(t => t.name === targetName);
+
+      subSel.innerHTML = '<option value="">(None / Entire Target)</option>';
+      if (target && target.subassemblies) {
+        target.subassemblies.forEach(s => {
+          const opt = document.createElement("option");
+          opt.value = s;
+          opt.textContent = s;
+          if (s === state.currentSub) opt.selected = true;
+          subSel.appendChild(opt);
+        });
+      }
+
+      const availableModes = target?.modes || ["CAD"];
+      document.querySelectorAll("#chooser-mode-pills .mode-pill").forEach(pill => {
+        const isSupp = availableModes.includes(pill.dataset.mode);
+        pill.disabled = !isSupp;
+        pill.classList.toggle("disabled", !isSupp);
+        if (!isSupp && pill.classList.contains("active")) {
+          pill.classList.remove("active");
+        }
+      });
+
+      let activePill = document.querySelector("#chooser-mode-pills .mode-pill.active");
+      if (!activePill || activePill.disabled) {
+        const firstAvail = document.querySelector("#chooser-mode-pills .mode-pill:not(:disabled)");
+        if (firstAvail) {
+          document.querySelectorAll("#chooser-mode-pills .mode-pill").forEach(p => p.classList.remove("active"));
+          firstAvail.classList.add("active");
+          activePill = firstAvail;
+        }
+      }
+
+      const isSim = activePill && activePill.dataset.mode === "SIMULATE";
+      const simStepsContainer = document.getElementById("chooser-sim-steps-container");
+      if (simStepsContainer) {
+        simStepsContainer.style.display = isSim ? "block" : "none";
+      }
+    }
+
+    function updateModePillsForActiveTarget() {
+      const proj = state.projects.find(p => p.name === state.currentProject);
+      const target = proj?.targets?.find(t => t.name === state.currentTarget);
+      const availableModes = target?.modes || ["CAD"];
+
+      document.querySelectorAll(".mode-pills .mode-pill").forEach(pill => {
+        if (pill.closest("#modal-project-chooser")) return;
+        const pillMode = pill.dataset.mode;
+        const isSupported = availableModes.includes(pillMode);
+        pill.disabled = !isSupported;
+        pill.classList.toggle("disabled", !isSupported);
+        if (!isSupported && pill.classList.contains("active")) {
+          pill.classList.remove("active");
+        }
+      });
+
+      // If current mode is not supported on this target, auto-select first available mode
+      if (!availableModes.includes(state.currentMode)) {
+        state.currentMode = availableModes[0] || "CAD";
+      }
+
+      // Update active pill styling
+      document.querySelectorAll(".mode-pills .mode-pill").forEach(pill => {
+        if (pill.closest("#modal-project-chooser")) return;
+        pill.classList.toggle("active", pill.dataset.mode === state.currentMode);
+      });
+
+      // Update sim-bar visibility
+      const simBar = document.getElementById("sim-bar");
+      if (simBar) {
+        simBar.classList.toggle("visible", state.currentMode === "SIMULATE");
+      }
+      document.body.className = "mode-" + state.currentMode.toLowerCase();
+    }
+
+    function updateActiveTargetHudBadge() {
+      const badge = document.getElementById("hud-active-target");
+      if (!badge) return;
+      if (state.currentProject && state.currentTarget) {
+        let label = `${state.currentProject} / ${state.currentTarget}`;
+        if (state.currentSub) {
+          label += ` : ${state.currentSub}`;
+        }
+        badge.textContent = label;
+      } else {
+        badge.textContent = "(Select Target)";
+      }
+    }
+
+    // PROJECT & TARGET INITIALIZATION
+    async function loadProjects(shouldLoadGeometry = true, showProgress = false, retryCount = 0) {
+      try {
+        setChooserLoading(true, "Discovering registered targets...", 60);
+        const resp = await fetch("/api/scope/projects");
+        if (!resp.ok) {
+          throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
+        }
+        const data = await resp.json();
+        state.projects = data.projects || [];
+
+        updateTargetsForActiveProject(shouldLoadGeometry, showProgress);
+
+        // Always populate Chooser modal dropdowns
+        const projSel = document.getElementById("chooser-project");
+        if (projSel && state.projects.length > 0) {
+          projSel.innerHTML = "";
+          state.projects.forEach(p => {
+            const opt = document.createElement("option");
+            opt.value = p.name;
+            opt.textContent = p.name;
+            if (p.name === state.currentProject) opt.selected = true;
+            projSel.appendChild(opt);
+          });
+
+          if (!state.currentProject && state.projects.length > 0) {
+            state.currentProject = state.projects[0].name;
+            if (projSel.options.length > 0) projSel.selectedIndex = 0;
+          }
+
+          updateChooserTargets();
+        }
+
+        setChooserLoading(false, "Targets ready", 100);
+      } catch (err) {
+        console.error("Scope load projects error:", err);
+        setChooserLoading(false, "Error loading targets", 0);
+        if (retryCount === 0 && showProgress) {
+          console.warn("Retrying projects fetch in 1s...");
+          await new Promise(r => setTimeout(r, 1000));
+          return loadProjects(shouldLoadGeometry, showProgress, 1);
+        }
+        showToast("Error loading projects: " + (err.message || err), 3000);
+      }
+    }
+
+    function updateTargetsForActiveProject(shouldLoadGeometry = true, showProgress = false) {
+      const proj = state.projects.find(p => p.name === state.currentProject);
+      if (!proj || !proj.targets) return;
+
+      if (!proj.targets.some(t => t.name === state.currentTarget) && proj.targets.length > 0) {
+        state.currentTarget = proj.targets[0].name;
+      }
+
+      updateActiveTargetHudBadge();
+      updateModePillsForActiveTarget();
+
+      if (shouldLoadGeometry) {
+        loadActiveGeometry(showProgress);
+      }
+    }
+
+    // UI SCALE MANAGEMENT
+    const UI_SCALES = ["75%", "80%", "90%", "100%", "110%", "125%", "150%"];
+    const UI_SCALE_KEY = "scope_ui_scale";
+
+    function applyUiScale(scale) {
+      if (!UI_SCALES.includes(scale)) {
+        scale = "100%";
+      }
+      const factor = parseInt(scale, 10) / 100;
+      if (document.documentElement) {
+        document.documentElement.style.zoom = factor;
+        if (factor === 1.0) {
+          document.documentElement.style.width = "";
+          document.documentElement.style.height = "";
+        } else {
+          document.documentElement.style.width = (window.innerWidth / factor) + "px";
+          document.documentElement.style.height = (window.innerHeight / factor) + "px";
+        }
+      }
+      try {
+        localStorage.setItem(UI_SCALE_KEY, scale);
+      } catch (e) {}
+      const sel = document.getElementById("uiScaleSelect");
+      if (sel && sel.value !== scale) {
+        sel.value = scale;
+      }
+      resizeViewport();
+      window.dispatchEvent(new Event("resize"));
+    }
+
+    function onUiScaleChange(scale) {
+      applyUiScale(scale);
+    }
+
+    function adjustUiScale(delta) {
+      let current = "100%";
+      try {
+        current = localStorage.getItem(UI_SCALE_KEY) || "100%";
+      } catch (e) {}
+      let idx = UI_SCALES.indexOf(current);
+      if (idx === -1) idx = UI_SCALES.indexOf("100%");
+      const nextIdx = Math.max(0, Math.min(UI_SCALES.length - 1, idx + delta));
+      applyUiScale(UI_SCALES[nextIdx]);
+    }
+
+    function resetUiScale() {
+      applyUiScale("100%");
+    }
+
+    function initUiScale() {
+      let saved = "100%";
+      try {
+        saved = localStorage.getItem(UI_SCALE_KEY) || "100%";
+      } catch (e) {}
+      applyUiScale(saved);
+    }
+
+    // VERTICAL PANEL RESIZER / GRIPPER
+    function initSidebarResizer() {
+      const resizer = document.getElementById("sidebar-resizer");
+      const sidebar = document.getElementById("sidebar");
+      if (!resizer || !sidebar) return;
+
+      let isResizing = false;
+      let startX = 0;
+      let startWidth = 0;
+
+      // Restore saved width from localStorage if valid
+      const savedWidth = localStorage.getItem("scope_sidebar_width");
+      if (savedWidth) {
+        const parsed = parseInt(savedWidth, 10);
+        if (parsed >= 180 && parsed <= 800) {
+          sidebar.style.width = parsed + "px";
+        }
+      }
+
+      resizer.addEventListener("mousedown", (e) => {
+        isResizing = true;
+        startX = e.clientX;
+        startWidth = sidebar.offsetWidth;
+        resizer.classList.add("resizing");
+        document.body.style.cursor = "col-resize";
+        document.body.style.userSelect = "none";
+      });
+
+      window.addEventListener("mousemove", (e) => {
+        if (!isResizing) return;
+        const delta = e.clientX - startX;
+        let newWidth = startWidth + delta;
+        const minWidth = 180;
+        const maxWidth = Math.min(800, window.innerWidth - 300);
+        newWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+        sidebar.style.width = newWidth + "px";
+        resizeViewport();
+        window.dispatchEvent(new Event("resize"));
+      });
+
+      window.addEventListener("mouseup", () => {
+        if (!isResizing) return;
+        isResizing = false;
+        resizer.classList.remove("resizing");
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        localStorage.setItem("scope_sidebar_width", sidebar.offsetWidth);
+        resizeViewport();
+        window.dispatchEvent(new Event("resize"));
+      });
+
+      // Double-click to reset to default 320px
+      resizer.addEventListener("dblclick", () => {
+        sidebar.style.width = "320px";
+        localStorage.setItem("scope_sidebar_width", "320");
+        resizeViewport();
+        window.dispatchEvent(new Event("resize"));
+      });
+    }
+
+    // EVENT LISTENERS & DOM HOOKUPS
+    document.addEventListener("DOMContentLoaded", async () => {
+      try {
+        initUiScale();
+        initSidebarResizer();
+        initCadViewer();
+        updateActiveTargetHudBadge();
+
+        if (state.currentProject && state.currentTarget) {
+          showSyncProgress("INITIALIZING WORKSTATION");
+          updateSyncProgress(25, "Loading Workstation...", `Preparing ${state.currentProject}/${state.currentTarget}`);
+          await Promise.all([
+            loadProjects(false),
+            loadActiveGeometry(true),
+          ]);
+          hideSyncProgress();
+        } else {
+          // When run with no arguments, immediately pop up Target Chooser Modal before displaying anything
+          openProjectChooserModal();
+          await loadProjects(false);
+        }
+      } catch (err) {
+        hideSyncProgress();
+        showToast("Initialization error: " + err, 4000);
+      }
+
+      // Check for URL query parameter overrides
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.has("max_steps")) {
+        const parsedSteps = parseInt(urlParams.get("max_steps"));
+        if (!isNaN(parsedSteps) && parsedSteps > 0) {
+          state.maxSteps = parsedSteps;
+        }
+      }
+
+      // Chooser Modal Listeners
+      document.getElementById("btn-open-chooser")?.addEventListener("click", openProjectChooserModal);
+      document.getElementById("btn-close-chooser")?.addEventListener("click", closeProjectChooserModal);
+      document.getElementById("btn-chooser-cancel")?.addEventListener("click", closeProjectChooserModal);
+      document.getElementById("chooser-project")?.addEventListener("change", updateChooserTargets);
+      document.getElementById("chooser-target")?.addEventListener("change", updateChooserModesAndSubs);
+
+      document.querySelectorAll("#chooser-mode-pills .mode-pill").forEach(pill => {
+        pill.addEventListener("click", () => {
+          if (pill.disabled) return;
+          document.querySelectorAll("#chooser-mode-pills .mode-pill").forEach(p => p.classList.remove("active"));
+          pill.classList.add("active");
+          const isSim = pill.dataset.mode === "SIMULATE";
+          const simStepsContainer = document.getElementById("chooser-sim-steps-container");
+          if (simStepsContainer) {
+            simStepsContainer.style.display = isSim ? "block" : "none";
+          }
+        });
+      });
+
+      document.getElementById("btn-chooser-submit")?.addEventListener("click", async () => {
+        const projSel = document.getElementById("chooser-project");
+        const targetSel = document.getElementById("chooser-target");
+        const subSel = document.getElementById("chooser-sub");
+        const activePill = document.querySelector("#chooser-mode-pills .mode-pill.active");
+
+        const selectedProj = projSel.value;
+        const selectedTarget = targetSel.value;
+        if (!selectedProj || !selectedTarget) {
+          showToast("Please select a project and target to inspect", 3000);
+          return;
+        }
+
+        state.currentProject = selectedProj;
+        state.currentTarget = selectedTarget;
+        state.currentSub = subSel.value || "";
+        state.currentMode = activePill ? activePill.dataset.mode : "CAD";
+
+        if (state.currentMode === "SIMULATE") {
+          const stepsSel = document.getElementById("chooser-max-steps");
+          if (stepsSel) {
+            state.maxSteps = parseInt(stepsSel.value) || 1000;
+          }
+        }
+
+        closeProjectChooserModal();
+
+        updateActiveTargetHudBadge();
+        updateModePillsForActiveTarget();
+
+        // Update URL query params
+        const simStepsParam = state.currentMode === "SIMULATE" && state.maxSteps ? `&max_steps=${state.maxSteps}` : "";
+        const newUrl = `/?project=${encodeURIComponent(state.currentProject)}&target=${encodeURIComponent(state.currentTarget)}${state.currentSub ? '&subassembly=' + encodeURIComponent(state.currentSub) : ''}&mode=${encodeURIComponent(state.currentMode)}${simStepsParam}`;
+        window.history.pushState(null, "", newUrl);
+
+        showSyncProgress(`LOADING ${state.currentProject}/${state.currentTarget}`);
+        try {
+          await loadActiveGeometry(true);
+        } finally {
+          hideSyncProgress();
+        }
+      });
+
+      document.getElementById("btn-sync").addEventListener("click", async () => {
+        showSyncProgress("SYNCHRONIZING WORKSTATION");
+        try {
+          updateSyncProgress(20, "Invalidating Caches...", "Flushing provider manifests and geometry cache");
+          await fetch("/api/scope/sync");
+
+          updateSyncProgress(45, "Discovering Assets...", "Querying registered targets and components");
+          await loadProjects(false);
+
+          updateSyncProgress(70, "Compiling Geometry...", `Generating 3D model for ${state.currentTarget || state.currentProject}`);
+          await loadActiveGeometry(true);
+
+          updateSyncProgress(100, "Synchronized", "Workstation ready");
+          showToast("Workstation synchronized.", 2000);
+        } catch (err) {
+          showToast(`Sync failed: ${err}`, 4000);
+        } finally {
+          hideSyncProgress();
+        }
+      });
+
+      // Mode switch pills
+      document.querySelectorAll(".mode-pills .mode-pill").forEach(pill => {
+        if (pill.closest("#modal-project-chooser")) return;
+        pill.addEventListener("click", async () => {
+          if (pill.disabled) return;
+          document.querySelectorAll(".mode-pills .mode-pill").forEach(p => {
+            if (!p.closest("#modal-project-chooser")) p.classList.remove("active");
+          });
+          pill.classList.add("active");
+          state.currentMode = pill.dataset.mode;
+          document.body.className = "mode-" + state.currentMode.toLowerCase();
+
+          // Toggle Sim Bar
+          document.getElementById("sim-bar").classList.toggle("visible", state.currentMode === "SIMULATE");
+          updateSidebarModeTabs();
+          showSyncProgress(`SWITCHING TO ${state.currentMode} MODE`);
+          try {
+            await loadActiveGeometry(true);
+          } finally {
+            hideSyncProgress();
+          }
+        });
+      });
+
+      // Camera Toolbar Buttons
+      document.getElementById("cam-iso")?.addEventListener("click", () => setCameraPreset("iso"));
+      document.getElementById("cam-top")?.addEventListener("click", () => setCameraPreset("top"));
+      document.getElementById("cam-bottom")?.addEventListener("click", () => setCameraPreset("bottom"));
+      document.getElementById("cam-flip")?.addEventListener("click", flipPcbView);
+      document.getElementById("cam-front")?.addEventListener("click", () => setCameraPreset("front"));
+      document.getElementById("cam-right")?.addEventListener("click", () => setCameraPreset("right"));
+      document.getElementById("cam-ortho")?.addEventListener("click", toggleProjection);
+      document.getElementById("cam-wire")?.addEventListener("click", toggleWireframe);
+      document.getElementById("cam-focus")?.addEventListener("click", () => {
+        if (state.viewer && state.viewer.controls && state.viewer.controls.reset) state.viewer.controls.reset();
+      });
+
+      // PCB Layer & Mode Control Buttons
+      document.getElementById("btn-all-layers")?.addEventListener("click", () => setAllLayersVisible(true));
+      document.getElementById("btn-flip-pcb")?.addEventListener("click", flipPcbView);
+      const rulerBtn = document.getElementById("cam-ruler");
+      let rulerActive = false;
+      if (rulerBtn) {
+        rulerBtn.addEventListener("click", () => {
+          rulerActive = !rulerActive;
+          rulerBtn.classList.toggle("active", rulerActive);
+          if (state.display && typeof state.display.setTool === "function") {
+            state.display.setTool("distance", rulerActive);
+            if (state.display.clickButtons && state.display.clickButtons["distance"]) {
+              state.display.clickButtons["distance"].set(rulerActive);
+            }
+          }
+          showToast(rulerActive ? "Ruler tool active (mm): Click two points to measure distance" : "Ruler tool deactivated");
+        });
+      }
+
+      // Left Panel Display Controls (BUG-BRIGHT-STAGBEETLE-720)
+      document.getElementById("btn-view-iso")?.addEventListener("click", () => setCameraPreset("iso"));
+      document.getElementById("btn-view-top")?.addEventListener("click", () => setCameraPreset("top"));
+      document.getElementById("btn-view-front")?.addEventListener("click", () => setCameraPreset("front"));
+      document.getElementById("btn-view-right")?.addEventListener("click", () => setCameraPreset("right"));
+      document.getElementById("btn-view-bottom")?.addEventListener("click", () => setCameraPreset("bottom"));
+      document.getElementById("btn-view-left")?.addEventListener("click", () => setCameraPreset("left"));
+      document.getElementById("btn-view-ortho")?.addEventListener("click", toggleProjection);
+      document.getElementById("btn-view-wire")?.addEventListener("click", toggleWireframe);
+      document.getElementById("btn-view-axes")?.addEventListener("click", toggleAxes);
+      document.getElementById("btn-view-grid")?.addEventListener("click", toggleGrid);
+      document.getElementById("view-explode-slider")?.addEventListener("input", (e) => {
+        setExplode(e.target.value);
+      });
+
+      // Netlist Search & Clear Highlighting
+      document.getElementById("net-search")?.addEventListener("input", () => {
+        updateNetsList();
+      });
+      document.getElementById("btn-clear-net-highlight")?.addEventListener("click", () => {
+        clearNetHighlight();
+      });
+
+      // Markup Toolbar Toggles & Buttons
+      document.getElementById("btn-toggle-markup")?.addEventListener("click", () => {
+        const tb = document.getElementById("markup-toolbar");
+        tb.classList.toggle("visible");
+        markupCanvas.classList.toggle("active", tb.classList.contains("visible"));
+      });
+
+      document.querySelectorAll(".tool-btn[data-tool]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".tool-btn[data-tool]").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          state.activeTool = btn.dataset.tool;
+        });
+      });
+
+      document.querySelectorAll(".color-swatch").forEach(swatch => {
+        swatch.addEventListener("click", () => {
+          document.querySelectorAll(".color-swatch").forEach(s => s.classList.remove("active"));
+          swatch.classList.add("active");
+          state.activeColor = swatch.dataset.color;
+        });
+      });
+
+      document.getElementById("btn-clear-markup")?.addEventListener("click", clearMarkups);
+      document.getElementById("btn-undo-markup")?.addEventListener("click", undoMarkup);
+
+      // Shortcuts Toggle in Viewport
+      document.getElementById("btn-shortcuts")?.addEventListener("click", () => toggleShortcuts());
+      document.getElementById("btn-close-shortcuts-hud")?.addEventListener("click", () => toggleShortcuts(false));
+
+      // Target Bug Modal
+      document.getElementById("btn-target-bug")?.addEventListener("click", openTargetBugModal);
+      document.getElementById("btn-close-bug")?.addEventListener("click", () => {
+        document.getElementById("modal-bug").classList.remove("visible");
+      });
+      document.getElementById("btn-cancel-bug")?.addEventListener("click", () => {
+        document.getElementById("modal-bug").classList.remove("visible");
+      });
+      document.getElementById("btn-submit-bug")?.addEventListener("click", submitBugReport);
+
+      // Sidebar Tabs
+      document.querySelectorAll(".sidebar-tab").forEach(tab => {
+        tab.addEventListener("click", () => {
+          document.querySelectorAll(".sidebar-tab").forEach(t => t.classList.remove("active"));
+          document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
+          tab.classList.add("active");
+          document.getElementById(tab.dataset.pane)?.classList.add("active");
+        });
+      });
+
+      // Simulation Bar Scrubber Controls (BUG-LUSTROUS-MANTIS-333)
+      document.getElementById("btn-sim-play")?.addEventListener("click", toggleSimPlay);
+      document.getElementById("btn-sim-prev")?.addEventListener("click", () => {
+        const nextStep = Math.max(0, state.simStep - 15);
+        if (!simParticlesMesh) initSimulationParticles();
+        updateSimulationStep(nextStep);
+      });
+      document.getElementById("btn-sim-next")?.addEventListener("click", () => {
+        const nextStep = (state.simStep + 15) % (state.maxSteps || 1000);
+        if (!simParticlesMesh) initSimulationParticles();
+        updateSimulationStep(nextStep);
+      });
+      document.getElementById("sim-step-slider")?.addEventListener("input", (e) => {
+        const nextStep = parseInt(e.target.value);
+        if (!simParticlesMesh) initSimulationParticles();
+        updateSimulationStep(nextStep);
+      });
+      document.querySelectorAll(".sim-log-chip").forEach(chip => {
+        chip.addEventListener("click", () => {
+          const step = parseInt(chip.dataset.step);
+          if (!simParticlesMesh) initSimulationParticles();
+          updateSimulationStep(step);
+          showToast(`Scrubbed to Rerun milestone: ${chip.textContent}`);
+        });
+      });
+
+      // Rerun Logs Filter & Search (BUG-JUMPING-INSTAR-950)
+      document.getElementById("rerun-search")?.addEventListener("input", (e) => {
+        renderRerunLogs(e.target.value);
+      });
+      document.getElementById("btn-rerun-clear-filter")?.addEventListener("click", () => {
+        const input = document.getElementById("rerun-search");
+        if (input) input.value = "";
+        renderRerunLogs("");
+      });
+
+      // Synchronize text input with selected pin or selected text markup
+      const txtInput = document.getElementById("markup-text-input");
+      if (txtInput) {
+        txtInput.addEventListener("input", (e) => {
+          const val = e.target.value;
+          if (state.selectedPin) {
+            state.selectedPin.text = val;
+            const inlineInput = document.querySelector(`.pin-item[data-id="${state.selectedPin.id}"] .pin-note-input`);
+            if (inlineInput && inlineInput.value !== val) {
+              inlineInput.value = val;
+            }
+            redrawMarkups();
+          } else if (state.selectedMarkup) {
+            state.selectedMarkup.text = val;
+            redrawMarkups();
+          }
+        });
+      }
+
+      // UI Scale & Navigation Global Shortcuts
+      document.addEventListener("keydown", (e) => {
+        if (e.metaKey || e.ctrlKey) {
+          if (e.key === "=" || e.key === "+" || e.code === "Equal" || e.code === "NumpadAdd") {
+            e.preventDefault();
+            adjustUiScale(1);
+            return;
+          }
+          if (e.key === "-" || e.key === "_" || e.code === "Minus" || e.code === "NumpadSubtract") {
+            e.preventDefault();
+            adjustUiScale(-1);
+            return;
+          }
+          if (e.key === "0" || e.code === "Digit0" || e.code === "Numpad0") {
+            e.preventDefault();
+            resetUiScale();
+            return;
+          }
+        }
+      });
+    });
+  </script>
+</body>
+</html>

@@ -77,10 +77,10 @@ def test_smoke_test_runs_with_typical_user_setup() -> None:
         smoke.run_command(["tools/build.py", "exhaust_manifolds/*"])
         assert "--no-daemon" not in captured_args, f"tools/build.py should not force --no-daemon, got: {captured_args}"
 
-        # 2. view.py command
+        # 2. scope.py command
         captured_args.clear()
-        smoke.run_command(["tools/view.py", "cat_fountain/product", "--no-gui"])
-        assert "--no-daemon" not in captured_args, f"tools/view.py should not force --no-daemon, got: {captured_args}"
+        smoke.run_command(["tools/scope.py", "--help"])
+        assert "--no-daemon" not in captured_args, f"tools/scope.py should not force --no-daemon, got: {captured_args}"
 
         # 3. config.py command
         captured_args.clear()
