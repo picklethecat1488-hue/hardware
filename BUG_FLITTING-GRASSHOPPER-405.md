@@ -1,6 +1,6 @@
 # 🟢 `[BUG-FLITTING-GRASSHOPPER-405]` Regression tests are not useful
 
-- **UUID**: `1228ba78-9bd2-4a0d-8b04-a5f0ace6e0ab`
+- **UUID**: `297ddfef-0afe-4b91-9de6-0e9608797534`
 - **ID**: `BUG-FLITTING-GRASSHOPPER-405`
 - **Status**: `CLOSED`
 - **Severity**: `HIGH`
