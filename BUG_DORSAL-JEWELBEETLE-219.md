@@ -1,4 +1,4 @@
-# 🔴 `[BUG-DORSAL-JEWELBEETLE-219]` [cat_fountain/product] Defect in CAD view
+# 🔴 `[BUG-DORSAL-JEWELBEETLE-219]` Viewport snapshot not capturing 3D model and rotation render performance is slow
 
 - **UUID**: `e6ee3e8d-ecd1-45ff-bbef-04322be48dc3`
 - **ID**: `BUG-DORSAL-JEWELBEETLE-219`

@@ -1,4 +1,4 @@
-# 🔴 `[BUG-BRIGHT-STAGBEETLE-720]` [carrier_board/carrier_board] Defect in CAD view
+# 🔴 `[BUG-BRIGHT-STAGBEETLE-720]` Hide CAD viewer widget controls in all modes and move navigation, tree, and ruler to sidebar
 
 - **UUID**: `c4361ee2-b0f3-4f96-8e31-335d3d9c87af`
 - **ID**: `BUG-BRIGHT-STAGBEETLE-720`

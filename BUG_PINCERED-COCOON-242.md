@@ -18,12 +18,6 @@ Inspect panel doesn’t work/selecting a face or object doesn’t do anything.
 
 1. python tools/scope.py cat_fountain/product:cad
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-PINCERED-COCOON-242/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
-
 #### Attached Commits
 
 - `84e9c3d4`

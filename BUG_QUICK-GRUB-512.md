@@ -1,4 +1,4 @@
-# 🔴 `[BUG-QUICK-GRUB-512]` Horizontal scrollbar not themed
+# 🔴 `[BUG-QUICK-GRUB-512]` Horizontal scrollbar under top HUD not themed to Quake CRT palette
 
 - **UUID**: `02986800-0ef0-4a22-a6ed-b55f7082736c`
 - **ID**: `BUG-QUICK-GRUB-512`

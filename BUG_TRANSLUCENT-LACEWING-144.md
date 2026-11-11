@@ -1,4 +1,4 @@
-# 🔴 `[BUG-TRANSLUCENT-LACEWING-144]` [carrier_board/carrier_board] Defect in PCB view
+# 🔴 `[BUG-TRANSLUCENT-LACEWING-144]` PCB view lacks net highlighting, high contrast theme, layer toggles, and PCB quickbar
 
 - **UUID**: `cf9a924c-9c73-4e4c-b249-6be0475c8f46`
 - **ID**: `BUG-TRANSLUCENT-LACEWING-144`
@@ -16,12 +16,6 @@ Net highlighting does not work. We should also use a high contrast color scheme 
 #### Reproduction Steps
 
 1. python tools/scope.py carrier_board/carrier_board:pcb
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1794421069036_kjvhz.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794421069036_kjvhz.png) | Pasted screenshot screenshot_paste_1794421069036_kjvhz.png |
 
 #### Attached Commits
 

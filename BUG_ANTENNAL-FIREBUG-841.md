@@ -1,4 +1,4 @@
-# 🔴 `[BUG-ANTENNAL-FIREBUG-841]` [cat_fountain/product] Defect in CAD view
+# 🔴 `[BUG-ANTENNAL-FIREBUG-841]` CAD viewport canvas height does not expand to fill browser window
 
 - **UUID**: `37a3ee75-19a5-428e-a618-b1c71af0f4bd`
 - **ID**: `BUG-ANTENNAL-FIREBUG-841`
@@ -16,12 +16,6 @@ The viewport doesn’t cover the bottom 2/3 of my browser window
 #### Reproduction Steps
 
 1. python tools/scope.py cat_fountain/product:cad
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1794420937200_iuskk.png](attachments/BUG-ANTENNAL-FIREBUG-841/screenshot_paste_1794420937200_iuskk.png) | Pasted screenshot screenshot_paste_1794420937200_iuskk.png |
 
 #### Attached Commits
 

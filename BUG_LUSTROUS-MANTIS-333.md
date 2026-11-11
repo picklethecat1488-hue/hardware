@@ -1,4 +1,4 @@
-# 🔴 `[BUG-LUSTROUS-MANTIS-333]` [cat_fountain/simulation] Defect in SIMULATE view
+# 🔴 `[BUG-LUSTROUS-MANTIS-333]` Simulate mode play button does not run PyBullet physics simulation or timeline logs
 
 - **UUID**: `f3f7eee9-b90f-42b0-94ce-40a40f317991`
 - **ID**: `BUG-LUSTROUS-MANTIS-333`
