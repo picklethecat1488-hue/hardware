@@ -529,6 +529,10 @@ face 46 ignored
 | `image/png` | [snapshot.png](attachments/BUG-JUMPING-INSTAR-950/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
 | `text/plain` | [scope.log](attachments/BUG-JUMPING-INSTAR-950/scope.log) | Scope workstation execution logs |
 
+#### Attached Commits
+
+- `9dc8b061`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:cf738cdd --> Open Scope with cat_fountain in simulate mode, select max steps in Target chooser, inspect physics telemetry in Inspect panel, and query rerun logs in Left Panel Logs tab | `python tools/scope.py cat_fountain/product:simulate`
