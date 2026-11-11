@@ -1,12 +1,13 @@
-# 🔴 `[BUG-TRANSLUCENT-LACEWING-144]` PCB view net highlighting is non-functional and requires KiCad high-contrast theme (carrier_board)
+# 🟢 `[BUG-TRANSLUCENT-LACEWING-144]` PCB view net highlighting is non-functional and requires KiCad high-contrast theme (carrier_board)
 
 - **UUID**: `cf9a924c-9c73-4e4c-b249-6be0475c8f46`
 - **ID**: `BUG-TRANSLUCENT-LACEWING-144`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-11 13:59:20 UTC`
+- **Resolved**: `2026-11-11 22:36:50 UTC`
 - **Rejected**: `2026-11-11 22:00:22 UTC`
 
 #### Description
@@ -33,16 +34,7 @@ Net highlighting does not work. We should also use a high contrast color scheme 
 
 #### Resolution Notes
 
-Implemented KiCad high-contrast PCB color scheme, interactive layer checkboxes and solo toggling, 3D glowing net highlighting with background dimming and canvas repaint, PCB camera quickbar buttons (Top, Bot, Flip, HC), and rich PCB entity inspection for traces, vias, pads, and components
-
-Rejected:
--The high contrast mode doesn’t really work the way I expect (attached a screenshot showing the kicad viewer’s contrasting colors)
--Can we disable highlighting of the substrate? We should only highlight things like components, traces, pads, vias, and silkscreening
--I cannot accutrately highlight individual traces and vias-the mouse pointer doesn’t accurately indicate which component is being highlighted
--There is a weird up arrow thing in the middle of the board
--We only need HC mode in PCB view and it should be always on-we don’t need a separate HC button in CAD or simulate view
--The inspect panel doesn’t show any info about the component, trace, pad, or via
--The pads and traces aren’t currently being rendered correctly when zoomed in (see atached screenshot from kicad viewer)
+Removed manual HC buttons and made KiCad high contrast theme always on in PCB mode, suppressed substrate highlighting and bounding box selection, implemented minimum-distance entity picking and live hover pointer tooltip, replaced carrier board silkscreen arrow with sleek diamond emblem, and added rounded cylinder caps to trace vertices while disabling wireframe edge outlines on copper layers.
 
 #### Rejection Feedback
 
