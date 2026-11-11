@@ -7,7 +7,7 @@
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-11 13:59:20 UTC`
-- **Resolved**: `2026-11-11 23:18:06 UTC`
+- **Resolved**: `2026-11-11 23:20:43 UTC`
 - **Rejected**: `2026-11-11 22:00:22 UTC`
 
 #### Description
@@ -26,6 +26,7 @@ Net highlighting does not work. We should also use a high contrast color scheme 
 | `screenshot` | [screenshot_paste_1794434209020_bde4d.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794434209020_bde4d.png) | Pasted screenshot screenshot_paste_1794434209020_bde4d.png |
 | `screenshot` | [screenshot_paste_1794434388241_j5k2b.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794434388241_j5k2b.png) | Pasted screenshot screenshot_paste_1794434388241_j5k2b.png |
 | `screenshot` | [screenshot_paste_1794439086273_7ec08.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794439086273_7ec08.png) | Pasted screenshot screenshot_paste_1794439086273_7ec08.png |
+| `screenshot` | [screenshot_paste_1794439243034_okmeb.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794439243034_okmeb.png) | Pasted screenshot screenshot_paste_1794439243034_okmeb.png |
 
 #### Attached Commits
 
@@ -46,6 +47,9 @@ Net highlighting does not work. We should also use a high contrast color scheme 
 #### Resolution Notes
 
 Removed manual HC buttons and made KiCad high contrast theme always on in PCB mode, suppressed substrate highlighting and bounding box selection, implemented minimum-distance entity picking and live hover pointer tooltip, replaced carrier board silkscreen arrow with sleek diamond emblem, and added rounded cylinder caps to trace vertices while disabling wireframe edge outlines on copper layers.
+-The diamond seems like misplaced silkscreening of the test board logo. Can you revert the geometry change, and figure out why the silkscreen is being placed on the wrong part of the board? 
+-I am still able to highlight substrates, and unable to highlight anything else to show in edge inspector
+-In the latest version, there is z ordering issue b/w pads and traces
 
 #### Rejection Feedback
 
