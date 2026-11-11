@@ -24,6 +24,7 @@ The CAD controls in the CAD viewer widget show in PCB view. We should hide those
 - `b418d50f04087b84dc59786ae7618385dbf035f9`
 - `5919a5dd`
 - `d3e08b55`
+- `7b5bbd30`
 
 #### Review Tasks & Functional Checklist
 
