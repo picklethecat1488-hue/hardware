@@ -1,12 +1,13 @@
-# 🔴 `[BUG-SEGMENTED-MOTH-70]` New Bug Report
+# 🟢 `[BUG-SEGMENTED-MOTH-70]` New Bug Report
 
 - **UUID**: `2b254ab4-aaab-4a35-8d14-7aee1b2d1a5f`
 - **ID**: `BUG-SEGMENTED-MOTH-70`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `Scope`
 - **Created**: `2026-11-11 00:17:25 UTC`
+- **Resolved**: `2026-11-11 01:41:30 UTC`
 - **Rejected**: `2026-11-11 00:45:51 UTC`
 
 #### Description
@@ -42,9 +43,7 @@ pybullet build time: Oct 20 2025 08:05:00
 
 #### Resolution Notes
 
-Added terminal detaching by default with --no-detach and --foreground flags and stop command matching forge.py.
-
-There is still some extra printing to stdout that I’d like cleaned up. Can you check under “Expected Behavior” and “Actual Behavior"
+Eliminated terminal noise on detaching, added structured logging, resolved 10s socket timeout, fixed 512x512 app icon scaling and alpha transparency, added panel resizer, UI scale controls, Quake theme styling, inline pin and text editing, fixed Three-CAD-Viewer 'tab' destructuring error, and brought load time from >20s to <2s with disk caching, background pre-warming, and gzip streaming.
 
 #### Rejection Feedback
 
