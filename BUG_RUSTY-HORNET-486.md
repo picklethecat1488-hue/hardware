@@ -18,12 +18,6 @@ When syncing for loading viewer.py with a target, we should show a modal progres
 
 1. python tools/scope.py carrier_board/carrier_board:pcb
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-RUSTY-HORNET-486/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
-
 #### Resolution Notes
 
 Added staged modal progress bar UI during workstation sync, target switching, and geometry loading.
