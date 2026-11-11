@@ -7,7 +7,7 @@
 - **Category**: `CAD`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-11 14:01:07 UTC`
-- **Resolved**: `2026-11-11 14:27:38 UTC`
+- **Resolved**: `2026-11-11 18:22:32 UTC`
 
 #### Description
 
@@ -28,3 +28,8 @@ The CAD controls in the CAD viewer widget show in PCB view. We should hide those
 #### Resolution Notes
 
 Hid CAD viewer controls overlay in PCB mode and added Display controls to sidebar panel
+
+- Rejected, we should hide the CAD viewer controls in the CAD and simulate modes as well
+- Update the Tree view to show/hide individual layers and components like the Tree view does in the VAD Viewer widget does
+- Add a ruler (mm) to the quicker
+- Maintain the Axis indicator, when we hide the CAD controls
