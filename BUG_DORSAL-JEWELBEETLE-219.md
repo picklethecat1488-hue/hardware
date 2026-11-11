@@ -16,8 +16,6 @@ The viewport snapshot is not showing the model. Rotating the model is also notic
 
 1. python tools/scope.py cat_fountain/product:cad
 
-#### Attachments & References
+#### Review Tasks & Functional Checklist
 
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-DORSAL-JEWELBEETLE-219/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
+- [ ] <!-- task:db38baf2 --> Verify Target Bug snapshot captures rendered 3D model and rotation responds with 60 FPS fluidity | `python tools/scope.py cat_fountain/product:cad`
