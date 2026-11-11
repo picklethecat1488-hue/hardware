@@ -15,22 +15,8 @@ The terminal doesn’t detach when opening viewer/scope, unlike forge.py. See ou
 
 #### Behavior Comparison
 
-- **Expected**: $ python tools/scope.py carrier_board/carrier_board:pcb 
-pybullet build time: Oct 20 2025 08:05:00
-◈ SCOPE // CAD/PCB WORKSTATION ◈
-  Target: carrier_board/carrier_board [PCB]
-  URL:    http://127.0.0.1:8000/?project=carrier_board&target=carrier_board&subassembly=&mode=PCB
-Scope workstation running at http://127.0.0.1:8000/project=carrier_board&target=carrier_board&subassembly=&mode=PCB (PID 51694).
-➜ Detached from terminal.
-(cq)
-- **Actual**: $ python tools/scope.py carrier_board/carrier_board:pcb 
-pybullet build time: Oct 20 2025 08:05:00
-⠙ Building...◈ SCOPE // CAD/PCB WORKSTATION ◈
-  Target: carrier_board/carrier_board [PCB]
-  URL:    http://127.0.0.1:8000/?project=carrier_board&target=carrier_board&subassembly=&mode=PCB
-⠦ Building...➜ Scope workstation running at http://127.0.0.1:8000/?project=carrier_board&target=carrier_board&subassembly=&mode=PCB (PID 51694).
-➜ Detached from terminal.
-(cq)
+- **Expected**: $ python tools/scope.py carrier_board/carrier_board:pcb
+- **Actual**: $ python tools/scope.py carrier_board/carrier_board:pcb
 
 #### Execution / Console Logs
 
