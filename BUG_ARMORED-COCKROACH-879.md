@@ -2,12 +2,13 @@
 
 - **UUID**: `0eb5458d-548f-4192-89fa-02e92ff49cc0`
 - **ID**: `BUG-ARMORED-COCKROACH-879`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 00:14:18 UTC`
 - **Resolved**: `2026-11-11 18:09:11 UTC`
+- **Accepted**: `2026-11-11 18:09:17 UTC`
 
 #### Description
 
