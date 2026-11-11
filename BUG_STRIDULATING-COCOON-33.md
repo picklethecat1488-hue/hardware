@@ -16,8 +16,6 @@ Net highlighting shows 0 pins for everything
 
 1. python tools/scope.py carrier_board/carrier_board:pcb
 
-#### Attachments & References
+#### Review Tasks & Functional Checklist
 
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-STRIDULATING-COCOON-33/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
+- [ ] <!-- task:f7a17f1f --> Verify netlist panel displays non-zero pin counts for nets with connected component pads | `python tools/scope.py carrier_board/carrier_board:pcb`
