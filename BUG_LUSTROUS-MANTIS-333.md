@@ -1,14 +1,13 @@
-# 🟢 `[BUG-LUSTROUS-MANTIS-333]` Simulate mode play button does not run PyBullet physics simulation or timeline logs
+# 🔴 `[BUG-LUSTROUS-MANTIS-333]` Simulate mode play button does not run PyBullet physics simulation or timeline logs
 
 - **UUID**: `f3f7eee9-b90f-42b0-94ce-40a40f317991`
 - **ID**: `BUG-LUSTROUS-MANTIS-333`
-- **Status**: `RESOLVED`
+- **Status**: `OPEN`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 13:57:40 UTC`
-- **Resolved**: `2026-11-11 22:02:03 UTC`
-- **Rejected**: `2026-11-11 18:13:25 UTC`
+- **Rejected**: `2026-11-11 22:02:10 UTC`
 
 #### Description
 
@@ -45,6 +44,6 @@ Rejected-I dstill don’t think this is working right. The physics particles app
 
 #### Rejection Feedback
 
-Filtered non-applicable modes, mapped cat_fountain/simulation alias to product:simulate, and wired simulation playback loop
+Added fountain fluid particle simulation, rotating impeller animation, force repaint update loop, and clickable Rerun timeline log markers with live flow metrics
 
--Simulate mode still doesn’t work. Only the CAD window is shown, not the pybullet fountain simulation
+Rejected-I dstill don’t think this is working right. The physics particles appear incorrectly offset from the CAD geometry
