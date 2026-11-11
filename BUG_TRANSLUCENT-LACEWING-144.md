@@ -7,7 +7,7 @@
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-11 13:59:20 UTC`
-- **Resolved**: `2026-11-11 21:59:48 UTC`
+- **Resolved**: `2026-11-11 22:00:15 UTC`
 - **Rejected**: `2026-11-11 18:20:11 UTC`
 
 #### Description
@@ -50,7 +50,7 @@ Rejected:
 -There is a weird up arrow thing in the middle of the board
 -We only need HC mode in PCB view and it should be always on-we don’t need a separate HC button in CAD or simulate view
 -The inspect panel doesn’t show any info about the component, trace, pad, or via
--The pads and traces aren’t currently being rendered correctly when zoomed in (see atached screenshot from kicad viewer
+-The pads and traces aren’t currently being rendered correctly when zoomed in (see atached screenshot from kicad viewer)
 
 #### Rejection Feedback
 
