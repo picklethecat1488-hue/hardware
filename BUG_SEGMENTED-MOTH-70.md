@@ -2,12 +2,13 @@
 
 - **UUID**: `2b254ab4-aaab-4a35-8d14-7aee1b2d1a5f`
 - **ID**: `BUG-SEGMENTED-MOTH-70`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `Scope`
 - **Created**: `2026-11-11 00:17:25 UTC`
 - **Resolved**: `2026-11-11 18:08:38 UTC`
+- **Accepted**: `2026-11-11 18:08:44 UTC`
 - **Rejected**: `2026-11-11 00:45:51 UTC`
 
 #### Description
