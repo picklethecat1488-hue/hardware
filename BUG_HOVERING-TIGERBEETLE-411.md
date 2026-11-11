@@ -1,12 +1,13 @@
-# 🔴 `[BUG-HOVERING-TIGERBEETLE-411]` CAD Objects tree view lacks hierarchical group organization (exhaust_manifolds)
+# 🟢 `[BUG-HOVERING-TIGERBEETLE-411]` CAD Objects tree view lacks hierarchical group organization (exhaust_manifolds)
 
 - **UUID**: `d2938749-7c9f-47df-a757-fe094df7b58a`
 - **ID**: `BUG-HOVERING-TIGERBEETLE-411`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `exhaust_manifolds`
 - **Created**: `2026-11-11 22:03:40 UTC`
+- **Resolved**: `2026-11-11 22:25:09 UTC`
 
 #### Description
 
@@ -524,3 +525,7 @@ face 46 ignored
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:1eee1929 --> Inspect CAD Objects tree view in Scope and verify driver/passenger left/right assemblies are organized into collapsible folder groups | `python tools/scope.py exhaust_manifolds/part_positions:cad`
+
+#### Resolution Notes
+
+Implemented hierarchical tree view in Scope CAD Objects pane with group folding, expand/collapse toggles, and group visibility control, and structured part_positions room items into hierarchical slash-delimited paths.
