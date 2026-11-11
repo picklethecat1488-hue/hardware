@@ -71,7 +71,7 @@ class ExhaustManifoldsViewer:
                     else (ColorType.BLUE if right else ColorType.ORANGE)
                 )
                 room.add(
-                    f"{name}_{side}",
+                    f"{name}/{side}/{name}_{side}",
                     self.builder.create_part(name, right=right, tube_only=False),
                     color=color,
                     alpha=0.5,
@@ -79,12 +79,12 @@ class ExhaustManifoldsViewer:
 
                 for i in range(10):
                     room.add(
-                        f"{name}_{side}_pos_{i}",
+                        f"{name}/{side}/pos_{i}",
                         self.create_part_position_point(name, i / 10, right=right),
                         color=color,
                     )
                 room.add(
-                    f"{name}_{side}_center", self.create_solid_center_point(name, right=right), color=ColorType.BLUE
+                    f"{name}/{side}/center", self.create_solid_center_point(name, right=right), color=ColorType.BLUE
                 )
         room.add("bounds", self.bound_box, color=ColorType.GREY, alpha=0.2)
 

@@ -670,6 +670,35 @@ def test_regression_bug_nimble_bee_781_cat_fountain_footprints_z_ordering(scope_
     assert bottom_cover_color[3] == 1.0, "bottom_cover must have alpha 1.0 (opaque) to prevent Z-ordering bleed"
 
 
+def test_regression_bug_hovering_tigerbeetle_411_hierarchical_cad_tree(scope_server):
+    """Verify BUG-HOVERING-TIGERBEETLE-411: CAD Objects tree view renders hierarchical groups."""
+    # 1. Verify Scope UI contains hierarchical group tree structures and expand/collapse
+    html_url = f"http://127.0.0.1:{scope_server.actual_port}/"
+    req_html = urllib.request.urlopen(html_url)
+    assert req_html.status == 200
+    html = req_html.read().decode("utf-8")
+    assert "renderGroupNode" in html
+    assert "tree-group-item" in html
+    assert "tree-group-children" in html
+    assert "tree-expand-icon" in html
+    assert "setGroupVisibility" in html
+    assert "Expand All" in html
+    assert "Collapse All" in html
+
+    # 2. Verify pipeline preserves hierarchical names for exhaust_manifolds/part_positions
+    from provider.scope.pipeline import ScopeGeometryPipeline
+
+    pipeline = ScopeGeometryPipeline()
+    res = pipeline.load_geometry("exhaust_manifolds", "part_positions", mode="CAD")
+    parts = res.get("shapes", {}).get("parts", [])
+    assert len(parts) > 0
+    part_names = [p["name"] for p in parts]
+    assert any("driver/left" in name for name in part_names)
+    assert any("driver/right" in name for name in part_names)
+    assert any("passenger/left" in name for name in part_names)
+    assert any("passenger/right" in name for name in part_names)
+
+
 def test_regression_bug_lustrous_mantis_333_simulation_fountain_physics(scope_server):
     """Verify BUG-LUSTROUS-MANTIS-333: fountain physics trajectory respects bowl floor Z=41, tube at Y=28, spout Z=114, and timeline logs scrub."""
     import re
