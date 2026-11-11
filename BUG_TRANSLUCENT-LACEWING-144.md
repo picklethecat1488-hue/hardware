@@ -21,8 +21,6 @@ Net highlighting does not work. We should also use a high contrast color scheme 
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1794434113716_f0sw8.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794434113716_f0sw8.png) | Pasted screenshot screenshot_paste_1794434113716_f0sw8.png |
-| `screenshot` | [screenshot_paste_1794434209020_bde4d.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794434209020_bde4d.png) | Pasted screenshot screenshot_paste_1794434209020_bde4d.png |
 | `screenshot` | [screenshot_paste_1794434388241_j5k2b.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794434388241_j5k2b.png) | Pasted screenshot screenshot_paste_1794434388241_j5k2b.png |
 | `screenshot` | [screenshot_paste_1794439086273_7ec08.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794439086273_7ec08.png) | Pasted screenshot screenshot_paste_1794439086273_7ec08.png |
 | `screenshot` | [screenshot_paste_1794439243034_okmeb.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794439243034_okmeb.png) | Pasted screenshot screenshot_paste_1794439243034_okmeb.png |
@@ -36,6 +34,7 @@ Net highlighting does not work. We should also use a high contrast color scheme 
 - `7b5bbd30`
 - `a71069de`
 - `e40dabc6`
+- `5f2d077a`
 
 #### Review Tasks & Functional Checklist
 
