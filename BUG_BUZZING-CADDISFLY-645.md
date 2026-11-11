@@ -17,6 +17,10 @@ For text entry, ala pins, can we have a non-modal text input box on the main UI 
 
 1. python src/view.py cat_fountain/product
 
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:91b382a4 --> Verify non-modal note entry when dropping spatial pins and editing notes in sidebar | `python tools/scope.py cat_fountain/product --no-app --no-detach`
+
 #### Resolution Notes
 
 Replaced modal prompt() dialogs with non-modal toolbar text input and inline editable notes in sidebar pins list.
