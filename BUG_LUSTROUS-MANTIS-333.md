@@ -7,7 +7,7 @@
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 13:57:40 UTC`
-- **Resolved**: `2026-11-11 14:26:39 UTC`
+- **Resolved**: `2026-11-11 18:13:19 UTC`
 
 #### Description
 
@@ -28,3 +28,5 @@ The play button does not work when I switch to “Simulate” mode. We disable a
 #### Resolution Notes
 
 Filtered non-applicable modes, mapped cat_fountain/simulation alias to product:simulate, and wired simulation playback loop
+
+-Simulate mode still doesn’t work. Only the CAD window is shown, not the pybullet fountain simulation
