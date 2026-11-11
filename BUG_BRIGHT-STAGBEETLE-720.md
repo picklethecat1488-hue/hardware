@@ -17,6 +17,10 @@ The CAD controls in the CAD viewer widget show in PCB view. We should hide those
 
 1. python tools/scope.py carrier_board/carrier_board:cad
 
+#### Attached Commits
+
+- `84e9c3d4`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:f2f57f00 --> Verify CAD navigation and display controls appear in left Display panel and viewer overlay is hidden in PCB mode | `python tools/scope.py carrier_board/carrier_board:cad`
