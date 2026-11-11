@@ -2,12 +2,13 @@
 
 - **UUID**: `934eb8ac-a282-42da-a0ee-a6fc6c4f876b`
 - **ID**: `BUG-NIMBLE-BEE-781`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 21:50:54 UTC`
 - **Resolved**: `2026-11-11 23:15:46 UTC`
+- **Accepted**: `2026-11-11 23:15:53 UTC`
 
 #### Description
 
