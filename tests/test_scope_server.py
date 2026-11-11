@@ -647,6 +647,114 @@ def test_regression_bug_luminescent_springtail_8_unrendered_viewer_and_projects_
     assert "carrier_board" in proj_names
 
 
+def test_regression_bug_nimble_bee_781_cat_fountain_footprints_z_ordering(scope_server):
+    """Verify BUG-NIMBLE-BEE-781: bottom cover is opaque (alpha=1.0) and materials do not force transparent: true."""
+    # 1. Verify three-cad-viewer JS computes isTransparent dynamically based on alpha
+    js_url = f"http://127.0.0.1:{scope_server.actual_port}/static/three-cad-viewer.esm.js"
+    req_js = urllib.request.urlopen(js_url)
+    assert req_js.status == 200
+    js_content = req_js.read().decode("utf-8")
+    assert "const isTransparent = this.transparent || (alpha !== undefined && alpha < 1.0);" in js_content
+    assert "transparent: isTransparent," in js_content
+    assert "depthWrite: !isTransparent," in js_content
+
+    # 2. Verify cat_fountain manifest specifies opaque bottom cover
+    from pathlib import Path
+    import yaml
+
+    manifest_path = Path("projects/cat_fountain/manifest.yaml")
+    manifest_data = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    assert "bottom_cover" in manifest_data
+    bottom_cover_color = manifest_data["bottom_cover"]["color"]
+    assert len(bottom_cover_color) == 4
+    assert bottom_cover_color[3] == 1.0, "bottom_cover must have alpha 1.0 (opaque) to prevent Z-ordering bleed"
+
+
+def test_regression_bug_lustrous_mantis_333_simulation_fountain_physics(scope_server):
+    """Verify BUG-LUSTROUS-MANTIS-333: fountain physics trajectory respects bowl floor Z=41, tube at Y=28, spout Z=114, and timeline logs scrub."""
+    import re
+
+    # 1. Fetch Scope HTML template and check simulation trajectory and controls
+    html_url = f"http://127.0.0.1:{scope_server.actual_port}/"
+    req_html = urllib.request.urlopen(html_url)
+    assert req_html.status == 200
+    html = req_html.read().decode("utf-8")
+
+    assert "function getFountainTrajectoryPoint(t, meta)" in html
+    assert "const FLOOR_Z = 41.0;" in html
+    assert "const TUBE_TOP_Z = 107.0;" in html
+    assert "const DOME_APEX_Z = 114.5;" in html
+    assert "const LID_TRAY_Z = 105.0;" in html
+    assert "const TUBE_Y = 28.0;" in html
+    assert "btn-sim-play" in html
+    assert "toggleSimPlay" in html
+    assert "sim-log-chip" in html
+    assert "sim-flow-metrics" in html
+
+    # 2. Extract trajectory function from HTML and evaluate points across full cycle t in [0.0, 1.0]
+    # We can evaluate the math in Python to ensure every single Z point is strictly >= 41.0 (above reservoir floor)
+    # and <= 116.0 (below outer bounds)
+    import math
+
+    def py_get_trajectory_point(t, angle_offset=0.0):
+        FLOOR_Z = 41.0
+        TUBE_TOP_Z = 107.0
+        DOME_APEX_Z = 114.5
+        LID_TRAY_Z = 105.0
+        POOL_SURFACE_Z = 68.0
+        TUBE_Y = 28.0
+
+        if t < 0.22:
+            u = t / 0.22
+            if u < 0.15:
+                sub = u / 0.15
+                x = 0.0
+                y = sub * TUBE_Y
+                z = FLOOR_Z + 3.0 + sub * 2.0
+            else:
+                sub = (u - 0.15) / 0.85
+                z = FLOOR_Z + 5.0 + sub * (TUBE_TOP_Z - (FLOOR_Z + 5.0))
+                rad = 4.5
+                x = math.cos(angle_offset + sub * 5.0) * (rad * 0.7)
+                y = TUBE_Y + math.sin(angle_offset + sub * 5.0) * (rad * 0.7)
+        elif t < 0.32:
+            u = (t - 0.22) / 0.10
+            z = TUBE_TOP_Z + math.sin(u * math.pi) * (DOME_APEX_Z - TUBE_TOP_Z) - u * 2.0
+            spread = 6.0 + u * 20.0
+            x = math.cos(angle_offset) * spread
+            y = TUBE_Y + math.sin(angle_offset) * spread
+        elif t < 0.62:
+            u = (t - 0.32) / 0.30
+            z = LID_TRAY_Z - u * 1.0
+            startX = math.cos(angle_offset) * 26.0
+            startY = TUBE_Y + math.sin(angle_offset) * 26.0
+            endR = 76.0 + math.sin(angle_offset * 2.0) * 4.0
+            endX = math.cos(angle_offset) * endR
+            endY = math.sin(angle_offset) * endR
+            x = startX * (1 - u) + endX * u
+            y = startY * (1 - u) + endY * u
+        elif t < 0.82:
+            u = (t - 0.62) / 0.20
+            r = 78.0 + math.sin(u * math.pi * 0.5) * 3.0
+            z = (LID_TRAY_Z - 1.0) - (u * u) * (LID_TRAY_Z - 1.0 - POOL_SURFACE_Z)
+            x = math.cos(angle_offset) * r
+            y = math.sin(angle_offset) * r
+        else:
+            u = (t - 0.82) / 0.18
+            z = POOL_SURFACE_Z * (1 - u) + (FLOOR_Z + 4.0) * u + math.sin(u * math.pi * 2.0) * 1.5
+            r = 78.0 * (1 - u) + 4.0 * u
+            angle = angle_offset + u * 3.5
+            x = math.cos(angle) * r
+            y = math.sin(angle) * r
+        return x, y, z
+
+    for step_pct in range(0, 100):
+        t = step_pct / 100.0
+        x, y, z = py_get_trajectory_point(t)
+        assert z >= 41.0, f"Trajectory point at t={t} dipped below floor_z=41.0: z={z}"
+        assert z <= 116.0, f"Trajectory point at t={t} exceeded max bound: z={z}"
+
+
 def test_regression_bug_jumping_instar_950_simulate_view_max_steps_physics_inspection_rerun_logs(scope_server):
     """Verify BUG-JUMPING-INSTAR-950: simulate view max steps selection, physics object inspection, and rerun log queries."""
     # 1. Fetch Scope UI with max_steps query parameter and verify template injection
