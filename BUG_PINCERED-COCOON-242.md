@@ -23,6 +23,10 @@ Inspect panel doesn’t work/selecting a face or object doesn’t do anything.
 | :--- | :--- | :--- |
 | `image/png` | [snapshot.png](attachments/BUG-PINCERED-COCOON-242/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
 
+#### Attached Commits
+
+- `84e9c3d4`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:2b4cb4b4 --> Verify clicking 3D model faces or components populates geometric properties in Inspect panel | `python tools/scope.py cat_fountain/product:cad`
