@@ -17,6 +17,10 @@ We should hide PCB-related functionality when in CAD view, and vice versa
 
 1. python src/view.py cat_fountain/product
 
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:6e17cf04 --> Verify PCB Layers tab is hidden and CAD Tree tab is visible in CAD mode | `python tools/scope.py cat_fountain/product --no-app --no-detach`
+
 #### Resolution Notes
 
 Mode-aware sidebar tabs toggle PCB Layers vs CAD Tree tabs based on active view mode.
