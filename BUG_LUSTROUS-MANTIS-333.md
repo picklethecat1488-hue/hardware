@@ -17,6 +17,10 @@ The play button does not work when I switch to “Simulate” mode. We disable a
 
 1. python tools/scope.py cat_fountain/simulation:simulate
 
+#### Attached Commits
+
+- `84e9c3d4`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:bd000649 --> Verify play button animates simulation scrubber and non-applicable mode tabs are disabled | `python tools/scope.py cat_fountain/simulation:simulate`
