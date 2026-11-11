@@ -1,12 +1,13 @@
-# 🔴 `[BUG-NIMBLE-BEE-781]` Footprints render in front of bottom cover due to CAD view Z-ordering (cat_fountain)
+# 🟢 `[BUG-NIMBLE-BEE-781]` Footprints render in front of bottom cover due to CAD view Z-ordering (cat_fountain)
 
 - **UUID**: `934eb8ac-a282-42da-a0ee-a6fc6c4f876b`
 - **ID**: `BUG-NIMBLE-BEE-781`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 21:50:54 UTC`
+- **Resolved**: `2026-11-11 22:13:17 UTC`
 
 #### Description
 
@@ -524,3 +525,7 @@ face 46 ignored
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:fd325d61 --> Inspect cat fountain assembled CAD view and verify bottom cover fully occludes internal PCB footprints from below | `python tools/scope.py cat_fountain/product:cad`
+
+#### Resolution Notes
+
+Set bottom_cover in manifest.yaml to fully opaque alpha 1.0 and updated three-cad-viewer MaterialFactory._createBaseProps to only set transparent: true when alpha < 1.0, preserving opaque depth-testing and resolving Z-ordering bleed.
