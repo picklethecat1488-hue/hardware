@@ -616,6 +616,82 @@ def test_regression_bug_lustrous_mantis_333_simulation_playback_and_rerun_logs(s
     assert "simulation_water_particles" in html
 
 
+def test_regression_bug_translucent_lacewing_144_pcb_layers_and_net_highlight(scope_server):
+    """Verify BUG-TRANSLUCENT-LACEWING-144: PCB view includes high-contrast palette, layer toggles, net highlight, and quickbar."""
+    url = f"http://127.0.0.1:{scope_server.actual_port}/"
+    req = urllib.request.urlopen(url)
+    html = req.read().decode("utf-8")
+
+    # 1. PCB camera quickbar buttons (cam-contrast removed, HC always on in PCB)
+    assert 'id="cam-bottom"' in html
+    assert 'id="cam-flip"' in html
+    assert 'id="cam-contrast"' not in html
+
+    # 2. PCB layers pane controls (btn-high-contrast removed)
+    assert 'id="btn-all-layers"' in html
+    assert 'id="btn-flip-pcb"' in html
+    assert 'id="btn-high-contrast"' not in html
+    assert "setLayerVisibility" in html
+    assert "toggleSoloLayer" in html
+
+    # 3. KiCad high-contrast net highlighting & entity inspect
+    assert "highlightNet" in html
+    assert "clearNetHighlight" in html
+    assert "findPcbEntityAtPoint" in html
+    assert "minDistance" in html
+    assert "pcb-hover-tooltip" in html
+    assert 'target.includes("substrate")' in html
+    assert "setEdgesVisible(false)" in html
+    assert "COPPER TRACE" in html
+    assert "COPPER PAD" in html
+    assert "NetHighlight_" in html
+
+    # 4. Backend PCB data payload validation
+    load_url = f"http://127.0.0.1:{scope_server.actual_port}/api/scope/load?project=carrier_board&target=carrier_board&mode=PCB"
+    load_req = urllib.request.urlopen(load_url)
+    assert load_req.status == 200
+    data = json.loads(load_req.read().decode("utf-8"))
+    assert "pcb_metadata" in data
+    meta = data["pcb_metadata"]
+
+    # Verify high-contrast KiCad layer colors
+    layer_colors = {l["name"]: l["color"] for l in meta.get("layers", [])}
+    assert layer_colors.get("F.Cu (Top)") == "#ff3333"
+    assert layer_colors.get("B.Cu (Bottom)") == "#3366ff"
+    assert layer_colors.get("Pads") == "#ffcc00"
+
+    # Verify enriched traces, vias, pads, components, and nets
+    assert len(meta.get("traces", [])) > 0
+    assert len(meta.get("vias", [])) > 0
+    assert len(meta.get("pads", [])) > 0
+    assert len(meta.get("components", [])) > 0
+    assert len(meta.get("nets", [])) > 0
+    assert any(c.get("size") is not None for c in meta.get("components", []))
+
+    # Verify PCB3DAssembler builds traces with rounded vertex caps
+    from provider.pcb.cad_assembler import PCB3DAssembler
+    from projects.carrier_board.provider import CarrierBoardProvider
+
+    prov = CarrierBoardProvider()
+    assembler = PCB3DAssembler.from_provider(prov)
+    traces_compound = assembler.build_traces("F.Cu")
+    assert traces_compound is not None
+    assert len(traces_compound.children) > len(prov.pcb_config.traces)
+
+    # Verify carrier board silkscreen graphic does not have arrow points
+    silk_graphics = prov.silkscreen_graphics
+    for sg in silk_graphics:
+        if sg.shape == "polygon":
+            assert (0.0, 33.2) not in sg.points
+            assert len(sg.points) == 4  # Clean diamond emblem
+
+    sample_net = meta["nets"][0]
+    assert "name" in sample_net
+    assert "pins" in sample_net
+    assert "traces_count" in sample_net
+    assert "vias_count" in sample_net
+
+
 def test_regression_bug_luminescent_springtail_8_unrendered_viewer_and_projects_populate(scope_server):
     """Verify unrendered Viewer does not throw in resizeCadView and projects populate cleanly (BUG-LUMINESCENT-SPRINGTAIL-8)."""
     # 1. Verify three-cad-viewer JS safely returns null rather than throwing

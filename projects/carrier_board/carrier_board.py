@@ -823,22 +823,17 @@ class CarrierBoardPCBListing:
             SilkscreenRect(position=(0.0, 31.0), dimensions=(7.0, 7.0), thickness=0.20, layer="F.SilkS")
             SilkscreenPolygon(
                 polygon_points=[
-                    (0.0, 33.2),
-                    (1.6, 30.5),
-                    (0.5, 30.5),
-                    (0.5, 28.8),
-                    (-0.5, 28.8),
-                    (-0.5, 30.5),
-                    (-1.6, 30.5),
+                    (0.0, 33.0),
+                    (1.8, 31.0),
+                    (0.0, 29.0),
+                    (-1.8, 31.0),
                 ],
                 thickness=0.18,
                 layer="F.SilkS",
                 fill=True,
             )
-            SilkscreenLine(start_mm=(-2.4, 32.2), end_mm=(-1.4, 30.8), thickness=0.18, layer="F.SilkS")
-            SilkscreenLine(start_mm=(-2.4, 29.8), end_mm=(-1.4, 31.2), thickness=0.18, layer="F.SilkS")
-            SilkscreenLine(start_mm=(2.4, 32.2), end_mm=(1.4, 30.8), thickness=0.18, layer="F.SilkS")
-            SilkscreenLine(start_mm=(2.4, 29.8), end_mm=(1.4, 31.2), thickness=0.18, layer="F.SilkS")
+            SilkscreenLine(start_mm=(-2.0, 32.2), end_mm=(-2.0, 29.8), thickness=0.18, layer="F.SilkS")
+            SilkscreenLine(start_mm=(2.0, 32.2), end_mm=(2.0, 29.8), thickness=0.18, layer="F.SilkS")
         return silk.graphics
 
     @property
