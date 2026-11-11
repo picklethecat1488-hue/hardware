@@ -7,7 +7,7 @@
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 22:06:16 UTC`
-- **Resolved**: `2026-11-11 22:46:26 UTC`
+- **Resolved**: `2026-11-11 23:06:57 UTC`
 
 #### Description
 
@@ -541,3 +541,4 @@ face 46 ignored
 #### Resolution Notes
 
 Added max simulation steps selection (500, 1000, 2000, 5000) to Target Chooser modal and query param handling, rich physics telemetry object inspection in Inspector panel (SPH particles, kinematic state, density, viscosity, flow rate, EOS), and dedicated searchable Rerun Logs tab in Left Panel with instant timeline scrub.
+- Oops, rejected again! I forgot, we need to add a timescale adjustment to the main window, and I think we should also add a “Open in Rerun Viewer” clickable button to the timeline on the bottom, similar to what the SSD project has
