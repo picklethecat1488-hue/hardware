@@ -1,12 +1,13 @@
-# 🔴 `[BUG-ANTENNAL-FIREBUG-841]` CAD viewport canvas height does not expand to fill browser window
+# 🟢 `[BUG-ANTENNAL-FIREBUG-841]` CAD viewport canvas height does not expand to fill browser window
 
 - **UUID**: `37a3ee75-19a5-428e-a618-b1c71af0f4bd`
 - **ID**: `BUG-ANTENNAL-FIREBUG-841`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 13:54:05 UTC`
+- **Resolved**: `2026-11-11 18:49:46 UTC`
 - **Rejected**: `2026-11-11 18:15:54 UTC`
 
 #### Description
@@ -27,9 +28,7 @@ The viewport doesn’t cover the bottom 2/3 of my browser window
 
 #### Resolution Notes
 
-Added Viewer.resize method to three-cad-viewer.esm.js and wired ResizeObserver auto-fitting in scope.html.j2
-
-- This still doesn’t work. Attaching a screenshot
+Enforced 100% flex height layout on .tcv_cad_viewer, added null safety in resizeCadView, and triggered post-render viewport resize
 
 #### Rejection Feedback
 
