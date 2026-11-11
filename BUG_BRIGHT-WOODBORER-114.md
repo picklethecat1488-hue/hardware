@@ -2,13 +2,13 @@
 
 - **UUID**: `2ae46cbe-de50-44bc-a93e-71e4496dc58a`
 - **ID**: `BUG-BRIGHT-WOODBORER-114`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-10 14:11:40 UTC`
 - **Resolved**: `2026-11-11 00:17:13 UTC`
-- **Accepted**: `2026-11-10 20:40:42 UTC`
+- **Accepted**: `2026-11-11 00:17:19 UTC`
 
 #### Description
 
