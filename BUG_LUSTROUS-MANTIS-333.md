@@ -11,7 +11,7 @@
 
 #### Description
 
-The play button does not work when I switch to “Simulate” mode. We disable any views which are not applicable for the given target.
+The play button does not work when I switch to “Simulate” mode. No fountain simulation actually plays, and there’s no way to click on individual rerun logs on the timeline.
 
 #### Reproduction Steps
 
