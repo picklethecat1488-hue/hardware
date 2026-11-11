@@ -7,7 +7,7 @@
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-11 13:59:20 UTC`
-- **Resolved**: `2026-11-11 21:55:13 UTC`
+- **Resolved**: `2026-11-11 21:56:49 UTC`
 - **Rejected**: `2026-11-11 18:20:11 UTC`
 
 #### Description
@@ -23,6 +23,7 @@ Net highlighting does not work. We should also use a high contrast color scheme 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1794434113716_f0sw8.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794434113716_f0sw8.png) | Pasted screenshot screenshot_paste_1794434113716_f0sw8.png |
+| `screenshot` | [screenshot_paste_1794434209020_bde4d.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794434209020_bde4d.png) | Pasted screenshot screenshot_paste_1794434209020_bde4d.png |
 
 #### Attached Commits
 
@@ -43,6 +44,9 @@ Implemented KiCad high-contrast PCB color scheme, interactive layer checkboxes a
 
 Rejected:
 -The high contrast mode doesn’t really work the way I expect (attached a screenshot showing the kicad viewer’s contrasting colors)
+-Can we disable highlighting of the substrate?
+-I cannot accutrately highlight individual traces and vias-the mouse pointer doesn’t accurately indicate which component is being highlighted
+-
 
 #### Rejection Feedback
 
