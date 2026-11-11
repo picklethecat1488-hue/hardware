@@ -17,12 +17,6 @@ Net highlighting does not work. We should also use a high contrast color scheme 
 
 1. python tools/scope.py carrier_board/carrier_board:pcb
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1794434388241_j5k2b.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794434388241_j5k2b.png) | Pasted screenshot screenshot_paste_1794434388241_j5k2b.png |
-
 #### Attached Commits
 
 - `84e9c3d4`
@@ -35,6 +29,7 @@ Net highlighting does not work. We should also use a high contrast color scheme 
 
 - [ ] <!-- task:cbd6bdbb --> Verify PCB copper layers use KiCad high-contrast palette and active nets illuminate on click | `python tools/scope.py carrier_board/carrier_board:pcb`
 - [ ] <!-- task:2ceb8e09 --> Verify PCB view displays KiCad high-contrast theme, interactive layer checkboxes/solo, 3D net highlighting, and PCB camera quickbar | `python tools/scope.py carrier_board/carrier_board:pcb`
+- [ ] <!-- task:90ba4b66 --> Inspect carrier_board in Scope PCB mode, verify high-contrast theme is always active, hover pointer tooltip identifies components/traces/vias, clicking inspects elements without substrate selection, and traces/pads are smooth without black edge outlines | `python tools/scope.py carrier_board/carrier_board:pcb`
 
 #### Resolution Notes
 
