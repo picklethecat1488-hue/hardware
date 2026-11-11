@@ -7,7 +7,7 @@
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 14:02:00 UTC`
-- **Resolved**: `2026-11-11 14:27:56 UTC`
+- **Resolved**: `2026-11-11 18:23:18 UTC`
 
 #### Description
 
@@ -28,3 +28,5 @@ The viewport snapshot is not showing the model. Rotating the model is also notic
 #### Resolution Notes
 
 Enabled preserveDrawingBuffer in Three.js renderer and throttled rotation events via RAF to eliminate GPU readback stalls
+
+-Rejected. Can u check if there’s any other way to increase rendfer speed in the widget?
