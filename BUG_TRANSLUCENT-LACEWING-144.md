@@ -7,7 +7,7 @@
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-11 13:59:20 UTC`
-- **Resolved**: `2026-11-11 21:56:49 UTC`
+- **Resolved**: `2026-11-11 21:59:48 UTC`
 - **Rejected**: `2026-11-11 18:20:11 UTC`
 
 #### Description
@@ -24,6 +24,7 @@ Net highlighting does not work. We should also use a high contrast color scheme 
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1794434113716_f0sw8.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794434113716_f0sw8.png) | Pasted screenshot screenshot_paste_1794434113716_f0sw8.png |
 | `screenshot` | [screenshot_paste_1794434209020_bde4d.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794434209020_bde4d.png) | Pasted screenshot screenshot_paste_1794434209020_bde4d.png |
+| `screenshot` | [screenshot_paste_1794434388241_j5k2b.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794434388241_j5k2b.png) | Pasted screenshot screenshot_paste_1794434388241_j5k2b.png |
 
 #### Attached Commits
 
@@ -44,9 +45,12 @@ Implemented KiCad high-contrast PCB color scheme, interactive layer checkboxes a
 
 Rejected:
 -The high contrast mode doesn’t really work the way I expect (attached a screenshot showing the kicad viewer’s contrasting colors)
--Can we disable highlighting of the substrate?
+-Can we disable highlighting of the substrate? We should only highlight things like components, traces, pads, vias, and silkscreening
 -I cannot accutrately highlight individual traces and vias-the mouse pointer doesn’t accurately indicate which component is being highlighted
--
+-There is a weird up arrow thing in the middle of the board
+-We only need HC mode in PCB view and it should be always on-we don’t need a separate HC button in CAD or simulate view
+-The inspect panel doesn’t show any info about the component, trace, pad, or via
+-The pads and traces aren’t currently being rendered correctly when zoomed in (see atached screenshot from kicad viewer
 
 #### Rejection Feedback
 
