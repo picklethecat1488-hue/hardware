@@ -24,6 +24,7 @@ The play button does not work when I switch to “Simulate” mode. No fountain 
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:bd000649 --> Verify play button animates simulation scrubber and non-applicable mode tabs are disabled | `python tools/scope.py cat_fountain/simulation:simulate`
+- [ ] <!-- task:38de1d8e --> Verify play button animates fountain fluid particles and impeller with clickable rerun timeline logs | `python tools/scope.py cat_fountain/simulation:simulate`
 
 #### Resolution Notes
 
