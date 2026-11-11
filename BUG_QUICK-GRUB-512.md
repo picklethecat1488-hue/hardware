@@ -17,3 +17,7 @@ The horizontal scrollbar under the header is not themed (screenshot attached)
 | Type | Filename | Description |
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1794421688344_hbpe0.png](attachments/BUG-QUICK-GRUB-512/screenshot_paste_1794421688344_hbpe0.png) | Pasted screenshot screenshot_paste_1794421688344_hbpe0.png |
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:b054ca1c --> Verify horizontal scrollbar under top HUD renders with Quake dark track and copper thumb | `python tools/scope.py`
