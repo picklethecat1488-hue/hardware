@@ -522,6 +522,10 @@ face 46 ignored
 2026-11-11 14:03:07 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 14:03:07] "GET /api/scope/load?project=exhaust_manifolds&target=part_positions&subassembly=&mode=CAD HTTP/1.1" 200 -
 ```
 
+#### Attached Commits
+
+- `6033cc34`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:1eee1929 --> Inspect CAD Objects tree view in Scope and verify driver/passenger left/right assemblies are organized into collapsible folder groups | `python tools/scope.py exhaust_manifolds/part_positions:cad`
