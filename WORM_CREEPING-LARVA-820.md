@@ -1,6 +1,6 @@
 # 🟢 `[WORM-CREEPING-LARVA-820]` Regression tests are not useful
 
-- **UUID**: `b6f88ae8-de1c-4191-99ac-8472481dd160`
+- **UUID**: `4dee4e8f-92cf-4747-a047-6492abfa179d`
 - **ID**: `WORM-CREEPING-LARVA-820`
 - **Status**: `CLOSED`
 - **Severity**: `HIGH`
