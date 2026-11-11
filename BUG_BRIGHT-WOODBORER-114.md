@@ -21,9 +21,9 @@ For order C-E71W908185A, the height of the protruding feature is still not enoug
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1794319983993_0c6us.png](attachments/BUG-BRIGHT-WOODBORER-114/screenshot_paste_1794319983993_0c6us.png) | Pasted screenshot screenshot_paste_1794319983993_0c6us.png |
 | `screenshot` | [screenshot_paste_1794319993473_5hp3j.png](attachments/BUG-BRIGHT-WOODBORER-114/screenshot_paste_1794319993473_5hp3j.png) | Pasted screenshot screenshot_paste_1794319993473_5hp3j.png |
 | `screenshot` | [screenshot_paste_1794320001277_60qmk.png](attachments/BUG-BRIGHT-WOODBORER-114/screenshot_paste_1794320001277_60qmk.png) | Pasted screenshot screenshot_paste_1794320001277_60qmk.png |
+| `screenshot` | [screenshot_paste_1794319983993_0c6us.png](attachments/BUG-BRIGHT-WOODBORER-114/screenshot_paste_1794319983993_0c6us.png) | Pasted screenshot screenshot_paste_1794319983993_0c6us.png |
 
 #### Attached Commits
 
