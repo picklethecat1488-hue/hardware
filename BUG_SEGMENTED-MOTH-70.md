@@ -37,6 +37,7 @@ pybullet build time: Oct 20 2025 08:05:00
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:4905b55c --> Verify Scope CLI detaches from terminal when launched and terminates cleanly with stop | `python tools/scope.py --help`
+- [ ] <!-- task:2839c851 --> Verify Scope detaches cleanly with zero stdout/stderr noise | `python tools/scope.py carrier_board/carrier_board:pcb --no-app`
 
 #### Resolution Notes
 
