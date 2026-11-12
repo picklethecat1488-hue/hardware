@@ -1,13 +1,12 @@
-# 🟢 `[BUG-DORSAL-MIDGE-176]` PCB layer ordering, net labels on zoom, 2D pan/zoom controls, flip orientation, and KiCad color matching
+# 🔴 `[BUG-DORSAL-MIDGE-176]` PCB layer ordering, net labels on zoom, 2D pan/zoom controls, flip orientation, and KiCad color matching
 
 - **UUID**: `aada2cfa-f536-4cf7-9764-41d9662013b0`
 - **ID**: `BUG-DORSAL-MIDGE-176`
-- **Status**: `RESOLVED`
+- **Status**: `OPEN`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-12 14:41:48 UTC`
-- **Resolved**: `2026-11-12 22:42:04 UTC`
 - **Rejected**: `2026-11-12 20:48:51 UTC`
 
 #### Description
@@ -536,7 +535,11 @@ face 46 ignored
 
 #### Resolution Notes
 
-Matched KiCad 10 _builtin_default 2D PCB palette (#001023 canvas, #041830 substrate, #ce4785 F.Cu+F.Mask pads, #c83434 F.Cu, #4d7fc4 B.Cu, #ececec vias, #f2eda1 F.SilkS, #e8b2a7 B.SilkS), applied unlit emissive 2D WebGL rendering without CAD wireframe tessellation edges so colors match KiCad without 3D PBR dimming, locked 2D pan/zoom controls, and hooked Viewer/controls/wheel updates so net labels dynamically rerender and obey layer visibility.
+Align PCB layer stack with Components above Substrate, match KiCad theme colors, orient +Y downward matching KiCad, disable 3D rotate controls in 2D mode, and render net labels on pads and traces when zoomed in
+-Rejected:
+-Pallette doesn’t match the kicad pallete
+-Rotate is still enabled
+-Net labels are not being rerendered when I rotate the PCB
 
 #### Rejection Feedback
 
