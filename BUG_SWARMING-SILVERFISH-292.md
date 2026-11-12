@@ -529,6 +529,10 @@ ValueError: 'cad' is not a valid Section
 | `image/png` | [snapshot.png](attachments/BUG-SWARMING-SILVERFISH-292/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
 | `text/plain` | [scope.log](attachments/BUG-SWARMING-SILVERFISH-292/scope.log) | Scope workstation execution logs |
 
+#### Attached Commits
+
+- `3404dd39`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:c3df9ee1 --> Open cat fountain wiring diagram in Scope DIAGRAM mode, verify viewport background is pure white (#ffffff), text annotations are crisp black (#000000), and camera defaults to top orthographic projection matching SVG export | `python tools/scope.py cat_fountain/wiring:diagram`
