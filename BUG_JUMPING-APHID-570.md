@@ -2,12 +2,13 @@
 
 - **UUID**: `f616833a-1db1-4787-8936-4c87b44adb84`
 - **ID**: `BUG-JUMPING-APHID-570`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-12 20:49:35 UTC`
 - **Resolved**: `2026-11-12 23:46:37 UTC`
+- **Accepted**: `2026-11-12 23:46:48 UTC`
 
 #### Description
 
