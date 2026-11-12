@@ -1,12 +1,13 @@
-# 🔴 `[BUG-TARSIAL-TERMITE-773]` CAD and PCB targets fail to render due to :cad target parsing error, PCB frustum backface culling, viewer resize bug, and scope.lock reuse block
+# 🟢 `[BUG-TARSIAL-TERMITE-773]` CAD and PCB targets fail to render due to :cad target parsing error, PCB frustum backface culling, viewer resize bug, and scope.lock reuse block
 
 - **UUID**: `6a4a5316-242c-4b8f-b520-73300d26e1ff`
 - **ID**: `BUG-TARSIAL-TERMITE-773`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `CRITICAL`
 - **Category**: `CAD`
 - **Component**: `scope`
 - **Created**: `2026-11-12 18:51:22 UTC`
+- **Resolved**: `2026-11-12 18:51:46 UTC`
 
 #### Description
 
@@ -16,3 +17,7 @@
 
 - [ ] <!-- task:6804407a --> Verify CAD target loads and renders cleanly with :cad suffix | `python tools/scope.py cat_fountain/product:cad`
 - [ ] <!-- task:615d421d --> Verify PCB target renders non-culled top/bottom copper, components, and accurate entity picking | `python tools/scope.py carrier_board/carrier_board:pcb`
+
+#### Resolution Notes
+
+Fixed :cad//cad suffix parsing in parse_target_string and normalized mode specifiers in ScopeGeometryPipeline, replaced negative OrthographicCamera frustum with Y-mirrored rootGroup.scale.set(1, -1, 1) to eliminate WebGL backface culling while preserving KiCad +Y downward orientation and accurate picking/net highlights, prioritized resizeCadView over zoom-resetting viewer.resize, guarded unrendered viewer getters, and updated ScopeTool/Dashboard demo runner to cleanly switch running targets.
