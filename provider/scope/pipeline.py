@@ -636,3 +636,171 @@ class ScopeGeometryPipeline:
                 with self._lock:
                     if cache_key in self._in_progress:
                         self._in_progress.pop(cache_key).set()
+
+    def load_simulation_telemetry(self, project: str, target: str) -> Dict[str, Any]:
+        """Extract authentic fluid particle positions and physical flow metrics from server-side Rerun recordings."""
+        cache_key = f"{project}_{target}_sim_telemetry"
+        cache_file = self.cache_dir / f"{cache_key}.json.gz"
+
+        with self._lock:
+            if cache_key in self._cache:
+                return self._cache[cache_key]
+
+        if cache_file.exists():
+            try:
+                raw = gzip.decompress(cache_file.read_bytes())
+                data = orjson.loads(raw)
+                with self._lock:
+                    self._cache[cache_key] = data
+                return data
+            except Exception as err:
+                self.log.warning("Failed to read telemetry cache for %s: %s", cache_key, err)
+
+        # Locate recording on disk
+        candidates = [
+            Path(f"recordings/{project}_3blade.rrd"),
+            Path(f"recordings/{project}.rrd"),
+            Path(f"recordings/{project}_{target}.rrd"),
+        ]
+        rrd_file: Optional[Path] = None
+        for cand in candidates:
+            if cand.exists():
+                rrd_file = cand
+                break
+
+        if rrd_file is None:
+            recordings_dir = Path("recordings")
+            if recordings_dir.exists():
+                for f in recordings_dir.glob("*.rrd"):
+                    if project in f.name:
+                        rrd_file = f
+                        break
+
+        if rrd_file is None:
+            return {"status": "none", "frames_count": 0, "frames": []}
+
+        try:
+            import rerun as rr
+
+            reader = rr.bindings.RrdReaderInternal(str(rrd_file))
+            chunks = reader.stream().to_chunks()
+
+            particle_chunks = [c for c in chunks if c.entity_path == "/world/particles"]
+            metric_chunks = [c for c in chunks if c.entity_path.startswith("/metrics/")]
+
+            metrics_by_step: Dict[int, Dict[str, float]] = {}
+            for c in metric_chunks:
+                m_name = c.entity_path[len("/metrics/") :]
+                rb = c.to_record_batch()
+                step = int(rb["step"].to_pylist()[0])
+                val = float(rb["Scalars:scalars"].to_pylist()[0][0])
+                if step not in metrics_by_step:
+                    metrics_by_step[step] = {}
+                metrics_by_step[step][m_name] = val
+
+            frames = []
+            for c in particle_chunks:
+                rb = c.to_record_batch()
+                step = int(rb["step"].to_pylist()[0])
+                raw_pos = rb["Points3D:positions"].to_pylist()[0]
+                stride = max(1, len(raw_pos) // 600)
+                sampled = [
+                    [round(p[0] * 1000.0, 2), round(p[1] * 1000.0, 2), round(p[2] * 1000.0, 2)]
+                    for p in raw_pos[::stride][:600]
+                ]
+                m = metrics_by_step.get(step, {})
+                frames.append(
+                    {
+                        "step": step,
+                        "positions": sampled,
+                        "metrics": {
+                            "flow_spout": round(m.get("flow_spout", 0.0), 1),
+                            "flow_waterfall": round(m.get("drainage_waterfall", 0.0), 1),
+                            "drainage_cutout": round(m.get("drainage_cutout", 0.0), 1),
+                            "pool_volume": round(m.get("pool_volume", 69000.0) / 45000.0, 2),
+                        },
+                    }
+                )
+
+            frames.sort(key=lambda f: f["step"])
+
+            logs = []
+            if frames:
+                logs.append(
+                    {
+                        "step": frames[0]["step"],
+                        "time": "0.00s",
+                        "level": "INFO",
+                        "entity": f"world/{project}",
+                        "msg": f"SPH simulation domain initialized from Rerun recording. {len(frames[0]['positions'])} active particles.",
+                    }
+                )
+                spout_frames = [f for f in frames if f["metrics"]["flow_spout"] > 0]
+                if spout_frames:
+                    first_spout = spout_frames[0]
+                    logs.append(
+                        {
+                            "step": first_spout["step"],
+                            "time": f"{first_spout['step'] * 0.02:.2f}s",
+                            "level": "METRIC",
+                            "entity": "metrics/flow_spout",
+                            "msg": f"Spout eruption active: {first_spout['metrics']['flow_spout']:.1f} mL/s fluid discharge through spout tube.",
+                        }
+                    )
+                cutout_frames = [f for f in frames if f["metrics"]["drainage_cutout"] > 0]
+                if cutout_frames:
+                    first_cutout = cutout_frames[0]
+                    logs.append(
+                        {
+                            "step": first_cutout["step"],
+                            "time": f"{first_cutout['step'] * 0.02:.2f}s",
+                            "level": "METRIC",
+                            "entity": "metrics/drainage_cutout",
+                            "msg": f"Lid drainage cutout active: {first_cutout['metrics']['drainage_cutout']:.0f} particles draining through front hole.",
+                        }
+                    )
+                wf_frames = [f for f in frames if f["metrics"]["flow_waterfall"] > 0]
+                if wf_frames:
+                    first_wf = wf_frames[0]
+                    logs.append(
+                        {
+                            "step": first_wf["step"],
+                            "time": f"{first_wf['step'] * 0.02:.2f}s",
+                            "level": "METRIC",
+                            "entity": "metrics/drainage_waterfall",
+                            "msg": f"Perimeter waterfall cascade active: {first_wf['metrics']['flow_waterfall']:.1f} mL/s returning to reservoir.",
+                        }
+                    )
+                last_frame = frames[-1]
+                logs.append(
+                    {
+                        "step": last_frame["step"],
+                        "time": f"{last_frame['step'] * 0.02:.2f}s",
+                        "level": "INFO",
+                        "entity": f"world/{project}",
+                        "msg": f"Simulation recording cycle complete: reservoir pool volume {last_frame['metrics']['pool_volume']:.2f} L.",
+                    }
+                )
+
+            payload = {
+                "status": "ok",
+                "recording": str(rrd_file),
+                "frames_count": len(frames),
+                "max_steps": len(frames),
+                "frames": frames,
+                "logs": logs,
+            }
+
+            try:
+                gz = gzip.compress(orjson.dumps(payload), compresslevel=6)
+                cache_file.parent.mkdir(parents=True, exist_ok=True)
+                cache_file.write_bytes(gz)
+            except Exception as err:
+                self.log.warning("Failed to persist telemetry cache: %s", err)
+
+            with self._lock:
+                self._cache[cache_key] = payload
+            return payload
+        except Exception as err:
+            self.log.exception("Failed to parse simulation telemetry from %s: %s", rrd_file, err)
+            return {"status": "error", "error": str(err), "frames_count": 0, "frames": []}

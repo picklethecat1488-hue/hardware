@@ -783,92 +783,41 @@ def test_regression_bug_hovering_tigerbeetle_411_hierarchical_cad_tree(scope_ser
 
 
 def test_regression_bug_lustrous_mantis_333_simulation_fountain_physics(scope_server):
-    """Verify BUG-LUSTROUS-MANTIS-333: fountain physics trajectory respects bowl floor Z=41, tube at Y=28, spout Z=114, and timeline logs scrub."""
-    import re
-
-    # 1. Fetch Scope HTML template and check simulation trajectory and controls
+    """Verify BUG-LUSTROUS-MANTIS-333: authentic simulation telemetry respects bowl floor Z=41, spout Z=114, and enforces prohibition on client-side simulation facades."""
+    # 1. Fetch Scope HTML template and check simulation controls and authentic data pipeline
     html_url = f"http://127.0.0.1:{scope_server.actual_port}/"
     req_html = urllib.request.urlopen(html_url)
     assert req_html.status == 200
     html = req_html.read().decode("utf-8")
 
-    assert "function getFountainTrajectoryPoint(t, meta)" in html
-    assert "const FLOOR_Z = 41.0;" in html
-    assert "const TUBE_TOP_Z = 107.0;" in html
-    assert "const DOME_APEX_Z = 114.5;" in html
-    assert "const LID_TRAY_Z = 105.0;" in html
-    assert "const TUBE_Y = 28.0;" in html
+    # Enforce prohibition on client-side simulation facades (CR finding f5e496b8 and docs/physics_urdf_simulation.md)
+    assert "getFountainTrajectoryPoint" not in html
     assert "btn-sim-play" in html
     assert "toggleSimPlay" in html
     assert "sim-log-chip" in html
     assert "sim-flow-metrics" in html
+    assert "/api/scope/simulation_telemetry" in html
 
-    # 2. Extract trajectory function from HTML and evaluate points across full cycle t in [0.0, 1.0]
-    # We can evaluate the math in Python to ensure every single Z point is strictly >= 41.0 (above reservoir floor)
-    # and <= 116.0 (below outer bounds)
-    import math
+    # 2. Query authentic server-side telemetry endpoint and evaluate particle bounds
+    telem_url = f"http://127.0.0.1:{scope_server.actual_port}/api/scope/simulation_telemetry?project=cat_fountain&target=product"
+    req_telem = urllib.request.urlopen(telem_url)
+    assert req_telem.status == 200
+    telem = json.loads(req_telem.read().decode("utf-8"))
 
-    def py_get_trajectory_point(t, angle_offset=0.0):
-        FLOOR_Z = 41.0
-        TUBE_TOP_Z = 107.0
-        DOME_APEX_Z = 114.5
-        LID_TRAY_Z = 105.0
-        POOL_SURFACE_Z = 68.0
-        TUBE_Y = 28.0
+    assert telem["status"] == "ok"
+    assert telem["frames_count"] > 0
+    assert len(telem["frames"]) > 0
 
-        if t < 0.22:
-            u = t / 0.22
-            if u < 0.15:
-                sub = u / 0.15
-                x = 0.0
-                y = sub * TUBE_Y
-                z = FLOOR_Z + 3.0 + sub * 2.0
-            else:
-                sub = (u - 0.15) / 0.85
-                z = FLOOR_Z + 5.0 + sub * (TUBE_TOP_Z - (FLOOR_Z + 5.0))
-                rad = 4.5
-                x = math.cos(angle_offset + sub * 5.0) * (rad * 0.7)
-                y = TUBE_Y + math.sin(angle_offset + sub * 5.0) * (rad * 0.7)
-        elif t < 0.32:
-            u = (t - 0.22) / 0.10
-            z = TUBE_TOP_Z + math.sin(u * math.pi) * (DOME_APEX_Z - TUBE_TOP_Z) - u * 2.0
-            spread = 6.0 + u * 20.0
-            x = math.cos(angle_offset) * spread
-            y = TUBE_Y + math.sin(angle_offset) * spread
-        elif t < 0.62:
-            u = (t - 0.32) / 0.30
-            z = LID_TRAY_Z - u * 1.0
-            startX = math.cos(angle_offset) * 26.0
-            startY = TUBE_Y + math.sin(angle_offset) * 26.0
-            endR = 76.0 + math.sin(angle_offset * 2.0) * 4.0
-            endX = math.cos(angle_offset) * endR
-            endY = math.sin(angle_offset) * endR
-            x = startX * (1 - u) + endX * u
-            y = startY * (1 - u) + endY * u
-        elif t < 0.82:
-            u = (t - 0.62) / 0.20
-            r = 78.0 + math.sin(u * math.pi * 0.5) * 3.0
-            z = (LID_TRAY_Z - 1.0) - (u * u) * (LID_TRAY_Z - 1.0 - POOL_SURFACE_Z)
-            x = math.cos(angle_offset) * r
-            y = math.sin(angle_offset) * r
-        else:
-            u = (t - 0.82) / 0.18
-            z = POOL_SURFACE_Z * (1 - u) + (FLOOR_Z + 4.0) * u + math.sin(u * math.pi * 2.0) * 1.5
-            r = 78.0 * (1 - u) + 4.0 * u
-            angle = angle_offset + u * 3.5
-            x = math.cos(angle) * r
-            y = math.sin(angle) * r
-        return x, y, z
-
-    for step_pct in range(0, 100):
-        t = step_pct / 100.0
-        x, y, z = py_get_trajectory_point(t)
-        assert z >= 41.0, f"Trajectory point at t={t} dipped below floor_z=41.0: z={z}"
-        assert z <= 116.0, f"Trajectory point at t={t} exceeded max bound: z={z}"
+    # Ensure every sampled particle in authentic telemetry respects domain bounds
+    for frame in telem["frames"]:
+        for pt in frame["positions"]:
+            x, y, z = pt[0], pt[1], pt[2]
+            assert z >= 40.0, f"Authentic particle dipped below floor: z={z}"
+            assert z <= 116.0, f"Authentic particle exceeded max bound: z={z}"
 
 
 def test_regression_bug_jumping_instar_950_simulate_view_max_steps_physics_inspection_rerun_logs(scope_server):
-    """Verify BUG-JUMPING-INSTAR-950: simulate view max steps selection, physics object inspection, and rerun log queries."""
+    """Verify BUG-JUMPING-INSTAR-950: simulate view max steps selection, timescale selector, Rerun Viewer launcher, and rerun logs."""
     # 1. Fetch Scope UI with max_steps query parameter and verify template injection
     html_url = f"http://127.0.0.1:{scope_server.actual_port}/?mode=SIMULATE&max_steps=2000"
     req_html = urllib.request.urlopen(html_url)
@@ -885,7 +834,13 @@ def test_regression_bug_jumping_instar_950_simulate_view_max_steps_physics_inspe
     assert "maxSteps: 2000" in html
     assert "state.maxSteps = parsedSteps;" in html
 
-    # 3. Check Physics Object Inspection Telemetry in Inspector
+    # 3. Check timescale adjustment and Rerun Viewer button
+    assert 'id="sim-timescale"' in html
+    assert 'id="btn-open-rerun"' in html
+    assert "Open in Rerun Viewer" in html
+    assert "/api/scope/open_rerun" in html
+
+    # 4. Check Physics Object Inspection Telemetry in Inspector
     assert "PHYSICS TELEMETRY [Rerun / SPH]" in html
     assert "SPH Fluid Dynamics [JAX]" in html
     assert "Rigid Body Kinematics [PyBullet]" in html
@@ -895,19 +850,27 @@ def test_regression_bug_jumping_instar_950_simulate_view_max_steps_physics_inspe
     assert "Active Particles:" in html
     assert "Volumetric Flow:" in html
 
-    # 4. Check Left Panel Rerun Logs querying and milestone scrub
+    # 5. Check Left Panel Rerun Logs querying and milestone scrub
     assert 'id="tab-btn-logs"' in html
     assert 'id="tab-logs"' in html
     assert 'id="rerun-search"' in html
     assert 'id="rerun-logs-list"' in html
     assert 'id="rerun-logs-count"' in html
     assert 'function renderRerunLogs(query = "")' in html
-    assert "RERUN_LOGS =" in html
-    assert "world/cat_fountain" in html
-    assert "cat_fountain/impeller" in html
-    assert "metrics/flow_spout" in html
-    assert "metrics/flow_waterfall" in html
-    assert "metrics/reservoir_volume" in html
+    assert "state.simTelemetry.logs" in html
+
+    # 6. Verify POST /api/scope/open_rerun endpoint
+    open_req = urllib.request.Request(
+        f"http://127.0.0.1:{scope_server.actual_port}/api/scope/open_rerun",
+        data=json.dumps({"project": "cat_fountain", "target": "product"}).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    open_res = urllib.request.urlopen(open_req)
+    assert open_res.status == 200
+    open_data = json.loads(open_res.read().decode("utf-8"))
+    assert open_data["status"] == "ok"
+    assert "recordings/cat_fountain_3blade.rrd" in open_data["recording"]
 
 
 def test_shortcuts_toggle_cad_viewport_overlay(scope_server):

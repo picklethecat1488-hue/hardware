@@ -1187,6 +1187,19 @@
           <button id="btn-sim-next" class="hud-btn" style="padding: 4px 8px;" title="Step Forward (10 frames)">⏭</button>
           <input id="sim-step-slider" type="range" class="sim-slider" min="0" max="1000" value="0">
           <div id="sim-step-val" style="font-size: 11px; width: 68px; text-align: right; color: var(--quake-gold); font-weight: bold;">Step: 0</div>
+          <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0; white-space: nowrap;">
+            <label class="hud-label" style="font-size: 10px;">Speed:</label>
+            <select id="sim-timescale" class="hud-select" style="padding: 2px 6px; font-size: 11px; height: 24px;">
+              <option value="0.25">0.25x</option>
+              <option value="0.5">0.5x</option>
+              <option value="1.0" selected>1.0x</option>
+              <option value="2.0">2.0x</option>
+              <option value="5.0">5.0x</option>
+            </select>
+          </div>
+          <button id="btn-open-rerun" class="hud-btn" style="padding: 3px 10px; font-size: 11px; background: rgba(255, 136, 0, 0.2); border: 1px solid #ff8800; color: #ffaa33; white-space: nowrap; flex-shrink: 0;" title="Launch official Rerun Viewer for deep telemetry inspection">
+            🚀 Open in Rerun Viewer
+          </button>
         </div>
         <div id="sim-timeline-logs" style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 10px; white-space: nowrap; overflow-x: auto; gap: 8px;">
           <div style="display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; white-space: nowrap; flex-shrink: 0;">
@@ -2335,6 +2348,20 @@
               dimensions: "180.00 × 180.00 × 73.50 mm",
             });
           }
+          fetch(`/api/scope/simulation_telemetry?project=${encodeURIComponent(state.currentProject)}&target=${encodeURIComponent(state.currentTarget)}`)
+            .then(r => r.json())
+            .then(telem => {
+              if (telem && telem.frames_count > 0) {
+                state.simTelemetry = telem;
+                state.maxSteps = telem.max_steps || telem.frames_count;
+                const slider = document.getElementById("sim-step-slider");
+                if (slider) slider.max = state.maxSteps - 1;
+                initSimulationParticles();
+                updateSimulationStep(state.simStep || 0);
+                renderRerunLogs();
+              }
+            })
+            .catch(err => console.warn("Failed to load simulation telemetry:", err));
         } else if (simParticlesMesh && state.viewer && state.viewer.rendered && state.viewer.rendered.scene) {
           state.viewer.rendered.scene.remove(simParticlesMesh);
           simParticlesMesh = null;
@@ -3471,7 +3498,6 @@
 
     // SIMULATION ENGINE & FLUID DYNAMICS PARTICLES (BUG-LUSTROUS-MANTIS-333)
     let simParticlesMesh = null;
-    let simParticlesData = [];
 
     function initSimulationParticles() {
       if (!state.viewer || !state.viewer.rendered || !state.viewer.rendered.scene) return;
@@ -3482,29 +3508,22 @@
         simParticlesMesh = null;
       }
       if (state.currentMode !== "SIMULATE") return;
+      if (!state.simTelemetry || !state.simTelemetry.frames || state.simTelemetry.frames.length === 0) return;
 
-      const PARTICLE_COUNT = 600;
-      const positions = new Float32Array(PARTICLE_COUNT * 3);
-      const colors = new Float32Array(PARTICLE_COUNT * 3);
-      simParticlesData = [];
+      const f0 = state.simTelemetry.frames[0];
+      if (!f0.positions || f0.positions.length === 0) return;
 
-      for (let i = 0; i < PARTICLE_COUNT; i++) {
-        const progress = (i / PARTICLE_COUNT + Math.random() * 0.02) % 1.0;
-        const meta = {
-          progress: progress,
-          speed: 0.0035 + Math.random() * 0.002,
-          radiusOffset: (Math.random() - 0.5) * 8,
-          angleOffset: Math.random() * Math.PI * 2,
-        };
-        simParticlesData.push(meta);
+      const particleCount = f0.positions.length;
+      const positions = new Float32Array(particleCount * 3);
+      const colors = new Float32Array(particleCount * 3);
 
-        const pt = getFountainTrajectoryPoint(progress, meta);
-        positions[i * 3] = pt.x;
-        positions[i * 3 + 1] = pt.y;
-        positions[i * 3 + 2] = pt.z;
+      for (let i = 0; i < particleCount; i++) {
+        positions[i * 3] = f0.positions[i][0];
+        positions[i * 3 + 1] = f0.positions[i][1];
+        positions[i * 3 + 2] = f0.positions[i][2];
 
-        colors[i * 3] = 0.2 + Math.random() * 0.1;
-        colors[i * 3 + 1] = 0.7 + Math.random() * 0.2;
+        colors[i * 3] = 0.2 + (i % 10) * 0.01;
+        colors[i * 3 + 1] = 0.7 + (i % 10) * 0.02;
         colors[i * 3 + 2] = 0.95;
       }
 
@@ -3526,69 +3545,6 @@
       if (typeof state.viewer.update === "function") {
         state.viewer.update(false, false);
       }
-    }
-
-    function getFountainTrajectoryPoint(t, meta) {
-      let x = 0, y = 28, z = 41;
-      const FLOOR_Z = 41.0;
-      const TUBE_TOP_Z = 107.0;
-      const DOME_APEX_Z = 114.5;
-      const LID_TRAY_Z = 105.0;
-      const POOL_SURFACE_Z = 68.0;
-      const TUBE_Y = 28.0;
-
-      if (t < 0.22) {
-        // Phase 1: Fluid enters pump volute at (0, 0, 44), passes to tube base (0, 28, 44),
-        // and ascends vertically through the delivery tube bore to spout exit (0, 28, 107)
-        const u = t / 0.22;
-        if (u < 0.15) {
-          const sub = u / 0.15;
-          x = (Math.random() - 0.5) * 4.0;
-          y = sub * TUBE_Y;
-          z = FLOOR_Z + 3.0 + sub * 2.0;
-        } else {
-          const sub = (u - 0.15) / 0.85;
-          z = FLOOR_Z + 5.0 + sub * (TUBE_TOP_Z - (FLOOR_Z + 5.0));
-          const rad = 4.5;
-          x = Math.cos(meta.angleOffset + sub * 5.0) * (rad * 0.7);
-          y = TUBE_Y + Math.sin(meta.angleOffset + sub * 5.0) * (rad * 0.7);
-        }
-      } else if (t < 0.32) {
-        // Phase 2: Erupting from spout dome at (0, 28, 107) arching outward up to apex Z=114.5
-        const u = (t - 0.22) / 0.10;
-        z = TUBE_TOP_Z + Math.sin(u * Math.PI) * (DOME_APEX_Z - TUBE_TOP_Z) - u * 2.0;
-        const spread = 6.0 + u * 20.0;
-        x = Math.cos(meta.angleOffset) * spread;
-        y = TUBE_Y + Math.sin(meta.angleOffset) * spread;
-      } else if (t < 0.62) {
-        // Phase 3: Flowing across lid drinking tray at Z ≈ 105.0 towards outer rim (R ≈ 78mm)
-        const u = (t - 0.32) / 0.30;
-        z = LID_TRAY_Z - u * 1.0;
-        const startX = Math.cos(meta.angleOffset) * 26.0;
-        const startY = TUBE_Y + Math.sin(meta.angleOffset) * 26.0;
-        const endR = 76.0 + Math.sin(meta.angleOffset * 2.0) * 4.0;
-        const endX = Math.cos(meta.angleOffset) * endR;
-        const endY = Math.sin(meta.angleOffset) * endR;
-        x = startX * (1 - u) + endX * u;
-        y = startY * (1 - u) + endY * u;
-      } else if (t < 0.82) {
-        // Phase 4: Falling waterfall cascade down into reservoir pool (Z: 104 -> 68)
-        const u = (t - 0.62) / 0.20;
-        const r = 78.0 + Math.sin(u * Math.PI * 0.5) * 3.0;
-        z = (LID_TRAY_Z - 1.0) - (u * u) * (LID_TRAY_Z - 1.0 - POOL_SURFACE_Z);
-        x = Math.cos(meta.angleOffset) * r;
-        y = Math.sin(meta.angleOffset) * r;
-      } else {
-        // Phase 5: Swirling within reservoir pool (Z: 44.0 to 68.0, strictly above floor_z = 41.0)
-        // returning to pump intake at (0, 0)
-        const u = (t - 0.82) / 0.18;
-        z = POOL_SURFACE_Z * (1 - u) + (FLOOR_Z + 4.0) * u + Math.sin(u * Math.PI * 2.0) * 1.5;
-        const r = 78.0 * (1 - u) + 4.0 * u;
-        const angle = meta.angleOffset + u * 3.5;
-        x = Math.cos(angle) * r;
-        y = Math.sin(angle) * r;
-      }
-      return { x, y, z };
     }
 
     function updateSimulationStep(step) {
@@ -3617,14 +3573,14 @@
         row.style.background = match ? "rgba(56, 189, 248, 0.15)" : "rgba(0,0,0,0.35)";
       });
 
-      // Update flow metrics readout
+      // Update flow metrics readout from authentic telemetry
       const metricsEl = document.getElementById("sim-flow-metrics");
-      if (metricsEl) {
-        const flowSpout = Math.min(240, Math.round(step * (240 / (maxSteps * 0.35))));
-        const waterfallThreshold = maxSteps * 0.45;
-        const flowWaterfall = step > waterfallThreshold ? Math.min(195, Math.round((step - waterfallThreshold) * (195 / (maxSteps * 0.35)))) : 0;
-        const poolVol = (1.5 + (step / maxSteps) * 0.35).toFixed(2);
-        metricsEl.textContent = `Spout: ${flowSpout} mL/s | Waterfall: ${flowWaterfall} mL/s | Reservoir: ${poolVol} L`;
+      if (state.simTelemetry && state.simTelemetry.frames && state.simTelemetry.frames.length > 0) {
+        const frameIdx = Math.min(step, state.simTelemetry.frames.length - 1);
+        const frame = state.simTelemetry.frames[frameIdx];
+        if (metricsEl && frame.metrics) {
+          metricsEl.textContent = `Spout: ${frame.metrics.flow_spout.toFixed(1)} mL/s | Waterfall: ${frame.metrics.flow_waterfall.toFixed(1)} mL/s | Reservoir: ${frame.metrics.pool_volume.toFixed(2)} L | Drain: ${frame.metrics.drainage_cutout.toFixed(0)} pts`;
+        }
       }
 
       // Animate rotating parts (impeller and drive hub / rotor) while keeping motor stator and motor base bracket stationary
@@ -3639,19 +3595,21 @@
         });
       }
 
-      // Animate fluid particles
-      if (simParticlesMesh && simParticlesData.length > 0) {
-        const posAttr = simParticlesMesh.geometry.attributes.position;
-        const arr = posAttr.array;
-        for (let i = 0; i < simParticlesData.length; i++) {
-          const meta = simParticlesData[i];
-          meta.progress = (meta.progress + meta.speed) % 1.0;
-          const pt = getFountainTrajectoryPoint(meta.progress, meta);
-          arr[i * 3] = pt.x;
-          arr[i * 3 + 1] = pt.y;
-          arr[i * 3 + 2] = pt.z;
+      // Animate fluid particles from authentic Rerun simulation recording
+      if (simParticlesMesh && state.simTelemetry && state.simTelemetry.frames && state.simTelemetry.frames.length > 0) {
+        const frameIdx = Math.min(step, state.simTelemetry.frames.length - 1);
+        const frame = state.simTelemetry.frames[frameIdx];
+        if (frame && frame.positions) {
+          const posAttr = simParticlesMesh.geometry.attributes.position;
+          const arr = posAttr.array;
+          const count = Math.min(frame.positions.length, arr.length / 3);
+          for (let i = 0; i < count; i++) {
+            arr[i * 3] = frame.positions[i][0];
+            arr[i * 3 + 1] = frame.positions[i][1];
+            arr[i * 3 + 2] = frame.positions[i][2];
+          }
+          posAttr.needsUpdate = true;
         }
-        posAttr.needsUpdate = true;
       }
 
       // Force canvas repaint in Three-CAD-Viewer
@@ -3675,25 +3633,14 @@
     function runSimLoop() {
       if (!state.simPlaying) return;
       const maxSteps = state.maxSteps || 1000;
-      const nextStep = (state.simStep + 3) % maxSteps;
+      const stepStride = (state.simTelemetry && state.simTelemetry.frames) ? 1 : 3;
+      const nextStep = (state.simStep + stepStride) % maxSteps;
       updateSimulationStep(nextStep);
-      setTimeout(runSimLoop, 30);
+      const delay = Math.max(10, Math.round(35 / (state.simTimescale || 1.0)));
+      setTimeout(runSimLoop, delay);
     }
 
     // RERUN LOGS SYSTEM (BUG-JUMPING-INSTAR-950)
-    const RERUN_LOGS = [
-      { step: 0, time: "0.00s", level: "INFO", entity: "world/cat_fountain", msg: "SPH simulation domain initialized. Reservoir pool: 1.50 L, 600 active particles." },
-      { step: 100, time: "0.40s", level: "INFO", entity: "cat_fountain/impeller", msg: "Impeller volute spin-up: 1800 RPM. Centrifugal pressure head established." },
-      { step: 200, time: "0.80s", level: "METRIC", entity: "metrics/flow_spout", msg: "Spout eruption: first fluid particles exit vertical tube dome at (0, 28, 107). Flow: 50 mL/s." },
-      { step: 350, time: "1.40s", level: "INFO", entity: "cat_fountain/lid", msg: "Lid drinking tray wetting front reached R=45mm." },
-      { step: 450, time: "1.80s", level: "METRIC", entity: "metrics/flow_tube", msg: "Continuous laminar fluid sheet formed across lid platform at Z=105mm." },
-      { step: 600, time: "2.40s", level: "INFO", entity: "cat_fountain/rim", msg: "Fluid front reaches perimeter rim R=78mm. Waterfall cascade initiation." },
-      { step: 700, time: "2.80s", level: "METRIC", entity: "metrics/flow_waterfall", msg: "Waterfall drainage into reservoir pool active: 110 mL/s. Front cutout drain: 25 mL/s." },
-      { step: 850, time: "3.40s", level: "INFO", entity: "cat_fountain/volute", msg: "Closed-loop recirculation established. Suction return at pump intake Z=44mm." },
-      { step: 950, time: "3.80s", level: "METRIC", entity: "metrics/reservoir_volume", msg: "Steady-state equilibrium reached: 240 mL/s circulation, pool volume 1.83 L, zero leakage." },
-      { step: 1000, time: "4.00s", level: "INFO", entity: "world/cat_fountain", msg: "Full simulation cycle completed. Tait EOS numerical stability verified." }
-    ];
-
     function renderRerunLogs(query = "") {
       const container = document.getElementById("rerun-logs-list");
       const countEl = document.getElementById("rerun-logs-count");
@@ -3703,7 +3650,9 @@
       const q = (query || "").trim().toLowerCase();
       if (clearBtn) clearBtn.style.display = q ? "inline-block" : "none";
 
-      const filtered = RERUN_LOGS.filter(item => {
+      const logs = (state.simTelemetry && state.simTelemetry.logs) ? state.simTelemetry.logs : [];
+
+      const filtered = logs.filter(item => {
         if (!q) return true;
         return (
           item.step.toString().includes(q) ||
@@ -3715,11 +3664,11 @@
       });
 
       if (countEl) {
-        countEl.textContent = `${filtered.length} of ${RERUN_LOGS.length} milestones`;
+        countEl.textContent = `${filtered.length} of ${logs.length} milestones`;
       }
 
       if (filtered.length === 0) {
-        container.innerHTML = `<div style="padding: 12px; color: var(--quake-text-muted); text-align: center; font-size: 11px;">No rerun logs matching "${query}"</div>`;
+        container.innerHTML = `<div style="padding: 12px; color: var(--quake-text-muted); text-align: center; font-size: 11px;">${logs.length === 0 ? "Loading simulation telemetry milestones..." : `No rerun logs matching "${query}"`}</div>`;
         return;
       }
 
@@ -4381,6 +4330,24 @@
         const nextStep = parseInt(e.target.value);
         if (!simParticlesMesh) initSimulationParticles();
         updateSimulationStep(nextStep);
+      });
+      document.getElementById("sim-timescale")?.addEventListener("change", (e) => {
+        state.simTimescale = parseFloat(e.target.value) || 1.0;
+      });
+      document.getElementById("btn-open-rerun")?.addEventListener("click", () => {
+        showToast("Launching Rerun Viewer...", 3000);
+        fetch(`/api/scope/open_rerun?project=${encodeURIComponent(state.currentProject)}&target=${encodeURIComponent(state.currentTarget)}`, { method: "POST" })
+          .then(r => r.json())
+          .then(res => {
+            if (res.status === "ok") {
+              showToast(res.message || "Rerun Viewer launched", 3000);
+            } else {
+              showToast(res.error || "Failed to launch Rerun Viewer", 4000);
+            }
+          })
+          .catch(err => {
+            showToast("Failed to launch Rerun Viewer: " + err, 4000);
+          });
       });
       document.querySelectorAll(".sim-log-chip").forEach(chip => {
         chip.addEventListener("click", () => {

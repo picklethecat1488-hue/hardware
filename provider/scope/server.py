@@ -307,6 +307,14 @@ class ScopeRequestHandler(BaseHTTPRequestHandler):
                     self._send_json(payload.get("pcb_metadata", {}))
                 except Exception as err:
                     self._send_json({"error": str(err)}, status=500)
+            case "/api/scope/simulation_telemetry":
+                project = query.get("project", [""])[0]
+                target = query.get("target", [""])[0]
+                try:
+                    payload = self.server.pipeline.load_simulation_telemetry(project, target)
+                    self._send_json(payload)
+                except Exception as err:
+                    self._send_json({"error": str(err)}, status=500)
             case _:
                 self.send_error(404, f"Endpoint {path} not found")
 
@@ -326,6 +334,8 @@ class ScopeRequestHandler(BaseHTTPRequestHandler):
         match path:
             case "/api/scope/target_bug":
                 self._handle_target_bug(data)
+            case "/api/scope/open_rerun":
+                self._handle_open_rerun(data, parsed)
             case _:
                 self.send_error(404, f"Endpoint {path} not found")
 
@@ -438,6 +448,55 @@ class ScopeRequestHandler(BaseHTTPRequestHandler):
             )
         except Exception as err:
             self._send_json({"error": f"Failed to file bug: {err}"}, status=500)
+
+    def _handle_open_rerun(self, data: Dict[str, Any], parsed: urllib.parse.ParseResult) -> None:
+        """Launch official Rerun Viewer for deep telemetry inspection."""
+        query = urllib.parse.parse_qs(parsed.query)
+        project = data.get("project") or query.get("project", ["cat_fountain"])[0]
+        target = data.get("target") or query.get("target", ["product"])[0]
+        rec = data.get("recording") or query.get("recording", [""])[0]
+
+        rrd_path: Optional[Path] = None
+        if rec and Path(rec).exists():
+            rrd_path = Path(rec)
+        else:
+            candidates = [
+                Path(f"recordings/{project}_3blade.rrd"),
+                Path(f"recordings/{project}.rrd"),
+                Path(f"recordings/{project}_{target}.rrd"),
+            ]
+            for cand in candidates:
+                if cand.exists():
+                    rrd_path = cand
+                    break
+
+        if rrd_path is None or not rrd_path.exists():
+            recordings_dir = Path("recordings")
+            if recordings_dir.exists():
+                for f in recordings_dir.glob("*.rrd"):
+                    if project in f.name:
+                        rrd_path = f
+                        break
+
+        if rrd_path is None or not rrd_path.exists():
+            self._send_json({"error": f"No simulation recording found for {project}/{target}"}, status=404)
+            return
+
+        try:
+            import subprocess
+            import shutil
+
+            rerun_bin = shutil.which("rerun") or "rerun"
+            subprocess.Popen([rerun_bin, str(rrd_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self._send_json(
+                {
+                    "status": "ok",
+                    "message": f"Launched Rerun Viewer with {rrd_path.name}",
+                    "recording": str(rrd_path),
+                }
+            )
+        except Exception as err:
+            self._send_json({"error": f"Failed to launch Rerun Viewer: {err}"}, status=500)
 
 
 class ScopeServer(ThreadingHTTPServer):
