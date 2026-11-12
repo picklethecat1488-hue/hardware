@@ -1032,3 +1032,24 @@ def test_regression_bug_springing_grub_126_motor_base_fixed_and_impeller_rotatin
     assert check_rotation("cat_fountain/impeller")
     assert check_rotation("cat_fountain/drive_hub")
     assert check_rotation("cat_fountain/motor_rotor")
+
+
+def test_scope_headless_simulation_capture_rrd(tmp_path):
+    """Verify GUI-less simulation capture with scope.py -s <steps> --save-rrd <path>."""
+    from tools.scope import ScopeTool, get_args
+
+    rrd_out = tmp_path / "test_headless.rrd"
+    args = get_args(
+        [
+            "cat_fountain/product:view/simulate",
+            "-s",
+            "2",
+            "--save-rrd",
+            str(rrd_out),
+        ]
+    )
+    tool = ScopeTool()
+    ret = tool.run(args)
+    assert ret == 0
+    assert rrd_out.exists()
+    assert rrd_out.stat().st_size > 0

@@ -108,6 +108,109 @@ class ScopeTool:
             self.logger.print("Scope workstation is not running.", symbol="➜")
             return 0
 
+    def run_headless_simulation(self, args: argparse.Namespace) -> int:
+        """Execute physical simulation headlessly without GUI and capture RRD / MP4 artifacts."""
+        from provider.scope.pipeline import ScopeGeometryPipeline
+        from provider.types import Section, Mode
+        from provider.room import Room
+
+        primary_target = args.targets[0] if args.targets else None
+        if not primary_target:
+            self.logger.print("Error: No target specified for simulation capture.", symbol="❌")
+            return 1
+
+        proj, target, sub, auto_mode = parse_target_string(primary_target)
+        mode = args.mode or auto_mode or "SIMULATE"
+
+        self.logger.print(
+            f"Initializing headless simulation capture for {proj}/{target} (mode: {mode})...",
+            symbol="🌊",
+        )
+
+        pipeline = ScopeGeometryPipeline(manager=self.manager, logger=self.logger)
+
+        try:
+            parsed_targets = pipeline.target_parser.resolve(primary_target, Section.VIEW)
+        except Exception:
+            try:
+                parsed_targets = pipeline.target_parser.resolve(f"{proj}/{target}", Section.VIEW)
+            except Exception as err:
+                self.logger.print(f"Error: Failed to resolve simulation view target: {err}", symbol="❌")
+                return 1
+
+        parsed_targets = parsed_targets.for_modes([Mode.SIMULATE])
+        results = pipeline.manager.router.run(parsed_targets)
+        if not results:
+            self.logger.print(f"Error: No simulation room produced for target '{primary_target}'.", symbol="❌")
+            return 1
+
+        fq_target = f"{proj}/{target}"
+
+        # Ensure URDF is compiled if not already present
+        from tools.list import Lister
+
+        lister = Lister(pipeline.manager, self.logger)
+        urdf_rel_path = lister.get_urdf_output(fq_target)
+        real_urdf_path = Path("build") / urdf_rel_path
+        if not real_urdf_path.exists():
+            from tools.build import Builder
+
+            builder = Builder(pipeline.manager, self.logger)
+            builder.export_urdf([fq_target])
+
+        for room_name, room in results:
+            if not isinstance(room, Room):
+                self.logger.print(f"Error: Target '{room_name}' did not produce a Room object.", symbol="❌")
+                return 1
+
+            steps = args.steps if args.steps is not None else 20000
+            save_rrd = args.save_rrd
+            save_mp4 = args.save_mp4
+
+            if save_rrd:
+                Path(save_rrd).parent.mkdir(parents=True, exist_ok=True)
+            if save_mp4:
+                Path(save_mp4).parent.mkdir(parents=True, exist_ok=True)
+
+            self.logger.print(
+                f"Running simulation: {steps} steps -> RRD: {save_rrd or 'None'}, MP4: {save_mp4 or 'None'}",
+                symbol="🤖",
+            )
+
+            p_map = {p.name: p for p in pipeline.manager.router.providers}
+            provider = p_map.get(proj)
+            hooks = getattr(room, "provider_hooks", None)
+            if not hooks and provider:
+                try:
+                    hooks = provider.get_simulate_hooks(target)
+                except Exception:
+                    hooks = {}
+            if hooks is None:
+                hooks = {}
+
+            room.simulate(
+                provider_hooks=hooks,
+                proj_name=proj,
+                sim_target=fq_target,
+                steps=steps,
+                manager=pipeline.manager,
+                logger=self.logger,
+                save_rrd=save_rrd,
+                save_mp4=save_mp4,
+                fps=args.fps,
+                spawn_viewer=False,
+                stage_window_size=args.stage_window_size,
+            )
+            self.logger.print("Headless simulation completed successfully.", symbol="✅")
+            if save_rrd and Path(save_rrd).exists():
+                size_mb = Path(save_rrd).stat().st_size / (1024 * 1024)
+                self.logger.print(f"Artifact captured: {save_rrd} ({size_mb:.2f} MB)", symbol="📦")
+            if save_mp4 and Path(save_mp4).exists():
+                size_mb = Path(save_mp4).stat().st_size / (1024 * 1024)
+                self.logger.print(f"Artifact captured: {save_mp4} ({size_mb:.2f} MB)", symbol="📦")
+
+        return 0
+
     def run(self, args: argparse.Namespace) -> int:
         """Execute Scope workstation server lifecycle."""
         # 1. Subcommands
@@ -117,6 +220,10 @@ class ScopeTool:
         if args.targets and args.targets[0] == "restart":
             self.handle_stop()
             args.targets = args.targets[1:]
+
+        # 2. Headless simulation capture mode (e.g. anvil simulate ... -s 500 --save-rrd ...)
+        if getattr(args, "save_rrd", None) or getattr(args, "save_mp4", None):
+            return self.run_headless_simulation(args)
 
         lock_file = _repo_dir / "build" / "scope.lock"
         if lock_file.exists() and not getattr(args, "no_detach", False):
@@ -361,6 +468,37 @@ def setup_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help="Path to scope log file (default: build/scope.log).",
+    )
+    parser.add_argument(
+        "-s",
+        "--steps",
+        type=int,
+        default=None,
+        help="Number of simulation steps to run in simulation capture mode.",
+    )
+    parser.add_argument(
+        "--save-rrd",
+        type=str,
+        default=None,
+        help="Path to save simulation Rerun recording (.rrd) in GUI-less capture mode.",
+    )
+    parser.add_argument(
+        "--save-mp4",
+        type=str,
+        default=None,
+        help="Path to save simulation video recording (.mp4) in GUI-less capture mode.",
+    )
+    parser.add_argument(
+        "--stage-window-size",
+        type=int,
+        default=None,
+        help="Stage window size for staging and merging simulation recordings.",
+    )
+    parser.add_argument(
+        "--fps",
+        type=int,
+        default=60,
+        help="Simulation frame rate (default: 60).",
     )
     return parser
 
