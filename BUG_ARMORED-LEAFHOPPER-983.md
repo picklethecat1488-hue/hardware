@@ -6,6 +6,7 @@
 - **Severity**: `HIGH`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `daemon`
+- **Created**: `2026-11-12 17:48:20 UTC`
 
 #### Description
 
