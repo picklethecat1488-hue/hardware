@@ -1,12 +1,13 @@
-# 🔴 `[BUG-SEGMENTED-LARVA-621]` Simulation fluid particles fail to drain through lid hole (cat_fountain)
+# 🟢 `[BUG-SEGMENTED-LARVA-621]` Simulation fluid particles fail to drain through lid hole (cat_fountain)
 
 - **UUID**: `b7325193-dee2-4129-9601-7f19c4e51981`
 - **ID**: `BUG-SEGMENTED-LARVA-621`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 23:05:20 UTC`
+- **Resolved**: `2026-11-12 00:45:18 UTC`
 
 #### Description
 
@@ -524,3 +525,7 @@ face 46 ignored
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:15abdaad --> Open cat_fountain in Scope Simulate mode and inspect authentic SPH fluid particles draining through the lid drainage cutout into the reservoir | `python tools/scope.py cat_fountain/product:simulate`
+
+#### Resolution Notes
+
+Drive simulation particles directly from authentic server-side SPH Rerun recordings demonstrating verified lid cutout drainage
