@@ -1,6 +1,6 @@
 # 🟢 `[BUG-MANDIBLED-DOBSONFLY-52]` Regression tests are not useful
 
-- **UUID**: `d0cf7dc5-30f2-4605-8554-01b26a8b99b4`
+- **UUID**: `80f99876-1aa7-493f-af26-fa895535283f`
 - **ID**: `BUG-MANDIBLED-DOBSONFLY-52`
 - **Status**: `CLOSED`
 - **Severity**: `HIGH`
