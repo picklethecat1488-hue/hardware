@@ -1,12 +1,13 @@
-# 🔴 `[BUG-RADIANT-SKIPPER-379]` UI scale selector defaults to 75% on load and fails to increase at 100% scale in scope workstation
+# 🟢 `[BUG-RADIANT-SKIPPER-379]` UI scale selector defaults to 75% on load and fails to increase at 100% scale in scope workstation
 
 - **UUID**: `ba1a0115-bea3-405a-bc29-4b4dc60cf46b`
 - **ID**: `BUG-RADIANT-SKIPPER-379`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `HIGH`
 - **Category**: `UI`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-12 18:04:04 UTC`
+- **Resolved**: `2026-11-12 18:04:23 UTC`
 
 #### Description
 
@@ -15,3 +16,7 @@ In provider/templates/scope.html.j2, uiScaleSelect lacked the selected attribute
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:07ccb8f5 --> Verify UI scale selector defaults to 100% and scales properly | `python tools/scope.py`
+
+#### Resolution Notes
+
+Added selected attribute to option 100% in uiScaleSelect dropdown, changed root styles to width/height 100% instead of 100vw/100vh for zoom scaling, and updated initUiScale to default to 100% and auto-correct former erroneous 75% fallback.
