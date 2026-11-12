@@ -510,10 +510,21 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
             self._send_json({"error": "Empty command"}, status=400)
             return
 
+        env = os.environ.copy()
+        py_bin_dir = str(Path(sys.executable).resolve().parent)
+        env["PATH"] = f"{py_bin_dir}{os.pathsep}{env.get('PATH', '')}"
+        repo_str = str(self.server.repo_root)
+        tools_str = str(self.server.repo_root / "tools")
+        existing_pypath = env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = f"{repo_str}{os.pathsep}{tools_str}" + (
+            f"{os.pathsep}{existing_pypath}" if existing_pypath else ""
+        )
+
         proc = subprocess.run(
             cmd,
             shell=True,
-            cwd=str(self.server.repo_root),
+            cwd=repo_str,
+            env=env,
             capture_output=True,
             text=True,
         )

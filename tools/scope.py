@@ -94,6 +94,13 @@ class ScopeTool:
                 pid = data.get("pid")
                 if pid:
                     os.kill(pid, signal.SIGTERM)
+                    deadline = time.time() + 1.5
+                    while time.time() < deadline:
+                        try:
+                            os.kill(pid, 0)
+                            time.sleep(0.05)
+                        except OSError:
+                            break
                     self.logger.print(f"Stopped Scope workstation (PID {pid}).", symbol="➜")
             except OSError as e:
                 self.logger.print(f"Could not stop Scope: {e}", symbol="❌")
@@ -225,39 +232,12 @@ class ScopeTool:
         if getattr(args, "save_rrd", None) or getattr(args, "save_mp4", None):
             return self.run_headless_simulation(args)
 
-        lock_file = _repo_dir / "build" / "scope.lock"
-        if lock_file.exists() and not getattr(args, "no_detach", False):
-            try:
-                data = json.loads(lock_file.read_text(encoding="utf-8"))
-                running_pid = data.get("pid")
-                running_url = data.get("url")
-                if running_pid:
-                    try:
-                        os.kill(running_pid, 0)
-                        self.logger.print(
-                            f"Scope workstation is already running at {running_url} (PID {running_pid}).",
-                            symbol="➜",
-                        )
-                        self.logger.print(
-                            "Use 'python tools/scope.py stop' or 'python tools/scope.py restart' to manage it.",
-                            symbol="➜",
-                        )
-                        return 0
-                    except OSError:
-                        lock_file.unlink(missing_ok=True)
-            except Exception:
-                pass
-
         primary_target = args.targets[0] if args.targets else None
         proj, target, sub, auto_mode = parse_target_string(primary_target)
         mode = args.mode or auto_mode
 
-        port = args.port
-        if is_port_in_use(port, args.host):
-            port = find_available_port(start_port=port, host=args.host)
-
-        if proj and target:
-            url_params = urllib.parse.urlencode(
+        expected_query = (
+            urllib.parse.urlencode(
                 {
                     "project": proj,
                     "target": target,
@@ -265,7 +245,42 @@ class ScopeTool:
                     "mode": mode,
                 }
             )
-            server_url = f"http://{args.host}:{port}/?{url_params}"
+            if proj
+            else ""
+        )
+
+        lock_file = _repo_dir / "build" / "scope.lock"
+        if lock_file.exists() and not getattr(args, "no_detach", False):
+            try:
+                data = json.loads(lock_file.read_text(encoding="utf-8"))
+                running_pid = data.get("pid")
+                running_url = data.get("url", "")
+                if running_pid:
+                    try:
+                        os.kill(running_pid, 0)
+                        running_query = urllib.parse.urlsplit(running_url).query
+                        if getattr(args, "no_browser", False) and running_query == expected_query:
+                            self.logger.print(
+                                f"Scope workstation is already running at {running_url} (PID {running_pid}).",
+                                symbol="➜",
+                            )
+                            self.logger.print(
+                                "Use 'python tools/scope.py stop' or 'python tools/scope.py restart' to manage it.",
+                                symbol="➜",
+                            )
+                            return 0
+                        self.handle_stop()
+                    except OSError:
+                        lock_file.unlink(missing_ok=True)
+            except (json.JSONDecodeError, OSError):
+                lock_file.unlink(missing_ok=True)
+
+        port = args.port
+        if is_port_in_use(port, args.host):
+            port = find_available_port(start_port=port, host=args.host)
+
+        if proj:
+            server_url = f"http://{args.host}:{port}/?{expected_query}"
         else:
             server_url = f"http://{args.host}:{port}/"
 

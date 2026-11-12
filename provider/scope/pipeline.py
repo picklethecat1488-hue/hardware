@@ -127,6 +127,16 @@ class ScopeGeometryPipeline:
         except OSError:
             return False
 
+    @staticmethod
+    def _normalize_subassembly(subassembly: Optional[str]) -> Optional[str]:
+        """Normalize empty or mode-specifier subassembly strings to None."""
+        if not subassembly:
+            return None
+        cleaned = subassembly.strip()
+        if not cleaned or cleaned.lower() in ("cad", "pcb", "simulate", "diagram", "view", "part"):
+            return None
+        return cleaned
+
     def get_cached_gzip(
         self,
         project: str,
@@ -140,6 +150,7 @@ class ScopeGeometryPipeline:
             target = "product"
             mode = "SIMULATE"
 
+        subassembly = self._normalize_subassembly(subassembly)
         mode_upper = mode.upper()
         cache_key = (project, target, subassembly, mode_upper, step_index)
         with self._lock:
@@ -240,6 +251,7 @@ class ScopeGeometryPipeline:
             target = "product"
             mode = "SIMULATE"
 
+        subassembly = self._normalize_subassembly(subassembly)
         mode_upper = mode.upper()
         cache_key = (project, target, subassembly, mode_upper, step_index)
 

@@ -167,3 +167,12 @@ def test_parse_target_string():
     assert target == "bowl"
     assert sub is None
     assert mode == "CAD"
+
+    # Explicit :cad and /cad suffixes (BUG-TARSIAL-TERMITE-773)
+    assert parse_target_string("cat_fountain/product:cad") == ("cat_fountain", "product", None, "CAD")
+    assert parse_target_string("carrier_board/carrier_board:cad") == ("carrier_board", "carrier_board", None, "CAD")
+    assert parse_target_string("cat_fountain/product/cad") == ("cat_fountain", "product", None, "CAD")
+    assert parse_target_string("cat_fountain/product:print:cad") == ("cat_fountain", "product", "print", "CAD")
+
+    # Project-only target string
+    assert parse_target_string("carrier_board") == ("carrier_board", "", None, "CAD")

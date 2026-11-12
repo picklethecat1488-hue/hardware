@@ -1269,8 +1269,8 @@ def test_regression_bug_dorsal_midge_176_pcb_layer_order_colors_orientation_net_
 
     assert "setupPcbOrientation" in html
     assert "drawPcbNetLabels" in html
-    assert "cam.top = -Math.abs(halfH)" in html
-    assert "cam.bottom = Math.abs(halfH)" in html
+    assert "scale.set(1, -1, 1)" in html
+    assert "cam.top = -Math.abs(halfH)" not in html
     assert 'camRight.style.display = is2D ? "none" : ""' in html
 
 
@@ -1400,3 +1400,167 @@ def test_regression_bug_radiant_skipper_379_ui_scale_default_100_percent(scope_s
     # 3. initUiScale must auto-correct former 75% fallback and default to 100%
     assert 'saved === "75%"' in html
     assert 'localStorage.setItem(UI_SCALE_KEY, "100%");' in html
+
+
+def test_regression_bug_tarsial_termite_773_cad_and_pcb_target_loading_and_orientation(
+    scope_server, monkeypatch, tmp_path
+):
+    """Verify :cad subassembly defensive handling, Y-mirrored PCB non-culled orientation, resizeCadView priority, and scope.lock replacement (BUG-TARSIAL-TERMITE-773)."""
+    # 1. Stale or explicit ?subassembly=cad / ?subassembly=pcb URLs must resolve cleanly with HTTP 200
+    load_url = f"http://127.0.0.1:{scope_server.actual_port}/api/scope/load?project=cat_fountain&target=bowl&subassembly=cad&mode=CAD"
+    req_load = urllib.request.urlopen(load_url)
+    assert req_load.status == 200
+    payload = json.loads(req_load.read().decode("utf-8"))
+    assert "shapes" in payload or "instances" in payload
+
+    # 2. Behavioral JS verification of unrendered guards, resizeCadView, Y-mirrored PCB scene, and picking
+    html_url = f"http://127.0.0.1:{scope_server.actual_port}/?project=carrier_board&target=carrier_board&mode=PCB"
+    html = urllib.request.urlopen(html_url).read().decode("utf-8")
+
+    node_bin = shutil.which("node")
+    if node_bin:
+        setup_match = re.search(r"(function setupPcbOrientation\([^)]*\)\s*\{.*?\n    \})", html, re.DOTALL)
+        pick_match = re.search(
+            r"(function distanceToSegment\(.*?\n    function findPcbEntityAtPoint\(.*?\n      return bestEntity;\n    \})",
+            html,
+            re.DOTALL,
+        )
+        assert setup_match is not None, "setupPcbOrientation must exist in scope.html.j2"
+        assert pick_match is not None, "findPcbEntityAtPoint must exist in scope.html.j2"
+
+        harness = f"""
+const assert = require('assert');
+let pcbIsFlipped = false;
+const state = {{
+  currentMode: 'PCB',
+  viewer: {{
+    _rendered: null,
+    setOrthoCalled: 0,
+    setOrtho(v) {{
+      if (!this._rendered) throw new TypeError('Cannot read properties of null');
+      this.setOrthoCalled++;
+      this._rendered.camera.ortho = v;
+    }},
+    update() {{}},
+  }},
+  pcbMetadata: {{
+    pads: [{{ comp: 'U1', pin: '1', net: 'VCC_3V3', x: 10.0, y: 25.0, w: 1.0, h: 1.0, layer: 'F.Cu' }}],
+    traces: [],
+    vias: [],
+    test_points: [],
+    components: [{{ ref_des: 'U1', footprint: 'QFN', position: [10.0, 25.0], size: [4.0, 4.0] }}],
+    nets: [{{ name: 'VCC_3V3', pins: ['U1.1'] }}],
+  }},
+}};
+function getViewerRendered() {{
+  return (state.viewer && (state.viewer._rendered || state.viewer.rendered)) || null;
+}}
+const window = {{
+  THREE: {{
+    Vector3: class Vector3 {{
+      constructor(x = 0, y = 0, z = 0) {{ this.x = x; this.y = y; this.z = z; }}
+      project(cam) {{
+        return new Vector3((this.x - cam.target.x) / 50.0, (this.y - cam.target.y) / 50.0, 0);
+      }}
+      copy(other) {{ this.x = other.x; this.y = other.y; this.z = other.z; return this; }}
+    }},
+    Quaternion: class Quaternion {{
+      constructor(x = 0, y = 0, z = 0, w = 1) {{ this.x = x; this.y = y; this.z = z; this.w = w; }}
+    }},
+  }},
+}};
+{setup_match.group(1)}
+{pick_match.group(1)}
+
+// A. Unrendered viewer must NOT throw when setupPcbOrientation runs early
+setupPcbOrientation(true);
+
+// B. Rendered viewer must keep cam.top > 0 (no backface culling) and mirror rootGroup Y to -1
+const oCam = {{
+  isOrthographicCamera: true,
+  top: 60,
+  bottom: -60,
+  target: new window.THREE.Vector3(40, 30, 0),
+  updateProjectionMatrix() {{}},
+  updateMatrixWorld() {{}},
+}};
+state.viewer._rendered = {{
+  nestedGroup: {{
+    rootGroup: {{
+      scale: {{ x: 1, y: 1, z: 1, set(x, y, z) {{ this.x = x; this.y = y; this.z = z; }} }},
+      updateMatrixWorld() {{}},
+    }},
+  }},
+  camera: {{
+    ortho: false,
+    oCamera: oCam,
+    camera: oCam,
+    target: oCam.target,
+    presetCamera() {{}},
+    setQuaternion() {{}},
+  }},
+  controls: {{
+    target: new window.THREE.Vector3(40, 30, 0),
+    update() {{}},
+  }},
+}};
+setupPcbOrientation(true);
+assert.strictEqual(state.viewer._rendered.nestedGroup.rootGroup.scale.y, -1, 'PCB rootGroup must mirror Y');
+assert.ok(oCam.top > 0 && oCam.bottom < 0, 'OrthographicCamera frustum must stay positive (right-handed) to avoid WebGL backface culling');
+assert.strictEqual(oCam.target.y, -30, 'Camera lookAt target Y must mirror original center Y');
+
+// C. Clicking at Three.js world (10, -25) -> KiCad (10, +25) must pick pad U1.1 both in world and screen space
+const worldPick = findPcbEntityAtPoint(10.0, 25.0, 0.8, null, null, null, 0, 0);
+assert.ok(worldPick && worldPick.type === 'pad' && worldPick.data.comp === 'U1', 'World pick must resolve U1.1');
+// Screen projection of pad (10, 25) in mirrored world (10, -25) relative to target (40, -30):
+// ndcX = (10 - 40)/50 = -0.6 -> px = 0.2 * 1000 = 200
+// ndcY = (-25 - (-30))/50 = +0.1 -> py = (-0.1 + 1)/2 * 1000 = 450
+const screenPick = findPcbEntityAtPoint(10.0, 25.0, 0.8, 200, 450, oCam, 1000, 1000);
+assert.ok(screenPick && screenPick.type === 'pad' && screenPick.data.comp === 'U1', 'Screen pick must project (px, -py) to match mirrored mesh');
+console.log('BEHAVIORAL_OK');
+"""
+        res = subprocess.run([node_bin, "-e", harness], capture_output=True, text=True)
+        assert res.returncode == 0 and "BEHAVIORAL_OK" in res.stdout, (
+            f"PCB orientation/picking behavioral check failed:\nSTDOUT: {res.stdout}\nSTDERR: {res.stderr}"
+        )
+
+    # 3. Verify ScopeTool replaces an existing scope.lock instance when invoked with a new target
+    import tools.scope as scope_mod
+
+    fake_repo = tmp_path / "repo"
+    (fake_repo / "build").mkdir(parents=True)
+    lock_file = fake_repo / "build" / "scope.lock"
+    lock_file.write_text(json.dumps({"pid": 999991, "url": "http://127.0.0.1:8001/"}), encoding="utf-8")
+
+    stopped_pids = []
+    monkeypatch.setattr(scope_mod, "_repo_dir", fake_repo)
+    monkeypatch.setattr(
+        os,
+        "kill",
+        lambda pid, sig: (
+            stopped_pids.append((pid, sig))
+            if sig != 0
+            else (None if not stopped_pids else (_ for _ in ()).throw(ProcessLookupError()))
+        ),
+    )
+
+    spawned_cmds = []
+
+    class DummyProc:
+        pid = 999992
+
+        def poll(self):
+            lock_file.write_text(
+                json.dumps({"pid": 999992, "url": "http://127.0.0.1:8001/?project=cat_fountain"}), encoding="utf-8"
+            )
+            return None
+
+    monkeypatch.setattr(subprocess, "Popen", lambda cmd, **kw: spawned_cmds.append(cmd) or DummyProc())
+    tool = scope_mod.ScopeTool()
+    args = scope_mod.get_args(["cat_fountain/product:cad"])
+    rc = tool.run(args)
+    assert rc == 0
+    assert any(pid == 999991 for pid, _ in stopped_pids), (
+        "Prior Scope instance must be stopped when launching a new target"
+    )
+    assert len(spawned_cmds) == 1, "New Scope detached server must be spawned for the requested target"

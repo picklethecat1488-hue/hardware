@@ -14,17 +14,28 @@ def parse_target_string(target_str: Optional[str]) -> tuple[str, str, Optional[s
         return "", "", None, "CAD"
 
     mode = "CAD"
-    clean_target = target_str
+    clean_target = target_str.strip()
+    lower_target = clean_target.lower()
 
-    if clean_target.endswith(":pcb") or "/pcb" in clean_target:
+    if lower_target.endswith(":pcb") or "/pcb" in lower_target:
         mode = "PCB"
-        clean_target = clean_target.replace(":pcb", "").replace("/pcb", "")
-    elif clean_target.endswith(":simulate") or "/simulate" in clean_target:
+        clean_target = clean_target.replace(":pcb", "").replace(":PCB", "").replace("/pcb", "").replace("/PCB", "")
+    elif lower_target.endswith(":simulate") or "/simulate" in lower_target:
         mode = "SIMULATE"
-        clean_target = clean_target.replace(":simulate", "").replace("/simulate", "")
-    elif clean_target.endswith(":diagram") or "/diagram" in clean_target:
+        clean_target = (
+            clean_target.replace(":simulate", "")
+            .replace(":SIMULATE", "")
+            .replace("/simulate", "")
+            .replace("/SIMULATE", "")
+        )
+    elif lower_target.endswith(":diagram") or "/diagram" in lower_target:
         mode = "DIAGRAM"
-        clean_target = clean_target.replace(":diagram", "").replace("/diagram", "")
+        clean_target = (
+            clean_target.replace(":diagram", "").replace(":DIAGRAM", "").replace("/diagram", "").replace("/DIAGRAM", "")
+        )
+    elif lower_target.endswith(":cad") or "/cad" in lower_target:
+        mode = "CAD"
+        clean_target = clean_target.replace(":cad", "").replace(":CAD", "").replace("/cad", "").replace("/CAD", "")
 
     # Strip action specifiers like :view or :part
     if clean_target.endswith(":view") or "/view" in clean_target:
@@ -35,10 +46,14 @@ def parse_target_string(target_str: Optional[str]) -> tuple[str, str, Optional[s
     subassembly = None
     if ":" in clean_target:
         clean_target, subassembly = clean_target.split(":", 1)
+        if subassembly and subassembly.lower() in ("cad", "pcb", "simulate", "diagram", "view", "part"):
+            subassembly = None
 
     base = clean_target.split(":", 1)[0]
-    project = base.split("/", 1)[0] if "/" in base else ""
-    target = base.split("/", 1)[1] if "/" in base else ""
+    if "/" in base:
+        project, target = base.split("/", 1)
+    else:
+        project, target = base, ""
 
     return project, target, subassembly, mode
 

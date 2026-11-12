@@ -1498,16 +1498,16 @@
       const h = Math.round(rect.height || container.clientHeight || window.innerHeight - 44);
       if (w > 0 && h > 0 && state.viewer) {
         try {
-          if (typeof state.viewer.resize === "function") {
-            state.viewer.resize(w, h);
-          } else if (typeof state.viewer.resizeCadView === "function") {
+          if (typeof state.viewer.resizeCadView === "function") {
             state.viewer.resizeCadView(w, 0, h, true);
+          } else if (typeof state.viewer.resize === "function" && getViewerRendered()) {
+            state.viewer.resize();
           }
         } catch {
           // Suppress unrendered resize errors during initialization
         }
         if (state.currentMode === "PCB" && typeof setupPcbOrientation === "function") {
-          setupPcbOrientation();
+          setupPcbOrientation(false);
         }
       }
     }
@@ -1543,7 +1543,7 @@
 
       function toScreen(px, py, pz) {
         if (!useScreen) return null;
-        const v = new window.THREE.Vector3(px, py, pz != null ? pz : 0.8).project(threeCam);
+        const v = new window.THREE.Vector3(px, -py, pz != null ? pz : 0.8).project(threeCam);
         return {
           x: ((v.x + 1) / 2) * canvasWidth,
           y: ((-v.y + 1) / 2) * canvasHeight,
@@ -2038,7 +2038,7 @@
             if (!worldPoint) worldPoint = new window.THREE.Vector3(0, 0, pcbIsFlipped ? -0.8 : 0.8);
 
             const entity = findPcbEntityAtPoint(
-              worldPoint.x, worldPoint.y, worldPoint.z,
+              worldPoint.x, -worldPoint.y, worldPoint.z,
               coords.x, coords.y, threeCam, coords.width, coords.height
             );
             if (entity) {
@@ -2127,23 +2127,25 @@
           rafPending = true;
           requestAnimationFrame(() => {
             rafPending = false;
-            if (state.viewer && state.viewer.controls) {
+            const rDrag = getViewerRendered();
+            if (rDrag && rDrag.controls) {
+              const ctrls = rDrag.controls;
               if (dragMode === "orbit") {
-                if (state.viewer.controls.rotateLeft) {
-                  state.viewer.controls.rotateLeft(pendingDx * 0.005);
-                  state.viewer.controls.rotateUp(pendingDy * 0.005);
-                  state.viewer.controls.update();
+                if (ctrls.rotateLeft) {
+                  ctrls.rotateLeft(pendingDx * 0.005);
+                  ctrls.rotateUp(pendingDy * 0.005);
+                  ctrls.update();
                 }
               } else if (dragMode === "pan") {
-                if (state.viewer.controls.pan) {
-                  state.viewer.controls.pan(pendingDx, pendingDy);
-                  state.viewer.controls.update();
+                if (ctrls.pan) {
+                  ctrls.pan(pendingDx, pendingDy);
+                  ctrls.update();
                 }
               } else if (dragMode === "zoom") {
                 const zoomFactor = Math.pow(0.99, pendingDy);
-                if (typeof state.viewer.controls.dollyIn === "function" && typeof state.viewer.controls.dollyOut === "function") {
-                  if (pendingDy > 0) state.viewer.controls.dollyOut(zoomFactor);
-                  else if (pendingDy < 0) state.viewer.controls.dollyIn(1 / zoomFactor);
+                if (typeof ctrls.dollyIn === "function" && typeof ctrls.dollyOut === "function") {
+                  if (pendingDy > 0) ctrls.dollyOut(zoomFactor);
+                  else if (pendingDy < 0) ctrls.dollyIn(1 / zoomFactor);
                 } else if (typeof state.viewer.zoom === "function") {
                   state.viewer.zoom(zoomFactor);
                 } else {
@@ -2157,7 +2159,7 @@
                     }
                   }
                 }
-                if (state.viewer.controls.update) state.viewer.controls.update();
+                if (ctrls.update) ctrls.update();
               }
             }
             pendingDx = 0;
@@ -2209,8 +2211,9 @@
           }
           if (!worldPoint) worldPoint = new window.THREE.Vector3(0, 0, pcbIsFlipped ? -0.8 : 0.8);
 
+          const pcbClickY = -worldPoint.y;
           const entity = findPcbEntityAtPoint(
-            worldPoint.x, worldPoint.y, worldPoint.z,
+            worldPoint.x, pcbClickY, worldPoint.z,
             coords.x, coords.y, threeCam, coords.width, coords.height
           );
           if (entity) {
@@ -2232,7 +2235,7 @@
               if (inspectEl) {
                 inspectEl.innerHTML = formatInspectHtml({
                   name: entityName,
-                  point: `(${worldPoint.x.toFixed(2)}, ${worldPoint.y.toFixed(2)}, ${worldPoint.z.toFixed(2)}) mm`,
+                  point: `(${worldPoint.x.toFixed(2)}, ${pcbClickY.toFixed(2)}, ${worldPoint.z.toFixed(2)}) mm`,
                   entity: entity,
                   component: compObj,
                   net: netObj,
@@ -2393,37 +2396,70 @@
       });
     }
 
-    function setupPcbOrientation() {
+    function setupPcbOrientation(resetTarget = false) {
       if (state.currentMode !== "PCB" || !state.viewer) return;
-      if (typeof state.viewer.setOrtho === "function") {
-        state.viewer.setOrtho(true);
-      }
       const r = getViewerRendered();
       if (!r || !r.camera) return;
+      if (!r.camera.ortho && typeof state.viewer.setOrtho === "function") {
+        state.viewer.setOrtho(true);
+      }
+      if (r._origTargetY === undefined && r.camera.target) {
+        r._origTargetY = r.camera.target.y;
+      }
+      if (r.nestedGroup && r.nestedGroup.rootGroup) {
+        r.nestedGroup.rootGroup.scale.set(1, -1, 1);
+        if (typeof r.nestedGroup.rootGroup.updateMatrixWorld === "function") {
+          r.nestedGroup.rootGroup.updateMatrixWorld(true);
+        }
+      }
       const cam = r.camera.oCamera || (r.camera.camera && r.camera.camera.isOrthographicCamera ? r.camera.camera : null);
       if (cam && cam.isOrthographicCamera) {
-        // KiCad orientation: top is -Y, bottom is +Y, left is -X, right is +X.
-        // Invert top and bottom in Orthographic camera so +Y increases downward.
+        // Keep OrthographicCamera frustum right-handed (cam.top > 0) so Three.js WebGLRenderer
+        // never backface-culls PCB top faces; rootGroup.scale.set(1, -1, 1) sets det(M) < 0,
+        // which makes Three.js automatically switch gl.frontFace to CW while mirroring KiCad +Y downward.
         const halfH = Math.abs(cam.top - cam.bottom) / 2.0 || 60;
-        cam.top = -Math.abs(halfH);
-        cam.bottom = Math.abs(halfH);
+        cam.top = Math.abs(halfH);
+        cam.bottom = -Math.abs(halfH);
         cam.updateProjectionMatrix();
-        if (state.viewer.controls && state.viewer.controls.update) {
-          state.viewer.controls.update();
+      }
+      if (resetTarget && r.camera.target) {
+        r.camera.target.y = -(r._origTargetY || 0);
+        if (typeof r.camera.presetCamera === "function") {
+          r.camera.presetCamera(pcbIsFlipped ? "bottom" : "top");
+          if (pcbIsFlipped && window.THREE && typeof r.camera.setQuaternion === "function") {
+            r.camera.setQuaternion(new window.THREE.Quaternion(0, 1, 0, 0));
+          }
+        }
+        if (r.controls) {
+          if (r.controls.target && typeof r.controls.target.copy === "function") {
+            r.controls.target.copy(r.camera.target);
+          }
+          if (typeof r.controls.update === "function") {
+            r.controls.update();
+          }
+        }
+        if (typeof state.viewer.update === "function") {
+          state.viewer.update(true, false);
         }
       }
     }
 
     function setCameraPreset(viewName) {
-      if (!state.viewer) return;
+      const r = getViewerRendered();
+      if (!state.viewer || !r) return;
+      if (state.currentMode === "PCB") {
+        setupPcbOrientation(true);
+        redrawMarkups();
+        return;
+      }
       if (typeof state.viewer.presetCamera === "function") {
         state.viewer.presetCamera(viewName);
       } else if (typeof state.viewer.presetView === "function") {
         state.viewer.presetView(viewName);
       } else if (typeof state.viewer.setView === "function") {
         state.viewer.setView(viewName);
-      } else if (state.viewer.controls) {
-        const c = getThreeCamera() || state.viewer.camera;
+      } else if (r.controls) {
+        const c = getThreeCamera() || r.camera;
         if (viewName === "top") { c.position.set(0, 0, 200); c.up.set(0, 1, 0); }
         if (viewName === "bottom") { c.position.set(0, 0, -200); c.up.set(0, 1, 0); }
         if (viewName === "front") { c.position.set(0, -200, 0); c.up.set(0, 0, 1); }
@@ -2431,10 +2467,7 @@
         if (viewName === "left") { c.position.set(-200, 0, 0); c.up.set(0, 0, 1); }
         if (viewName === "iso") { c.position.set(150, -150, 150); c.up.set(0, 0, 1); }
         c.lookAt(0, 0, 0);
-        state.viewer.controls.update();
-      }
-      if (state.currentMode === "PCB") {
-        setupPcbOrientation();
+        r.controls.update();
       }
       redrawMarkups();
     }
@@ -2584,6 +2617,19 @@
         }
 
         state.pcbMetadata = data.pcb_metadata;
+        const rRendered = getViewerRendered();
+        if (state.currentMode !== "PCB" && rRendered?.nestedGroup?.rootGroup && rRendered.nestedGroup.rootGroup.scale.y !== 1) {
+          rRendered.nestedGroup.rootGroup.scale.set(1, 1, 1);
+          if (typeof rRendered.nestedGroup.rootGroup.updateMatrixWorld === "function") {
+            rRendered.nestedGroup.rootGroup.updateMatrixWorld(true);
+          }
+          if (rRendered._origTargetY !== undefined && rRendered.camera?.target) {
+            rRendered.camera.target.y = rRendered._origTargetY;
+            if (rRendered.controls?.target?.copy) {
+              rRendered.controls.target.copy(rRendered.camera.target);
+            }
+          }
+        }
         if (state.currentMode === "DIAGRAM") {
           document.body.classList.remove("pcb-high-contrast");
           document.body.classList.add("diagram-mode");
@@ -2602,10 +2648,10 @@
           if (state.viewer && typeof state.viewer.setTheme === "function") {
             state.viewer.setTheme("dark");
           }
-          if (state.viewer && typeof state.viewer.setOrtho === "function") {
+          if (rRendered && typeof state.viewer.setOrtho === "function") {
             state.viewer.setOrtho(true);
           }
-          setupPcbOrientation();
+          setupPcbOrientation(true);
         } else {
           document.body.classList.remove("diagram-mode");
           document.body.classList.remove("pcb-high-contrast");
@@ -2615,7 +2661,7 @@
           if (state.viewer && typeof state.viewer.setTheme === "function") {
             state.viewer.setTheme("dark");
           }
-          if (state.viewer && typeof state.viewer.setOrtho === "function") {
+          if (rRendered && typeof state.viewer.setOrtho === "function") {
             state.viewer.setOrtho(false);
           }
         }
@@ -2717,16 +2763,17 @@
 
     function updateControlsForMode() {
       const is2D = state.currentMode === "PCB" || state.currentMode === "DIAGRAM";
-      if (state.viewer && state.viewer.controls) {
-        state.viewer.controls.enableRotate = !is2D;
+      const r = getViewerRendered();
+      if (r && r.controls) {
+        r.controls.enableRotate = !is2D;
         if (is2D) {
-          state.viewer.controls.mouseButtons = { LEFT: 2, MIDDLE: 1, RIGHT: 2 };
+          r.controls.mouseButtons = { LEFT: 2, MIDDLE: 1, RIGHT: 2 };
         } else {
-          state.viewer.controls.mouseButtons = { LEFT: 0, MIDDLE: 1, RIGHT: 2 };
+          r.controls.mouseButtons = { LEFT: 0, MIDDLE: 1, RIGHT: 2 };
         }
-        if (!state.viewer.controls._pcbChangeAttached && typeof state.viewer.controls.addEventListener === "function") {
-          state.viewer.controls._pcbChangeAttached = true;
-          state.viewer.controls.addEventListener("change", () => {
+        if (!r.controls._pcbChangeAttached && typeof r.controls.addEventListener === "function") {
+          r.controls._pcbChangeAttached = true;
+          r.controls.addEventListener("change", () => {
             if (state.currentMode === "PCB") {
               requestAnimationFrame(redrawMarkups);
             }
@@ -2982,6 +3029,10 @@
         const THREE = window.THREE;
         netHighlightGroup = new THREE.Group();
         netHighlightGroup.name = "NetHighlight_" + net.name;
+        if (state.currentMode === "PCB") {
+          netHighlightGroup.scale.set(1, -1, 1);
+          netHighlightGroup.updateMatrixWorld(true);
+        }
 
         // 1. High contrast dimming of scene meshes
         state.viewer.rendered.scene.traverse((obj) => {
@@ -3518,7 +3569,7 @@
       if (w <= 0 || h <= 0) return;
 
       function toScreen(px, py, pz) {
-        const v = new window.THREE.Vector3(px, py, pz != null ? pz : 0.8).project(threeCam);
+        const v = new window.THREE.Vector3(px, -py, pz != null ? pz : 0.8).project(threeCam);
         return {
           x: ((v.x + 1) / 2) * w,
           y: ((-v.y + 1) / 2) * h,
