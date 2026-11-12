@@ -1350,3 +1350,25 @@ def test_regression_bug_emerald_moth_182_target_and_sync_synchronous_initializat
     # 4. Verify sync button has unconfigured project/target fallback to prevent 400/500 errors
     assert "if (state.currentProject && state.currentTarget)" in html
     assert "openProjectChooserModal();" in html
+
+
+def test_regression_bug_radiant_skipper_379_ui_scale_default_100_percent(scope_server):
+    """Verify UI scale select defaults to 100% selected, cleans up former 75% fallback, and uses percentage root sizing (BUG-RADIANT-SKIPPER-379)."""
+    url = f"http://127.0.0.1:{scope_server.actual_port}/"
+    req = urllib.request.urlopen(url)
+    assert req.status == 200
+    html = req.read().decode("utf-8")
+
+    # 1. Option 100% must have selected attribute
+    assert '<option value="100%" selected>100%</option>' in html
+    assert '<option value="75%" selected>' not in html
+
+    # 2. html, body styles must use 100% instead of 100vw/100vh for zoom compatibility
+    assert "width: 100%;" in html
+    assert "height: 100%;" in html
+    assert "width: 100vw;" not in html
+    assert "height: 100vh;" not in html
+
+    # 3. initUiScale must auto-correct former 75% fallback and default to 100%
+    assert 'saved === "75%"' in html
+    assert 'localStorage.setItem(UI_SCALE_KEY, "100%");' in html
