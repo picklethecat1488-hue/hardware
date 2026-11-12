@@ -13,6 +13,10 @@
 
 When tools/view.py was removed and replaced by tools/scope.py, tools/daemon.py still listed 'view' in preloaded modules and tests/test_daemon.py::test_daemon_spawn_tools attempted client.run('view', ['--help']), causing ModuleNotFoundError: No module named 'view'.
 
+#### Attached Commits
+
+- `f64eb5cd`
+
 #### Resolution Notes
 
 Replaced obsolete view module with scope in daemon preloaded modules and test_daemon_spawn_tools
