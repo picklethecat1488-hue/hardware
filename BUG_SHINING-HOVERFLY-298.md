@@ -522,13 +522,6 @@ face 46 ignored
 2026-11-11 16:59:59 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 16:59:59] "GET /api/scope/simulation_telemetry?project=cat_fountain&target=product HTTP/1.1" 200 -
 ```
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-SHINING-HOVERFLY-298/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
-| `text/plain` | [scope.log](attachments/BUG-SHINING-HOVERFLY-298/scope.log) | Scope workstation execution logs |
-
 #### Attached Commits
 
 - `d845247c`
@@ -536,6 +529,7 @@ face 46 ignored
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:3707fc5c --> Open cat fountain simulation in Scope SIMULATE mode, verify fluid particles render with circular soft sprite texture and velocity-based color grading without shimmer, verify playback controls and step readout do not overlap at any scale, and verify Save .rrd button downloads the recording | `python tools/scope.py cat_fountain/product:simulate`
+- [ ] <!-- task:08e83f11 --> Verify fluid simulation particles smooth blending and hydrodynamic motion blur streamlines with clean STEPS/SCALE badge | `python tools/scope.py cat_fountain/product:simulate`
 
 #### Resolution Notes
 
