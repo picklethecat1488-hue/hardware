@@ -1,6 +1,6 @@
 # 🟢 `[BUG-RADIANT-MANTIS-359]` Regression tests are not useful
 
-- **UUID**: `4b9fa26f-02e9-411d-be9d-925bf5ad9a03`
+- **UUID**: `2a44162d-cad3-4a40-a5fa-899d08d56203`
 - **ID**: `BUG-RADIANT-MANTIS-359`
 - **Status**: `CLOSED`
 - **Severity**: `HIGH`
