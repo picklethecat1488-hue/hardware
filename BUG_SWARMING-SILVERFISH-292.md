@@ -2,12 +2,13 @@
 
 - **UUID**: `cfedf9ee-42c6-4e2f-85b9-c29cb7138a3a`
 - **ID**: `BUG-SWARMING-SILVERFISH-292`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-12 00:59:06 UTC`
 - **Resolved**: `2026-11-12 14:37:52 UTC`
+- **Accepted**: `2026-11-12 14:38:01 UTC`
 
 #### Description
 
