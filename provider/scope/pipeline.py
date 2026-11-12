@@ -111,6 +111,7 @@ class ScopeGeometryPipeline:
             check_dirs = [
                 self.repo_root / "projects" / project,
                 self.repo_root / "provider" / "pcb",
+                self.repo_root / "provider" / "scope",
             ]
             for d in check_dirs:
                 if not d.is_dir():
@@ -419,6 +420,20 @@ class ScopeGeometryPipeline:
                     for v in getattr(pcb_cfg, "vias", [])
                 ]
 
+                test_points_data = [
+                    {
+                        "name": getattr(tp, "name", "TP"),
+                        "net": getattr(tp, "net", "GND"),
+                        "x": round(float(tp.position_mm[0]), 3),
+                        "y": round(float(tp.position_mm[1]), 3),
+                        "dia": round(float(tp.pad_diameter_mm), 3),
+                        "drill": round(float(getattr(tp, "drill_diameter_mm", 0.0) or 0.0), 3),
+                        "layer": getattr(tp, "layer", "F.Cu"),
+                        "label": getattr(tp, "label", None) or getattr(tp, "name", "TP"),
+                    }
+                    for tp in getattr(pcb_cfg, "test_points", [])
+                ]
+
                 # Map pin to net
                 pin_net_map = {}
                 if wiring and hasattr(wiring, "nets"):
@@ -459,6 +474,23 @@ class ScopeGeometryPipeline:
                                     "layer": getattr(c, "layer", "F.Cu"),
                                 }
                             )
+
+                for tp in test_points_data:
+                    pads_data.append(
+                        {
+                            "x": tp["x"],
+                            "y": tp["y"],
+                            "w": tp["dia"],
+                            "h": tp["dia"],
+                            "comp": tp["name"],
+                            "pin": "1",
+                            "net": tp["net"],
+                            "layer": tp["layer"],
+                            "is_test_point": True,
+                            "dia": tp["dia"],
+                            "drill": tp["drill"],
+                        }
+                    )
 
                 net_trace_counts = {}
                 net_layers = {}
@@ -524,6 +556,7 @@ class ScopeGeometryPipeline:
                     "traces": traces_data,
                     "vias": vias_data,
                     "pads": pads_data,
+                    "test_points": test_points_data,
                 }
 
             elif mode_upper == "DIAGRAM":

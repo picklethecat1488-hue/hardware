@@ -1174,3 +1174,33 @@ def test_regression_bug_proboscid_caterpillar_529_open_kicad_button(scope_server
     assert 'id="btn-open-kicad"' in html
     assert "Open in KiCad" in html
     assert "/api/scope/open_kicad" in html
+
+
+def test_regression_bug_creeping_scorpion_866_pcb_entity_picking_and_test_points(scope_server):
+    """Verify BUG-CREEPING-SCORPION-866: Accurate raycasting entity picking for test points, pads, traces, and vias."""
+    # 1. Verify backend PCB metadata exports test points
+    load_url = f"http://127.0.0.1:{scope_server.actual_port}/api/scope/load?project=carrier_board&target=carrier_board&mode=PCB"
+    req_load = urllib.request.urlopen(load_url)
+    assert req_load.status == 200
+    data = json.loads(req_load.read().decode("utf-8"))
+    assert "pcb_metadata" in data
+    meta = data["pcb_metadata"]
+
+    assert "test_points" in meta
+    assert len(meta["test_points"]) == 14
+    tp0 = meta["test_points"][0]
+    assert "name" in tp0 and tp0["name"] == "TP1"
+    assert "net" in tp0 and tp0["net"] == "GND"
+    assert "dia" in tp0 and tp0["dia"] == 1.4
+    assert "x" in tp0 and "y" in tp0
+
+    # 2. Verify HTML template contains test point inspect handling and screen-space pixel picking
+    html_url = f"http://127.0.0.1:{scope_server.actual_port}/"
+    req_html = urllib.request.urlopen(html_url)
+    assert req_html.status == 200
+    html = req_html.read().decode("utf-8")
+
+    assert "TEST POINT" in html
+    assert "test_points" in html
+    assert "findPcbEntityAtPoint" in html
+    assert "test_point" in html

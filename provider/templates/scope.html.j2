@@ -1527,46 +1527,131 @@
       return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
     }
 
-    function findPcbEntityAtPoint(x, y, z) {
+    function findPcbEntityAtPoint(x, y, z, screenX, screenY, threeCam, canvasWidth, canvasHeight) {
       if (!state.pcbMetadata) return null;
 
+      const useScreen = screenX != null && screenY != null && threeCam && canvasWidth && canvasHeight && window.THREE;
       let bestEntity = null;
-      let minDistance = Infinity;
+      let bestScore = Infinity;
 
-      // 1. Check vias (search for closest via center)
-      if (state.pcbMetadata.vias) {
-        for (const v of state.pcbMetadata.vias) {
-          const d = Math.hypot(x - v.pos[0], y - v.pos[1]);
-          const padRadius = (v.pad || 0.6) / 2.0;
-          if (d <= padRadius + 0.35 && d < minDistance) {
-            minDistance = d;
-            bestEntity = {
-              type: "via",
-              data: v,
-              net: state.pcbMetadata.nets?.find(n => n.name === v.net),
-              distance: d,
-            };
+      function toScreen(px, py, pz) {
+        if (!useScreen) return null;
+        const v = new window.THREE.Vector3(px, py, pz != null ? pz : 0.8).project(threeCam);
+        return {
+          x: ((v.x + 1) / 2) * canvasWidth,
+          y: ((-v.y + 1) / 2) * canvasHeight,
+        };
+      }
+
+      // 0. Check test points (Highest Priority: explicit probe targets)
+      if (state.pcbMetadata.test_points) {
+        for (const tp of state.pcbMetadata.test_points) {
+          const tpRadius = (tp.dia || 1.4) / 2.0;
+          let effDist = Infinity;
+          if (useScreen) {
+            const sc = toScreen(tp.x, tp.y, 0.8);
+            const scEdge = toScreen(tp.x + tpRadius, tp.y, 0.8);
+            const rPx = Math.max(5, Math.hypot(scEdge.x - sc.x, scEdge.y - sc.y));
+            const pDist = Math.hypot(screenX - sc.x, screenY - sc.y);
+            effDist = Math.max(0, pDist - rPx);
+            if (effDist <= 18 && effDist < bestScore) {
+              bestScore = effDist;
+              bestEntity = {
+                type: "test_point",
+                data: tp,
+                net: state.pcbMetadata.nets?.find(n => n.name === tp.net),
+                distance: effDist,
+              };
+            }
+          } else {
+            const d = Math.hypot(x - tp.x, y - tp.y);
+            effDist = Math.max(0, d - tpRadius);
+            if (effDist <= 1.2 && effDist < bestScore) {
+              bestScore = effDist;
+              bestEntity = {
+                type: "test_point",
+                data: tp,
+                net: state.pcbMetadata.nets?.find(n => n.name === tp.net),
+                distance: d,
+              };
+            }
           }
         }
       }
 
-      // 2. Check copper pads (search for closest pad)
+      // 1. Check copper pads (High Priority)
       if (state.pcbMetadata.pads) {
         for (const p of state.pcbMetadata.pads) {
           const halfW = (p.w || 0.8) / 2.0;
           const halfH = (p.h || 0.8) / 2.0;
-          const dx = Math.max(0, Math.abs(x - p.x) - halfW);
-          const dy = Math.max(0, Math.abs(y - p.y) - halfH);
-          const d = Math.hypot(dx, dy);
-          if (d <= 0.35 && d < minDistance) {
-            minDistance = d;
-            bestEntity = {
-              type: "pad",
-              data: p,
-              net: state.pcbMetadata.nets?.find(n => n.name === p.net),
-              component: state.pcbMetadata.components?.find(c => c.ref_des === p.comp),
-              distance: d,
-            };
+          if (useScreen) {
+            const sc = toScreen(p.x, p.y, 0.8);
+            const scW = toScreen(p.x + halfW, p.y, 0.8);
+            const scH = toScreen(p.x, p.y + halfH, 0.8);
+            const wPx = Math.max(4, Math.abs(scW.x - sc.x));
+            const hPx = Math.max(4, Math.abs(scH.y - sc.y));
+            const dxPx = Math.max(0, Math.abs(screenX - sc.x) - wPx);
+            const dyPx = Math.max(0, Math.abs(screenY - sc.y) - hPx);
+            const effDist = Math.hypot(dxPx, dyPx);
+            if (effDist <= 16 && effDist < bestScore) {
+              bestScore = effDist;
+              bestEntity = {
+                type: p.is_test_point ? "test_point" : "pad",
+                data: p,
+                net: state.pcbMetadata.nets?.find(n => n.name === p.net),
+                component: state.pcbMetadata.components?.find(c => c.ref_des === p.comp),
+                distance: effDist,
+              };
+            }
+          } else {
+            const dx = Math.max(0, Math.abs(x - p.x) - halfW);
+            const dy = Math.max(0, Math.abs(y - p.y) - halfH);
+            const d = Math.hypot(dx, dy);
+            if (d <= 1.0 && d < bestScore) {
+              bestScore = d;
+              bestEntity = {
+                type: p.is_test_point ? "test_point" : "pad",
+                data: p,
+                net: state.pcbMetadata.nets?.find(n => n.name === p.net),
+                component: state.pcbMetadata.components?.find(c => c.ref_des === p.comp),
+                distance: d,
+              };
+            }
+          }
+        }
+      }
+
+      // 2. Check vias (High Priority)
+      if (state.pcbMetadata.vias) {
+        for (const v of state.pcbMetadata.vias) {
+          const viaRadius = (v.pad || 0.6) / 2.0;
+          if (useScreen) {
+            const sc = toScreen(v.pos[0], v.pos[1], 0.8);
+            const scR = toScreen(v.pos[0] + viaRadius, v.pos[1], 0.8);
+            const rPx = Math.max(3, Math.hypot(scR.x - sc.x, scR.y - sc.y));
+            const pDist = Math.hypot(screenX - sc.x, screenY - sc.y);
+            const effDist = Math.max(0, pDist - rPx);
+            if (effDist <= 16 && effDist < bestScore) {
+              bestScore = effDist;
+              bestEntity = {
+                type: "via",
+                data: v,
+                net: state.pcbMetadata.nets?.find(n => n.name === v.net),
+                distance: effDist,
+              };
+            }
+          } else {
+            const d = Math.hypot(x - v.pos[0], y - v.pos[1]);
+            const effDist = Math.max(0, d - viaRadius);
+            if (effDist <= 1.0 && effDist < bestScore) {
+              bestScore = effDist;
+              bestEntity = {
+                type: "via",
+                data: v,
+                net: state.pcbMetadata.nets?.find(n => n.name === v.net),
+                distance: d,
+              };
+            }
           }
         }
       }
@@ -1574,23 +1659,41 @@
       // 3. Check copper traces (search for closest trace segment)
       if (state.pcbMetadata.traces) {
         for (const t of state.pcbMetadata.traces) {
-          const d = distanceToSegment(x, y, t.start[0], t.start[1], t.end[0], t.end[1]);
           const traceRadius = (t.width || 0.25) / 2.0;
-          const effDist = Math.max(0, d - traceRadius);
-          if (effDist <= 0.30 && effDist < minDistance) {
-            minDistance = effDist;
-            bestEntity = {
-              type: "trace",
-              data: t,
-              net: state.pcbMetadata.nets?.find(n => n.name === t.net),
-              distance: effDist,
-            };
+          if (useScreen) {
+            const s1 = toScreen(t.start[0], t.start[1], 0.8);
+            const s2 = toScreen(t.end[0], t.end[1], 0.8);
+            const sR = toScreen(t.start[0] + traceRadius, t.start[1], 0.8);
+            const rPx = Math.max(2, Math.hypot(sR.x - s1.x, sR.y - s1.y));
+            const segDist = distanceToSegment(screenX, screenY, s1.x, s1.y, s2.x, s2.y);
+            const effDist = Math.max(0, segDist - rPx);
+            if (effDist <= 14 && effDist < bestScore) {
+              bestScore = effDist;
+              bestEntity = {
+                type: "trace",
+                data: t,
+                net: state.pcbMetadata.nets?.find(n => n.name === t.net),
+                distance: effDist,
+              };
+            }
+          } else {
+            const d = distanceToSegment(x, y, t.start[0], t.start[1], t.end[0], t.end[1]);
+            const effDist = Math.max(0, d - traceRadius);
+            if (effDist <= 0.8 && effDist < bestScore) {
+              bestScore = effDist;
+              bestEntity = {
+                type: "trace",
+                data: t,
+                net: state.pcbMetadata.nets?.find(n => n.name === t.net),
+                distance: effDist,
+              };
+            }
           }
         }
       }
 
-      // 4. Check component package bodies (if cursor is not directly on a specific trace/pad/via)
-      if (state.pcbMetadata.components && minDistance > 0.4) {
+      // 4. Check component package bodies (only if cursor is not directly on a specific trace/pad/via/test point)
+      if (state.pcbMetadata.components && (bestEntity === null || bestScore > 10)) {
         for (const c of state.pcbMetadata.components) {
           if (!c.position) continue;
           const cx = c.position[0];
@@ -1603,8 +1706,8 @@
           const dx = Math.max(0, Math.abs(localX) - halfW);
           const dy = Math.max(0, Math.abs(localY) - halfH);
           const d = Math.hypot(dx, dy);
-          if (d <= 0.4 && d < minDistance) {
-            minDistance = d;
+          if (d <= 1.0 && d < bestScore) {
+            bestScore = d;
             bestEntity = {
               type: "component",
               data: c,
@@ -1621,7 +1724,19 @@
       let extraHtml = "";
 
       if (data.entity) {
-        if (data.entity.type === "via") {
+        if (data.entity.type === "test_point") {
+          const tp = data.entity.data;
+          extraHtml = `
+            <div style="margin-top: 6px; padding: 6px; background: rgba(255, 204, 0, 0.18); border: 1px solid #ffcc00; border-radius: 4px;">
+              <div style="font-size: 11px; font-weight: bold; color: #ffcc00; margin-bottom: 4px;">📍 TEST POINT: ${tp.name}</div>
+              <div><b>Net:</b> <span style="color: #33ff33; font-weight: bold;">${tp.net || "N/A"}</span></div>
+              <div><b>Pad Diameter:</b> <span style="color: var(--quake-cyan);">${tp.dia} mm</span></div>
+              <div><b>Drill Diameter:</b> <span style="color: var(--quake-cyan);">${tp.drill || 0} mm</span></div>
+              <div><b>Layer:</b> <span style="color: var(--quake-text);">${tp.layer || "F.Cu"}</span></div>
+              <div><b>Coordinates:</b> <span style="color: var(--quake-text);">(${tp.x}, ${tp.y}) mm</span></div>
+            </div>
+          `;
+        } else if (data.entity.type === "via") {
           const v = data.entity.data;
           extraHtml = `
             <div style="margin-top: 6px; padding: 6px; background: rgba(224, 168, 32, 0.15); border: 1px solid #e0a820; border-radius: 4px;">
@@ -1658,6 +1773,17 @@
           `;
         } else if (data.entity.type === "component") {
           const c = data.entity.data;
+          extraHtml = `
+            <div style="margin-top: 6px; padding: 6px; background: rgba(0,0,0,0.4); border: 1px solid var(--quake-border); border-radius: 4px;">
+              <div style="font-size: 11px; font-weight: bold; color: #ffb800; margin-bottom: 4px;">📦 COMPONENT: ${c.ref_des}</div>
+              <div><b>Package:</b> <span style="color: var(--quake-text);">${c.footprint || "N/A"}</span></div>
+              ${c.value ? `<div><b>Value:</b> <span style="color: var(--quake-text);">${c.value}</span></div>` : ""}
+              ${c.mpn ? `<div><b>MPN:</b> <span style="color: var(--quake-text);">${c.mpn}</span></div>` : ""}
+              ${c.side ? `<div><b>Side:</b> <span style="color: var(--quake-text);">${c.side}</span></div>` : ""}
+            </div>
+          `;
+        }
+      }
           extraHtml = `
             <div style="margin-top: 6px; padding: 6px; background: rgba(0,0,0,0.4); border: 1px solid var(--quake-border); border-radius: 4px;">
               <div style="font-size: 11px; font-weight: bold; color: #ffb800; margin-bottom: 4px;">📦 COMPONENT: ${c.ref_des}</div>
@@ -1895,36 +2021,38 @@
             raycaster.setFromCamera(mouse, threeCam);
 
             let worldPoint = null;
-            if (state.viewer.rendered.scene) {
+            const plane = new window.THREE.Plane(new window.THREE.Vector3(0, 0, 1), -0.8);
+            worldPoint = new window.THREE.Vector3();
+            raycaster.ray.intersectPlane(plane, worldPoint);
+            if (!worldPoint && state.viewer.rendered.scene) {
               const hits = raycaster.intersectObjects(state.viewer.rendered.scene.children, true);
               if (hits && hits.length > 0) worldPoint = hits[0].point;
             }
-            if (!worldPoint) {
-              const plane = new window.THREE.Plane(new window.THREE.Vector3(0, 0, 1), -0.8);
-              worldPoint = new window.THREE.Vector3();
-              raycaster.ray.intersectPlane(plane, worldPoint);
-            }
+            if (!worldPoint) worldPoint = new window.THREE.Vector3(0, 0, 0.8);
 
-            if (worldPoint) {
-              const entity = findPcbEntityAtPoint(worldPoint.x, worldPoint.y, worldPoint.z);
-              if (entity) {
-                container.style.cursor = "pointer";
-                let badge = "";
-                if (entity.type === "pad") {
-                  badge = `⚡ Pad: <b style="color: #ffb800;">${entity.data.comp}.${entity.data.pin}</b>` + (entity.net ? ` [Net: <span style="color: #33ff66;">${entity.net.name}</span>]` : "");
-                } else if (entity.type === "via") {
-                  badge = `🎯 Via: <b style="color: #33ff66;">${entity.data.net || "GND"}</b> (⌀${entity.data.drill}mm)`;
-                } else if (entity.type === "trace") {
-                  badge = `〰️ Trace: <b style="color: #33ff66;">${entity.data.net}</b> (${entity.data.layer}, w=${entity.data.width}mm)`;
-                } else if (entity.type === "component") {
-                  badge = `📦 Component: <b style="color: #ffb800;">${entity.data.ref_des}</b> (${entity.data.footprint})`;
-                }
-                hoverTooltipEl.innerHTML = badge;
-                hoverTooltipEl.style.left = (e.clientX + 14) + "px";
-                hoverTooltipEl.style.top = (e.clientY + 14) + "px";
-                hoverTooltipEl.style.display = "block";
-                return;
+            const entity = findPcbEntityAtPoint(
+              worldPoint.x, worldPoint.y, worldPoint.z,
+              coords.x, coords.y, threeCam, coords.width, coords.height
+            );
+            if (entity) {
+              container.style.cursor = "pointer";
+              let badge = "";
+              if (entity.type === "test_point") {
+                badge = `📍 Test Point: <b style="color: #ffcc00;">${entity.data.name}</b>` + (entity.net ? ` [Net: <span style="color: #33ff66;">${entity.net.name}</span>]` : "");
+              } else if (entity.type === "pad") {
+                badge = `⚡ Pad: <b style="color: #ffb800;">${entity.data.comp}.${entity.data.pin}</b>` + (entity.net ? ` [Net: <span style="color: #33ff66;">${entity.net.name}</span>]` : "");
+              } else if (entity.type === "via") {
+                badge = `🎯 Via: <b style="color: #33ff66;">${entity.data.net || "GND"}</b> (⌀${entity.data.drill}mm)`;
+              } else if (entity.type === "trace") {
+                badge = `〰️ Trace: <b style="color: #33ff66;">${entity.data.net}</b> (${entity.data.layer}, w=${entity.data.width}mm)`;
+              } else if (entity.type === "component") {
+                badge = `📦 Component: <b style="color: #ffb800;">${entity.data.ref_des}</b> (${entity.data.footprint})`;
               }
+              hoverTooltipEl.innerHTML = badge;
+              hoverTooltipEl.style.left = (e.clientX + 14) + "px";
+              hoverTooltipEl.style.top = (e.clientY + 14) + "px";
+              hoverTooltipEl.style.display = "block";
+              return;
             }
           }
 
@@ -2015,33 +2143,33 @@
           raycaster.setFromCamera(mouse, threeCam);
 
           let worldPoint = null;
-          if (state.viewer.rendered.scene) {
+          const plane = new window.THREE.Plane(new window.THREE.Vector3(0, 0, 1), -0.8);
+          worldPoint = new window.THREE.Vector3();
+          raycaster.ray.intersectPlane(plane, worldPoint);
+          if (!worldPoint && state.viewer.rendered.scene) {
             const hits = raycaster.intersectObjects(state.viewer.rendered.scene.children, true);
-            if (hits && hits.length > 0) {
-              worldPoint = hits[0].point;
+            if (hits && hits.length > 0) worldPoint = hits[0].point;
+          }
+          if (!worldPoint) worldPoint = new window.THREE.Vector3(0, 0, 0.8);
+
+          const entity = findPcbEntityAtPoint(
+            worldPoint.x, worldPoint.y, worldPoint.z,
+            coords.x, coords.y, threeCam, coords.width, coords.height
+          );
+          if (entity) {
+            let compObj = entity.component || (entity.type === "component" ? entity.data : null);
+            let netObj = entity.net || (entity.data && entity.data.net ? state.pcbMetadata.nets?.find(n => n.name === entity.data.net) : null);
+
+            if (!compObj && entity.type === "pad" && entity.data?.comp) {
+              compObj = state.pcbMetadata.components?.find(c => c.ref_des === entity.data.comp);
             }
-          }
-          if (!worldPoint) {
-            const plane = new window.THREE.Plane(new window.THREE.Vector3(0, 0, 1), -0.8);
-            worldPoint = new window.THREE.Vector3();
-            raycaster.ray.intersectPlane(plane, worldPoint);
-          }
 
-          if (worldPoint) {
-            const entity = findPcbEntityAtPoint(worldPoint.x, worldPoint.y, worldPoint.z);
-            if (entity) {
-              let compObj = entity.component || (entity.type === "component" ? entity.data : null);
-              let netObj = entity.net || (entity.data && entity.data.net ? state.pcbMetadata.nets?.find(n => n.name === entity.data.net) : null);
-
-              if (!compObj && entity.type === "pad" && entity.data?.comp) {
-                compObj = state.pcbMetadata.components?.find(c => c.ref_des === entity.data.comp);
-              }
-
-              let entityName = "";
-              if (entity.type === "pad") entityName = `Pad: ${entity.data.comp}.${entity.data.pin}`;
-              else if (entity.type === "via") entityName = `Via: ${entity.data.net || "GND"}`;
-              else if (entity.type === "trace") entityName = `Trace: ${entity.data.net} [${entity.data.layer}]`;
-              else if (entity.type === "component") entityName = `Component: ${entity.data.ref_des}`;
+            let entityName = "";
+            if (entity.type === "test_point") entityName = `Test Point: ${entity.data.name}`;
+            else if (entity.type === "pad") entityName = `Pad: ${entity.data.comp}.${entity.data.pin}`;
+            else if (entity.type === "via") entityName = `Via: ${entity.data.net || "GND"}`;
+            else if (entity.type === "trace") entityName = `Trace: ${entity.data.net} [${entity.data.layer}]`;
+            else if (entity.type === "component") entityName = `Component: ${entity.data.ref_des}`;
 
               const inspectEl = document.getElementById("inspect-content");
               if (inspectEl) {
