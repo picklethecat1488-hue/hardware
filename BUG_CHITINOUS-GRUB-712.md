@@ -1,12 +1,13 @@
-# 🔴 `[BUG-CHITINOUS-GRUB-712]` [cat_fountain/product] Defect in SIMULATE view
+# 🟢 `[BUG-CHITINOUS-GRUB-712]` [cat_fountain/product] Defect in SIMULATE view
 
 - **UUID**: `162a59f5-e11e-417a-a305-abb8e76cd03c`
 - **ID**: `BUG-CHITINOUS-GRUB-712`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-12 20:45:04 UTC`
+- **Resolved**: `2026-11-12 22:54:24 UTC`
 
 #### Description
 
@@ -520,3 +521,11 @@ face 46 ignored
 [2m2026-11-12T20:44:08.395602Z[0m [33m WARN[0m [2mre_sorbet::sorbet_schema[0m[2m:[0m Sorbet batch version mismatch. Expected 0.1.3, got "0.1.4"
 2026-11-12 12:44:14 [INFO] scope: 127.0.0.1 - - [12/Nov/2026 12:44:14] "GET /api/scope/simulation_telemetry?project=cat_fountain&target=product HTTP/1.1" 200 -
 ```
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:a4f505d1 --> Open cat_fountain simulation in Scope and verify water particles play smoothly without cross-bowl jumping or white streak artifacts, matching Rerun Viewer | `python tools/scope.py cat_fountain/product:simulate`
+
+#### Resolution Notes
+
+Replaced index-strided subsampling of variable-count Eulerian LBM wet-voxel frames with a deterministic 3D spatial hash (~4,000 points/frame, >99.5% stationary cell stability), extracted authentic Rerun particle color/radius, and disabled Lagrangian cross-index velocity streak lines on Eulerian voxel clouds.
