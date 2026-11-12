@@ -1,12 +1,13 @@
-# 🔴 `[BUG-JUMPING-INSTAR-950]` Simulate view timescale adjustment and Rerun Viewer launch button (cat_fountain)
+# 🟢 `[BUG-JUMPING-INSTAR-950]` Simulate view timescale adjustment and Rerun Viewer launch button (cat_fountain)
 
 - **UUID**: `f9bfa2d4-b45b-4fec-849a-c63b9ce5e153`
 - **ID**: `BUG-JUMPING-INSTAR-950`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 22:06:16 UTC`
+- **Resolved**: `2026-11-12 00:44:09 UTC`
 - **Rejected**: `2026-11-11 23:07:04 UTC`
 
 #### Description
@@ -534,8 +535,7 @@ face 46 ignored
 
 #### Resolution Notes
 
-Added max simulation steps selection (500, 1000, 2000, 5000) to Target Chooser modal and query param handling, rich physics telemetry object inspection in Inspector panel (SPH particles, kinematic state, density, viscosity, flow rate, EOS), and dedicated searchable Rerun Logs tab in Left Panel with instant timeline scrub.
-- Oops, rejected again! I forgot, we need to add a timescale adjustment to the main window, and I think we should also add a “Open in Rerun Viewer” clickable button to the timeline on the bottom, similar to what the SSD project has
+Add simulation timescale adjustment, Open in Rerun Viewer launcher button, authentic server-side telemetry endpoint, and enforce prohibition on client-side simulation facades
 
 #### Rejection Feedback
 
