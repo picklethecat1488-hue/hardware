@@ -1,12 +1,13 @@
-# 🔴 `[BUG-SPRINGING-GRUB-126]` Motor and motor base rotate with motor instead of remaining stationary (cat_fountain)
+# 🟢 `[BUG-SPRINGING-GRUB-126]` Motor and motor base rotate with motor instead of remaining stationary (cat_fountain)
 
 - **UUID**: `39dd20f4-30de-464e-b9d4-b9ff827ed856`
 - **ID**: `BUG-SPRINGING-GRUB-126`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 23:22:45 UTC`
+- **Resolved**: `2026-11-12 00:25:01 UTC`
 
 #### Description
 
@@ -531,3 +532,7 @@ face 46 ignored
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:5c0a525a --> Inspect cat_fountain product in Scope Simulate mode and verify motor body and motor base bracket stay stationary while impeller and drive hub rotate | `python tools/scope.py cat_fountain/product:simulate`
+
+#### Resolution Notes
+
+Restrict simulation rotation animation to impeller and drive hub/rotor, ensuring motor stator and motor base bracket stay stationary
