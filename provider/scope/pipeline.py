@@ -371,7 +371,7 @@ class ScopeGeometryPipeline:
                     substrate_color=substrate_color,
                     pcb_name=item_name,
                 )
-                layer_items = assembler.get_display_items(prefix=item_name)
+                layer_items = assembler.get_display_items(prefix=item_name, include_components=False)
                 if layer_items:
                     display_items.extend(layer_items)
                 else:
@@ -539,12 +539,6 @@ class ScopeGeometryPipeline:
 
                 pcb_metadata = {
                     "layers": [
-                        {
-                            "id": f"{item_name}_components",
-                            "name": "Components",
-                            "color": "#2a2e35",
-                            "type": "Components",
-                        },
                         {"id": f"{item_name}_substrate", "name": "Substrate", "color": "#0a2410", "type": "Substrate"},
                         {"id": f"{item_name}_pads", "name": "Pads", "color": "#c8a034", "type": "Pads"},
                         {"id": f"{item_name}_traces_top", "name": "F.Cu (Top)", "color": "#c83434", "type": "F.Cu"},

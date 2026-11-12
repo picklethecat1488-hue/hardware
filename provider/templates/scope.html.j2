@@ -1745,8 +1745,8 @@
         }
       }
 
-      // 4. Check component package bodies (only if cursor is not directly on a specific trace/pad/via/test point)
-      if (state.pcbMetadata.components && (bestEntity === null || bestScore > 10)) {
+      // 4. Check component footprints only if no trace/pad/via/test point matched
+      if (state.pcbMetadata.components && bestEntity === null) {
         for (const c of state.pcbMetadata.components) {
           if (!c.position) continue;
           const cx = c.position[0];

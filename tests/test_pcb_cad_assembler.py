@@ -108,6 +108,15 @@ def test_pcb_cad_assembler_full_layers():
     ):
         assert name in room
 
+    pcb_only_items = assembler.get_display_items(prefix="test_pcb", include_components=False)
+    pcb_only_names = [name for _, name, _, _ in pcb_only_items]
+    assert "test_pcb_components" not in pcb_only_names
+    assert "test_pcb_substrate" in pcb_only_names
+    assert "test_pcb_pads" in pcb_only_names
+    assert "test_pcb_traces_top" in pcb_only_names
+    assert "test_pcb_traces_bottom" in pcb_only_names
+    assert "test_pcb_vias" in pcb_only_names
+
 
 def test_build_pcb_populate_room_and_to_cad_assembly():
     """Verify BuildPcb context manager exposes populate_room and to_cad_assembly methods."""

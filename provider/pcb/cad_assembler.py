@@ -259,7 +259,9 @@ class PCB3DAssembler:
 
         return Compound(children=cylinders)
 
-    def build_components_and_pads(self) -> Tuple[Optional[Compound], Optional[Compound]]:
+    def build_components_and_pads(
+        self, include_components: bool = True
+    ) -> Tuple[Optional[Compound], Optional[Compound]]:
         """Construct Compounds of 3D component package bodies and copper pads."""
         target_ref = getattr(self.pcb_config, "shape_ref", None)
         is_flex = getattr(self.pcb_config, "board_type", None) == BoardType.FLEX or "flex" in self.pcb_name.lower()
@@ -303,7 +305,7 @@ class PCB3DAssembler:
             fp_factory = FOOTPRINT_REGISTRY.get(c.package)
             if fp_factory is not None:
                 fp_inst = fp_factory()
-                if fp_inst.part is not None:
+                if include_components and fp_inst.part is not None:
                     body = fp_inst.part
                     body_bb = body.bounding_box()
                     z_mount = (
@@ -336,7 +338,7 @@ class PCB3DAssembler:
                         pad.locate(Location((wx, wy, pad_z), (0.0, 0.0, yaw)))
                     pad.label = f"pad_{c.name}_{p.name}"
                     pad_solids.append(pad)
-            else:
+            elif include_components:
                 dims = getattr(c, "dimensions", None) or (5.0, 5.0, 1.0)
                 dx, dy, dz = dims[0], dims[1], dims[2]
                 z_mount = (
@@ -522,15 +524,17 @@ class PCB3DAssembler:
         return Compound(children=solids)
 
     def get_display_items(
-        self, prefix: Optional[str] = None
+        self,
+        prefix: Optional[str] = None,
+        include_components: bool = True,
     ) -> List[Tuple[Any, str, Tuple[float, float, float], float]]:
-        """Return list of (geometry, layer_name, rgb_color, alpha) for all active PCB layers."""
+        """Return list of (geometry, layer_name, rgb_color, alpha) for active PCB layers."""
         pfx = prefix or self.pcb_name
         items: List[Tuple[Any, str, Tuple[float, float, float], float]] = []
 
-        # 1. Components (above Substrate on layer stack)
-        comps, pads = self.build_components_and_pads()
-        if comps is not None:
+        # 1. Components (included for 3D CAD assemblies; omitted in 2D PCB view)
+        comps, pads = self.build_components_and_pads(include_components=include_components)
+        if include_components and comps is not None:
             items.append((comps, f"{pfx}_components", self.DEFAULT_COMPONENT_COLOR, 1.0))
 
         # 2. Substrate

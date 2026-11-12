@@ -90,7 +90,7 @@ def test_scope_server_api_projects(scope_server):
 
 
 def test_scope_server_api_load_pcb(scope_server):
-    """Verify GET /api/scope/load returns tessellated PCB layers and metadata."""
+    """Verify GET /api/scope/load returns tessellated PCB layers and metadata (excluding 3D Components)."""
     url = f"http://127.0.0.1:{scope_server.actual_port}/api/scope/load?project=carrier_board&target=carrier_board&mode=PCB"
     req = urllib.request.urlopen(url)
     assert req.status == 200
@@ -98,7 +98,7 @@ def test_scope_server_api_load_pcb(scope_server):
     assert data["type"] == "data"
     assert "shapes" in data
     assert "pcb_metadata" in data
-    assert len(data["pcb_metadata"]["layers"]) == 8
+    assert len(data["pcb_metadata"]["layers"]) == 7
 
 
 def test_scope_server_target_bug_submission(scope_server):
@@ -577,7 +577,7 @@ def test_regression_bug_creeping_scorpion_866_pcb_test_points_metadata(scope_ser
 
 
 def test_regression_bug_dorsal_midge_176_pcb_layer_order_and_colors(scope_server):
-    """Verify BUG-DORSAL-MIDGE-176: layer stack ordering and KiCad palette colors."""
+    """Verify BUG-DORSAL-MIDGE-176 & BUG-CRIMSON-GNAT-877: PCB view omits Components layer while preserving KiCad palette."""
     load_url = f"http://127.0.0.1:{scope_server.actual_port}/api/scope/load?project=carrier_board&target=carrier_board&mode=PCB"
     req_load = urllib.request.urlopen(load_url)
     assert req_load.status == 200
@@ -586,12 +586,17 @@ def test_regression_bug_dorsal_midge_176_pcb_layer_order_and_colors(scope_server
     layers = data["pcb_metadata"]["layers"]
 
     layer_names = [layer["name"] for layer in layers]
-    assert "Components" in layer_names
+    assert "Components" not in layer_names
     assert "Substrate" in layer_names
-    assert layer_names.index("Components") < layer_names.index("Substrate")
+    assert data["pcb_metadata"]["components"], "Component metadata must remain populated for pad/inspector lookup"
+
+    part_ids = [part.get("id", "") or part.get("name", "") for part in data.get("shapes", {}).get("parts", [])]
+    assert not any("components" in pid for pid in part_ids)
+    assert any("substrate" in pid for pid in part_ids)
+    assert any("pads" in pid for pid in part_ids)
 
     layer_colors = {layer["name"]: layer["color"].lower() for layer in layers}
-    assert layer_colors["Components"] == "#2a2e35"
+    assert "Components" not in layer_colors
     assert layer_colors["Substrate"] == "#0a2410"
     assert layer_colors["Pads"] == "#c8a034"
     assert layer_colors["F.Cu (Top)"] == "#c83434"

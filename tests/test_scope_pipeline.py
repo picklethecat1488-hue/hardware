@@ -26,7 +26,7 @@ def test_scope_pipeline_get_projects():
 
 
 def test_scope_pipeline_load_geometry_pcb_layers():
-    """Verify load_geometry in PCB mode extracts all 8 distinct layers with canonical colors."""
+    """Verify load_geometry in PCB mode extracts all 7 distinct 2D PCB layers without 3D Components."""
     pipeline = ScopeGeometryPipeline()
     payload = pipeline.load_geometry("carrier_board", "carrier_board", mode="PCB")
 
@@ -36,11 +36,11 @@ def test_scope_pipeline_load_geometry_pcb_layers():
     assert "parts" in shapes
 
     parts = shapes["parts"]
-    assert len(parts) >= 8
+    assert len(parts) == 7
 
     part_names = [p.get("name", "") for p in parts]
     assert any("substrate" in n for n in part_names)
-    assert any("components" in n for n in part_names)
+    assert not any("components" in n for n in part_names)
     assert any("pads" in n for n in part_names)
     assert any("traces_top" in n for n in part_names)
     assert any("traces_bottom" in n for n in part_names)
@@ -52,7 +52,7 @@ def test_scope_pipeline_load_geometry_pcb_layers():
     pcb_meta = payload.get("pcb_metadata")
     assert pcb_meta is not None
     assert "layers" in pcb_meta
-    assert len(pcb_meta["layers"]) == 8
+    assert len(pcb_meta["layers"]) == 7
     assert "components" in pcb_meta
     assert len(pcb_meta["components"]) > 0
     assert "nets" in pcb_meta
