@@ -2,12 +2,13 @@
 
 - **UUID**: `aec7c3de-fb60-446a-bef1-6fdbd40ea64a`
 - **ID**: `BUG-EMERALD-TICK-950`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-12 14:37:37 UTC`
 - **Resolved**: `2026-11-12 23:44:41 UTC`
+- **Accepted**: `2026-11-12 23:44:51 UTC`
 - **Rejected**: `2026-11-12 20:46:56 UTC`
 
 #### Description
