@@ -530,6 +530,7 @@ face 46 ignored
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:cf738cdd --> Open Scope with cat_fountain in simulate mode, select max steps in Target chooser, inspect physics telemetry in Inspect panel, and query rerun logs in Left Panel Logs tab | `python tools/scope.py cat_fountain/product:simulate`
+- [ ] <!-- task:6e2dfdd5 --> Open cat_fountain in Scope Simulate mode, verify simulation speed can be adjusted via timescale selector, and click Open in Rerun Viewer to launch native Rerun app | `python tools/scope.py cat_fountain/product:simulate`
 
 #### Resolution Notes
 
