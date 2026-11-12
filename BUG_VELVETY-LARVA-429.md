@@ -531,6 +531,10 @@ face 46 ignored
 | `image/png` | [snapshot.png](attachments/BUG-VELVETY-LARVA-429/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
 | `text/plain` | [scope.log](attachments/BUG-VELVETY-LARVA-429/scope.log) | Scope workstation execution logs |
 
+#### Attached Commits
+
+- `85668294`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:46d262fa --> Inspect simulation metrics panel, histograms, and scrubber timeline in cat_fountain | `python tools/scope.py cat_fountain/product:simulate`
