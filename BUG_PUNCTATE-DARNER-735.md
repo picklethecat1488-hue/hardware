@@ -1,12 +1,13 @@
-# 🔴 `[BUG-PUNCTATE-DARNER-735]` Diagram view text labels invisible (cat_fountain)
+# 🟢 `[BUG-PUNCTATE-DARNER-735]` Diagram view text labels invisible (cat_fountain)
 
 - **UUID**: `3b039707-7c67-4406-bcbc-baa9b6fee23b`
 - **ID**: `BUG-PUNCTATE-DARNER-735`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 23:13:47 UTC`
+- **Resolved**: `2026-11-12 00:22:08 UTC`
 
 #### Description
 
@@ -524,3 +525,7 @@ face 46 ignored
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:fa677cd2 --> Open cat_fountain wiring diagram in Scope and verify that schematic text annotations and component pin labels render crisply in the viewport | `python tools/scope.py cat_fountain/wiring:diagram`
+
+#### Resolution Notes
+
+Project and tessellate Room text annotations (_labels) into 2D sketch faces on Plane.XY so labels and pin descriptions render in Scope diagram view
