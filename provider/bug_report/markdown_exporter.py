@@ -954,7 +954,7 @@ class MarkdownBugExporter:
         """
         try:
             m_header = re.search(
-                r"^#\s+(?:[^\n\[]*?)?`\[((?:BUG|WORM)-[^\]]+|[^\]]+)\]`\s*(.*?)$", content, re.MULTILINE
+                r"^#\s+(?:[^\n\[]*?)?`?\[((?:BUG|WORM)-[^\]]+|[^\]]+)\]`?\s*(.*?)$", content, re.MULTILINE
             )
             m_fn = re.match(r"^(BUG|WORM)[_-](.+)\.md$", default_filename, re.IGNORECASE) if default_filename else None
             fn_id = ""

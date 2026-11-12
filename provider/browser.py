@@ -1,8 +1,17 @@
 """Shared workstation browser launcher for standalone webview, eel, app mode, and browser fallback."""
 
+from enum import StrEnum
 from pathlib import Path
 from typing import Callable, Optional
 import webbrowser
+
+
+class BrowserMode(StrEnum):
+    """Target display environment for workstation dashboard and visualizer tools."""
+
+    WEBVIEW = "webview"
+    EEL = "eel"
+    BROWSER = "browser"
 
 
 def get_default_icon_path(repo_root: Optional[Path] = None) -> Optional[Path]:
@@ -20,7 +29,7 @@ def get_default_icon_path(repo_root: Optional[Path] = None) -> Optional[Path]:
 
 def launch_browser(
     url: str,
-    browser: str = "webview",
+    browser: BrowserMode | str = BrowserMode.WEBVIEW,
     on_close: Optional[Callable[[], None]] = None,
     title: Optional[str] = None,
     bg_color: Optional[str] = None,
@@ -30,7 +39,7 @@ def launch_browser(
 
     Args:
         url: Web URL to open.
-        browser: Target display environment ('webview', 'eel', or browser fallback).
+        browser: Target display environment (BrowserMode.WEBVIEW, BrowserMode.EEL, or fallback).
         on_close: Callback invoked when standalone window is closed.
         title: Window title for standalone frames.
         bg_color: Background color for initial window creation.
@@ -39,7 +48,9 @@ def launch_browser(
     Returns:
         True if successfully launched, False otherwise.
     """
-    if browser == "eel":
+    mode = BrowserMode(browser) if isinstance(browser, str) and browser in BrowserMode._value2member_map_ else browser
+
+    if mode == BrowserMode.EEL:
         try:
             from provider.eel.launcher import launch_eel
 
@@ -49,7 +60,7 @@ def launch_browser(
         except Exception:
             pass
 
-    if browser == "webview":
+    if mode == BrowserMode.WEBVIEW:
         try:
             from provider.webview.launcher import launch_webview
 

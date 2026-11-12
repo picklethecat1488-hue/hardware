@@ -33,8 +33,6 @@ from model.vcs import (
 from provider.sanitizer import elide_commit_author, elide_commit_email, elide_personal_info
 
 MAX_DIFF_LINE_LENGTH: int = 1000
-MAX_DIFF_FILE_SIZE_BYTES: int = 500 * 1024  # 500 KB limit for generating line-by-line diffs
-MAX_DIFF_LINES: int = 4500  # 4,500 lines limit for full side-by-side matching
 IGNORED_REVIEW_FILES: frozenset[str] = frozenset({"BUGS.md", "BUGS.txt", "CR.md"})
 
 
@@ -2083,55 +2081,6 @@ class GitEngine:
             old_content = self.get_file_content(commit, file_path, parent=True)
             new_content = self.get_file_content(commit, file_path, parent=False)
 
-        # Check for oversized content that could hang difflib or browser rendering
-        file_size = max(
-            len(old_content.encode("utf-8", errors="replace")),
-            len(new_content.encode("utf-8", errors="replace")),
-        )
-        old_lines_count = old_content.count("\n") + (1 if old_content else 0)
-        new_lines_count = new_content.count("\n") + (1 if new_content else 0)
-        is_oversized = (
-            file_size > MAX_DIFF_FILE_SIZE_BYTES or old_lines_count > MAX_DIFF_LINES or new_lines_count > MAX_DIFF_LINES
-        )
-
-        if is_oversized:
-            status = "M"
-            if not old_content and new_content:
-                status = "A"
-            elif old_content and not new_content:
-                status = "D"
-
-            size_kb = file_size / 1024
-            line_count = max(old_lines_count, new_lines_count)
-            summary_msg = (
-                f"File diff is too large to render ({size_kb:.1f} KB, {line_count:,} lines). "
-                f"Interactive syntax highlighting and side-by-side diff are collapsed to preserve performance."
-            )
-            raw_diff_summary = (
-                f"--- a/{file_path}\n+++ b/{file_path}\n@@ -0,0 +0,0 @@\n [Oversized file diff: {summary_msg}]\n"
-            )
-
-            diff_model = FileDiffModel(
-                file_path=file_path,
-                old_path=file_path,
-                new_path=file_path,
-                status=status,
-                is_binary=False,
-                is_lfs=is_lfs,
-                is_oversized=True,
-                additions=new_lines_count if status == "A" else 0,
-                deletions=old_lines_count if status == "D" else 0,
-                hunks=[],
-                side_by_side=[],
-                full_content=summary_msg,
-                old_content="",
-                new_content="",
-                raw_diff=raw_diff_summary,
-            )
-            if commit != "working":
-                self._file_diff_cache[cache_key] = diff_model
-            return diff_model
-
         if commit == "working":
             if staged_only:
                 try:
@@ -2157,7 +2106,7 @@ class GitEngine:
                 raw_diff = ""
 
         hunks = self._parse_diff_hunks(raw_diff)
-        side_by_side = self._generate_side_by_side(old_content, new_content)
+        side_by_side = self._generate_side_by_side(old_content, new_content, hunks=hunks)
 
         additions = sum(1 for line in raw_diff.splitlines() if line.startswith("+") and not line.startswith("+++"))
         deletions = sum(1 for line in raw_diff.splitlines() if line.startswith("-") and not line.startswith("---"))
@@ -2274,68 +2223,230 @@ class GitEngine:
 
         return hunks
 
-    def _generate_side_by_side(self, old_text: str, new_text: str) -> List[DiffSideBySideRow]:
-        """Align old and new text into paired side-by-side rows using difflib SequenceMatcher."""
+    def _generate_side_by_side(
+        self, old_text: str, new_text: str, hunks: Optional[List[DiffHunk]] = None
+    ) -> List[DiffSideBySideRow]:
+        """Align old and new text into paired side-by-side rows in O(N) linear time using hunk-driven mapping."""
         old_lines = old_text.splitlines()
         new_lines = new_text.splitlines()
-
-        matcher = difflib.SequenceMatcher(None, old_lines, new_lines)
-        rows: List[DiffSideBySideRow] = []
 
         def _trim(s: str) -> str:
             if len(s) > MAX_DIFF_LINE_LENGTH:
                 return s[:MAX_DIFF_LINE_LENGTH] + "…"
             return s
 
-        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-            match tag:
-                case "equal":
-                    for offset in range(i2 - i1):
-                        rows.append(
-                            DiffSideBySideRow(
-                                old_no=i1 + offset + 1,
-                                old_text=_trim(old_lines[i1 + offset]),
-                                new_no=j1 + offset + 1,
-                                new_text=_trim(new_lines[j1 + offset]),
-                                row_type="equal",
-                            )
+        rows: List[DiffSideBySideRow] = []
+
+        # If one side is empty, generate pure insertions or deletions directly in linear time
+        if not old_lines:
+            for j, line in enumerate(new_lines):
+                rows.append(
+                    DiffSideBySideRow(
+                        old_no=None,
+                        old_text="",
+                        new_no=j + 1,
+                        new_text=_trim(line),
+                        row_type="insert",
+                    )
+                )
+            return rows
+
+        if not new_lines:
+            for i, line in enumerate(old_lines):
+                rows.append(
+                    DiffSideBySideRow(
+                        old_no=i + 1,
+                        old_text=_trim(line),
+                        new_no=None,
+                        new_text="",
+                        row_type="delete",
+                    )
+                )
+            return rows
+
+        # If no hunks provided or hunks empty
+        if not hunks:
+            if old_lines == new_lines:
+                for i, line in enumerate(old_lines):
+                    rows.append(
+                        DiffSideBySideRow(
+                            old_no=i + 1,
+                            old_text=_trim(line),
+                            new_no=i + 1,
+                            new_text=_trim(line),
+                            row_type="equal",
                         )
-                case "replace":
-                    count = max(i2 - i1, j2 - j1)
-                    for offset in range(count):
-                        has_old = offset < (i2 - i1)
-                        has_new = offset < (j2 - j1)
-                        rows.append(
-                            DiffSideBySideRow(
-                                old_no=i1 + offset + 1 if has_old else None,
-                                old_text=_trim(old_lines[i1 + offset]) if has_old else "",
-                                new_no=j1 + offset + 1 if has_new else None,
-                                new_text=_trim(new_lines[j1 + offset]) if has_new else "",
-                                row_type="replace",
+                    )
+                return rows
+            matcher = difflib.SequenceMatcher(None, old_lines, new_lines, autojunk=True)
+            for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+                match tag:
+                    case "equal":
+                        for offset in range(i2 - i1):
+                            rows.append(
+                                DiffSideBySideRow(
+                                    old_no=i1 + offset + 1,
+                                    old_text=_trim(old_lines[i1 + offset]),
+                                    new_no=j1 + offset + 1,
+                                    new_text=_trim(new_lines[j1 + offset]),
+                                    row_type="equal",
+                                )
                             )
-                        )
-                case "delete":
-                    for offset in range(i2 - i1):
-                        rows.append(
-                            DiffSideBySideRow(
-                                old_no=i1 + offset + 1,
-                                old_text=_trim(old_lines[i1 + offset]),
-                                new_no=None,
-                                new_text="",
-                                row_type="delete",
+                    case "replace":
+                        count = max(i2 - i1, j2 - j1)
+                        for offset in range(count):
+                            has_old = offset < (i2 - i1)
+                            has_new = offset < (j2 - j1)
+                            rows.append(
+                                DiffSideBySideRow(
+                                    old_no=i1 + offset + 1 if has_old else None,
+                                    old_text=_trim(old_lines[i1 + offset]) if has_old else "",
+                                    new_no=j1 + offset + 1 if has_new else None,
+                                    new_text=_trim(new_lines[j1 + offset]) if has_new else "",
+                                    row_type="replace",
+                                )
                             )
-                        )
-                case "insert":
-                    for offset in range(j2 - j1):
-                        rows.append(
-                            DiffSideBySideRow(
-                                old_no=None,
-                                old_text="",
-                                new_no=j1 + offset + 1,
-                                new_text=_trim(new_lines[j1 + offset]),
-                                row_type="insert",
+                    case "delete":
+                        for offset in range(i2 - i1):
+                            rows.append(
+                                DiffSideBySideRow(
+                                    old_no=i1 + offset + 1,
+                                    old_text=_trim(old_lines[i1 + offset]),
+                                    new_no=None,
+                                    new_text="",
+                                    row_type="delete",
+                                )
                             )
+                    case "insert":
+                        for offset in range(j2 - j1):
+                            rows.append(
+                                DiffSideBySideRow(
+                                    old_no=None,
+                                    old_text="",
+                                    new_no=j1 + offset + 1,
+                                    new_text=_trim(new_lines[j1 + offset]),
+                                    row_type="insert",
+                                )
+                            )
+            return rows
+
+        # Fast Hunk-Driven Side-by-Side Construction
+        old_idx = 0
+        new_idx = 0
+
+        for hunk in hunks:
+            hunk_old_start_0 = hunk.old_start - 1
+            hunk_new_start_0 = hunk.new_start - 1
+
+            while old_idx < hunk_old_start_0 and new_idx < hunk_new_start_0:
+                old_t = old_lines[old_idx] if old_idx < len(old_lines) else ""
+                new_t = new_lines[new_idx] if new_idx < len(new_lines) else ""
+                rows.append(
+                    DiffSideBySideRow(
+                        old_no=old_idx + 1,
+                        old_text=_trim(old_t),
+                        new_no=new_idx + 1,
+                        new_text=_trim(new_t),
+                        row_type="equal",
+                    )
+                )
+                old_idx += 1
+                new_idx += 1
+
+            hunk_lines = hunk.lines
+            k = 0
+            while k < len(hunk_lines):
+                line = hunk_lines[k]
+                if line.type == DiffLineType.CONTEXT:
+                    rows.append(
+                        DiffSideBySideRow(
+                            old_no=line.old_line_no,
+                            old_text=_trim(line.content),
+                            new_no=line.new_line_no,
+                            new_text=_trim(line.content),
+                            row_type="equal",
                         )
+                    )
+                    if line.old_line_no is not None:
+                        old_idx = line.old_line_no
+                    if line.new_line_no is not None:
+                        new_idx = line.new_line_no
+                    k += 1
+                else:
+                    del_block: List[DiffLine] = []
+                    add_block: List[DiffLine] = []
+                    while k < len(hunk_lines) and hunk_lines[k].type != DiffLineType.CONTEXT:
+                        if hunk_lines[k].type == DiffLineType.DELETE:
+                            del_block.append(hunk_lines[k])
+                        elif hunk_lines[k].type == DiffLineType.ADD:
+                            add_block.append(hunk_lines[k])
+                        k += 1
+
+                    if del_block and add_block:
+                        count = max(len(del_block), len(add_block))
+                        for offset in range(count):
+                            d_line = del_block[offset] if offset < len(del_block) else None
+                            a_line = add_block[offset] if offset < len(add_block) else None
+                            rows.append(
+                                DiffSideBySideRow(
+                                    old_no=d_line.old_line_no if d_line else None,
+                                    old_text=_trim(d_line.content) if d_line else "",
+                                    new_no=a_line.new_line_no if a_line else None,
+                                    new_text=_trim(a_line.content) if a_line else "",
+                                    row_type="replace",
+                                )
+                            )
+                            if d_line and d_line.old_line_no is not None:
+                                old_idx = d_line.old_line_no
+                            if a_line and a_line.new_line_no is not None:
+                                new_idx = a_line.new_line_no
+                    elif del_block:
+                        for d_line in del_block:
+                            rows.append(
+                                DiffSideBySideRow(
+                                    old_no=d_line.old_line_no,
+                                    old_text=_trim(d_line.content),
+                                    new_no=None,
+                                    new_text="",
+                                    row_type="delete",
+                                )
+                            )
+                            if d_line.old_line_no is not None:
+                                old_idx = d_line.old_line_no
+                    elif add_block:
+                        for a_line in add_block:
+                            rows.append(
+                                DiffSideBySideRow(
+                                    old_no=None,
+                                    old_text="",
+                                    new_no=a_line.new_line_no,
+                                    new_text=_trim(a_line.content),
+                                    row_type="insert",
+                                )
+                            )
+                            if a_line.new_line_no is not None:
+                                new_idx = a_line.new_line_no
+
+        while old_idx < len(old_lines) or new_idx < len(new_lines):
+            has_old = old_idx < len(old_lines)
+            has_new = new_idx < len(new_lines)
+            old_t = old_lines[old_idx] if has_old else ""
+            new_t = new_lines[new_idx] if has_new else ""
+            rows.append(
+                DiffSideBySideRow(
+                    old_no=old_idx + 1 if has_old else None,
+                    old_text=_trim(old_t) if has_old else "",
+                    new_no=new_idx + 1 if has_new else None,
+                    new_text=_trim(new_t) if has_new else "",
+                    row_type="equal"
+                    if (has_old and has_new and old_t == new_t)
+                    else ("replace" if (has_old and has_new) else ("delete" if has_old else "insert")),
+                )
+            )
+            if has_old:
+                old_idx += 1
+            if has_new:
+                new_idx += 1
 
         return rows
 

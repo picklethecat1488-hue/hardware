@@ -1725,8 +1725,8 @@ def test_git_engine_file_diff_caching(tmp_path: Path) -> None:
     assert (target_sha, target_file) not in engine._file_diff_cache
 
 
-def test_oversized_diff_handling_three_cad_viewer(tmp_path: Path) -> None:
-    """Verify that oversized/bundled vendor files (>500KB or >3000 lines) collapse without hanging diff viewer."""
+def test_large_diff_handling_without_hanging_three_cad_viewer(tmp_path: Path) -> None:
+    """Verify that large vendor files (>500KB or >3000 lines) are diffed without hanging."""
     repo_dir = tmp_path / "oversized_repo"
     repo_dir.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "init"], cwd=repo_dir, check=True, capture_output=True)
@@ -1746,7 +1746,8 @@ def test_oversized_diff_handling_three_cad_viewer(tmp_path: Path) -> None:
     engine = GitEngine(repo_root=repo_dir)
     diff = engine.get_file_diff("working", "three-cad-viewer.esm.js")
 
-    assert diff.is_oversized is True
-    assert diff.side_by_side == []
-    assert diff.hunks == []
-    assert "File diff is too large to render" in diff.full_content
+    assert diff.is_oversized is False
+    assert len(diff.side_by_side) == 5000
+    assert len(diff.hunks) == 1
+    assert diff.additions == 5000
+    assert diff.deletions == 0
