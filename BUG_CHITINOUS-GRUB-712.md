@@ -2,12 +2,13 @@
 
 - **UUID**: `162a59f5-e11e-417a-a305-abb8e76cd03c`
 - **ID**: `BUG-CHITINOUS-GRUB-712`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-12 20:45:04 UTC`
 - **Resolved**: `2026-11-12 23:47:41 UTC`
+- **Accepted**: `2026-11-12 23:47:52 UTC`
 
 #### Description
 
