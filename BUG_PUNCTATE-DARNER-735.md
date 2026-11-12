@@ -520,3 +520,7 @@ face 46 ignored
 2026-11-11 15:12:49 [INFO] scope: Successfully loaded geometry for cat_fountain/wiring [DIAGRAM] in 49.89s
 2026-11-11 15:12:49 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 15:12:49] "GET /api/scope/load?project=cat_fountain&target=wiring&subassembly=&mode=DIAGRAM HTTP/1.1" 200 -
 ```
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:fa677cd2 --> Open cat_fountain wiring diagram in Scope and verify that schematic text annotations and component pin labels render crisply in the viewport | `python tools/scope.py cat_fountain/wiring:diagram`
