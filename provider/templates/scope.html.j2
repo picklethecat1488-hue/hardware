@@ -1998,7 +1998,7 @@
         }
       });
 
-      // Prevent substrate highlighting in PCB mode
+      // Prevent substrate hover/pick/selection highlighting in PCB mode
       const origHandlePick = state.viewer.handlePick;
       if (typeof origHandlePick === "function") {
         state.viewer.handlePick = function(path, name, meta, shift, alt, point, nodeType, tree) {
@@ -2016,6 +2016,31 @@
           }
           return origHandlePick.call(this, path, name, meta, shift, alt, point, nodeType, tree);
         };
+      }
+
+      if (state.viewer.pickingController) {
+        const pc = state.viewer.pickingController;
+        if (typeof pc.pickVisible === "function") {
+          const origPickVisible = pc.pickVisible.bind(pc);
+          pc.pickVisible = function(info) {
+            if (state.currentMode === "PCB") {
+              const targetPath = `${info?.solidPath || ""}/${info?.path || ""}`.toLowerCase();
+              if (targetPath.includes("substrate")) {
+                return false;
+              }
+            }
+            return origPickVisible(info);
+          };
+        }
+        if (typeof pc.setTreeHover === "function") {
+          const origSetTreeHover = pc.setTreeHover.bind(pc);
+          pc.setTreeHover = function(path) {
+            if (state.currentMode === "PCB" && String(path || "").toLowerCase().includes("substrate")) {
+              return origSetTreeHover(null);
+            }
+            return origSetTreeHover(path);
+          };
+        }
       }
 
       if (state.viewer && state.viewer.renderer && typeof state.viewer.renderer.setClearColor === "function") {
@@ -2492,7 +2517,31 @@
           if (typeof group.setEdgesVisible === "function") {
             group.setEdgesVisible(isSubstrate);
           }
+          if (isSubstrate) {
+            if (group.layers) {
+              group.layers.disable(1);
+              group.layers.disable(2);
+              group.layers.disable(3);
+            }
+            if (group.pickVertices) {
+              group.pickVertices.visible = false;
+              if (group.pickVertices.layers) {
+                group.pickVertices.layers.disableAll();
+              }
+            }
+          }
           group.traverse((child) => {
+            if (isSubstrate) {
+              if (child.layers) {
+                child.layers.disable(1); // PICK_LAYER.FACE
+                child.layers.disable(2); // PICK_LAYER.EDGE
+                child.layers.disable(3); // PICK_LAYER.VERTEX
+              }
+              if (child.isPoints) {
+                child.visible = false;
+              }
+              child.raycast = () => {};
+            }
             if (child.isLineSegments || child.isLine) {
               if (isSubstrate && child.material && child.material.color) {
                 child.material.color.setHex(0xd0d2cd);
@@ -2521,6 +2570,58 @@
             }
           });
         }
+      }
+
+      // Guard HighlightController so substrate component IDs can never be hovered or selected
+      const hl = r.nestedGroup.highlight;
+      if (hl && !hl._pcbSubstrateGuarded) {
+        hl._pcbSubstrateGuarded = true;
+        const substrateIds = new Set();
+        if (hl.registry && typeof hl.registry.entries === "function") {
+          for (const info of hl.registry.entries()) {
+            const p = `${info?.solidPath || ""}/${info?.path || ""}`.toLowerCase();
+            if (p.includes("substrate")) {
+              substrateIds.add(info.id);
+            }
+          }
+        }
+        if (typeof hl.setHover === "function") {
+          const origSetHover = hl.setHover.bind(hl);
+          hl.setHover = (id) => origSetHover(substrateIds.has(id) ? null : id);
+        }
+        if (typeof hl.setHoverSolid === "function") {
+          const origSetHoverSolid = hl.setHoverSolid.bind(hl);
+          hl.setHoverSolid = (solidPath) => origSetHoverSolid(
+            String(solidPath || "").toLowerCase().includes("substrate") ? null : solidPath
+          );
+        }
+        if (typeof hl.setHoverPath === "function") {
+          const origSetHoverPath = hl.setHoverPath.bind(hl);
+          hl.setHoverPath = (prefix) => origSetHoverPath(
+            String(prefix || "").toLowerCase().includes("substrate") ? null : prefix
+          );
+        }
+        if (typeof hl.setSelected === "function") {
+          const origSetSelected = hl.setSelected.bind(hl);
+          hl.setSelected = (id, flag) => {
+            if (substrateIds.has(id)) return;
+            return origSetSelected(id, flag);
+          };
+        }
+        if (typeof hl.selectSolid === "function") {
+          const origSelectSolid = hl.selectSolid.bind(hl);
+          hl.selectSolid = (solidPath, flag) => {
+            if (String(solidPath || "").toLowerCase().includes("substrate")) return;
+            return origSelectSolid(solidPath, flag);
+          };
+        }
+      }
+
+      if (state.viewer && state.viewer.pickingController && typeof state.viewer.pickingController.clearHover === "function") {
+        state.viewer.pickingController.clearHover();
+      }
+      if (state.viewer && state.viewer.idPicker && typeof state.viewer.idPicker.setDirty === "function") {
+        state.viewer.idPicker.setDirty();
       }
       if (state.viewer && typeof state.viewer.update === "function") {
         state.viewer.update(true, false);
@@ -2982,7 +3083,8 @@
           if (key === layerId || key.endsWith("/" + layerId) || key.includes(layerId)) {
             group.visible = isVisible;
             if (typeof group.setShapeVisible === "function") group.setShapeVisible(isVisible);
-            if (typeof group.setEdgesVisible === "function") group.setEdgesVisible(isVisible);
+            const showEdges = isVisible && (state.currentMode !== "PCB" || key.toLowerCase().includes("substrate"));
+            if (typeof group.setEdgesVisible === "function") group.setEdgesVisible(showEdges);
             group.traverse((child) => {
               if (child.isMesh) child.visible = isVisible;
             });
@@ -2997,6 +3099,9 @@
             toggled = true;
           }
         });
+      }
+      if (state.viewer && state.viewer.idPicker && typeof state.viewer.idPicker.setDirty === "function") {
+        state.viewer.idPicker.setDirty();
       }
       if (state.viewer && typeof state.viewer.update === "function") {
         state.viewer.update(false, false);
