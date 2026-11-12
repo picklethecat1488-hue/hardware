@@ -1,4 +1,4 @@
-# 🔴 `[BUG-SWARMING-SILVERFISH-292]` [cat_fountain/wiring] Defect in DIAGRAM view
+# 🔴 `[BUG-SWARMING-SILVERFISH-292]` Diagram view background dark with unreadable black text and non-SVG default camera
 
 - **UUID**: `cfedf9ee-42c6-4e2f-85b9-c29cb7138a3a`
 - **ID**: `BUG-SWARMING-SILVERFISH-292`

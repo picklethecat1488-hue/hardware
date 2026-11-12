@@ -1,4 +1,4 @@
-# 🔴 `[BUG-SHINING-HOVERFLY-298]` [cat_fountain/product] Defect in SIMULATE view
+# 🔴 `[BUG-SHINING-HOVERFLY-298]` Simulation water particles shimmer/motion blur and STEPS/SCALE playback control text overlap
 
 - **UUID**: `3707fc5c-39a2-48c2-89a9-73c07ca08d9c`
 - **ID**: `BUG-SHINING-HOVERFLY-298`

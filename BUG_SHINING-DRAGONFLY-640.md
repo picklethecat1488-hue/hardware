@@ -1,12 +1,13 @@
-# 🔴 `[BUG-SHINING-DRAGONFLY-640]` [carrier_board/carrier_board] Defect in PCB view
+# 🟢 `[BUG-SHINING-DRAGONFLY-640]` Silkscreen text flipped upside down in PCB 3D view (carrier_board)
 
 - **UUID**: `5f192f47-2012-42d4-b07e-262ad0aa5a05`
 - **ID**: `BUG-SHINING-DRAGONFLY-640`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-12 00:52:30 UTC`
+- **Resolved**: `2026-11-12 01:38:17 UTC`
 
 #### Description
 
@@ -521,9 +522,6 @@ face 46 ignored
 2026-11-11 16:50:44 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 16:50:44] "GET /api/scope/projects HTTP/1.1" 200 -
 ```
 
-#### Attachments & References
+#### Resolution Notes
 
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-SHINING-DRAGONFLY-640/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
-| `text/plain` | [scope.log](attachments/BUG-SHINING-DRAGONFLY-640/scope.log) | Scope workstation execution logs |
+Invert silkscreen text orientation in 3D PCB CAD assembler to match KiCad CAM export, default PCB camera to top preset, and dereference Three.js camera for raycasting entity selection
