@@ -7,7 +7,7 @@
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-12 14:37:37 UTC`
-- **Resolved**: `2026-11-12 15:14:37 UTC`
+- **Resolved**: `2026-11-12 20:46:46 UTC`
 
 #### Description
 
@@ -533,3 +533,5 @@ face 46 ignored
 #### Resolution Notes
 
 Configure LMB hold to pan, MMB to zoom, and disable orbit/rotate in HUD and toolbar in PCB and Diagram views
+-This working for me: Configure LMB hold to pan
+- I also observed orbit/rotate were still enabled
