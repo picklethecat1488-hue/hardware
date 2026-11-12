@@ -17,6 +17,7 @@ Target (#btn-open-chooser) and Sync (#btn-sync) buttons in the scope CAD viewer 
 #### Attached Commits
 
 - `27161e8e`
+- `e1e29d83`
 
 #### Review Tasks & Functional Checklist
 
