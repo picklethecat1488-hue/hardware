@@ -1460,6 +1460,17 @@
       }
     }
 
+    function getThreeCamera() {
+      try {
+        const r = getViewerRendered();
+        if (!r || !r.camera) return null;
+        const c = r.camera;
+        return c.camera || c.pCamera || c.oCamera || c;
+      } catch {
+        return null;
+      }
+    }
+
     function resizeViewport() {
       resizeMarkupCanvas();
       const rect = container.getBoundingClientRect();
@@ -1848,10 +1859,11 @@
           hoverRaf = false;
           const coords = getCanvasRelativeCoords(e);
 
-          if (state.pcbMetadata && state.viewer?.rendered?.camera && window.THREE) {
+          const threeCam = getThreeCamera();
+          if (state.pcbMetadata && threeCam && window.THREE) {
             const mouse = new window.THREE.Vector2(coords.ndcX, coords.ndcY);
             const raycaster = new window.THREE.Raycaster();
-            raycaster.setFromCamera(mouse, state.viewer.rendered.camera);
+            raycaster.setFromCamera(mouse, threeCam);
 
             let worldPoint = null;
             if (state.viewer.rendered.scene) {
@@ -1967,10 +1979,11 @@
         const y = coords.y;
 
         // Dedicated PCB View Click & Inspection Handler
-        if (state.currentMode === "PCB" && state.pcbMetadata && state.viewer?.rendered?.camera && window.THREE) {
+        const threeCam = getThreeCamera();
+        if (state.currentMode === "PCB" && state.pcbMetadata && threeCam && window.THREE) {
           const mouse = new window.THREE.Vector2(coords.ndcX, coords.ndcY);
           const raycaster = new window.THREE.Raycaster();
-          raycaster.setFromCamera(mouse, state.viewer.rendered.camera);
+          raycaster.setFromCamera(mouse, threeCam);
 
           let worldPoint = null;
           if (state.viewer.rendered.scene) {
@@ -2055,11 +2068,11 @@
         }
 
         // Raycasting fallback
-        if (!hitName && state.viewer && state.viewer.rendered && state.viewer.rendered.scene && state.viewer.rendered.camera) {
+        if (!hitName && threeCam && state.viewer?.rendered?.scene) {
           try {
             const mouse = new window.THREE.Vector2(coords.ndcX, coords.ndcY);
             const raycaster = new window.THREE.Raycaster();
-            raycaster.setFromCamera(mouse, state.viewer.rendered.camera);
+            raycaster.setFromCamera(mouse, threeCam);
             const hits = raycaster.intersectObjects(state.viewer.rendered.scene.children, true);
             if (hits && hits.length > 0) {
               const h0 = hits[0];
@@ -2170,7 +2183,7 @@
       } else if (typeof state.viewer.setView === "function") {
         state.viewer.setView(viewName);
       } else if (state.viewer.controls) {
-        const c = state.viewer.camera;
+        const c = getThreeCamera() || state.viewer.camera;
         if (viewName === "top") { c.position.set(0, 0, 200); c.up.set(0, 1, 0); }
         if (viewName === "bottom") { c.position.set(0, 0, -200); c.up.set(0, 1, 0); }
         if (viewName === "front") { c.position.set(0, -200, 0); c.up.set(0, 0, 1); }
@@ -2309,10 +2322,11 @@
 
         if (state.viewer && shapes) {
           state.viewer.render(shapes, data.config || {}, {});
+          const defaultPreset = (state.currentMode === "PCB" || state.currentMode === "DIAGRAM") ? "top" : "iso";
           if (typeof state.viewer.presetCamera === "function") {
-            state.viewer.presetCamera("iso");
+            state.viewer.presetCamera(defaultPreset);
           } else if (typeof state.viewer.setView === "function") {
-            state.viewer.setView("iso");
+            state.viewer.setView(defaultPreset);
           }
           resizeViewport();
           requestAnimationFrame(() => {

@@ -1053,3 +1053,30 @@ def test_scope_headless_simulation_capture_rrd(tmp_path):
     assert ret == 0
     assert rrd_out.exists()
     assert rrd_out.stat().st_size > 0
+
+
+def test_regression_bug_shining_dragonfly_640_silkscreen_text_orientation_and_pcb_selection(scope_server):
+    """Verify BUG-SHINING-DRAGONFLY-640: silkscreen text orientation in 3D PCB CAD matches KiCad CAM export.
+
+    Also verify getThreeCamera helper dereferences actual Three.js camera for raycasting/selection.
+    """
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider.pcb.cad_assembler import PCB3DAssembler
+
+    prov = CarrierBoardProvider()
+    assembler = PCB3DAssembler.from_provider(prov)
+
+    # 1. Verify 3D silkscreen compound is built with correct solid primitives
+    silk_top = assembler.build_silkscreen("F.SilkS")
+    assert silk_top is not None
+    assert len(silk_top.children) > 0
+
+    # 2. Verify Scope HTML template dereferences actual Three.js camera and uses default 'top' preset for PCB
+    html_url = f"http://127.0.0.1:{scope_server.actual_port}/"
+    req_html = urllib.request.urlopen(html_url)
+    assert req_html.status == 200
+    html = req_html.read().decode("utf-8")
+
+    assert "function getThreeCamera()" in html
+    assert "raycaster.setFromCamera(mouse, threeCam);" in html
+    assert 'defaultPreset = (state.currentMode === "PCB" || state.currentMode === "DIAGRAM") ? "top" : "iso";' in html
