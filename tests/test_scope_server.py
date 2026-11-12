@@ -2,7 +2,11 @@
 
 import gzip
 import json
+import os
 from pathlib import Path
+import re
+import shutil
+import subprocess
 import threading
 import time
 import urllib.request
@@ -1350,6 +1354,30 @@ def test_regression_bug_emerald_moth_182_target_and_sync_synchronous_initializat
     # 4. Verify sync button has unconfigured project/target fallback to prevent 400/500 errors
     assert "if (state.currentProject && state.currentTarget)" in html
     assert "openProjectChooserModal();" in html
+
+    # 5. Verify the entire embedded <script type="module"> compiles with zero syntax errors via node/vm.Script
+    script_match = re.search(r"<script type=\"module\">(.*?)</script>", html, re.DOTALL)
+    assert script_match is not None, "Scope workstation HTML must contain a <script type='module'>"
+    script_content = script_match.group(1)
+
+    node_bin = shutil.which("node")
+    if node_bin:
+        sanitized_script = re.sub(
+            r"import\s+.*?from\s+.*?;\n",
+            "const Display = function(){}; const Viewer = function(){}; const decodeInstancedFormat = function(){}; const isInstancedFormat = function(){};",
+            script_content,
+        )
+        res = subprocess.run(
+            [
+                node_bin,
+                "-e",
+                "const vm = require('vm'); try { new vm.Script(process.env.JS_CODE, { filename: 'scope.js' }); console.log('VALID'); } catch (e) { console.error(e.message); process.exit(1); }",
+            ],
+            env={**os.environ, "JS_CODE": sanitized_script},
+            capture_output=True,
+            text=True,
+        )
+        assert res.returncode == 0, f"Scope workstation JavaScript syntax error: {res.stderr}"
 
 
 def test_regression_bug_radiant_skipper_379_ui_scale_default_100_percent(scope_server):

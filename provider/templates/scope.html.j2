@@ -2258,7 +2258,6 @@
               return;
             }
           }
-        }
 
         // CAD and Simulation mode fallback inspection
         let hitName = "";
@@ -4358,31 +4357,31 @@
         if (targetSel) targetSel.innerHTML = '<option value="">(Loading targets...)</option>';
         setChooserLoading(true, "Scanning workspace projects and targets...", 35);
         await loadProjects(false);
-      } else {
-        setChooserLoading(false);
-        if (projSel) {
-          projSel.innerHTML = "";
-          state.projects.forEach(p => {
-            const opt = document.createElement("option");
-            opt.value = p.name;
-            opt.textContent = p.name;
-            if (p.name === state.currentProject) opt.selected = true;
-            projSel.appendChild(opt);
-          });
-
-          if (!state.currentProject && state.projects.length > 0) {
-            state.currentProject = state.projects[0].name;
-            if (projSel.options.length > 0) projSel.selectedIndex = 0;
-          }
-        }
-
-        const maxStepsSel = document.getElementById("chooser-max-steps");
-        if (maxStepsSel && state.maxSteps) {
-          maxStepsSel.value = state.maxSteps.toString();
-        }
-
-        updateChooserTargets();
       }
+
+      setChooserLoading(false);
+      if (projSel) {
+        projSel.innerHTML = "";
+        state.projects.forEach(p => {
+          const opt = document.createElement("option");
+          opt.value = p.name;
+          opt.textContent = p.name;
+          if (p.name === state.currentProject) opt.selected = true;
+          projSel.appendChild(opt);
+        });
+
+        if (!state.currentProject && state.projects.length > 0) {
+          state.currentProject = state.projects[0].name;
+          if (projSel.options.length > 0) projSel.selectedIndex = 0;
+        }
+      }
+
+      const maxStepsSel = document.getElementById("chooser-max-steps");
+      if (maxStepsSel && state.maxSteps) {
+        maxStepsSel.value = state.maxSteps.toString();
+      }
+
+      updateChooserTargets();
     }
 
     function closeProjectChooserModal() {
@@ -5052,10 +5051,14 @@
     }
 
     // EVENT LISTENERS & DOM HOOKUPS
-    document.addEventListener("DOMContentLoaded", () => {
+    function initWorkstation() {
       initUiScale();
       initSidebarResizer();
-      initCadViewer();
+      try {
+        initCadViewer();
+      } catch (err) {
+        console.error("CAD viewer initialization error:", err);
+      }
       resizeViewport();
       updateActiveTargetHudBadge();
 
@@ -5073,7 +5076,13 @@
 
       // Initiate asynchronous data loading in background
       initWorkstationData();
-    });
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initWorkstation);
+    } else {
+      initWorkstation();
+    }
   </script>
 </body>
 </html>
