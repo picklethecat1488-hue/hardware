@@ -522,6 +522,10 @@ face 46 ignored
 2026-11-12 06:41:48 [INFO] scope: 127.0.0.1 - - [12/Nov/2026 06:41:48] "POST /api/scope/target_bug HTTP/1.1" 200 -
 ```
 
+#### Attached Commits
+
+- `c1206b05`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:45b25997 --> Open carrier board in Scope PCB view, hover over and click on test points (TP1, TP2, TP3, TP4), copper pads, vias, and traces, and verify accurate raycasting selection and detailed inspection card in sidebar | `python tools/scope.py carrier_board/carrier_board:pcb`
