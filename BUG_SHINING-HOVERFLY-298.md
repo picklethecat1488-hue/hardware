@@ -1,12 +1,13 @@
-# 🔴 `[BUG-SHINING-HOVERFLY-298]` Simulation water particles shimmer/motion blur and STEPS/SCALE playback control text overlap
+# 🟢 `[BUG-SHINING-HOVERFLY-298]` Simulation water particles shimmer/motion blur and STEPS/SCALE playback control text overlap
 
 - **UUID**: `3707fc5c-39a2-48c2-89a9-73c07ca08d9c`
 - **ID**: `BUG-SHINING-HOVERFLY-298`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-12 01:01:10 UTC`
+- **Resolved**: `2026-11-12 01:55:33 UTC`
 
 #### Description
 
@@ -527,3 +528,11 @@ face 46 ignored
 | :--- | :--- | :--- |
 | `image/png` | [snapshot.png](attachments/BUG-SHINING-HOVERFLY-298/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
 | `text/plain` | [scope.log](attachments/BUG-SHINING-HOVERFLY-298/scope.log) | Scope workstation execution logs |
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:3707fc5c --> Open cat fountain simulation in Scope SIMULATE mode, verify fluid particles render with circular soft sprite texture and velocity-based color grading without shimmer, verify playback controls and step readout do not overlap at any scale, and verify Save .rrd button downloads the recording | `python tools/scope.py cat_fountain/product:simulate`
+
+#### Resolution Notes
+
+Eliminate particle shimmer with circular soft sprite and velocity color ramp, fix playback control overlap with nowrap layout, add Save .rrd button, and genericize rerun events
