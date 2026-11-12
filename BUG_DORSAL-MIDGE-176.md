@@ -525,6 +525,10 @@ face 46 ignored
 2026-11-12 06:39:19 [INFO] scope: 127.0.0.1 - - [12/Nov/2026 06:39:19] "GET /api/scope/projects HTTP/1.1" 200 -
 ```
 
+#### Attached Commits
+
+- `b373fdd0`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:4657e403 --> Open carrier board in Scope PCB view, verify Components is above Substrate on layer stack, colors match KiCad default palette, PCB is oriented matching KiCad (+Y down), 3D rotate controls are hidden, and net labels appear on pads and traces when zoomed in | `python tools/scope.py carrier_board/carrier_board:pcb`
