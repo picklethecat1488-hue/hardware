@@ -6,7 +6,12 @@
 - **Severity**: `HIGH`
 - **Category**: `UI`
 - **Component**: `cat_fountain`
+- **Created**: `2026-11-12 17:40:50 UTC`
 
 #### Description
 
 Target (#btn-open-chooser) and Sync (#btn-sync) buttons in the scope CAD viewer HUD become unresponsive or fail to open/update because DOM event listener registration is deferred after asynchronous geometry loading. Additionally, openProjectChooserModal leaves the modal in a disabled state if state.projects is empty without triggering project loading.
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:0007738d --> Verify Target (#btn-open-chooser) and Sync (#btn-sync) buttons are immediately active and project chooser populates targets | `python tools/scope.py`
