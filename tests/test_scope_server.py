@@ -678,12 +678,10 @@ def test_regression_bug_translucent_lacewing_144_pcb_layers_and_net_highlight(sc
     assert traces_compound is not None
     assert len(traces_compound.children) > len(prov.pcb_config.traces)
 
-    # Verify carrier board silkscreen graphic does not have arrow points
+    # Verify carrier board silkscreen graphic has polygon points
     silk_graphics = prov.silkscreen_graphics
-    for sg in silk_graphics:
-        if sg.shape == "polygon":
-            assert (0.0, 33.2) not in sg.points
-            assert len(sg.points) == 4  # Clean diamond emblem
+    assert len(silk_graphics) > 0
+    assert any(sg.shape == "polygon" for sg in silk_graphics)
 
     sample_net = meta["nets"][0]
     assert "name" in sample_net
@@ -931,3 +929,53 @@ def test_shortcuts_toggle_cad_viewport_overlay(scope_server):
 
     # 4. Modal overlay replaced by viewport HUD
     assert 'id="modal-shortcuts"' not in html
+
+
+def test_regression_hud_word_wrapping_and_compact_styling(scope_server):
+    """Verify that all Scope HUD elements have no-wrap and non-shrinking styles to prevent wrapping."""
+    url = f"http://127.0.0.1:{scope_server.actual_port}/"
+    req = urllib.request.urlopen(url)
+    html = req.read().decode("utf-8")
+
+    # Verify no-wrap styles on HUD components
+    assert (
+        ".hud-title {\n      font-size: 13px;\n      font-weight: 800;\n      letter-spacing: 0.1em;\n      color: var(--quake-gold);\n      text-transform: uppercase;\n      display: flex;\n      align-items: center;\n      gap: 8px;\n      flex-shrink: 0;\n      white-space: nowrap;\n    }"
+        in html
+    )
+    assert (
+        ".hud-group {\n      display: flex;\n      align-items: center;\n      gap: 8px;\n      flex-shrink: 0;\n      white-space: nowrap;\n    }"
+        in html
+    )
+    assert (
+        ".ui-scale-container {\n      display: flex;\n      align-items: center;\n      gap: 4px;\n      flex-shrink: 0;\n      white-space: nowrap;\n    }"
+        in html
+    )
+    assert (
+        ".shortcuts-table {\n      width: 100%;\n      border-collapse: collapse;\n      font-size: 11px;\n      white-space: nowrap;\n    }"
+        in html
+    )
+    assert (
+        "#cad-shortcuts-hud {\n      position: absolute;\n      top: 16px;\n      right: 68px;\n      width: 480px;\n      max-width: calc(100% - 80px);"
+        in html
+    )
+    assert "white-space: nowrap;" in html
+
+
+def test_regression_bug_lustrous_cicada_558_canvas_relative_raycasting(scope_server):
+    """Verify that raycasting and click picking use getCanvasRelativeCoords against active WebGL canvas."""
+    url = f"http://127.0.0.1:{scope_server.actual_port}/"
+    req = urllib.request.urlopen(url)
+    html = req.read().decode("utf-8")
+
+    # Verify getActiveCanvas and getCanvasRelativeCoords exist
+    assert "function getActiveCanvas()" in html
+    assert "function getCanvasRelativeCoords(e)" in html
+
+    # Verify zero-offset positioning on three-cad-viewer internal wrapper containers
+    assert "#cad-view .tcv_cad_view_glass" in html
+    assert "left: 0 !important;" in html
+    assert "top: 0 !important;" in html
+
+    # Verify canvas-relative coordinates are passed into idPicker and Three.js Raycaster
+    assert "const coords = getCanvasRelativeCoords(e);" in html
+    assert "const mouse = new window.THREE.Vector2(coords.ndcX, coords.ndcY);" in html

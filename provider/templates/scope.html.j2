@@ -149,6 +149,7 @@
       align-items: center;
       gap: 8px;
       flex-shrink: 0;
+      white-space: nowrap;
     }
 
     .hud-group {
@@ -156,6 +157,7 @@
       align-items: center;
       gap: 8px;
       flex-shrink: 0;
+      white-space: nowrap;
     }
 
     .hud-label {
@@ -163,6 +165,8 @@
       font-weight: 700;
       color: var(--quake-text-muted);
       text-transform: uppercase;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .hud-select {
@@ -175,8 +179,44 @@
       font-family: var(--font-mono);
       outline: none;
       cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
     .hud-select:focus, .hud-select:hover {
+      border-color: var(--quake-cyan);
+      box-shadow: 0 0 6px rgba(0, 229, 255, 0.3);
+    }
+
+    .ui-scale-container {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .ui-scale-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--quake-text-muted);
+      text-transform: uppercase;
+      white-space: nowrap;
+      flex-shrink: 0;
+      font-family: var(--font-mono);
+    }
+    .ui-scale-select {
+      background: var(--quake-bg);
+      color: var(--quake-gold);
+      border: 1px solid var(--quake-border-mid);
+      border-radius: 3px;
+      padding: 3px 6px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      outline: none;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .ui-scale-select:focus, .ui-scale-select:hover {
       border-color: var(--quake-cyan);
       box-shadow: 0 0 6px rgba(0, 229, 255, 0.3);
     }
@@ -187,6 +227,8 @@
       border-radius: 4px;
       overflow: hidden;
       background: #090b0e;
+      flex-shrink: 0;
+      white-space: nowrap;
     }
     .mode-pill {
       background: transparent;
@@ -198,6 +240,8 @@
       cursor: pointer;
       font-family: var(--font-mono);
       transition: all 0.15s ease;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
     .mode-pill:hover {
       color: var(--quake-text);
@@ -230,6 +274,8 @@
       align-items: center;
       gap: 6px;
       transition: all 0.15s ease;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
     .hud-btn:hover {
       background: #261a0f;
@@ -511,20 +557,34 @@
       background-color: #0d0f14 !important;
     }
 
-    /* FULL VIEWPORT EXPANSION (BUG-ANTENNAL-FIREBUG-841) */
+    /* FULL VIEWPORT EXPANSION (BUG-ANTENNAL-FIREBUG-841, BUG-LUSTROUS-CICADA-558) */
     #cad-view .tcv_cad_viewer,
     #cad-view .tcv_cad_body,
-    #cad-view .tcv_cad_view {
+    #cad-view .tcv_cad_view,
+    #cad-view .tcv_cad_view_glass {
       width: 100% !important;
       height: 100% !important;
       flex: 1 !important;
       margin: 0 !important;
+      padding: 0 !important;
       position: relative !important;
+      left: 0 !important;
+      top: 0 !important;
+    }
+    #cad-view .tcv_cad_view_glass {
+      position: absolute !important;
+      left: 0 !important;
+      top: 0 !important;
     }
     #cad-view .tcv_cad_view canvas {
       width: 100% !important;
       height: 100% !important;
       display: block !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      position: absolute !important;
+      left: 0 !important;
+      top: 0 !important;
     }
 
     #markup-canvas {
@@ -663,6 +723,7 @@
       padding: 8px 16px;
       z-index: 35;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7);
+      white-space: nowrap;
     }
     #sim-bar.visible {
       display: flex;
@@ -677,6 +738,14 @@
       border: 1px solid rgba(255, 184, 0, 0.3);
       color: var(--quake-text);
       border-radius: 3px;
+      padding: 2px 6px;
+      font-size: 9px;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      transition: all 0.15s ease;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
       padding: 2px 6px;
       font-size: 9px;
       cursor: pointer;
@@ -786,16 +855,19 @@
       width: 100%;
       border-collapse: collapse;
       font-size: 11px;
+      white-space: nowrap;
     }
     .shortcuts-table th {
       text-align: left;
       color: var(--quake-gold);
       padding: 6px;
       border-bottom: 1px solid var(--quake-border);
+      white-space: nowrap;
     }
     .shortcuts-table td {
       padding: 6px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      white-space: nowrap;
     }
     .kbd-badge {
       background: #090b0e;
@@ -805,6 +877,7 @@
       border-radius: 3px;
       font-size: 10px;
       font-weight: 700;
+      white-space: nowrap;
     }
 
     /* CAD VIEWPORT SHORTCUTS HUD OVERLAY */
@@ -812,7 +885,8 @@
       position: absolute;
       top: 16px;
       right: 68px;
-      width: 330px;
+      width: 480px;
+      max-width: calc(100% - 80px);
       max-height: calc(100% - 32px);
       background: rgba(13, 16, 23, 0.94);
       border: 1px solid var(--quake-border-bright);
@@ -822,6 +896,7 @@
       display: none;
       flex-direction: column;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8), 0 0 1px rgba(255, 170, 0, 0.4);
+      white-space: nowrap;
     }
     #cad-shortcuts-hud.visible {
       display: flex;
@@ -834,10 +909,15 @@
       background: rgba(255, 170, 0, 0.08);
       border-bottom: 1px solid var(--quake-border);
       border-radius: 5px 5px 0 0;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
     .hud-panel-header .hud-title {
       font-size: 11px;
       font-weight: 800;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
       color: var(--quake-gold);
       letter-spacing: 0.05em;
       font-family: var(--font-mono);
@@ -1108,16 +1188,16 @@
           <input id="sim-step-slider" type="range" class="sim-slider" min="0" max="1000" value="0">
           <div id="sim-step-val" style="font-size: 11px; width: 68px; text-align: right; color: var(--quake-gold); font-weight: bold;">Step: 0</div>
         </div>
-        <div id="sim-timeline-logs" style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 10px;">
-          <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
-            <span style="color: var(--quake-text-muted); font-size: 9px; font-weight: bold;">RERUN LOGS:</span>
+        <div id="sim-timeline-logs" style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 10px; white-space: nowrap; overflow-x: auto; gap: 8px;">
+          <div style="display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; white-space: nowrap; flex-shrink: 0;">
+            <span style="color: var(--quake-text-muted); font-size: 9px; font-weight: bold; white-space: nowrap; flex-shrink: 0;">RERUN LOGS:</span>
             <button class="sim-log-chip active" data-step="0">t=0s: Init</button>
             <button class="sim-log-chip" data-step="200">t=0.8s: Spout</button>
             <button class="sim-log-chip" data-step="450">t=1.8s: Lid Sheet</button>
             <button class="sim-log-chip" data-step="700">t=2.8s: Waterfall</button>
             <button class="sim-log-chip" data-step="950">t=3.8s: Equilibrium</button>
           </div>
-          <div id="sim-flow-metrics" style="color: var(--quake-cyan); font-size: 10px; font-weight: 500;">
+          <div id="sim-flow-metrics" style="color: var(--quake-cyan); font-size: 10px; font-weight: 500; white-space: nowrap; flex-shrink: 0;">
             Spout: 0 mL/s | Waterfall: 0 mL/s | Reservoir: 1.50 L
           </div>
         </div>
@@ -1327,10 +1407,35 @@
       setTimeout(() => { toast.style.display = "none"; }, duration);
     }
 
+    function getActiveCanvas() {
+      return state.viewer?.rendered?.renderer?.domElement ||
+             state.viewer?.renderer?.domElement ||
+             container.querySelector("canvas") ||
+             container;
+    }
+
+    function getCanvasRelativeCoords(e) {
+      const canvas = getActiveCanvas();
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const width = rect.width || canvas.clientWidth || 1;
+      const height = rect.height || canvas.clientHeight || 1;
+      const ndcX = (x / width) * 2 - 1;
+      const ndcY = -(y / height) * 2 + 1;
+      return { canvas, rect, x, y, width, height, ndcX, ndcY };
+    }
+
     function resizeMarkupCanvas() {
-      const rect = container.getBoundingClientRect();
-      markupCanvas.width = rect.width;
-      markupCanvas.height = rect.height;
+      const canvas = getActiveCanvas();
+      const rect = canvas.getBoundingClientRect();
+      const cRect = container.getBoundingClientRect();
+      markupCanvas.width = Math.round(rect.width || cRect.width);
+      markupCanvas.height = Math.round(rect.height || cRect.height);
+      markupCanvas.style.width = Math.round(rect.width || cRect.width) + "px";
+      markupCanvas.style.height = Math.round(rect.height || cRect.height) + "px";
+      markupCanvas.style.left = Math.round(rect.left - cRect.left) + "px";
+      markupCanvas.style.top = Math.round(rect.top - cRect.top) + "px";
       redrawMarkups();
     }
 
@@ -1719,12 +1824,10 @@
         hoverRaf = true;
         requestAnimationFrame(() => {
           hoverRaf = false;
-          const rect = container.getBoundingClientRect();
-          const mx = e.clientX - rect.left;
-          const my = e.clientY - rect.top;
+          const coords = getCanvasRelativeCoords(e);
 
           if (state.pcbMetadata && state.viewer?.rendered?.camera && window.THREE) {
-            const mouse = new window.THREE.Vector2((mx / rect.width) * 2 - 1, -(my / rect.height) * 2 + 1);
+            const mouse = new window.THREE.Vector2(coords.ndcX, coords.ndcY);
             const raycaster = new window.THREE.Raycaster();
             raycaster.setFromCamera(mouse, state.viewer.rendered.camera);
 
@@ -1836,16 +1939,14 @@
         const dist = Math.hypot(e.clientX - downX, e.clientY - downY);
         if (dist > 5) return; // Ignore drag release
 
-        const rect = container.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const coords = getCanvasRelativeCoords(e);
+        const rect = coords.rect;
+        const x = coords.x;
+        const y = coords.y;
 
         // Dedicated PCB View Click & Inspection Handler
         if (state.currentMode === "PCB" && state.pcbMetadata && state.viewer?.rendered?.camera && window.THREE) {
-          const mouse = new window.THREE.Vector2(
-            (x / rect.width) * 2 - 1,
-            -(y / rect.height) * 2 + 1
-          );
+          const mouse = new window.THREE.Vector2(coords.ndcX, coords.ndcY);
           const raycaster = new window.THREE.Raycaster();
           raycaster.setFromCamera(mouse, state.viewer.rendered.camera);
 
@@ -1928,10 +2029,7 @@
         // Raycasting fallback
         if (!hitName && state.viewer && state.viewer.rendered && state.viewer.rendered.scene && state.viewer.rendered.camera) {
           try {
-            const mouse = {
-              x: (x / rect.width) * 2 - 1,
-              y: -(y / rect.height) * 2 + 1,
-            };
+            const mouse = new window.THREE.Vector2(coords.ndcX, coords.ndcY);
             const raycaster = new window.THREE.Raycaster();
             raycaster.setFromCamera(mouse, state.viewer.rendered.camera);
             const hits = raycaster.intersectObjects(state.viewer.rendered.scene.children, true);
@@ -4016,6 +4114,7 @@
         initUiScale();
         initSidebarResizer();
         initCadViewer();
+        resizeViewport();
         updateActiveTargetHudBadge();
 
         if (state.currentProject && state.currentTarget) {
