@@ -1,12 +1,13 @@
-# 🔴 `[BUG-DORSAL-MIDGE-176]` PCB layer ordering, net labels on zoom, 2D pan/zoom controls, flip orientation, and KiCad color matching
+# 🟢 `[BUG-DORSAL-MIDGE-176]` PCB layer ordering, net labels on zoom, 2D pan/zoom controls, flip orientation, and KiCad color matching
 
 - **UUID**: `aada2cfa-f536-4cf7-9764-41d9662013b0`
 - **ID**: `BUG-DORSAL-MIDGE-176`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-12 14:41:48 UTC`
+- **Resolved**: `2026-11-12 15:27:42 UTC`
 
 #### Description
 
@@ -523,3 +524,7 @@ face 46 ignored
 2026-11-12 06:39:19 [INFO] scope: 127.0.0.1 - - [12/Nov/2026 06:39:19] "GET /api/scope/load?project=carrier_board&target=carrier_board&subassembly=&mode=PCB HTTP/1.1" 200 -
 2026-11-12 06:39:19 [INFO] scope: 127.0.0.1 - - [12/Nov/2026 06:39:19] "GET /api/scope/projects HTTP/1.1" 200 -
 ```
+
+#### Resolution Notes
+
+Align PCB layer stack with Components above Substrate, match KiCad theme colors, orient +Y downward matching KiCad, disable 3D rotate controls in 2D mode, and render net labels on pads and traces when zoomed in
