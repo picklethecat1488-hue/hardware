@@ -1,12 +1,13 @@
-# 🔴 `[BUG-VELVETY-LARVA-429]` Replace simulation timeline events and logs with METRICS panel and histograms
+# 🟢 `[BUG-VELVETY-LARVA-429]` Replace simulation timeline events and logs with METRICS panel and histograms
 
 - **UUID**: `a53de247-8838-4879-8ea0-cf2e30c7e3fc`
 - **ID**: `BUG-VELVETY-LARVA-429`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `CRITICAL`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-12 14:46:44 UTC`
+- **Resolved**: `2026-11-12 17:23:49 UTC`
 
 #### Description
 
@@ -533,3 +534,7 @@ face 46 ignored
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:46d262fa --> Inspect simulation metrics panel, histograms, and scrubber timeline in cat_fountain | `python tools/scope.py cat_fountain/product:simulate`
+
+#### Resolution Notes
+
+Removed timeline scrubber events chips and replaced sidebar LOGS tab with METRICS panel featuring live SVG histograms and step scrubbing for all telemetry series logged under metrics/.
