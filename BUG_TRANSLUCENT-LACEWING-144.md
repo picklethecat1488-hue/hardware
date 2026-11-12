@@ -2,12 +2,13 @@
 
 - **UUID**: `cf9a924c-9c73-4e4c-b249-6be0475c8f46`
 - **ID**: `BUG-TRANSLUCENT-LACEWING-144`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-11 13:59:20 UTC`
 - **Resolved**: `2026-11-12 00:52:54 UTC`
+- **Accepted**: `2026-11-12 00:53:02 UTC`
 - **Rejected**: `2026-11-11 23:21:02 UTC`
 
 #### Description
