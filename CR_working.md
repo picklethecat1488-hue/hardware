@@ -8,8 +8,8 @@
 | :--- | :--- |
 | **Review Date** | `2026-11-08 11:45:41 UTC` |
 | **Revisions** | `working` |
-| **Overall Verdict** | **`CHANGES_REQUESTED`** |
-| **Review Progress** | `0/8 files reviewed (0%)` |
+| **Overall Verdict** | **`IN_REVIEW`** |
+| **Review Progress** | `0/3 files reviewed (0%)` |
 | **Total Comments** | `26 findings` |
 
 ## Findings by Severity
@@ -2991,6 +2991,6 @@ if wiring is None:
 - [x] **[MUST FIX]** [`provider/pcb/test_steps.py:L12`](file:///Users/<username>/gh/hardware/provider/pcb/test_steps.py#L12): this is a good start, but doesn’t go far enough to provide a safe environment to build PCB config and assembly testing steps. see my comments in [`@projects/carrier_board/pcb.py`](file:///Users/<username>/gh/hardware/projects/carrier_board/pcb.py) <!-- uuid:b6026d89-c299-4de7-bf1e-30f7e0a3db93 -->
 - [x] **[MUST FIX]** [`provider/provider.py:L314-L348`](file:///Users/<username>/gh/hardware/provider/provider.py#L314-L348): let’s remove the wiring_path property and use a provider property for returning wiring for each subassembly. then, all pcb.py has to do is overload the wiring property <!-- uuid:4f134659-55da-4f50-af53-913c1fd58b5f -->
 - [x] **[MUST FIX]** [`provider/provider.py:L351-L369`](file:///Users/<username>/gh/hardware/provider/provider.py#L351-L369): same idea here; we can remove the pcb_manifest_path and only read the pcb manifest from the pcb_config attr <!-- uuid:1e3f05ed-393d-485e-8562-2d7a2694302a -->
-- [x] **[MUST FIX]** [`tools/build.py:L563-L566`](file:///Users/<username>/gh/hardware/tools/build.py#L563-L566): let’s remove the wiring_path fallback logic here <!-- uuid:9c4d7eb9-dbe4-4f4e-97f4-6dc2b3f8216f -->
-- [x] **[MUST FIX]** [`provider/vcs/git_engine.py:L35-L37`](file:///Users/<username>/gh/hardware/provider/vcs/git_engine.py#L35-L37): pls remove this limit and stop the git engine from hanging on large files instead, or show a progress bar for large file <!-- uuid:3f57a99f-6e20-42b5-abad-682ad8805a70 -->
 - [x] **[MUST FIX]** [`provider/templates/scope.html.j2:L1524`](file:///Users/<username>/gh/hardware/provider/templates/scope.html.j2#L1524): we should be doing this server side. can we update our learnings about rerun that we should only present the user data out of a captured rerun session, and not create our own facade of rerun? <!-- uuid:967809a5-da28-44f8-97d9-85b3d1e1b6a0 -->
+- [x] **[MUST FIX]** [`provider/vcs/git_engine.py:L35-L37`](file:///Users/<username>/gh/hardware/provider/vcs/git_engine.py#L35-L37): pls remove this limit and stop the git engine from hanging on large files instead, or show a progress bar for large file <!-- uuid:3f57a99f-6e20-42b5-abad-682ad8805a70 -->
+- [x] **[MUST FIX]** [`tools/build.py:L563-L566`](file:///Users/<username>/gh/hardware/tools/build.py#L563-L566): let’s remove the wiring_path fallback logic here <!-- uuid:9c4d7eb9-dbe4-4f4e-97f4-6dc2b3f8216f -->
