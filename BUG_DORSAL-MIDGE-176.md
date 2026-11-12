@@ -2,12 +2,13 @@
 
 - **UUID**: `aada2cfa-f536-4cf7-9764-41d9662013b0`
 - **ID**: `BUG-DORSAL-MIDGE-176`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-12 14:41:48 UTC`
 - **Resolved**: `2026-11-12 23:48:15 UTC`
+- **Accepted**: `2026-11-12 23:48:26 UTC`
 - **Rejected**: `2026-11-12 20:48:51 UTC`
 
 #### Description
