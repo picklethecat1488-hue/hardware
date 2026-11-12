@@ -2,12 +2,13 @@
 
 - **UUID**: `a4fba4d7-e56a-47d0-8be5-11174c7bcba1`
 - **ID**: `BUG-PROBOSCID-CATERPILLAR-529`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-12 01:12:02 UTC`
 - **Resolved**: `2026-11-12 14:54:57 UTC`
+- **Accepted**: `2026-11-12 14:55:06 UTC`
 
 #### Description
 
