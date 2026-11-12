@@ -26,6 +26,8 @@ class PCB3DAssembler:
     DEFAULT_BOTTOM_TRACE_COLOR = (0.18, 0.50, 0.95)  # B.Cu KiCad contrasting vivid blue ribbon
     DEFAULT_VIA_COLOR = (0.88, 0.75, 0.35)  # Copper/gold through-hole via barrels
     DEFAULT_SILKSCREEN_COLOR = (0.95, 0.95, 0.95)  # High-contrast crisp white silkscreen legend
+    Z_PAD_OFFSET = 0.015  # Solder pads sit proud of trace ribbons to prevent Z-fighting (BUG-TRANSLUCENT-LACEWING-144)
+    Z_SILK_OFFSET = 0.030  # Silkscreen legends sit proud of copper pads to guarantee clean visibility
 
     SOLDERMASK_COLORS: Dict[str, Tuple[float, float, float]] = {
         "matte_black": (0.06, 0.08, 0.07),
@@ -293,7 +295,9 @@ class PCB3DAssembler:
             is_bottom = (getattr(c, "layer", "F.Cu") == "B.Cu") or (cz < 0.0)
 
             pad_z = (
-                (self.z_top + self.cu_thickness / 2.0) if not is_bottom else (self.z_bottom - self.cu_thickness / 2.0)
+                (self.z_top + self.cu_thickness / 2.0 + self.Z_PAD_OFFSET)
+                if not is_bottom
+                else (self.z_bottom - self.cu_thickness / 2.0 - self.Z_PAD_OFFSET)
             )
 
             fp_factory = FOOTPRINT_REGISTRY.get(c.package)
@@ -302,7 +306,11 @@ class PCB3DAssembler:
                 if fp_inst.part is not None:
                     body = fp_inst.part
                     body_bb = body.bounding_box()
-                    z_mount = self.z_top + self.cu_thickness if not is_bottom else self.z_bottom - self.cu_thickness
+                    z_mount = (
+                        (self.z_top + self.cu_thickness + self.Z_PAD_OFFSET)
+                        if not is_bottom
+                        else (self.z_bottom - self.cu_thickness - self.Z_PAD_OFFSET)
+                    )
                     if is_bottom:
                         comp_z = z_mount + body_bb.min.Z
                         loc = Location((cx, cy, comp_z), (180.0, 0.0, -yaw))
@@ -331,7 +339,11 @@ class PCB3DAssembler:
             else:
                 dims = getattr(c, "dimensions", None) or (5.0, 5.0, 1.0)
                 dx, dy, dz = dims[0], dims[1], dims[2]
-                z_mount = self.z_top + self.cu_thickness if not is_bottom else self.z_bottom - self.cu_thickness
+                z_mount = (
+                    (self.z_top + self.cu_thickness + self.Z_PAD_OFFSET)
+                    if not is_bottom
+                    else (self.z_bottom - self.cu_thickness - self.Z_PAD_OFFSET)
+                )
                 box_z = (z_mount + dz / 2.0) if not is_bottom else (z_mount - dz / 2.0)
                 body = Box(dx, dy, dz)
                 body.locate(Location((cx, cy, box_z), (0.0, 0.0, yaw)))
@@ -351,7 +363,7 @@ class PCB3DAssembler:
             ex, ey = center[0], center[1]
             ew, eh = cap.area_mm[0], cap.area_mm[1]
             pad = Box(ew, eh, self.cu_thickness)
-            pad.locate(Location((ex, ey, self.z_top + self.cu_thickness / 2.0)))
+            pad.locate(Location((ex, ey, self.z_top + self.cu_thickness / 2.0 + self.Z_PAD_OFFSET)))
             pad_solids.append(pad)
 
         # Include test points in copper pads (scoped to target subassembly)
@@ -367,9 +379,9 @@ class PCB3DAssembler:
             dia = tp.pad_diameter_mm
             tp_is_bottom = getattr(tp, "layer", "F.Cu") == "B.Cu"
             tp_z = (
-                (self.z_top + self.cu_thickness / 2.0)
+                (self.z_top + self.cu_thickness / 2.0 + self.Z_PAD_OFFSET)
                 if not tp_is_bottom
-                else (self.z_bottom - self.cu_thickness / 2.0)
+                else (self.z_bottom - self.cu_thickness / 2.0 - self.Z_PAD_OFFSET)
             )
             pad = Cylinder(radius=dia / 2.0, height=self.cu_thickness)
             pad.locate(Location((tpx, tpy, tp_z)))
@@ -391,12 +403,12 @@ class PCB3DAssembler:
         """
         is_bottom = layer == "B.SilkS"
         t_silk = 0.02
-        # Position silkscreen slightly proud of copper foil to prevent visual z-fighting
+        # Position silkscreen slightly proud of copper pads to prevent visual z-fighting
         if not is_bottom:
-            z_base = self.z_top + self.cu_thickness + 0.005
+            z_base = self.z_top + self.cu_thickness + self.Z_SILK_OFFSET
             z_center = z_base + t_silk / 2.0
         else:
-            z_base = self.z_bottom - self.cu_thickness - 0.005
+            z_base = self.z_bottom - self.cu_thickness - self.Z_SILK_OFFSET
             z_center = z_base - t_silk / 2.0
 
         solids: List[Shape] = []
@@ -456,7 +468,7 @@ class PCB3DAssembler:
                 case "polygon":
                     if sg.points and len(sg.points) >= 3:
                         pts = [(pt[0], pt[1]) for pt in sg.points]
-                        poly = Polygon(*pts)
+                        poly = Polygon(*pts, align=None)
                         s = extrude(poly, t_silk)
                         if not is_bottom:
                             s.locate(Location((0.0, 0.0, z_base)))

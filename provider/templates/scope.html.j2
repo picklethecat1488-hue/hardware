@@ -1745,6 +1745,9 @@
             if (state.viewer && typeof state.viewer.removeLastBbox === "function") {
               state.viewer.removeLastBbox();
             }
+            if (state.viewer && typeof state.viewer.clearSelection === "function") {
+              state.viewer.clearSelection();
+            }
             return;
           }
           let bboxStr = null;
@@ -1776,6 +1779,12 @@
           if (state.currentMode === "PCB") {
             const target = `${path}/${name}`.toLowerCase();
             if (target.includes("substrate")) {
+              if (typeof state.viewer.removeLastBbox === "function") {
+                state.viewer.removeLastBbox();
+              }
+              if (typeof state.viewer.clearSelection === "function") {
+                state.viewer.clearSelection();
+              }
               return;
             }
           }
@@ -1999,6 +2008,12 @@
               // Clicked on empty substrate: clear net highlight if any, NEVER highlight substrate
               if (state.selectedNet) {
                 clearNetHighlight();
+              }
+              if (state.viewer && typeof state.viewer.removeLastBbox === "function") {
+                state.viewer.removeLastBbox();
+              }
+              if (state.viewer && typeof state.viewer.clearSelection === "function") {
+                state.viewer.clearSelection();
               }
               return;
             }
@@ -2297,15 +2312,6 @@
           document.body.classList.add("pcb-high-contrast");
           if (state.viewer && state.viewer.renderer && typeof state.viewer.renderer.setClearColor === "function") {
             state.viewer.renderer.setClearColor(0x101413, 1.0);
-          }
-          if (state.viewer?.rendered?.nestedGroup?.groups) {
-            const groups = state.viewer.rendered.nestedGroup.groups;
-            for (const [key, grp] of Object.entries(groups)) {
-              const k = key.toLowerCase();
-              if (k.includes("trace") || k.includes("pad") || k.includes("via")) {
-                if (typeof grp.setEdgesVisible === "function") grp.setEdgesVisible(false);
-              }
-            }
           }
         } else {
           document.body.classList.remove("pcb-high-contrast");

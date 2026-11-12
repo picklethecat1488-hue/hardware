@@ -641,7 +641,8 @@ def test_regression_bug_translucent_lacewing_144_pcb_layers_and_net_highlight(sc
     assert "minDistance" in html
     assert "pcb-hover-tooltip" in html
     assert 'target.includes("substrate")' in html
-    assert "setEdgesVisible(false)" in html
+    assert "removeLastBbox" in html
+    assert "clearSelection" in html
     assert "COPPER TRACE" in html
     assert "COPPER PAD" in html
     assert "NetHighlight_" in html
@@ -681,7 +682,15 @@ def test_regression_bug_translucent_lacewing_144_pcb_layers_and_net_highlight(sc
     # Verify carrier board silkscreen graphic has polygon points
     silk_graphics = prov.silkscreen_graphics
     assert len(silk_graphics) > 0
-    assert any(sg.shape == "polygon" for sg in silk_graphics)
+    poly_sg = next(sg for sg in silk_graphics if sg.shape == "polygon")
+    assert (0.0, 33.2) in poly_sg.points
+
+    # Verify pad/trace Z-ordering: pads must sit proud of copper traces (BUG-TRANSLUCENT-LACEWING-144)
+    assert assembler.Z_PAD_OFFSET > 0.0
+    assert assembler.Z_SILK_OFFSET > assembler.Z_PAD_OFFSET
+    comps_cmp, pads_cmp = assembler.build_components_and_pads()
+    assert pads_cmp is not None
+    assert pads_cmp.bounding_box().max.Z > traces_compound.bounding_box().max.Z
 
     sample_net = meta["nets"][0]
     assert "name" in sample_net
