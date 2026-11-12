@@ -1213,16 +1213,19 @@
           <button id="btn-sim-prev" class="hud-btn" style="padding: 4px 8px;" title="Step Back (10 frames)">⏮</button>
           <button id="btn-sim-next" class="hud-btn" style="padding: 4px 8px;" title="Step Forward (10 frames)">⏭</button>
           <input id="sim-step-slider" type="range" class="sim-slider" min="0" max="1000" value="0">
-          <div id="sim-step-val" style="font-size: 11px; min-width: 120px; text-align: right; color: var(--quake-gold); font-weight: bold; white-space: nowrap; flex-shrink: 0; font-variant-numeric: tabular-nums;">Step: 0</div>
-          <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0; white-space: nowrap;">
-            <label class="hud-label" style="font-size: 10px;">Speed:</label>
-            <select id="sim-timescale" class="hud-select" style="padding: 2px 6px; font-size: 11px; height: 24px;">
-              <option value="0.25">0.25x</option>
-              <option value="0.5">0.5x</option>
-              <option value="1.0" selected>1.0x</option>
-              <option value="2.0">2.0x</option>
-              <option value="5.0">5.0x</option>
-            </select>
+          <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--quake-border); border-radius: 4px; padding: 2px 8px; white-space: nowrap;">
+            <div id="sim-step-val" style="font-size: 11px; min-width: 120px; text-align: center; color: var(--quake-gold); font-weight: bold; white-space: nowrap; flex-shrink: 0; font-variant-numeric: tabular-nums;">Step: 0</div>
+            <div style="width: 1px; height: 16px; background: var(--quake-border); flex-shrink: 0;"></div>
+            <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0; white-space: nowrap;">
+              <label class="hud-label" style="font-size: 10px; color: var(--quake-text-muted); white-space: nowrap;">SCALE:</label>
+              <select id="sim-timescale" class="hud-select" style="padding: 2px 6px; font-size: 11px; height: 22px;">
+                <option value="0.25">0.25x</option>
+                <option value="0.5">0.5x</option>
+                <option value="1.0" selected>1.0x</option>
+                <option value="2.0">2.0x</option>
+                <option value="5.0">5.0x</option>
+              </select>
+            </div>
           </div>
           <button id="btn-open-rerun" class="hud-btn" style="padding: 3px 10px; font-size: 11px; background: rgba(255, 136, 0, 0.2); border: 1px solid #ff8800; color: #ffaa33; white-space: nowrap; flex-shrink: 0;" title="Launch official Rerun Viewer for deep telemetry inspection">
             🚀 Open in Rerun Viewer
@@ -2647,9 +2650,15 @@
               }
             })
             .catch(err => console.warn("Failed to load simulation telemetry:", err));
-        } else if (simParticlesMesh && state.viewer && state.viewer.rendered && state.viewer.rendered.scene) {
-          state.viewer.rendered.scene.remove(simParticlesMesh);
-          simParticlesMesh = null;
+        } else if (state.viewer && state.viewer.rendered && state.viewer.rendered.scene) {
+          if (simParticlesMesh) {
+            state.viewer.rendered.scene.remove(simParticlesMesh);
+            simParticlesMesh = null;
+          }
+          if (simMotionBlurMesh) {
+            state.viewer.rendered.scene.remove(simMotionBlurMesh);
+            simMotionBlurMesh = null;
+          }
         }
         if (!showProgress) {
           showToast("Geometry loaded.", 1500);
@@ -3923,8 +3932,9 @@
     }
     const toggleShortcutsModal = toggleShortcuts;
 
-    // SIMULATION ENGINE & FLUID DYNAMICS PARTICLES (BUG-LUSTROUS-MANTIS-333)
+    // SIMULATION ENGINE & FLUID DYNAMICS PARTICLES (BUG-LUSTROUS-MANTIS-333, BUG-SHINING-HOVERFLY-298)
     let simParticlesMesh = null;
+    let simMotionBlurMesh = null;
 
     function createParticleTexture() {
       const canvas = document.createElement("canvas");
@@ -3932,15 +3942,14 @@
       canvas.height = 64;
       const ctx = canvas.getContext("2d");
       const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-      grad.addColorStop(0, "rgba(255, 255, 255, 1.0)");
-      grad.addColorStop(0.25, "rgba(230, 248, 255, 0.95)");
-      grad.addColorStop(0.55, "rgba(56, 189, 248, 0.65)");
-      grad.addColorStop(0.85, "rgba(14, 116, 144, 0.2)");
+      grad.addColorStop(0, "rgba(220, 245, 255, 0.95)");
+      grad.addColorStop(0.25, "rgba(100, 210, 255, 0.85)");
+      grad.addColorStop(0.60, "rgba(20, 140, 220, 0.45)");
+      grad.addColorStop(0.85, "rgba(10, 80, 160, 0.15)");
       grad.addColorStop(1.0, "rgba(0, 0, 0, 0)");
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, 64, 64);
-      const texture = new window.THREE.CanvasTexture(canvas);
-      return texture;
+      return new window.THREE.CanvasTexture(canvas);
     }
 
     function initSimulationParticles() {
@@ -3950,6 +3959,12 @@
         if (simParticlesMesh.geometry) simParticlesMesh.geometry.dispose();
         if (simParticlesMesh.material) simParticlesMesh.material.dispose();
         simParticlesMesh = null;
+      }
+      if (simMotionBlurMesh) {
+        state.viewer.rendered.scene.remove(simMotionBlurMesh);
+        if (simMotionBlurMesh.geometry) simMotionBlurMesh.geometry.dispose();
+        if (simMotionBlurMesh.material) simMotionBlurMesh.material.dispose();
+        simMotionBlurMesh = null;
       }
       if (state.currentMode !== "SIMULATE") return;
       if (!state.simTelemetry || !state.simTelemetry.frames || state.simTelemetry.frames.length === 0) return;
@@ -3977,18 +3992,56 @@
 
       const particleTexture = createParticleTexture();
       const material = new window.THREE.PointsMaterial({
-        size: 5.0,
+        size: 12.0,
         map: particleTexture,
         vertexColors: true,
         transparent: true,
-        opacity: 0.90,
+        opacity: 0.88,
         depthWrite: false,
-        blending: window.THREE.AdditiveBlending,
+        blending: window.THREE.NormalBlending,
       });
 
       simParticlesMesh = new window.THREE.Points(geometry, material);
       simParticlesMesh.name = "simulation_water_particles";
       state.viewer.rendered.scene.add(simParticlesMesh);
+
+      // Hydrodynamic Motion Blur Streamlines (BUG-SHINING-HOVERFLY-298)
+      const blurPositions = new Float32Array(particleCount * 6);
+      const blurColors = new Float32Array(particleCount * 6);
+      for (let i = 0; i < particleCount; i++) {
+        const px = f0.positions[i][0];
+        const py = f0.positions[i][1];
+        const pz = f0.positions[i][2];
+        blurPositions[i * 6] = px;
+        blurPositions[i * 6 + 1] = py;
+        blurPositions[i * 6 + 2] = pz;
+        blurPositions[i * 6 + 3] = px;
+        blurPositions[i * 6 + 4] = py;
+        blurPositions[i * 6 + 5] = pz;
+
+        blurColors[i * 6] = 0.10;
+        blurColors[i * 6 + 1] = 0.35;
+        blurColors[i * 6 + 2] = 0.75;
+        blurColors[i * 6 + 3] = 0.35;
+        blurColors[i * 6 + 4] = 0.85;
+        blurColors[i * 6 + 5] = 1.00;
+      }
+      const blurGeometry = new window.THREE.BufferGeometry();
+      blurGeometry.setAttribute("position", new window.THREE.BufferAttribute(blurPositions, 3));
+      blurGeometry.setAttribute("color", new window.THREE.BufferAttribute(blurColors, 3));
+
+      const blurMaterial = new window.THREE.LineBasicMaterial({
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.75,
+        depthWrite: false,
+        blending: window.THREE.NormalBlending,
+      });
+
+      simMotionBlurMesh = new window.THREE.LineSegments(blurGeometry, blurMaterial);
+      simMotionBlurMesh.name = "simulation_water_motion_blur";
+      state.viewer.rendered.scene.add(simMotionBlurMesh);
+
       if (typeof state.viewer.update === "function") {
         state.viewer.update(false, false);
       }
@@ -4056,7 +4109,7 @@
         });
       }
 
-      // Animate fluid particles from authentic Rerun simulation recording with velocity-based color grading
+      // Animate fluid particles and hydrodynamic motion blur streamlines from authentic Rerun telemetry
       if (simParticlesMesh && state.simTelemetry && state.simTelemetry.frames && state.simTelemetry.frames.length > 0) {
         const frameIdx = Math.min(step, state.simTelemetry.frames.length - 1);
         const prevIdx = Math.max(0, frameIdx - 1);
@@ -4068,6 +4121,12 @@
           const arr = posAttr.array;
           const colArr = colAttr ? colAttr.array : null;
           const count = Math.min(frame.positions.length, arr.length / 3);
+
+          const blurPosAttr = simMotionBlurMesh?.geometry.attributes.position;
+          const blurColAttr = simMotionBlurMesh?.geometry.attributes.color;
+          const blurArr = blurPosAttr ? blurPosAttr.array : null;
+          const blurColArr = blurColAttr ? blurColAttr.array : null;
+
           for (let i = 0; i < count; i++) {
             const x = frame.positions[i][0];
             const y = frame.positions[i][1];
@@ -4076,19 +4135,46 @@
             arr[i * 3 + 1] = y;
             arr[i * 3 + 2] = z;
 
-            if (colArr && prevFrame && prevFrame.positions && prevFrame.positions[i]) {
-              const dx = x - prevFrame.positions[i][0];
-              const dy = y - prevFrame.positions[i][1];
-              const dz = z - prevFrame.positions[i][2];
-              const speed = Math.sqrt(dx * dx + dy * dy + dz * dz);
-              const t = Math.min(1.0, speed / 8.0);
+            const prevX = (prevFrame && prevFrame.positions && prevFrame.positions[i]) ? prevFrame.positions[i][0] : x;
+            const prevY = (prevFrame && prevFrame.positions && prevFrame.positions[i]) ? prevFrame.positions[i][1] : y;
+            const prevZ = (prevFrame && prevFrame.positions && prevFrame.positions[i]) ? prevFrame.positions[i][2] : z;
+
+            const dx = x - prevX;
+            const dy = y - prevY;
+            const dz = z - prevZ;
+            const speed = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            const t = Math.min(1.0, speed / 8.0);
+
+            if (colArr) {
               colArr[i * 3] = 0.15 + t * 0.70;
               colArr[i * 3 + 1] = 0.60 + t * 0.38;
               colArr[i * 3 + 2] = 0.95 + t * 0.05;
             }
+
+            // Update motion blur streamline segment
+            if (blurArr && blurColArr) {
+              blurArr[i * 6] = prevX;
+              blurArr[i * 6 + 1] = prevY;
+              blurArr[i * 6 + 2] = prevZ;
+              blurArr[i * 6 + 3] = x;
+              blurArr[i * 6 + 4] = y;
+              blurArr[i * 6 + 5] = z;
+
+              // Tail: deep water hue
+              blurColArr[i * 6] = 0.10 + t * 0.35;
+              blurColArr[i * 6 + 1] = 0.35 + t * 0.45;
+              blurColArr[i * 6 + 2] = 0.75 + t * 0.20;
+
+              // Head: vivid hydrodynamic streak
+              blurColArr[i * 6 + 3] = 0.25 + t * 0.65;
+              blurColArr[i * 6 + 4] = 0.70 + t * 0.30;
+              blurColArr[i * 6 + 5] = 0.95 + t * 0.05;
+            }
           }
           posAttr.needsUpdate = true;
           if (colAttr) colAttr.needsUpdate = true;
+          if (blurPosAttr) blurPosAttr.needsUpdate = true;
+          if (blurColAttr) blurColAttr.needsUpdate = true;
         }
       }
 

@@ -1137,6 +1137,9 @@ def test_regression_bug_shining_hoverfly_298_sim_particles_and_hud_controls(scop
     assert "updateTimelineChips" not in html
     assert "sim-flow-metrics" in html
     assert "Spout: 0 mL/s" not in html
+    assert "simMotionBlurMesh" in html
+    assert "simulation_water_motion_blur" in html
+    assert "SCALE:" in html
 
 
 def test_regression_bug_proboscid_caterpillar_529_open_kicad_button(scope_server, monkeypatch):
