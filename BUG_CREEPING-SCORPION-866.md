@@ -2,12 +2,13 @@
 
 - **UUID**: `42818030-2ca7-490c-9833-d157509017c3`
 - **ID**: `BUG-CREEPING-SCORPION-866`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `CRITICAL`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-12 14:42:52 UTC`
 - **Resolved**: `2026-11-12 20:50:45 UTC`
+- **Accepted**: `2026-11-12 20:50:56 UTC`
 
 #### Description
 
