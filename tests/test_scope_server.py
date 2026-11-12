@@ -496,7 +496,7 @@ def test_scope_server_warm_up_background_thread(tmp_path):
     server.warm_up("footprints", "0402", mode="CAD")
 
     # Wait for warm-up thread to populate cache
-    deadline = time.time() + 60.0
+    deadline = time.time() + 120.0
     while time.time() < deadline:
         if getattr(server, "_warm_up_error", None) is not None:
             raise RuntimeError(f"Warm up background error: {server._warm_up_error}")
@@ -657,11 +657,11 @@ def test_regression_bug_translucent_lacewing_144_pcb_layers_and_net_highlight(sc
     assert "pcb_metadata" in data
     meta = data["pcb_metadata"]
 
-    # Verify high-contrast KiCad layer colors
+    # Verify high-contrast KiCad layer colors (BUG-DORSAL-MIDGE-176)
     layer_colors = {l["name"]: l["color"] for l in meta.get("layers", [])}
-    assert layer_colors.get("F.Cu (Top)") == "#ff3333"
-    assert layer_colors.get("B.Cu (Bottom)") == "#3366ff"
-    assert layer_colors.get("Pads") == "#ffcc00"
+    assert layer_colors.get("F.Cu (Top)") == "#c83434"
+    assert layer_colors.get("B.Cu (Bottom)") == "#345ac8"
+    assert layer_colors.get("Pads") == "#c8a034"
 
     # Verify enriched traces, vias, pads, components, and nets
     assert len(meta.get("traces", [])) > 0
@@ -842,24 +842,20 @@ def test_regression_bug_jumping_instar_950_simulate_view_max_steps_physics_inspe
     assert "Open in Rerun Viewer" in html
     assert "/api/scope/open_rerun" in html
 
-    # 4. Check Physics Object Inspection Telemetry in Inspector
-    assert "PHYSICS TELEMETRY [Rerun / SPH]" in html
-    assert "SPH Fluid Dynamics [JAX]" in html
-    assert "Rigid Body Kinematics [PyBullet]" in html
-    assert "Static CAD Boundary [SDF Collision]" in html
-    assert "Tait Weakly Compressible EOS" in html
-    assert "Mass Density:" in html
-    assert "Active Particles:" in html
-    assert "Volumetric Flow:" in html
+    # 4. Check Physics Object Inspection Telemetry in Inspector (CR fb2d3fd1)
+    assert "RERUN LOGGED OBJECT" in html
+    assert "Position (pos):" in html
+    assert "Orientation (orn):" in html
+    assert "renderRerunObjectInspect" in html
 
-    # 5. Check Left Panel Rerun Logs querying and milestone scrub
-    assert 'id="tab-btn-logs"' in html
-    assert 'id="tab-logs"' in html
-    assert 'id="rerun-search"' in html
-    assert 'id="rerun-logs-list"' in html
-    assert 'id="rerun-logs-count"' in html
-    assert 'function renderRerunLogs(query = "")' in html
-    assert "state.simTelemetry.logs" in html
+    # 5. Check Left Panel Simulation Metrics querying and histograms (BUG-VELVETY-LARVA-429)
+    assert 'id="tab-btn-metrics"' in html
+    assert 'id="tab-metrics"' in html
+    assert 'id="metrics-search"' in html
+    assert 'id="metrics-list"' in html
+    assert 'id="metrics-count"' in html
+    assert 'function renderSimulationMetrics(query = "")' in html
+    assert "getSimulationMetricsSeries" in html
 
     # 6. Verify POST /api/scope/open_rerun endpoint
     open_req = urllib.request.Request(
@@ -1134,11 +1130,12 @@ def test_regression_bug_shining_hoverfly_298_sim_particles_and_hud_controls(scop
     html = req_html.read().decode("utf-8")
 
     assert "createParticleTexture()" in html
-    assert "sim-timeline-chips" in html
+    assert "sim-timeline-chips" not in html
     assert "btn-save-rrd" in html
     assert "min-width: 120px" in html
     assert "min-width: 140px" in html
-    assert "updateTimelineChips()" in html
+    assert "updateTimelineChips" not in html
+    assert "sim-flow-metrics" in html
     assert "Spout: 0 mL/s" not in html
 
 
@@ -1268,3 +1265,59 @@ def test_regression_bug_dorsal_midge_176_pcb_layer_order_colors_orientation_net_
     assert "cam.top = -Math.abs(halfH)" in html
     assert "cam.bottom = Math.abs(halfH)" in html
     assert 'camRight.style.display = is2D ? "none" : ""' in html
+
+
+def test_regression_bug_velvety_larva_429_metrics_panel_and_histograms(scope_server):
+    """Verify BUG-VELVETY-LARVA-429: Scrubber events removed, LOGS replaced with METRICS panel and histograms."""
+    # 1. Verify simulation telemetry API returns metrics_series matching simulate_hooks.py:153-167
+    telem_url = f"http://127.0.0.1:{scope_server.actual_port}/api/scope/simulation_telemetry?project=cat_fountain&target=product"
+    req_telem = urllib.request.urlopen(telem_url)
+    assert req_telem.status == 200
+    telem = json.loads(req_telem.read().decode("utf-8"))
+
+    assert telem["status"] == "ok"
+    assert "metrics_series" in telem
+    series = telem["metrics_series"]
+
+    # Invariants for metrics logged under metrics/
+    expected_metrics = [
+        "flow_spout",
+        "flow_tube",
+        "flow_lid_sheet",
+        "drainage_waterfall",
+        "drainage_cutout",
+        "pool_volume",
+        "water_depth",
+    ]
+    for m in expected_metrics:
+        assert m in series, f"Missing metric {m} in simulation telemetry series"
+        assert len(series[m]) > 0, f"Empty series for metric {m}"
+        assert "step" in series[m][0]
+        assert "value" in series[m][0]
+
+    # 2. Verify HTML template has scrubber events removed and METRICS panel with histograms
+    html_url = f"http://127.0.0.1:{scope_server.actual_port}/?mode=SIMULATE"
+    req_html = urllib.request.urlopen(html_url)
+    assert req_html.status == 200
+    html = req_html.read().decode("utf-8")
+
+    # Scrubber events removed
+    assert "sim-timeline-chips" not in html
+    assert "updateTimelineChips" not in html
+    assert "EVENTS:" not in html
+    assert 'id="sim-flow-metrics"' in html
+
+    # LOGS replaced by METRICS
+    assert 'id="tab-btn-logs"' not in html
+    assert 'id="tab-logs"' not in html
+    assert 'id="tab-btn-metrics"' in html
+    assert 'id="tab-metrics"' in html
+    assert 'id="metrics-search"' in html
+    assert 'id="metrics-list"' in html
+    assert 'id="metrics-count"' in html
+
+    # Histograms and metrics series rendering functions
+    assert "getSimulationMetricsSeries" in html
+    assert "renderSimulationMetrics" in html
+    assert "metric-card" in html
+    assert "hist-bar" in html

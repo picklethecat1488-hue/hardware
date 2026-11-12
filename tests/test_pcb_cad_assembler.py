@@ -155,7 +155,7 @@ def test_pcb_cad_assembler_silkscreen_and_colors():
 
     assembler = PCB3DAssembler(cfg)
     assert assembler.substrate_color == assembler.SOLDERMASK_COLORS["blue"]
-    assert assembler.silkscreen_color == (0.95, 0.95, 0.95)
+    assert assembler.silkscreen_color == assembler.DEFAULT_SILKSCREEN_COLOR
 
     silk_top = assembler.build_silkscreen("F.SilkS")
     assert silk_top is not None
@@ -173,7 +173,7 @@ def test_pcb_cad_assembler_silkscreen_and_colors():
     item_dict = {name: (geom, color, alpha) for geom, name, color, alpha in display_items}
     assert "silk_board_silkscreen_top" in item_dict
     assert "silk_board_silkscreen_bottom" in item_dict
-    assert item_dict["silk_board_silkscreen_top"][1] == (0.95, 0.95, 0.95)
+    assert item_dict["silk_board_silkscreen_top"][1] == assembler.DEFAULT_SILKSCREEN_COLOR
     assert item_dict["silk_board_substrate"][1] == (0.10, 0.35, 0.65)
 
 

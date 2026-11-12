@@ -168,10 +168,10 @@ def test_regression_bug_translucent_lacewing_144_kicad_high_contrast_colors():
     layers = payload.get("pcb_metadata", {}).get("layers", [])
 
     layer_colors = {l["type"]: l["color"] for l in layers}
-    assert layer_colors.get("F.Cu") == "#ff3333"  # Bright red for top copper
-    assert layer_colors.get("B.Cu") == "#3366ff"  # Bright blue for bottom copper
-    assert layer_colors.get("Pads") == "#ffcc00"  # High-contrast gold
-    assert layer_colors.get("F.SilkS") == "#ffffff"  # Crisp white
+    assert layer_colors.get("F.Cu") == "#c83434"  # Canonical KiCad red for top copper
+    assert layer_colors.get("B.Cu") == "#345ac8"  # Canonical KiCad blue for bottom copper
+    assert layer_colors.get("Pads") == "#c8a034"  # Canonical KiCad gold
+    assert layer_colors.get("F.SilkS") == "#e6e6e6"  # Canonical KiCad white
 
 
 def test_regression_bug_lustrous_mantis_333_target_modes_filtering_and_simulation():

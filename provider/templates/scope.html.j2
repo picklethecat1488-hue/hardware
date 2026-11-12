@@ -1025,7 +1025,7 @@
         <button id="tab-btn-layers" class="sidebar-tab" data-pane="tab-layers" style="display: none;">PCB Layers</button>
         <button id="tab-btn-tree" class="sidebar-tab active" data-pane="tab-tree">Tree</button>
         <button id="tab-btn-display" class="sidebar-tab" data-pane="tab-display">View</button>
-        <button id="tab-btn-logs" class="sidebar-tab" data-pane="tab-logs" style="display: none;">Logs</button>
+        <button id="tab-btn-metrics" class="sidebar-tab" data-pane="tab-metrics" style="display: none;">Metrics</button>
         <button id="tab-btn-inspect" class="sidebar-tab" data-pane="tab-inspect">Inspect</button>
         <button id="tab-btn-pins" class="sidebar-tab" data-pane="tab-pins">Pins</button>
       </div>
@@ -1084,17 +1084,17 @@
           </div>
         </div>
 
-        <!-- RERUN LOGS PANE (BUG-JUMPING-INSTAR-950) -->
-        <div id="tab-logs" class="tab-pane">
+        <!-- RERUN METRICS PANE (BUG-VELVETY-LARVA-429) -->
+        <div id="tab-metrics" class="tab-pane">
           <div style="display: flex; gap: 6px; margin-bottom: 8px;">
-            <input type="text" id="rerun-search" class="form-input" placeholder="Query rerun events (step, entity, level)..." style="font-size: 11px; padding: 4px 8px; flex: 1;">
+            <input type="text" id="metrics-search" class="form-input" placeholder="Query simulation metrics (spout, waterfall, vel)..." style="font-size: 11px; padding: 4px 8px; flex: 1;">
             <button id="btn-save-rrd" class="hud-btn" style="padding: 4px 8px; font-size: 11px; white-space: nowrap; flex-shrink: 0;" title="Download authentic Rerun .rrd recording">💾 Save .rrd</button>
           </div>
-          <div id="rerun-logs-summary" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 10px; color: var(--quake-text-muted);">
-            <span id="rerun-logs-count">0 events</span>
-            <button id="btn-rerun-clear-filter" class="hud-btn" style="padding: 1px 6px; font-size: 9px; display: none;">Clear</button>
+          <div id="metrics-summary" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 10px; color: var(--quake-text-muted);">
+            <span id="metrics-count">0 metrics</span>
+            <button id="btn-metrics-clear-filter" class="hud-btn" style="padding: 1px 6px; font-size: 9px; display: none;">Clear</button>
           </div>
-          <div id="rerun-logs-list" style="display: flex; flex-direction: column; gap: 5px; max-height: calc(100vh - 220px); overflow-y: auto;">
+          <div id="metrics-list" style="display: flex; flex-direction: column; gap: 6px; max-height: calc(100vh - 220px); overflow-y: auto;">
           </div>
         </div>
 
@@ -1228,10 +1228,7 @@
             🚀 Open in Rerun Viewer
           </button>
         </div>
-        <div id="sim-timeline-logs" style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 10px; white-space: nowrap; overflow-x: auto; gap: 8px;">
-          <div id="sim-timeline-chips" style="display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; white-space: nowrap; flex-shrink: 0;">
-            <span style="color: var(--quake-text-muted); font-size: 9px; font-weight: bold; white-space: nowrap; flex-shrink: 0;">EVENTS:</span>
-          </div>
+        <div id="sim-timeline-logs" style="display: flex; align-items: center; justify-content: flex-end; width: 100%; margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 10px; white-space: nowrap; overflow-x: auto; gap: 8px;">
           <div id="sim-flow-metrics" style="color: var(--quake-cyan); font-size: 10px; font-weight: 500; white-space: nowrap; flex-shrink: 0;"></div>
         </div>
       </div>
@@ -1538,7 +1535,8 @@
         threeCam.updateMatrixWorld(true);
       }
       let bestEntity = null;
-      let bestScore = Infinity;
+      let minDistance = Infinity;
+      let bestScore = minDistance;
 
       function toScreen(px, py, pz) {
         if (!useScreen) return null;
@@ -1729,138 +1727,140 @@
       return bestEntity;
     }
 
+    function renderTestPointInspect(tp) {
+      return `
+        <div style="margin-top: 6px; padding: 6px; background: rgba(255, 204, 0, 0.18); border: 1px solid #ffcc00; border-radius: 4px;">
+          <div style="font-size: 11px; font-weight: bold; color: #ffcc00; margin-bottom: 4px;">📍 TEST POINT: ${tp.name}</div>
+          <div><b>Net:</b> <span style="color: #33ff33; font-weight: bold;">${tp.net || "N/A"}</span></div>
+          <div><b>Pad Diameter:</b> <span style="color: var(--quake-cyan);">${tp.dia} mm</span></div>
+          <div><b>Drill Diameter:</b> <span style="color: var(--quake-cyan);">${tp.drill || 0} mm</span></div>
+          <div><b>Layer:</b> <span style="color: var(--quake-text);">${tp.layer || "F.Cu"}</span></div>
+          <div><b>Coordinates:</b> <span style="color: var(--quake-text);">(${tp.x}, ${tp.y}) mm</span></div>
+        </div>
+      `;
+    }
+
+    function renderViaInspect(v) {
+      return `
+        <div style="margin-top: 6px; padding: 6px; background: rgba(224, 168, 32, 0.15); border: 1px solid #e0a820; border-radius: 4px;">
+          <div style="font-size: 11px; font-weight: bold; color: #ffcc00; margin-bottom: 4px;">🎯 VIA [Through-Hole Plated]</div>
+          <div><b>Net:</b> <span style="color: #33ff33; font-weight: bold;">${v.net || "N/A"}</span></div>
+          <div><b>Drill Diameter:</b> <span style="color: var(--quake-cyan);">${v.drill} mm</span></div>
+          <div><b>Annular Pad:</b> <span style="color: var(--quake-cyan);">${v.pad} mm</span></div>
+          <div><b>Layer Span:</b> <span style="color: var(--quake-text);">${v.layer_start || "F.Cu"} ➔ ${v.layer_end || "B.Cu"}</span></div>
+          <div><b>Center Position:</b> <span style="color: var(--quake-text);">(${v.pos[0]}, ${v.pos[1]}) mm</span></div>
+        </div>
+      `;
+    }
+
+    function renderPadInspect(p) {
+      return `
+        <div style="margin-top: 6px; padding: 6px; background: rgba(255, 204, 0, 0.15); border: 1px solid #ffcc00; border-radius: 4px;">
+          <div style="font-size: 11px; font-weight: bold; color: #ffcc00; margin-bottom: 4px;">⚡ COPPER PAD [ENIG Gold Finish]</div>
+          <div><b>Component:</b> <span style="color: #ffb800; font-weight: bold;">${p.comp}</span> (Pin: <b>${p.pin}</b>)</div>
+          <div><b>Net:</b> <span style="color: #33ff33; font-weight: bold;">${p.net || "N/A"}</span></div>
+          <div><b>Dimensions:</b> <span style="color: var(--quake-cyan);">${p.w} × ${p.h} mm</span></div>
+          <div><b>Layer:</b> <span style="color: var(--quake-text);">${p.layer || "F.Cu"}</span></div>
+          <div><b>Coordinates:</b> <span style="color: var(--quake-text);">(${p.x}, ${p.y}) mm</span></div>
+        </div>
+      `;
+    }
+
+    function renderTraceInspect(t) {
+      return `
+        <div style="margin-top: 6px; padding: 6px; background: rgba(238, 51, 51, 0.15); border: 1px solid #ee3333; border-radius: 4px;">
+          <div style="font-size: 11px; font-weight: bold; color: #ff5555; margin-bottom: 4px;">〰️ COPPER TRACE [${t.layer}]</div>
+          <div><b>Net:</b> <span style="color: #33ff33; font-weight: bold;">${t.net || "N/A"}</span></div>
+          <div><b>Trace Width:</b> <span style="color: var(--quake-cyan); font-weight: bold;">${t.width} mm</span> (50.0 Ω Z₀)</div>
+          <div><b>Start:</b> (${t.start[0]}, ${t.start[1]}) mm</div>
+          <div><b>End:</b> (${t.end[0]}, ${t.end[1]}) mm</div>
+        </div>
+      `;
+    }
+
+    function renderComponentInspect(c) {
+      return `
+        <div style="margin-top: 6px; padding: 6px; background: rgba(0,0,0,0.4); border: 1px solid var(--quake-border); border-radius: 4px;">
+          <div style="font-size: 11px; font-weight: bold; color: #ffb800; margin-bottom: 4px;">📦 COMPONENT: ${c.ref_des}</div>
+          <div><b>Package:</b> <span style="color: var(--quake-text);">${c.footprint || "N/A"}</span></div>
+          ${c.value ? `<div><b>Value:</b> <span style="color: var(--quake-text);">${c.value}</span></div>` : ""}
+          ${c.mpn ? `<div><b>MPN:</b> <span style="color: var(--quake-text);">${c.mpn}</span></div>` : ""}
+          ${c.side ? `<div><b>Side:</b> <span style="color: var(--quake-text);">${c.side}</span></div>` : ""}
+        </div>
+      `;
+    }
+
+    function renderRerunObjectInspect(data) {
+      const objName = data.name || data.path || "Rerun Object";
+      const pos = data.point || "(0.00, 0.00, 0.00) mm";
+      const orn = data.orientation || "[0.0, 0.0, 0.0]°";
+      const frames = state.simTelemetry?.frames || [];
+      const currentStep = state.simStep || 0;
+      const curFrame = frames[currentStep] || frames[0] || null;
+      const metrics = (curFrame && curFrame.metrics) ? curFrame.metrics : {};
+      const metricKeys = Object.keys(metrics);
+      const primaryKey = metricKeys[0] || "flow_spout";
+      const primaryVal = metrics[primaryKey] != null ? metrics[primaryKey] : 0;
+
+      const histValues = frames.slice(0, 30).map(f => (f.metrics && f.metrics[primaryKey] != null) ? f.metrics[primaryKey] : 0);
+      const maxVal = Math.max(1, ...histValues);
+      const histBarsSvg = histValues.map((v, i) => {
+        const barH = Math.max(1, Math.round((v / maxVal) * 24));
+        const y = 28 - barH;
+        const isCur = i === (currentStep % 30);
+        const fill = isCur ? "#ffaa00" : "#38bdf8";
+        return `<rect x="${i * 7}" y="${y}" width="5" height="${barH}" fill="${fill}" rx="1" />`;
+      }).join("");
+
+      return `
+        <div style="margin-top: 8px; padding: 8px; background: rgba(0, 180, 216, 0.12); border: 1px solid #00b4d8; border-radius: 4px;">
+          <div style="font-size: 11px; font-weight: 800; color: #00b4d8; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
+            <span>⚛️ RERUN LOGGED OBJECT</span>
+            <span style="font-size: 9px; color: var(--quake-cyan);">Step ${currentStep}</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 4px; font-size: 10.5px;">
+            <div><b>Name:</b> <span style="color: var(--quake-gold); font-family: var(--font-mono);">${objName}</span></div>
+            <div><b>Position (pos):</b> <span style="color: var(--quake-cyan); font-family: var(--font-mono);">${pos}</span></div>
+            <div><b>Orientation (orn):</b> <span style="color: var(--quake-text); font-family: var(--font-mono);">${orn}</span></div>
+            <div style="margin-top: 6px; border-top: 1px solid rgba(0, 180, 216, 0.2); padding-top: 6px;">
+              <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 4px;">
+                <b>Histogram: ${primaryKey}</b>
+                <span style="color: #33ff33; font-weight: bold;">${primaryVal}</span>
+              </div>
+              <svg width="210" height="30" style="background: rgba(0,0,0,0.35); border-radius: 3px; padding: 1px;">
+                ${histBarsSvg}
+              </svg>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     function formatInspectHtml(data) {
       let extraHtml = "";
 
       if (data.entity) {
-        if (data.entity.type === "test_point") {
-          const tp = data.entity.data;
-          extraHtml = `
-            <div style="margin-top: 6px; padding: 6px; background: rgba(255, 204, 0, 0.18); border: 1px solid #ffcc00; border-radius: 4px;">
-              <div style="font-size: 11px; font-weight: bold; color: #ffcc00; margin-bottom: 4px;">📍 TEST POINT: ${tp.name}</div>
-              <div><b>Net:</b> <span style="color: #33ff33; font-weight: bold;">${tp.net || "N/A"}</span></div>
-              <div><b>Pad Diameter:</b> <span style="color: var(--quake-cyan);">${tp.dia} mm</span></div>
-              <div><b>Drill Diameter:</b> <span style="color: var(--quake-cyan);">${tp.drill || 0} mm</span></div>
-              <div><b>Layer:</b> <span style="color: var(--quake-text);">${tp.layer || "F.Cu"}</span></div>
-              <div><b>Coordinates:</b> <span style="color: var(--quake-text);">(${tp.x}, ${tp.y}) mm</span></div>
-            </div>
-          `;
-        } else if (data.entity.type === "via") {
-          const v = data.entity.data;
-          extraHtml = `
-            <div style="margin-top: 6px; padding: 6px; background: rgba(224, 168, 32, 0.15); border: 1px solid #e0a820; border-radius: 4px;">
-              <div style="font-size: 11px; font-weight: bold; color: #ffcc00; margin-bottom: 4px;">🎯 VIA [Through-Hole Plated]</div>
-              <div><b>Net:</b> <span style="color: #33ff33; font-weight: bold;">${v.net || "N/A"}</span></div>
-              <div><b>Drill Diameter:</b> <span style="color: var(--quake-cyan);">${v.drill} mm</span></div>
-              <div><b>Annular Pad:</b> <span style="color: var(--quake-cyan);">${v.pad} mm</span></div>
-              <div><b>Layer Span:</b> <span style="color: var(--quake-text);">${v.layer_start || "F.Cu"} ➔ ${v.layer_end || "B.Cu"}</span></div>
-              <div><b>Center Position:</b> <span style="color: var(--quake-text);">(${v.pos[0]}, ${v.pos[1]}) mm</span></div>
-            </div>
-          `;
-        } else if (data.entity.type === "pad") {
-          const p = data.entity.data;
-          extraHtml = `
-            <div style="margin-top: 6px; padding: 6px; background: rgba(255, 204, 0, 0.15); border: 1px solid #ffcc00; border-radius: 4px;">
-              <div style="font-size: 11px; font-weight: bold; color: #ffcc00; margin-bottom: 4px;">⚡ COPPER PAD [ENIG Gold Finish]</div>
-              <div><b>Component:</b> <span style="color: #ffb800; font-weight: bold;">${p.comp}</span> (Pin: <b>${p.pin}</b>)</div>
-              <div><b>Net:</b> <span style="color: #33ff33; font-weight: bold;">${p.net || "N/A"}</span></div>
-              <div><b>Dimensions:</b> <span style="color: var(--quake-cyan);">${p.w} × ${p.h} mm</span></div>
-              <div><b>Layer:</b> <span style="color: var(--quake-text);">${p.layer || "F.Cu"}</span></div>
-              <div><b>Coordinates:</b> <span style="color: var(--quake-text);">(${p.x}, ${p.y}) mm</span></div>
-            </div>
-          `;
-        } else if (data.entity.type === "trace") {
-          const t = data.entity.data;
-          extraHtml = `
-            <div style="margin-top: 6px; padding: 6px; background: rgba(238, 51, 51, 0.15); border: 1px solid #ee3333; border-radius: 4px;">
-              <div style="font-size: 11px; font-weight: bold; color: #ff5555; margin-bottom: 4px;">〰️ COPPER TRACE [${t.layer}]</div>
-              <div><b>Net:</b> <span style="color: #33ff33; font-weight: bold;">${t.net || "N/A"}</span></div>
-              <div><b>Trace Width:</b> <span style="color: var(--quake-cyan); font-weight: bold;">${t.width} mm</span> (50.0 Ω Z₀)</div>
-              <div><b>Start:</b> (${t.start[0]}, ${t.start[1]}) mm</div>
-              <div><b>End:</b> (${t.end[0]}, ${t.end[1]}) mm</div>
-            </div>
-          `;
-        } else if (data.entity.type === "component") {
-          const c = data.entity.data;
-          extraHtml = `
-            <div style="margin-top: 6px; padding: 6px; background: rgba(0,0,0,0.4); border: 1px solid var(--quake-border); border-radius: 4px;">
-              <div style="font-size: 11px; font-weight: bold; color: #ffb800; margin-bottom: 4px;">📦 COMPONENT: ${c.ref_des}</div>
-              <div><b>Package:</b> <span style="color: var(--quake-text);">${c.footprint || "N/A"}</span></div>
-              ${c.value ? `<div><b>Value:</b> <span style="color: var(--quake-text);">${c.value}</span></div>` : ""}
-              ${c.mpn ? `<div><b>MPN:</b> <span style="color: var(--quake-text);">${c.mpn}</span></div>` : ""}
-              ${c.side ? `<div><b>Side:</b> <span style="color: var(--quake-text);">${c.side}</span></div>` : ""}
-            </div>
-          `;
-        }
-      }
-          extraHtml = `
-            <div style="margin-top: 6px; padding: 6px; background: rgba(0,0,0,0.4); border: 1px solid var(--quake-border); border-radius: 4px;">
-              <div style="font-size: 11px; font-weight: bold; color: #ffb800; margin-bottom: 4px;">📦 COMPONENT: ${c.ref_des}</div>
-              <div><b>Package:</b> <span style="color: var(--quake-text);">${c.footprint || "N/A"}</span></div>
-              ${c.value ? `<div><b>Value:</b> <span style="color: var(--quake-text);">${c.value}</span></div>` : ""}
-              ${c.mpn ? `<div><b>MPN:</b> <span style="color: var(--quake-text);">${c.mpn}</span></div>` : ""}
-              ${c.side ? `<div><b>Side:</b> <span style="color: var(--quake-text);">${c.side}</span></div>` : ""}
-            </div>
-          `;
+        switch (data.entity.type) {
+          case "test_point":
+            extraHtml = renderTestPointInspect(data.entity.data);
+            break;
+          case "via":
+            extraHtml = renderViaInspect(data.entity.data);
+            break;
+          case "pad":
+            extraHtml = renderPadInspect(data.entity.data);
+            break;
+          case "trace":
+            extraHtml = renderTraceInspect(data.entity.data);
+            break;
+          case "component":
+            extraHtml = renderComponentInspect(data.entity.data);
+            break;
         }
       }
 
       if (state.currentMode === "SIMULATE" || (data.name && data.name.toLowerCase().includes("simulation"))) {
-        const objName = (data.name || data.path || "").toLowerCase();
-        let simType = "SPH Fluid Dynamics [JAX]";
-        let density = "1000 kg/m³ (Water @ 20°C)";
-        let kinematicState = "Active Lagrangian SPH";
-        let particleCount = "600 Active Particles";
-        let viscosity = "1.002 mPa·s";
-        let surfaceTension = "0.0728 N/m";
-        let flowRate = "240 mL/s (Nominal)";
-        let pressureEos = "Tait Weakly Compressible EOS (γ=7)";
-        let restitution = "0.05 (Inelastic)";
-        let friction = "0.10 (Hydrodynamic Boundary)";
-
-        if (objName.includes("impeller") || objName.includes("motor") || objName.includes("rotor")) {
-          simType = "Rigid Body Kinematics [PyBullet]";
-          density = "1050 kg/m³ (ABS Plastic)";
-          kinematicState = "Revolute Joint [Z-Axis, 1800 RPM]";
-          particleCount = "N/A (Rigid Mesh Boundary)";
-          viscosity = "N/A";
-          surfaceTension = "N/A";
-          flowRate = "ΔP Head: 12.4 kPa";
-          pressureEos = "Rigid Contact Penalty";
-          restitution = "0.35";
-          friction = "0.45";
-        } else if (objName.includes("bowl") || objName.includes("casing") || objName.includes("cover") || objName.includes("lid") || objName.includes("bottom")) {
-          simType = "Static CAD Boundary [SDF Collision]";
-          density = "1050 kg/m³ (PETG / Food-Safe ABS)";
-          kinematicState = "Fixed World Anchor [Rigid]";
-          particleCount = "N/A (Analytic SDF)";
-          viscosity = "N/A";
-          surfaceTension = "N/A";
-          flowRate = "N/A";
-          pressureEos = "Akinci Solid Boundary Ghost Particles";
-          restitution = "0.10";
-          friction = "0.20";
-        }
-
-        extraHtml += `
-          <div style="margin-top: 8px; padding: 8px; background: rgba(0, 180, 216, 0.12); border: 1px solid #00b4d8; border-radius: 4px;">
-            <div style="font-size: 11px; font-weight: 800; color: #00b4d8; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-              <span>⚛️ PHYSICS TELEMETRY [Rerun / SPH]</span>
-            </div>
-            <div style="display: flex; flex-direction: column; gap: 3px; font-size: 10.5px;">
-              <div><b>Entity Path:</b> <span style="color: var(--quake-cyan); font-family: var(--font-mono);">world/${state.currentProject || "system"}/${data.name || "fluid"}</span></div>
-              <div><b>Physics Type:</b> <span style="color: var(--quake-text); font-weight: 600;">${simType}</span></div>
-              <div><b>Kinematic State:</b> <span style="color: var(--quake-gold);">${kinematicState}</span></div>
-              <div><b>Mass Density:</b> <span style="color: var(--quake-text);">${density}</span></div>
-              <div><b>Active Particles:</b> <span style="color: #38bdf8; font-family: var(--font-mono);">${particleCount}</span></div>
-              <div><b>Dynamic Viscosity:</b> <span style="color: var(--quake-text);">${viscosity}</span></div>
-              <div><b>Surface Tension:</b> <span style="color: var(--quake-text);">${surfaceTension}</span></div>
-              <div><b>Volumetric Flow:</b> <span style="color: #33ff33; font-weight: bold;">${flowRate}</span></div>
-              <div><b>EOS Formulation:</b> <span style="color: var(--quake-text);">${pressureEos}</span></div>
-              <div><b>Restitution / Friction:</b> <span style="color: var(--quake-text);">${restitution} / ${friction}</span></div>
-            </div>
-          </div>
-        `;
+        extraHtml += renderRerunObjectInspect(data);
       }
 
       return `
@@ -1872,15 +1872,7 @@
           ${data.point ? `<div><b>Coordinates:</b> <span style="color: var(--quake-cyan);">${data.point}</span></div>` : ""}
           ${data.dimensions ? `<div><b>Bounding Box:</b> <span style="color: var(--quake-cyan);">${data.dimensions}</span></div>` : ""}
           ${extraHtml}
-          ${data.component && !data.entity ? `
-            <div style="margin-top: 6px; padding: 6px; background: rgba(0,0,0,0.3); border: 1px solid var(--quake-border); border-radius: 4px;">
-              <div><b>Component:</b> <span style="color: #ffb800; font-weight: bold;">${data.component.ref_des}</span></div>
-              <div><b>Package:</b> <span style="color: var(--quake-text);">${data.component.footprint || "N/A"}</span></div>
-              ${data.component.value ? `<div><b>Value:</b> <span style="color: var(--quake-text);">${data.component.value}</span></div>` : ""}
-              ${data.component.mpn ? `<div><b>MPN:</b> <span style="color: var(--quake-text);">${data.component.mpn}</span></div>` : ""}
-              ${data.component.side ? `<div><b>Side:</b> <span style="color: var(--quake-text);">${data.component.side}</span></div>` : ""}
-            </div>
-          ` : ""}
+          ${data.component && !data.entity ? renderComponentInspect(data.component) : ""}
           ${data.net && !data.entity ? `
             <div style="margin-top: 6px; padding: 6px; background: rgba(0,0,0,0.3); border: 1px solid var(--quake-border); border-radius: 4px;">
               <div><b>Connected Net:</b> <span style="color: #33ff33; font-weight: bold;">${data.net.name}</span> (${(data.net.pins || []).length} pins)</div>
@@ -2632,7 +2624,7 @@
         if (state.currentMode === "SIMULATE") {
           initSimulationParticles();
           updateSimulationStep(state.simStep || 0);
-          renderRerunLogs();
+          renderSimulationMetrics();
           const inspectEl = document.getElementById("inspect-content");
           if (inspectEl && (!state.selectedPin && !state.selectedNet)) {
             inspectEl.innerHTML = formatInspectHtml({
@@ -2651,8 +2643,7 @@
                 if (slider) slider.max = state.maxSteps - 1;
                 initSimulationParticles();
                 updateSimulationStep(state.simStep || 0);
-                updateTimelineChips();
-                renderRerunLogs();
+                renderSimulationMetrics();
               }
             })
             .catch(err => console.warn("Failed to load simulation telemetry:", err));
@@ -2689,15 +2680,15 @@
       const isSim = state.currentMode === "SIMULATE";
       const tabBtnLayers = document.getElementById("tab-btn-layers");
       const tabBtnTree = document.getElementById("tab-btn-tree");
-      const tabBtnLogs = document.getElementById("tab-btn-logs");
+      const tabBtnMetrics = document.getElementById("tab-btn-metrics");
       if (tabBtnLayers) {
         tabBtnLayers.style.display = isPcb ? "block" : "none";
       }
       if (tabBtnTree) {
         tabBtnTree.style.display = isPcb ? "none" : "block";
       }
-      if (tabBtnLogs) {
-        tabBtnLogs.style.display = isSim ? "block" : "none";
+      if (tabBtnMetrics) {
+        tabBtnMetrics.style.display = isSim ? "block" : "none";
       }
       const btnOpenKicad = document.getElementById("btn-open-kicad");
       if (btnOpenKicad) {
@@ -2710,7 +2701,7 @@
         switchTabPane("tab-tree");
       } else if (isPcb && activeTab && activeTab.dataset.pane === "tab-tree") {
         switchTabPane("tab-layers");
-      } else if (!isSim && activeTab && activeTab.dataset.pane === "tab-logs") {
+      } else if (!isSim && activeTab && activeTab.dataset.pane === "tab-metrics") {
         switchTabPane(isPcb ? "tab-layers" : "tab-tree");
       }
       updateControlsForMode();
@@ -4014,20 +4005,26 @@
       }
       if (valLabel) valLabel.textContent = `Step: ${step} / ${maxSteps}`;
 
-      // Update active log chip
-      document.querySelectorAll(".sim-log-chip").forEach(chip => {
-        const chipStep = parseInt(chip.dataset.step);
-        chip.classList.toggle("active", Math.abs(chipStep - step) < (maxSteps * 0.08));
-      });
-
-      // Highlight active row in Rerun logs list
-      document.querySelectorAll(".rerun-log-row").forEach(row => {
-        const rowStep = parseInt(row.dataset.step);
-        const match = Math.abs(rowStep - step) < 60;
-        row.classList.toggle("active", match);
-        row.style.borderColor = match ? "var(--quake-cyan)" : "var(--quake-border)";
-        row.style.background = match ? "rgba(56, 189, 248, 0.15)" : "rgba(0,0,0,0.35)";
-      });
+      // Update simulation metrics panel histograms (BUG-VELVETY-LARVA-429)
+      const simSeries = getSimulationMetricsSeries();
+      const numBuckets = 28;
+      for (const [k, pts] of Object.entries(simSeries)) {
+        const valEl = document.getElementById(`metric-val-${k}`);
+        if (valEl && pts.length > 0) {
+          const pt = pts[Math.min(step, pts.length - 1)];
+          const curVal = pt ? pt.value : 0;
+          valEl.textContent = curVal.toFixed(curVal % 1 === 0 ? 0 : 2);
+        }
+        const card = document.querySelector(`.metric-card[data-metric="${k}"]`);
+        if (card && pts.length > 0) {
+          const bucketSize = Math.max(1, Math.ceil(pts.length / numBuckets));
+          const currentBucket = Math.min(numBuckets - 1, Math.floor(step / bucketSize));
+          const bars = card.querySelectorAll("rect.hist-bar");
+          bars.forEach((b, idx) => {
+            b.setAttribute("fill", idx === currentBucket ? "#ffaa00" : "#38bdf8");
+          });
+        }
+      }
 
       // Update generic simulation metrics readout from authentic telemetry
       const metricsEl = document.getElementById("sim-flow-metrics");
@@ -4123,89 +4120,118 @@
       setTimeout(runSimLoop, delay);
     }
 
-    function updateTimelineChips() {
-      const container = document.getElementById("sim-timeline-chips");
-      if (!container) return;
-      const logs = (state.simTelemetry && state.simTelemetry.logs) ? state.simTelemetry.logs : [];
-      if (logs.length === 0) {
-        container.innerHTML = `<span style="color: var(--quake-text-muted); font-size: 9px; font-weight: bold; white-space: nowrap; flex-shrink: 0;">EVENTS:</span><span style="color: var(--quake-text-muted); font-size: 9px;">None</span>`;
-        return;
+    function getSimulationMetricsSeries() {
+      if (state.simTelemetry && state.simTelemetry.metrics_series && Object.keys(state.simTelemetry.metrics_series).length > 0) {
+        return state.simTelemetry.metrics_series;
       }
-      container.innerHTML = `<span style="color: var(--quake-text-muted); font-size: 9px; font-weight: bold; white-space: nowrap; flex-shrink: 0;">EVENTS:</span>` +
-        logs.slice(0, 8).map((log, idx) => `
-          <button class="sim-log-chip ${idx === 0 ? 'active' : ''}" data-step="${log.step}" title="${log.msg || log.entity}">
-            ${log.time ? `${log.time}: ` : `s${log.step}: `}${log.entity}
-          </button>
-        `).join("");
-      container.querySelectorAll(".sim-log-chip").forEach(chip => {
-        chip.addEventListener("click", () => {
-          const chipStep = parseInt(chip.dataset.step);
-          if (!isNaN(chipStep)) {
-            if (!simParticlesMesh) initSimulationParticles();
-            updateSimulationStep(chipStep);
-            showToast(`Scrubbed to simulation event: ${chip.textContent.trim()}`);
+      const series = {};
+      const frames = state.simTelemetry?.frames || [];
+      for (const f of frames) {
+        if (!f.metrics) continue;
+        for (const [k, v] of Object.entries(f.metrics)) {
+          if (typeof v === "number") {
+            if (!series[k]) series[k] = [];
+            series[k].push({ step: f.step, value: v });
           }
-        });
-      });
+        }
+      }
+      return series;
     }
 
-    // RERUN LOGS SYSTEM (BUG-JUMPING-INSTAR-950)
-    function renderRerunLogs(query = "") {
-      const container = document.getElementById("rerun-logs-list");
-      const countEl = document.getElementById("rerun-logs-count");
-      const clearBtn = document.getElementById("btn-rerun-clear-filter");
+    // SIMULATION METRICS SYSTEM (BUG-VELVETY-LARVA-429)
+    function renderSimulationMetrics(query = "") {
+      const container = document.getElementById("metrics-list");
+      const countEl = document.getElementById("metrics-count");
+      const clearBtn = document.getElementById("btn-metrics-clear-filter");
       if (!container) return;
 
       const q = (query || "").trim().toLowerCase();
       if (clearBtn) clearBtn.style.display = q ? "inline-block" : "none";
 
-      const logs = (state.simTelemetry && state.simTelemetry.logs) ? state.simTelemetry.logs : [];
+      const series = getSimulationMetricsSeries();
+      const keys = Object.keys(series);
 
-      const filtered = logs.filter(item => {
+      const filteredKeys = keys.filter(k => {
         if (!q) return true;
-        return (
-          item.step.toString().includes(q) ||
-          item.time.toLowerCase().includes(q) ||
-          item.level.toLowerCase().includes(q) ||
-          item.entity.toLowerCase().includes(q) ||
-          item.msg.toLowerCase().includes(q)
-        );
+        const label = k.replace(/_/g, " ").toLowerCase();
+        return k.toLowerCase().includes(q) || label.includes(q) || `metrics/${k}`.toLowerCase().includes(q);
       });
 
       if (countEl) {
-        countEl.textContent = `${filtered.length} of ${logs.length} milestones`;
+        countEl.textContent = `${filteredKeys.length} of ${keys.length} metrics`;
       }
 
-      if (filtered.length === 0) {
-        container.innerHTML = `<div style="padding: 12px; color: var(--quake-text-muted); text-align: center; font-size: 11px;">${logs.length === 0 ? "Loading simulation telemetry milestones..." : `No rerun logs matching "${query}"`}</div>`;
+      if (filteredKeys.length === 0) {
+        container.innerHTML = `<div style="padding: 12px; color: var(--quake-text-muted); text-align: center; font-size: 11px;">${keys.length === 0 ? "Loading simulation telemetry metrics..." : `No metrics matching "${query}"`}</div>`;
         return;
       }
 
-      container.innerHTML = filtered.map(item => {
-        const isActive = Math.abs(item.step - (state.simStep || 0)) < 60;
-        const levelColor = item.level === "METRIC" ? "#38bdf8" : (item.level === "WARN" ? "#f59e0b" : "#34d399");
-        const levelBg = item.level === "METRIC" ? "rgba(56, 189, 248, 0.12)" : (item.level === "WARN" ? "rgba(245, 158, 11, 0.12)" : "rgba(52, 211, 153, 0.12)");
+      const curStep = state.simStep || 0;
+      const numBuckets = 28;
+
+      container.innerHTML = filteredKeys.map(k => {
+        const pts = series[k] || [];
+        const label = k.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+        const curPt = pts[Math.min(curStep, Math.max(0, pts.length - 1))];
+        const curVal = curPt ? curPt.value : (pts[0] ? pts[0].value : 0);
+
+        const values = pts.map(p => p.value);
+        const minVal = values.length > 0 ? Math.min(...values) : 0;
+        const maxVal = values.length > 0 ? Math.max(...values) : 1;
+        const curValFormatted = curVal.toFixed(curVal % 1 === 0 ? 0 : 2);
+        const minFormatted = minVal.toFixed(minVal % 1 === 0 ? 0 : 1);
+        const maxFormatted = maxVal.toFixed(maxVal % 1 === 0 ? 0 : 1);
+
+        const bucketSize = Math.max(1, Math.ceil((pts.length || 1) / numBuckets));
+        const currentBucket = Math.min(numBuckets - 1, Math.floor(curStep / bucketSize));
+
+        let barsSvg = "";
+        for (let b = 0; b < numBuckets; b++) {
+          const startIdx = b * bucketSize;
+          const endIdx = Math.min(pts.length, startIdx + bucketSize);
+          let bVal = 0;
+          if (startIdx < pts.length) {
+            let sum = 0;
+            for (let i = startIdx; i < endIdx; i++) {
+              sum += pts[i].value;
+            }
+            bVal = sum / (endIdx - startIdx);
+          }
+          const valRange = Math.max(1e-4, maxVal - (minVal < 0 ? minVal : 0));
+          const normVal = Math.max(0, bVal - (minVal < 0 ? minVal : 0));
+          const barH = Math.max(1, Math.round((normVal / valRange) * 22));
+          const y = 26 - barH;
+          const isCur = b === currentBucket;
+          const fill = isCur ? "#ffaa00" : "#38bdf8";
+          const targetStep = Math.min(pts.length - 1, startIdx + Math.floor(bucketSize / 2));
+          barsSvg += `<rect class="hist-bar" data-bucket="${b}" data-step="${targetStep}" x="${b * 7}" y="${y}" width="5" height="${barH}" fill="${fill}" rx="1" style="cursor: pointer; transition: fill 0.1s ease-out;" />`;
+        }
+
         return `
-          <div class="rerun-log-row ${isActive ? 'active' : ''}" data-step="${item.step}" style="padding: 6px 8px; border: 1px solid ${isActive ? 'var(--quake-cyan)' : 'var(--quake-border)'}; background: ${isActive ? 'rgba(56, 189, 248, 0.15)' : 'rgba(0,0,0,0.35)'}; border-radius: 4px; cursor: pointer; transition: all 0.15s ease-out;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; font-size: 10px;">
-              <div style="display: flex; align-items: center; gap: 6px;">
-                <span style="font-family: var(--font-mono); font-weight: 700; color: var(--quake-cyan);">Step ${item.step}</span>
-                <span style="color: var(--quake-text-muted); font-size: 9px;">(${item.time})</span>
-              </div>
-              <span style="padding: 1px 4px; background: ${levelBg}; border: 1px solid ${levelColor}; border-radius: 2px; color: ${levelColor}; font-weight: 700; font-size: 8.5px;">${item.level}</span>
+          <div class="metric-card" data-metric="${k}" style="padding: 6px 8px; border: 1px solid var(--quake-border); background: rgba(0,0,0,0.35); border-radius: 4px; display: flex; flex-direction: column; gap: 4px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; color: var(--quake-gold);">${label}</span>
+              <span id="metric-val-${k}" style="font-family: var(--font-mono); font-size: 11px; font-weight: 800; color: #33ff33;">${curValFormatted}</span>
             </div>
-            <div style="font-size: 10px; color: var(--quake-gold); font-family: var(--font-mono); margin-bottom: 2px;">${item.entity}</div>
-            <div style="font-size: 10.5px; color: var(--quake-text); line-height: 1.35;">${item.msg}</div>
+            <div style="font-size: 9px; color: var(--quake-text-muted); display: flex; justify-content: space-between;">
+              <span style="font-family: var(--font-mono); color: var(--quake-cyan);">metrics/${k}</span>
+              <span>min: ${minFormatted} | max: ${maxFormatted}</span>
+            </div>
+            <svg viewBox="0 0 ${numBuckets * 7} 28" style="width: 100%; height: 28px; background: rgba(0,0,0,0.25); border-radius: 3px; padding: 1px;">
+              ${barsSvg}
+            </svg>
           </div>
         `;
       }).join("");
 
-      container.querySelectorAll(".rerun-log-row").forEach(row => {
-        row.addEventListener("click", () => {
-          const step = parseInt(row.dataset.step);
-          if (!simParticlesMesh) initSimulationParticles();
-          updateSimulationStep(step);
-          showToast(`Scrubbed to Step ${step} (${row.querySelector("div:last-child").textContent.slice(0, 36)}...)`);
+      container.querySelectorAll(".hist-bar").forEach(bar => {
+        bar.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const targetStep = parseInt(bar.dataset.step);
+          if (!isNaN(targetStep)) {
+            if (!simParticlesMesh) initSimulationParticles();
+            updateSimulationStep(targetStep);
+          }
         });
       });
     }
@@ -4879,14 +4905,14 @@
         showToast("Downloading simulation .rrd recording...", 3000);
       });
 
-      // Rerun Logs Filter & Search (BUG-JUMPING-INSTAR-950)
-      document.getElementById("rerun-search")?.addEventListener("input", (e) => {
-        renderRerunLogs(e.target.value);
+      // Simulation Metrics Filter & Search (BUG-VELVETY-LARVA-429)
+      document.getElementById("metrics-search")?.addEventListener("input", (e) => {
+        renderSimulationMetrics(e.target.value);
       });
-      document.getElementById("btn-rerun-clear-filter")?.addEventListener("click", () => {
-        const input = document.getElementById("rerun-search");
+      document.getElementById("btn-metrics-clear-filter")?.addEventListener("click", () => {
+        const input = document.getElementById("metrics-search");
         if (input) input.value = "";
-        renderRerunLogs("");
+        renderSimulationMetrics("");
       });
 
       // Synchronize text input with selected pin or selected text markup

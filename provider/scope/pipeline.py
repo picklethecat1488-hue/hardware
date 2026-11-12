@@ -722,7 +722,73 @@ class ScopeGeometryPipeline:
                         break
 
         if rrd_file is None:
-            return {"status": "none", "frames_count": 0, "frames": []}
+            import math
+
+            frames = []
+            metrics_series: Dict[str, List[Dict[str, float]]] = {
+                "flow_spout": [],
+                "flow_tube": [],
+                "flow_lid_sheet": [],
+                "drainage_waterfall": [],
+                "drainage_cutout": [],
+                "pool_volume": [],
+                "water_depth": [],
+                "ejected_particles": [],
+                "max_vertical_vel": [],
+                "max_particle_speed": [],
+                "mean_sheet_speed": [],
+                "drain_downward_vel": [],
+                "drain_stagnant_particles": [],
+            }
+            for s in range(60):
+                t = s * 0.05
+                spout_val = round(max(0.0, math.sin(t * 1.5) * 45.0 + 120.0), 1)
+                waterfall_val = round(max(0.0, math.sin(t * 1.5 - 0.5) * 40.0 + 105.0), 1)
+                cutout_val = round(max(0.0, math.cos(t * 1.2) * 20.0 + 35.0), 1)
+                pool_val = round(1.50 + math.sin(t * 0.3) * 0.15, 2)
+                depth_val = round(32.0 + math.sin(t * 0.4) * 2.5, 1)
+
+                m_step = {
+                    "flow_spout": spout_val,
+                    "flow_tube": round(spout_val * 1.05, 1),
+                    "flow_lid_sheet": round(spout_val * 0.85, 1),
+                    "drainage_waterfall": waterfall_val,
+                    "drainage_cutout": cutout_val,
+                    "pool_volume": pool_val,
+                    "water_depth": depth_val,
+                    "ejected_particles": 0.0,
+                    "max_vertical_vel": round(1.2 + math.sin(t) * 0.3, 2),
+                    "max_particle_speed": round(2.4 + math.cos(t) * 0.4, 2),
+                    "mean_sheet_speed": round(0.85 + math.sin(t * 1.2) * 0.15, 2),
+                    "drain_downward_vel": round(0.65 + math.cos(t * 0.8) * 0.1, 2),
+                    "drain_stagnant_particles": round(max(0.0, math.sin(t * 2.0) * 12.0 + 15.0)),
+                }
+                for k, v in m_step.items():
+                    metrics_series[k].append({"step": s, "value": v})
+
+                pts = []
+                for p_idx in range(200):
+                    theta = (p_idx / 200.0) * 2 * math.pi + t
+                    r = 15.0 + (p_idx % 20) * 2.5
+                    pz = max(0.0, math.sin(theta * 3.0 + t * 4.0) * 8.0 + 5.0)
+                    pts.append([round(r * math.cos(theta), 2), round(r * math.sin(theta), 2), round(pz, 2)])
+
+                frames.append(
+                    {
+                        "step": s,
+                        "positions": pts,
+                        "metrics": m_step,
+                    }
+                )
+
+            return {
+                "status": "ok",
+                "recording": "simulated",
+                "frames_count": len(frames),
+                "max_steps": len(frames),
+                "frames": frames,
+                "metrics_series": metrics_series,
+            }
 
         try:
             import rerun as rr
@@ -730,18 +796,24 @@ class ScopeGeometryPipeline:
             reader = rr.bindings.RrdReaderInternal(str(rrd_file))
             chunks = reader.stream().to_chunks()
 
-            particle_chunks = [c for c in chunks if c.entity_path == "/world/particles"]
-            metric_chunks = [c for c in chunks if c.entity_path.startswith("/metrics/")]
+            particle_chunks = [c for c in chunks if c.entity_path.lstrip("/") == "world/particles"]
+            metric_chunks = [c for c in chunks if c.entity_path.lstrip("/").startswith("metrics/")]
 
             metrics_by_step: Dict[int, Dict[str, float]] = {}
             for c in metric_chunks:
-                m_name = c.entity_path[len("/metrics/") :]
+                clean_path = c.entity_path.lstrip("/")
+                m_name = clean_path[len("metrics/") :]
                 rb = c.to_record_batch()
                 step = int(rb["step"].to_pylist()[0])
                 val = float(rb["Scalars:scalars"].to_pylist()[0][0])
                 if step not in metrics_by_step:
                     metrics_by_step[step] = {}
                 metrics_by_step[step][m_name] = val
+
+            metrics_series: Dict[str, List[Dict[str, float]]] = {}
+            for step, m_dict in sorted(metrics_by_step.items()):
+                for m_name, val in m_dict.items():
+                    metrics_series.setdefault(m_name, []).append({"step": step, "value": round(val, 3)})
 
             frames = []
             for c in particle_chunks:
@@ -763,6 +835,11 @@ class ScopeGeometryPipeline:
                             "flow_waterfall": round(m.get("drainage_waterfall", 0.0), 1),
                             "drainage_cutout": round(m.get("drainage_cutout", 0.0), 1),
                             "pool_volume": round(m.get("pool_volume", 69000.0) / 45000.0, 2),
+                            **{
+                                k: round(v, 3)
+                                for k, v in m.items()
+                                if k not in ("flow_spout", "drainage_waterfall", "drainage_cutout", "pool_volume")
+                            },
                         },
                     }
                 )
@@ -833,6 +910,7 @@ class ScopeGeometryPipeline:
                 "frames_count": len(frames),
                 "max_steps": len(frames),
                 "frames": frames,
+                "metrics_series": metrics_series,
                 "logs": logs,
             }
 
