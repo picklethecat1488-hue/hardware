@@ -1,12 +1,13 @@
-# 🔴 `[BUG-CREEPING-SCORPION-866]` Inaccurate click raycasting and entity picking for pads, traces, vias, and test points in PCB view
+# 🟢 `[BUG-CREEPING-SCORPION-866]` Inaccurate click raycasting and entity picking for pads, traces, vias, and test points in PCB view
 
 - **UUID**: `42818030-2ca7-490c-9833-d157509017c3`
 - **ID**: `BUG-CREEPING-SCORPION-866`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `CRITICAL`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-12 14:42:52 UTC`
+- **Resolved**: `2026-11-12 15:11:47 UTC`
 
 #### Description
 
@@ -524,3 +525,7 @@ face 46 ignored
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:45b25997 --> Open carrier board in Scope PCB view, hover over and click on test points (TP1, TP2, TP3, TP4), copper pads, vias, and traces, and verify accurate raycasting selection and detailed inspection card in sidebar | `python tools/scope.py carrier_board/carrier_board:pcb`
+
+#### Resolution Notes
+
+Export test points in PCB metadata and implement screen-space pixel raycasting and entity picking for test points, pads, vias, and traces in Scope
