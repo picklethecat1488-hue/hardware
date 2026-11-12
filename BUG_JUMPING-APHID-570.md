@@ -1,12 +1,13 @@
-# 🔴 `[BUG-JUMPING-APHID-570]` [carrier_board/carrier_board] Defect in PCB view
+# 🟢 `[BUG-JUMPING-APHID-570]` [carrier_board/carrier_board] Defect in PCB view
 
 - **UUID**: `f616833a-1db1-4787-8936-4c87b44adb84`
 - **ID**: `BUG-JUMPING-APHID-570`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-12 20:49:35 UTC`
+- **Resolved**: `2026-11-12 22:29:22 UTC`
 
 #### Description
 
@@ -520,3 +521,11 @@ face 46 ignored
 2026-11-12 12:49:03 [INFO] scope: 127.0.0.1 - - [12/Nov/2026 12:49:03] "GET /api/scope/load?project=carrier_board&target=carrier_board&subassembly=&mode=PCB HTTP/1.1" 200 -
 2026-11-12 12:49:03 [INFO] scope: 127.0.0.1 - - [12/Nov/2026 12:49:03] "GET /api/scope/projects HTTP/1.1" 200 -
 ```
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:fa3400ac --> Open carrier board PCB view in Scope and verify F.SilkS labels (e.g. STATUS, RESET, Pin 1, U1) and flipped B.SilkS labels read left-to-right without horizontal mirroring | `python tools/scope.py carrier_board/carrier_board:pcb`
+
+#### Resolution Notes
+
+Replaced 180-degree Z-axis rotation on F.SilkS text with 180-degree X-axis rotation and aligned B.SilkS bottom-view rotation so silkscreen glyphs map +X right and -Y_kicad up without horizontal mirroring.
