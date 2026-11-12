@@ -1,13 +1,13 @@
-# 🟢 `[BUG-LUSTROUS-CICADA-558]` CAD viewport mouse raycasting and object selection coordinates offset (carrier_board)
+# 🔴 `[BUG-LUSTROUS-CICADA-558]` CAD viewport mouse raycasting and object selection coordinates offset (carrier_board)
 
 - **UUID**: `dfaa3b31-f742-4aa2-8608-6848ded89564`
 - **ID**: `BUG-LUSTROUS-CICADA-558`
-- **Status**: `RESOLVED`
+- **Status**: `OPEN`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-11 23:11:29 UTC`
-- **Resolved**: `2026-11-12 00:57:01 UTC`
+- **Rejected**: `2026-11-12 00:57:10 UTC`
 
 #### Description
 
@@ -541,6 +541,12 @@ face 46 ignored
 - [ ] <!-- task:c1cad401 --> Open carrier_board in Scope CAD mode, hover and click over carrier board components, top cover, and battery cover, and verify the hovered and inspected element aligns sub-pixel accurately with the mouse cursor position | `python tools/scope.py carrier_board/product:cad`
 
 #### Resolution Notes
+
+Replaced container-based mouse offset calculations with getCanvasRelativeCoords() against active WebGL canvas, eliminated wrapper container margin/left offsets, and synchronized camera raycasting and idPicker to exact canvas dimensions.
+
+-No, I am seeing the exact same issue as before. I also have to click Target -> Inspect for the CAD geometry to actually show up in the viewport
+
+#### Rejection Feedback
 
 Replaced container-based mouse offset calculations with getCanvasRelativeCoords() against active WebGL canvas, eliminated wrapper container margin/left offsets, and synchronized camera raycasting and idPicker to exact canvas dimensions.
 
