@@ -522,6 +522,10 @@ face 46 ignored
 2026-11-11 17:10:39 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 17:10:39] "GET /api/scope/load?project=carrier_board&target=carrier_board&subassembly=&mode=PCB HTTP/1.1" 200 -
 ```
 
+#### Attached Commits
+
+- `8c021773`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:b92365b6 --> Open carrier board in Scope PCB mode, navigate to Inspect panel, verify 'Open in KiCad' button is visible and launches KiCad with carrier_board project | `python tools/scope.py carrier_board/carrier_board:pcb`
