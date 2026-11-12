@@ -529,6 +529,10 @@ face 46 ignored
 | `image/png` | [snapshot.png](attachments/BUG-SPRINGING-GRUB-126/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
 | `text/plain` | [scope.log](attachments/BUG-SPRINGING-GRUB-126/scope.log) | Scope workstation execution logs |
 
+#### Attached Commits
+
+- `7e1499d0`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:5c0a525a --> Inspect cat_fountain product in Scope Simulate mode and verify motor body and motor base bracket stay stationary while impeller and drive hub rotate | `python tools/scope.py cat_fountain/product:simulate`
