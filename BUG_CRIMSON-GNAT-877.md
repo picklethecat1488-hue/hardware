@@ -529,6 +529,10 @@ face 46 ignored
 | `image/png` | [snapshot.png](attachments/BUG-CRIMSON-GNAT-877/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
 | `text/plain` | [scope.log](attachments/BUG-CRIMSON-GNAT-877/scope.log) | Scope workstation execution logs |
 
+#### Attached Commits
+
+- `ba6ad103`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:90df2a2d --> Open carrier board PCB view in Scope and verify Components layer is omitted from the viewport and PCB Layers list while pads, traces, vias, and silkscreen remain inspectable | `python tools/scope.py carrier_board/carrier_board:pcb`
