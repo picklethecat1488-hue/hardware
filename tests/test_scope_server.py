@@ -577,7 +577,7 @@ def test_regression_bug_creeping_scorpion_866_pcb_test_points_metadata(scope_ser
 
 
 def test_regression_bug_dorsal_midge_176_pcb_layer_order_and_colors(scope_server):
-    """Verify BUG-DORSAL-MIDGE-176 & BUG-CRIMSON-GNAT-877: PCB view omits Components layer while preserving KiCad palette."""
+    """Verify BUG-DORSAL-MIDGE-176 & BUG-CRIMSON-GNAT-877: KiCad _builtin_default 2D palette and CAD layer stack."""
     load_url = f"http://127.0.0.1:{scope_server.actual_port}/api/scope/load?project=carrier_board&target=carrier_board&mode=PCB"
     req_load = urllib.request.urlopen(load_url)
     assert req_load.status == 200
@@ -590,28 +590,37 @@ def test_regression_bug_dorsal_midge_176_pcb_layer_order_and_colors(scope_server
     assert "Substrate" in layer_names
     assert data["pcb_metadata"]["components"], "Component metadata must remain populated for pad/inspector lookup"
 
-    part_ids = [part.get("id", "") or part.get("name", "") for part in data.get("shapes", {}).get("parts", [])]
+    parts = data.get("shapes", {}).get("parts", [])
+    part_ids = [part.get("id", "") or part.get("name", "") for part in parts]
     assert not any("components" in pid for pid in part_ids)
     assert any("substrate" in pid for pid in part_ids)
     assert any("pads" in pid for pid in part_ids)
 
+    expected_kicad_colors = {
+        "Substrate": "#041830",
+        "Pads": "#ce4785",
+        "F.Cu (Top)": "#c83434",
+        "B.Cu (Bottom)": "#4d7fc4",
+        "Vias": "#ececec",
+        "F.SilkS": "#f2eda1",
+        "B.SilkS": "#e8b2a7",
+    }
     layer_colors = {layer["name"]: layer["color"].lower() for layer in layers}
-    assert "Components" not in layer_colors
-    assert layer_colors["Substrate"] == "#0a2410"
-    assert layer_colors["Pads"] == "#c8a034"
-    assert layer_colors["F.Cu (Top)"] == "#c83434"
-    assert layer_colors["B.Cu (Bottom)"] == "#345ac8"
-    assert layer_colors["Vias"] == "#b4a03c"
-    assert layer_colors["F.SilkS"] == "#e6e6e6"
-    assert layer_colors["B.SilkS"] == "#e6e6e6"
+    assert layer_colors == expected_kicad_colors
 
-    assert PCB3DAssembler.DEFAULT_COMPONENT_COLOR == (0.165, 0.180, 0.208)
-    assert PCB3DAssembler.DEFAULT_SOLDERMASK_COLOR == (0.04, 0.14, 0.06)
-    assert PCB3DAssembler.DEFAULT_PAD_COLOR == (0.784, 0.627, 0.204)
-    assert PCB3DAssembler.DEFAULT_TOP_TRACE_COLOR == (0.784, 0.204, 0.204)
-    assert PCB3DAssembler.DEFAULT_BOTTOM_TRACE_COLOR == (0.204, 0.353, 0.784)
-    assert PCB3DAssembler.DEFAULT_VIA_COLOR == (0.706, 0.627, 0.235)
-    assert PCB3DAssembler.DEFAULT_SILKSCREEN_COLOR == (0.90, 0.90, 0.90)
+    # Verify tessellated 3D/2D mesh colors match pcb_metadata layer swatches 1-to-1
+    part_color_by_id = {}
+    for part in parts:
+        pname = part.get("name", "")
+        pcolor = (part.get("color") or (part.get("parts") or [{}])[0].get("color") or "").lower()
+        part_color_by_id[pname] = pcolor
+    for layer in layers:
+        assert part_color_by_id.get(layer["id"]) == layer["color"].lower()
+
+    # Verify 3D CAD assembly mode still retains Components above Substrate on the stack
+    cad_items = PCB3DAssembler.from_provider(CarrierBoardProvider()).get_display_items(prefix="carrier_board")
+    cad_names = [name for _, name, _, _ in cad_items]
+    assert cad_names.index("carrier_board_components") < cad_names.index("carrier_board_substrate")
 
 
 def test_regression_bug_velvety_larva_429_simulation_metrics_series(scope_server):

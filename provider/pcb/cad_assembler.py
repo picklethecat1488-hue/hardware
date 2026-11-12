@@ -26,6 +26,15 @@ class PCB3DAssembler:
     DEFAULT_BOTTOM_TRACE_COLOR = (0.204, 0.353, 0.784)  # B.Cu KiCad contrasting vivid blue ribbon (#345ac8)
     DEFAULT_VIA_COLOR = (0.706, 0.627, 0.235)  # Copper/gold through-hole via barrels (#b4a03c)
     DEFAULT_SILKSCREEN_COLOR = (0.90, 0.90, 0.90)  # High-contrast crisp white silkscreen legend (#e6e6e6)
+
+    # KiCad 10 _builtin_default 2D PCB Editor layer colors
+    KICAD_SUBSTRATE_COLOR = (0.015725, 0.094157, 0.188275)  # Board interior dark navy (#041830)
+    KICAD_PAD_COLOR = (0.807882, 0.278471, 0.521608)  # F.Cu + 40% F.Mask (#d864ff) SMD pad (#ce4785)
+    KICAD_TOP_TRACE_COLOR = (0.784353, 0.203961, 0.203961)  # F.Cu (#c83434)
+    KICAD_BOTTOM_TRACE_COLOR = (0.302000, 0.498078, 0.768667)  # B.Cu (#4d7fc4)
+    KICAD_VIA_COLOR = (0.925529, 0.925529, 0.925529)  # Plated via_through (#ececec)
+    KICAD_TOP_SILKSCREEN_COLOR = (0.949059, 0.929451, 0.631412)  # F.SilkS (#f2eda1)
+    KICAD_BOTTOM_SILKSCREEN_COLOR = (0.909843, 0.698078, 0.654941)  # B.SilkS (#e8b2a7)
     Z_PAD_OFFSET = 0.015  # Solder pads sit proud of trace ribbons to prevent Z-fighting (BUG-TRANSLUCENT-LACEWING-144)
     Z_SILK_OFFSET = 0.030  # Silkscreen legends sit proud of copper pads to guarantee clean visibility
 
@@ -530,10 +539,19 @@ class PCB3DAssembler:
         self,
         prefix: Optional[str] = None,
         include_components: bool = True,
+        kicad_2d_theme: bool = False,
     ) -> List[Tuple[Any, str, Tuple[float, float, float], float]]:
         """Return list of (geometry, layer_name, rgb_color, alpha) for active PCB layers."""
         pfx = prefix or self.pcb_name
         items: List[Tuple[Any, str, Tuple[float, float, float], float]] = []
+
+        substrate_col = self.KICAD_SUBSTRATE_COLOR if kicad_2d_theme else self.substrate_color
+        pad_col = self.KICAD_PAD_COLOR if kicad_2d_theme else self.DEFAULT_PAD_COLOR
+        top_trace_col = self.KICAD_TOP_TRACE_COLOR if kicad_2d_theme else self.DEFAULT_TOP_TRACE_COLOR
+        bottom_trace_col = self.KICAD_BOTTOM_TRACE_COLOR if kicad_2d_theme else self.DEFAULT_BOTTOM_TRACE_COLOR
+        via_col = self.KICAD_VIA_COLOR if kicad_2d_theme else self.DEFAULT_VIA_COLOR
+        top_silk_col = self.KICAD_TOP_SILKSCREEN_COLOR if kicad_2d_theme else self.silkscreen_color
+        bottom_silk_col = self.KICAD_BOTTOM_SILKSCREEN_COLOR if kicad_2d_theme else self.silkscreen_color
 
         # 1. Components (included for 3D CAD assemblies; omitted in 2D PCB view)
         comps, pads = self.build_components_and_pads(include_components=include_components)
@@ -543,36 +561,36 @@ class PCB3DAssembler:
         # 2. Substrate
         substrate = self.build_substrate()
         if substrate is not None:
-            items.append((substrate, f"{pfx}_substrate", self.substrate_color, 1.0))
+            items.append((substrate, f"{pfx}_substrate", substrate_col, 1.0))
 
         # 3. Copper Pads
         if pads is not None:
-            items.append((pads, f"{pfx}_pads", self.DEFAULT_PAD_COLOR, 1.0))
+            items.append((pads, f"{pfx}_pads", pad_col, 1.0))
 
         # 4. Front Copper Traces (F.Cu)
         traces_top = self.build_traces("F.Cu")
         if traces_top is not None:
-            items.append((traces_top, f"{pfx}_traces_top", self.DEFAULT_TOP_TRACE_COLOR, 1.0))
+            items.append((traces_top, f"{pfx}_traces_top", top_trace_col, 1.0))
 
         # 5. Back Copper Traces (B.Cu)
         traces_bottom = self.build_traces("B.Cu")
         if traces_bottom is not None:
-            items.append((traces_bottom, f"{pfx}_traces_bottom", self.DEFAULT_BOTTOM_TRACE_COLOR, 1.0))
+            items.append((traces_bottom, f"{pfx}_traces_bottom", bottom_trace_col, 1.0))
 
         # 6. Vias
         vias = self.build_vias()
         if vias is not None:
-            items.append((vias, f"{pfx}_vias", self.DEFAULT_VIA_COLOR, 1.0))
+            items.append((vias, f"{pfx}_vias", via_col, 1.0))
 
         # 7. Front Silkscreen (F.SilkS)
         silk_top = self.build_silkscreen("F.SilkS")
         if silk_top is not None:
-            items.append((silk_top, f"{pfx}_silkscreen_top", self.silkscreen_color, 1.0))
+            items.append((silk_top, f"{pfx}_silkscreen_top", top_silk_col, 1.0))
 
         # 8. Back Silkscreen (B.SilkS)
         silk_bottom = self.build_silkscreen("B.SilkS")
         if silk_bottom is not None:
-            items.append((silk_bottom, f"{pfx}_silkscreen_bottom", self.silkscreen_color, 1.0))
+            items.append((silk_bottom, f"{pfx}_silkscreen_bottom", bottom_silk_col, 1.0))
 
         return items
 

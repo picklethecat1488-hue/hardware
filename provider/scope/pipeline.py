@@ -371,11 +371,15 @@ class ScopeGeometryPipeline:
                     substrate_color=substrate_color,
                     pcb_name=item_name,
                 )
-                layer_items = assembler.get_display_items(prefix=item_name, include_components=False)
+                layer_items = assembler.get_display_items(
+                    prefix=item_name,
+                    include_components=False,
+                    kicad_2d_theme=True,
+                )
                 if layer_items:
                     display_items.extend(layer_items)
                 else:
-                    display_items.append((solid, item_name, substrate_color, 1.0))
+                    display_items.append((solid, item_name, PCB3DAssembler.KICAD_SUBSTRATE_COLOR, 1.0))
 
                 # Build PCB metadata for KiCad inspector & net highlight
                 from provider.footprints import FOOTPRINT_REGISTRY
@@ -539,21 +543,21 @@ class ScopeGeometryPipeline:
 
                 pcb_metadata = {
                     "layers": [
-                        {"id": f"{item_name}_substrate", "name": "Substrate", "color": "#0a2410", "type": "Substrate"},
-                        {"id": f"{item_name}_pads", "name": "Pads", "color": "#c8a034", "type": "Pads"},
+                        {"id": f"{item_name}_substrate", "name": "Substrate", "color": "#041830", "type": "Substrate"},
+                        {"id": f"{item_name}_pads", "name": "Pads", "color": "#ce4785", "type": "Pads"},
                         {"id": f"{item_name}_traces_top", "name": "F.Cu (Top)", "color": "#c83434", "type": "F.Cu"},
                         {
                             "id": f"{item_name}_traces_bottom",
                             "name": "B.Cu (Bottom)",
-                            "color": "#345ac8",
+                            "color": "#4d7fc4",
                             "type": "B.Cu",
                         },
-                        {"id": f"{item_name}_vias", "name": "Vias", "color": "#b4a03c", "type": "Vias"},
-                        {"id": f"{item_name}_silkscreen_top", "name": "F.SilkS", "color": "#e6e6e6", "type": "F.SilkS"},
+                        {"id": f"{item_name}_vias", "name": "Vias", "color": "#ececec", "type": "Vias"},
+                        {"id": f"{item_name}_silkscreen_top", "name": "F.SilkS", "color": "#f2eda1", "type": "F.SilkS"},
                         {
                             "id": f"{item_name}_silkscreen_bottom",
                             "name": "B.SilkS",
-                            "color": "#e6e6e6",
+                            "color": "#e8b2a7",
                             "type": "B.SilkS",
                         },
                     ],

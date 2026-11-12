@@ -649,8 +649,9 @@
       color: #000 !important;
       font-weight: bold;
     }
-    body.pcb-high-contrast #cad-view {
-      filter: contrast(1.12) brightness(1.05);
+    body.pcb-high-contrast #cad-view canvas,
+    body.mode-pcb #cad-view canvas {
+      background-color: #001023 !important;
     }
 
     /* DIAGRAM VIEWPORT WHITE BACKGROUND (BUG-SWARMING-SILVERFISH-292) */
@@ -1958,6 +1959,9 @@
         roughness: 0.65,
         preserveDrawingBuffer: true,
       }, (change) => {
+        if (state.currentMode === "PCB") {
+          requestAnimationFrame(redrawMarkups);
+        }
         if (change && change.lastPick) {
           const pick = change.lastPick.new || change.lastPick;
           const pName = (pick.name || pick.path || "").toLowerCase();
@@ -2474,6 +2478,51 @@
           state.viewer.update(true, false);
         }
       }
+      requestAnimationFrame(redrawMarkups);
+    }
+
+    function applyPcbUnlitShading() {
+      const r = getViewerRendered();
+      if (!r || !r.nestedGroup) return;
+      if (r.nestedGroup.groups) {
+        for (const [key, group] of Object.entries(r.nestedGroup.groups)) {
+          const isSubstrate = key.toLowerCase().includes("substrate");
+          if (typeof group.setEdgesVisible === "function") {
+            group.setEdgesVisible(isSubstrate);
+          }
+          group.traverse((child) => {
+            if (child.isLineSegments || child.isLine) {
+              if (isSubstrate && child.material && child.material.color) {
+                child.material.color.setHex(0xd0d2cd);
+                child.material.needsUpdate = true;
+              } else {
+                child.visible = false;
+              }
+            }
+            if (child.isMesh && child.material) {
+              const mats = Array.isArray(child.material) ? child.material : [child.material];
+              for (const mat of mats) {
+                if (mat.color && mat.emissive) {
+                  if (mat.userData._kicadBaseHex === undefined) {
+                    mat.userData._kicadBaseHex = mat.color.getHex();
+                  }
+                  const hex = mat.userData._kicadBaseHex;
+                  mat.color.setHex(0x000000);
+                  mat.emissive.setHex(hex);
+                  mat.emissiveIntensity = 1.0;
+                  if ("metalness" in mat) mat.metalness = 0.0;
+                  if ("roughness" in mat) mat.roughness = 1.0;
+                  mat.toneMapped = false;
+                  mat.needsUpdate = true;
+                }
+              }
+            }
+          });
+        }
+      }
+      if (state.viewer && typeof state.viewer.update === "function") {
+        state.viewer.update(true, false);
+      }
     }
 
     function setCameraPreset(viewName) {
@@ -2699,16 +2748,17 @@
         } else if (state.currentMode === "PCB") {
           document.body.classList.remove("diagram-mode");
           document.body.classList.add("pcb-high-contrast");
-          if (state.viewer && state.viewer.renderer && typeof state.viewer.renderer.setClearColor === "function") {
-            state.viewer.renderer.setClearColor(0x101413, 1.0);
-          }
           if (state.viewer && typeof state.viewer.setTheme === "function") {
             state.viewer.setTheme("dark");
+          }
+          if (state.viewer && state.viewer.renderer && typeof state.viewer.renderer.setClearColor === "function") {
+            state.viewer.renderer.setClearColor(0x001023, 0.0);
           }
           if (rRendered && typeof state.viewer.setOrtho === "function") {
             state.viewer.setOrtho(true);
           }
           setupPcbOrientation(true);
+          applyPcbUnlitShading();
         } else {
           document.body.classList.remove("diagram-mode");
           document.body.classList.remove("pcb-high-contrast");
@@ -2726,6 +2776,7 @@
         updateLayersList();
         updateNetsList();
         updateTreeList(shapes);
+        redrawMarkups();
         if (state.currentMode === "SIMULATE") {
           initSimulationParticles();
           updateSimulationStep(state.simStep || 0);
@@ -2857,6 +2908,14 @@
             }
           });
         }
+        if (r.controls.domElement && !r.controls.domElement._pcbWheelAttached) {
+          r.controls.domElement._pcbWheelAttached = true;
+          r.controls.domElement.addEventListener("wheel", () => {
+            if (state.currentMode === "PCB") {
+              requestAnimationFrame(redrawMarkups);
+            }
+          }, { passive: true });
+        }
       }
       const hideIn2DIds = [
         "cam-iso",
@@ -2939,6 +2998,9 @@
       }
       if (state.viewer && typeof state.viewer.update === "function") {
         state.viewer.update(false, false);
+      }
+      if (state.currentMode === "PCB") {
+        requestAnimationFrame(redrawMarkups);
       }
     }
 
@@ -3080,6 +3142,9 @@
       }
       if (state.viewer && typeof state.viewer.update === "function") {
         state.viewer.update(false, false);
+      }
+      if (state.currentMode === "PCB") {
+        requestAnimationFrame(redrawMarkups);
       }
     }
 
@@ -3682,15 +3747,25 @@
       const p1mm = toScreen(1, 0, 0.8);
       const pxPerMm = Math.hypot(p1mm.x - pOrigin.x, p1mm.y - pOrigin.y);
 
-      // Only show net labels when zoomed in sufficiently (at least 12 pixels per mm)
-      if (pxPerMm < 12) return;
+      // Only show net labels when zoomed in sufficiently (at least 10 pixels per mm)
+      if (pxPerMm < 10) return;
+
+      const visibleLayerTypes = new Set();
+      if (state.pcbMetadata.layers) {
+        for (const layer of state.pcbMetadata.layers) {
+          const cb = document.querySelector(`#layers-list input[data-layer-id="${layer.id}"]`);
+          if (!cb || cb.checked) {
+            visibleLayerTypes.add(layer.type);
+          }
+        }
+      }
 
       markupCtx.save();
       markupCtx.textAlign = "center";
       markupCtx.textBaseline = "middle";
 
       // 1. Draw net names on copper pads
-      if (state.pcbMetadata.pads) {
+      if (state.pcbMetadata.pads && visibleLayerTypes.has("Pads")) {
         for (const p of state.pcbMetadata.pads) {
           if (!p.net || p.net === "" || p.net === "unconnected") continue;
           const halfW = (p.w || 0.8) / 2.0;
@@ -3706,22 +3781,23 @@
           markupCtx.font = `bold ${fontSize}px sans-serif`;
 
           // Drop shadow/halo for legibility against copper
-          markupCtx.fillStyle = "rgba(0, 0, 0, 0.85)";
+          markupCtx.fillStyle = "rgba(0, 0, 0, 0.78)";
           markupCtx.fillText(label, sc.x + 0.5, sc.y + 0.5);
-          markupCtx.fillStyle = "#ffffff";
+          markupCtx.fillStyle = "rgba(255, 255, 255, 0.94)";
           markupCtx.fillText(label, sc.x, sc.y);
         }
       }
 
-      // 2. Draw net names on traces
+      // 2. Draw net names centered inside copper traces (matching KiCad GAL net labels)
       if (state.pcbMetadata.traces) {
         for (const t of state.pcbMetadata.traces) {
           if (!t.net || t.net === "" || t.net === "unconnected") continue;
+          if (!visibleLayerTypes.has(t.layer || "F.Cu")) continue;
           const zVal = t.layer === "B.Cu" ? -0.8 : 0.8;
           const s1 = toScreen(t.start[0], t.start[1], zVal);
           const s2 = toScreen(t.end[0], t.end[1], zVal);
           const segLen = Math.hypot(s2.x - s1.x, s2.y - s1.y);
-          if (segLen < 35) continue;
+          if (segLen < 32) continue;
 
           const midX = (s1.x + s2.x) / 2.0;
           const midY = (s1.y + s2.y) / 2.0;
@@ -3729,15 +3805,16 @@
 
           const angle = Math.atan2(s2.y - s1.y, s2.x - s1.x);
           const normAngle = (angle > Math.PI / 2 || angle < -Math.PI / 2) ? angle + Math.PI : angle;
+          const traceWidthPx = Math.max(7, Math.min(10, Math.round((t.width || 0.2) * pxPerMm * 0.75)));
 
           markupCtx.save();
           markupCtx.translate(midX, midY);
           markupCtx.rotate(normAngle);
-          markupCtx.font = "bold 8px sans-serif";
-          markupCtx.fillStyle = "rgba(0, 0, 0, 0.85)";
-          markupCtx.fillText(t.net, 0.5, -3.5);
-          markupCtx.fillStyle = "#38bdf8";
-          markupCtx.fillText(t.net, 0, -4);
+          markupCtx.font = `bold ${traceWidthPx}px sans-serif`;
+          markupCtx.fillStyle = "rgba(0, 0, 0, 0.78)";
+          markupCtx.fillText(t.net, 0.5, 0.5);
+          markupCtx.fillStyle = "rgba(255, 255, 255, 0.92)";
+          markupCtx.fillText(t.net, 0, 0);
           markupCtx.restore();
         }
       }
@@ -4331,6 +4408,9 @@
       // Force canvas repaint in Three-CAD-Viewer
       if (state.viewer && typeof state.viewer.update === "function") {
         state.viewer.update(false, false);
+      }
+      if (state.currentMode === "PCB") {
+        requestAnimationFrame(redrawMarkups);
       }
     }
 
