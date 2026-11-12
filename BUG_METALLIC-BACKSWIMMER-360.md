@@ -1,7 +1,7 @@
-# 🟢 `[WORM-CREEPING-LARVA-820]` Regression tests are not useful
+# 🟢 `[BUG-METALLIC-BACKSWIMMER-360]` Regression tests are not useful
 
-- **UUID**: `c9679ffa-7211-4f3f-bea5-a57be3bc91a4`
-- **ID**: `WORM-CREEPING-LARVA-820`
+- **UUID**: `a206b0fd-7983-4b41-a179-8486835b820e`
+- **ID**: `BUG-METALLIC-BACKSWIMMER-360`
 - **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `GENERAL`
