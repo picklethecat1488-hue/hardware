@@ -7,7 +7,7 @@
 - **Category**: `CAD`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-11 23:11:29 UTC`
-- **Resolved**: `2026-11-12 00:13:30 UTC`
+- **Resolved**: `2026-11-12 00:56:50 UTC`
 
 #### Description
 
@@ -526,6 +526,12 @@ face 46 ignored
 2026-11-11 15:10:03 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 15:10:03] "GET /api/scope/load?project=carrier_board&target=product&subassembly=&mode=CAD HTTP/1.1" 200 -
 ```
 
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `document` | [scope_1.log](attachments/BUG-LUSTROUS-CICADA-558/scope_1.log) | Uploaded document scope.log |
+
 #### Attached Commits
 
 - `a006ca95`
@@ -537,3 +543,5 @@ face 46 ignored
 #### Resolution Notes
 
 Replaced container-based mouse offset calculations with getCanvasRelativeCoords() against active WebGL canvas, eliminated wrapper container margin/left offsets, and synchronized camera raycasting and idPicker to exact canvas dimensions.
+
+-No, I am seeing the exact same issue as before. I also have to click Target -> Inspect for the CAD geometry to actually show up in the viewport
