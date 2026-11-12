@@ -1,6 +1,6 @@
 # 🟢 `[BUG-OBSIDIAN-LADYBUG-349]` Regression tests are not useful
 
-- **UUID**: `c112dcae-47ca-40fe-ada1-e2a86a2dc124`
+- **UUID**: `c3c1caf2-2ca4-4b2f-b90e-f8ad85c09d26`
 - **ID**: `BUG-OBSIDIAN-LADYBUG-349`
 - **Status**: `CLOSED`
 - **Severity**: `HIGH`

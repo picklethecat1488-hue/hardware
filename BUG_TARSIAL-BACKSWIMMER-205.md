@@ -1,6 +1,6 @@
 # 🟢 `[BUG-TARSIAL-BACKSWIMMER-205]` Regression tests are not useful
 
-- **UUID**: `c112dcae-47ca-40fe-ada1-e2a86a2dc124`
+- **UUID**: `72f33f12-09e7-4cb0-966a-bc2c112f6e22`
 - **ID**: `BUG-TARSIAL-BACKSWIMMER-205`
 - **Status**: `CLOSED`
 - **Severity**: `HIGH`
