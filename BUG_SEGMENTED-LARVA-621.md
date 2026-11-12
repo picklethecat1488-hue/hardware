@@ -1,4 +1,4 @@
-# 🔴 `[BUG-SEGMENTED-LARVA-621]` [cat_fountain/product] Defect in SIMULATE view
+# 🔴 `[BUG-SEGMENTED-LARVA-621]` Simulation fluid particles fail to drain through lid hole (cat_fountain)
 
 - **UUID**: `b7325193-dee2-4129-9601-7f19c4e51981`
 - **ID**: `BUG-SEGMENTED-LARVA-621`
@@ -520,10 +520,3 @@ face 46 ignored
 2026-11-11 15:03:49 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 15:03:49] "GET /api/scope/load?project=cat_fountain&target=product&subassembly=&mode=SIMULATE HTTP/1.1" 200 -
 2026-11-11 15:03:49 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 15:03:49] "GET /api/scope/projects HTTP/1.1" 200 -
 ```
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-SEGMENTED-LARVA-621/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
-| `text/plain` | [scope.log](attachments/BUG-SEGMENTED-LARVA-621/scope.log) | Scope workstation execution logs |

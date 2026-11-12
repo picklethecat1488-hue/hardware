@@ -1,4 +1,4 @@
-# 🔴 `[BUG-JUMPING-INSTAR-950]` Simulate view lacks max steps selection, physics object inspection, and rerun log queries (cat_fountain)
+# 🔴 `[BUG-JUMPING-INSTAR-950]` Simulate view timescale adjustment and Rerun Viewer launch button (cat_fountain)
 
 - **UUID**: `f9bfa2d4-b45b-4fec-849a-c63b9ce5e153`
 - **ID**: `BUG-JUMPING-INSTAR-950`
@@ -521,13 +521,6 @@ face 46 ignored
 2026-11-11 14:04:19 [INFO] scope: Successfully loaded geometry for cat_fountain/product [SIMULATE] in 2.53s
 2026-11-11 14:04:20 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 14:04:20] "GET /api/scope/load?project=cat_fountain&target=product&subassembly=&mode=SIMULATE HTTP/1.1" 200 -
 ```
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-JUMPING-INSTAR-950/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
-| `text/plain` | [scope.log](attachments/BUG-JUMPING-INSTAR-950/scope.log) | Scope workstation execution logs |
 
 #### Attached Commits
 

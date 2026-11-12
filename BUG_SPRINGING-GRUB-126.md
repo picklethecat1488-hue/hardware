@@ -1,4 +1,4 @@
-# 🔴 `[BUG-SPRINGING-GRUB-126]` [cat_fountain/product] Defect in SIMULATE view
+# 🔴 `[BUG-SPRINGING-GRUB-126]` Motor and motor base rotate with motor instead of remaining stationary (cat_fountain)
 
 - **UUID**: `39dd20f4-30de-464e-b9d4-b9ff827ed856`
 - **ID**: `BUG-SPRINGING-GRUB-126`

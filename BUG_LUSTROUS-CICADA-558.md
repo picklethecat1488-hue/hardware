@@ -1,12 +1,13 @@
-# 🔴 `[BUG-LUSTROUS-CICADA-558]` [carrier_board/product] Defect in CAD view
+# 🟢 `[BUG-LUSTROUS-CICADA-558]` CAD viewport mouse raycasting and object selection coordinates offset (carrier_board)
 
 - **UUID**: `dfaa3b31-f742-4aa2-8608-6848ded89564`
 - **ID**: `BUG-LUSTROUS-CICADA-558`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-11 23:11:29 UTC`
+- **Resolved**: `2026-11-12 00:13:30 UTC`
 
 #### Description
 
@@ -525,9 +526,6 @@ face 46 ignored
 2026-11-11 15:10:03 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 15:10:03] "GET /api/scope/load?project=carrier_board&target=product&subassembly=&mode=CAD HTTP/1.1" 200 -
 ```
 
-#### Attachments & References
+#### Resolution Notes
 
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-LUSTROUS-CICADA-558/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
-| `text/plain` | [scope.log](attachments/BUG-LUSTROUS-CICADA-558/scope.log) | Scope workstation execution logs |
+Replaced container-based mouse offset calculations with getCanvasRelativeCoords() against active WebGL canvas, eliminated wrapper container margin/left offsets, and synchronized camera raycasting and idPicker to exact canvas dimensions.

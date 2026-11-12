@@ -1,4 +1,4 @@
-# 🔴 `[BUG-PUNCTATE-DARNER-735]` [cat_fountain/wiring] Defect in DIAGRAM view
+# 🔴 `[BUG-PUNCTATE-DARNER-735]` Diagram view text labels invisible (cat_fountain)
 
 - **UUID**: `3b039707-7c67-4406-bcbc-baa9b6fee23b`
 - **ID**: `BUG-PUNCTATE-DARNER-735`
@@ -520,10 +520,3 @@ face 46 ignored
 2026-11-11 15:12:49 [INFO] scope: Successfully loaded geometry for cat_fountain/wiring [DIAGRAM] in 49.89s
 2026-11-11 15:12:49 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 15:12:49] "GET /api/scope/load?project=cat_fountain&target=wiring&subassembly=&mode=DIAGRAM HTTP/1.1" 200 -
 ```
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-PUNCTATE-DARNER-735/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
-| `text/plain` | [scope.log](attachments/BUG-PUNCTATE-DARNER-735/scope.log) | Scope workstation execution logs |

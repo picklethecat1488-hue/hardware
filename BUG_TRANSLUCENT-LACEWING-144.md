@@ -1,4 +1,4 @@
-# 🔴 `[BUG-TRANSLUCENT-LACEWING-144]` PCB view net highlighting is non-functional and requires KiCad high-contrast theme (carrier_board)
+# 🔴 `[BUG-TRANSLUCENT-LACEWING-144]` PCB view silkscreen alignment, element inspection, and pad/trace Z-ordering (carrier_board)
 
 - **UUID**: `cf9a924c-9c73-4e4c-b249-6be0475c8f46`
 - **ID**: `BUG-TRANSLUCENT-LACEWING-144`
@@ -21,8 +21,6 @@ Net highlighting does not work. We should also use a high contrast color scheme 
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
-| `screenshot` | [screenshot_paste_1794439243034_okmeb.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794439243034_okmeb.png) | Pasted screenshot screenshot_paste_1794439243034_okmeb.png |
-| `screenshot` | [screenshot_paste_1794434388241_j5k2b.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794434388241_j5k2b.png) | Pasted screenshot screenshot_paste_1794434388241_j5k2b.png |
 | `screenshot` | [screenshot_paste_1794439086273_7ec08.png](attachments/BUG-TRANSLUCENT-LACEWING-144/screenshot_paste_1794439086273_7ec08.png) | Pasted screenshot screenshot_paste_1794439086273_7ec08.png |
 
 #### Attached Commits
