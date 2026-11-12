@@ -15,3 +15,4 @@
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:6804407a --> Verify CAD target loads and renders cleanly with :cad suffix | `python tools/scope.py cat_fountain/product:cad`
+- [ ] <!-- task:615d421d --> Verify PCB target renders non-culled top/bottom copper, components, and accurate entity picking | `python tools/scope.py carrier_board/carrier_board:pcb`
