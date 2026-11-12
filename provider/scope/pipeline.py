@@ -695,8 +695,8 @@ class ScopeGeometryPipeline:
                         self._in_progress.pop(cache_key).set()
 
     def load_simulation_telemetry(self, project: str, target: str) -> Dict[str, Any]:
-        """Extract authentic fluid particle positions and physical flow metrics from server-side Rerun recordings."""
-        cache_key = f"{project}_{target}_sim_telemetry"
+        """Extract authentic fluid particle positions and raw provider metrics dynamically from Rerun recordings."""
+        cache_key = f"{project}_{target}_sim_telemetry_v2"
         cache_file = self.cache_dir / f"{cache_key}.json.gz"
 
         with self._lock:
@@ -713,11 +713,11 @@ class ScopeGeometryPipeline:
             except Exception as err:
                 self.log.warning("Failed to read telemetry cache for %s: %s", cache_key, err)
 
-        # Locate recording on disk
+        recordings_dir = self.repo_root / "recordings"
         candidates = [
-            Path(f"recordings/{project}_3blade.rrd"),
-            Path(f"recordings/{project}.rrd"),
-            Path(f"recordings/{project}_{target}.rrd"),
+            recordings_dir / f"{project}_{target}.rrd",
+            recordings_dir / f"{project}.rrd",
+            recordings_dir / f"{project}_3blade.rrd",
         ]
         rrd_file: Optional[Path] = None
         for cand in candidates:
@@ -725,81 +725,20 @@ class ScopeGeometryPipeline:
                 rrd_file = cand
                 break
 
-        if rrd_file is None:
-            recordings_dir = Path("recordings")
-            if recordings_dir.exists():
-                for f in recordings_dir.glob("*.rrd"):
-                    if project in f.name:
-                        rrd_file = f
-                        break
+        if rrd_file is None and recordings_dir.exists():
+            for f in sorted(recordings_dir.glob("*.rrd")):
+                if project in f.name:
+                    rrd_file = f
+                    break
 
         if rrd_file is None:
-            import math
-
-            frames = []
-            metrics_series: Dict[str, List[Dict[str, float]]] = {
-                "flow_spout": [],
-                "flow_tube": [],
-                "flow_lid_sheet": [],
-                "drainage_waterfall": [],
-                "drainage_cutout": [],
-                "pool_volume": [],
-                "water_depth": [],
-                "ejected_particles": [],
-                "max_vertical_vel": [],
-                "max_particle_speed": [],
-                "mean_sheet_speed": [],
-                "drain_downward_vel": [],
-                "drain_stagnant_particles": [],
-            }
-            for s in range(60):
-                t = s * 0.05
-                spout_val = round(max(0.0, math.sin(t * 1.5) * 45.0 + 120.0), 1)
-                waterfall_val = round(max(0.0, math.sin(t * 1.5 - 0.5) * 40.0 + 105.0), 1)
-                cutout_val = round(max(0.0, math.cos(t * 1.2) * 20.0 + 35.0), 1)
-                pool_val = round(1.50 + math.sin(t * 0.3) * 0.15, 2)
-                depth_val = round(32.0 + math.sin(t * 0.4) * 2.5, 1)
-
-                m_step = {
-                    "flow_spout": spout_val,
-                    "flow_tube": round(spout_val * 1.05, 1),
-                    "flow_lid_sheet": round(spout_val * 0.85, 1),
-                    "drainage_waterfall": waterfall_val,
-                    "drainage_cutout": cutout_val,
-                    "pool_volume": pool_val,
-                    "water_depth": depth_val,
-                    "ejected_particles": 0.0,
-                    "max_vertical_vel": round(1.2 + math.sin(t) * 0.3, 2),
-                    "max_particle_speed": round(2.4 + math.cos(t) * 0.4, 2),
-                    "mean_sheet_speed": round(0.85 + math.sin(t * 1.2) * 0.15, 2),
-                    "drain_downward_vel": round(0.65 + math.cos(t * 0.8) * 0.1, 2),
-                    "drain_stagnant_particles": round(max(0.0, math.sin(t * 2.0) * 12.0 + 15.0)),
-                }
-                for k, v in m_step.items():
-                    metrics_series[k].append({"step": s, "value": v})
-
-                pts = []
-                for p_idx in range(200):
-                    theta = (p_idx / 200.0) * 2 * math.pi + t
-                    r = 15.0 + (p_idx % 20) * 2.5
-                    pz = max(0.0, math.sin(theta * 3.0 + t * 4.0) * 8.0 + 5.0)
-                    pts.append([round(r * math.cos(theta), 2), round(r * math.sin(theta), 2), round(pz, 2)])
-
-                frames.append(
-                    {
-                        "step": s,
-                        "positions": pts,
-                        "metrics": m_step,
-                    }
-                )
-
             return {
-                "status": "ok",
-                "recording": "simulated",
-                "frames_count": len(frames),
-                "max_steps": len(frames),
-                "frames": frames,
-                "metrics_series": metrics_series,
+                "status": "not_found",
+                "recording": None,
+                "frames_count": 0,
+                "max_steps": 0,
+                "frames": [],
+                "metrics_series": {},
             }
 
         try:
@@ -825,7 +764,7 @@ class ScopeGeometryPipeline:
             metrics_series: Dict[str, List[Dict[str, float]]] = {}
             for step, m_dict in sorted(metrics_by_step.items()):
                 for m_name, val in m_dict.items():
-                    metrics_series.setdefault(m_name, []).append({"step": step, "value": round(val, 3)})
+                    metrics_series.setdefault(m_name, []).append({"step": step, "value": val})
 
             frames = []
             for c in particle_chunks:
@@ -837,93 +776,25 @@ class ScopeGeometryPipeline:
                     [round(p[0] * 1000.0, 2), round(p[1] * 1000.0, 2), round(p[2] * 1000.0, 2)]
                     for p in raw_pos[::stride][:600]
                 ]
-                m = metrics_by_step.get(step, {})
                 frames.append(
                     {
                         "step": step,
                         "positions": sampled,
-                        "metrics": {
-                            "flow_spout": round(m.get("flow_spout", 0.0), 1),
-                            "flow_waterfall": round(m.get("drainage_waterfall", 0.0), 1),
-                            "drainage_cutout": round(m.get("drainage_cutout", 0.0), 1),
-                            "pool_volume": round(m.get("pool_volume", 69000.0) / 45000.0, 2),
-                            **{
-                                k: round(v, 3)
-                                for k, v in m.items()
-                                if k not in ("flow_spout", "drainage_waterfall", "drainage_cutout", "pool_volume")
-                            },
-                        },
+                        "metrics": dict(metrics_by_step.get(step, {})),
                     }
                 )
 
             frames.sort(key=lambda f: f["step"])
 
-            logs = []
-            if frames:
-                logs.append(
-                    {
-                        "step": frames[0]["step"],
-                        "time": "0.00s",
-                        "level": "INFO",
-                        "entity": f"world/{project}",
-                        "msg": f"SPH simulation domain initialized from Rerun recording. {len(frames[0]['positions'])} active particles.",
-                    }
-                )
-                spout_frames = [f for f in frames if f["metrics"]["flow_spout"] > 0]
-                if spout_frames:
-                    first_spout = spout_frames[0]
-                    logs.append(
-                        {
-                            "step": first_spout["step"],
-                            "time": f"{first_spout['step'] * 0.02:.2f}s",
-                            "level": "METRIC",
-                            "entity": "metrics/flow_spout",
-                            "msg": f"Spout eruption active: {first_spout['metrics']['flow_spout']:.1f} mL/s fluid discharge through spout tube.",
-                        }
-                    )
-                cutout_frames = [f for f in frames if f["metrics"]["drainage_cutout"] > 0]
-                if cutout_frames:
-                    first_cutout = cutout_frames[0]
-                    logs.append(
-                        {
-                            "step": first_cutout["step"],
-                            "time": f"{first_cutout['step'] * 0.02:.2f}s",
-                            "level": "METRIC",
-                            "entity": "metrics/drainage_cutout",
-                            "msg": f"Lid drainage cutout active: {first_cutout['metrics']['drainage_cutout']:.0f} particles draining through front hole.",
-                        }
-                    )
-                wf_frames = [f for f in frames if f["metrics"]["flow_waterfall"] > 0]
-                if wf_frames:
-                    first_wf = wf_frames[0]
-                    logs.append(
-                        {
-                            "step": first_wf["step"],
-                            "time": f"{first_wf['step'] * 0.02:.2f}s",
-                            "level": "METRIC",
-                            "entity": "metrics/drainage_waterfall",
-                            "msg": f"Perimeter waterfall cascade active: {first_wf['metrics']['flow_waterfall']:.1f} mL/s returning to reservoir.",
-                        }
-                    )
-                last_frame = frames[-1]
-                logs.append(
-                    {
-                        "step": last_frame["step"],
-                        "time": f"{last_frame['step'] * 0.02:.2f}s",
-                        "level": "INFO",
-                        "entity": f"world/{project}",
-                        "msg": f"Simulation recording cycle complete: reservoir pool volume {last_frame['metrics']['pool_volume']:.2f} L.",
-                    }
-                )
-
             payload = {
                 "status": "ok",
-                "recording": str(rrd_file),
+                "recording": str(
+                    rrd_file.relative_to(self.repo_root) if rrd_file.is_relative_to(self.repo_root) else rrd_file
+                ),
                 "frames_count": len(frames),
                 "max_steps": len(frames),
                 "frames": frames,
                 "metrics_series": metrics_series,
-                "logs": logs,
             }
 
             try:
@@ -938,4 +809,4 @@ class ScopeGeometryPipeline:
             return payload
         except Exception as err:
             self.log.exception("Failed to parse simulation telemetry from %s: %s", rrd_file, err)
-            return {"status": "error", "error": str(err), "frames_count": 0, "frames": []}
+            return {"status": "error", "error": str(err), "frames_count": 0, "frames": [], "metrics_series": {}}

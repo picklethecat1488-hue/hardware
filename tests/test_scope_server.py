@@ -1302,6 +1302,17 @@ def test_regression_bug_velvety_larva_429_metrics_panel_and_histograms(scope_ser
         assert "step" in series[m][0]
         assert "value" in series[m][0]
 
+    # Verify raw provider values are preserved without synthetic post-processing or synthetic fallback (CR 1ad2a2ce, 2819ab5a, f8ea6d99)
+    first_frame_metrics = telem["frames"][0]["metrics"]
+    assert "flow_waterfall" not in first_frame_metrics
+    assert "drainage_waterfall" in first_frame_metrics
+    assert first_frame_metrics["pool_volume"] == series["pool_volume"][0]["value"]
+
+    missing_url = f"http://127.0.0.1:{scope_server.actual_port}/api/scope/simulation_telemetry?project=nonexistent_proj&target=none"
+    missing_telem = json.loads(urllib.request.urlopen(missing_url).read().decode("utf-8"))
+    assert missing_telem["status"] == "not_found"
+    assert missing_telem["frames_count"] == 0
+
     # 2. Verify HTML template has scrubber events removed and METRICS panel with histograms
     html_url = f"http://127.0.0.1:{scope_server.actual_port}/?mode=SIMULATE"
     req_html = urllib.request.urlopen(html_url)
