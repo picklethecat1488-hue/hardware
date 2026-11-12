@@ -186,6 +186,52 @@ def test_pcb_cad_assembler_silkscreen_and_colors():
     assert item_dict["silk_board_substrate"][1] == (0.10, 0.35, 0.65)
 
 
+def test_regression_bug_jumping_aphid_570_silkscreen_text_unmirrored_orientation():
+    """Verify BUG-JUMPING-APHID-570: silkscreen text is unmirrored left-to-right on F.SilkS and flipped B.SilkS."""
+    from model.pcb import LayerType, SilkscreenTextModel, StackupLayerModel
+
+    cfg = PCBConfig(
+        name="glyph_orientation_board",
+        dimensions_mm=(30.0, 30.0, 1.6),
+        stackup=StackupModel(
+            layers=[
+                StackupLayerModel(name="F.Cu", layer_type=LayerType.SIGNAL, thickness_mm=0.035, material="copper"),
+                StackupLayerModel(name="Core", layer_type=LayerType.DIELECTRIC, thickness_mm=1.53, material="FR4"),
+                StackupLayerModel(name="B.Cu", layer_type=LayerType.SIGNAL, thickness_mm=0.035, material="copper"),
+            ],
+            finish="ENIG",
+            soldermask_color="green",
+            silkscreen_color="white",
+        ),
+        silkscreen_texts=[
+            SilkscreenTextModel(text="L", layer="F.SilkS", position=(0.0, 0.0), font_size=10.0),
+            SilkscreenTextModel(text="L", layer="B.SilkS", position=(0.0, 0.0), font_size=10.0),
+        ],
+    )
+    assembler = PCB3DAssembler(cfg)
+
+    # Glyph "L" has its vertical stem on the left and horizontal foot at the bottom.
+    # In Scope PCB view (X_screen = +X_kicad, Y_screen = -Y_kicad):
+    # - F.SilkS top view requires center.X < 0 (stem left) and center.Y > 0 (foot bottom => -Y_screen < 0).
+    silk_top = assembler.build_silkscreen("F.SilkS")
+    assert silk_top is not None
+    top_center = silk_top.children[0].center()
+    top_bb = silk_top.bounding_box()
+    assert top_center.X < -0.5, f"F.SilkS glyph 'L' mirrored horizontally: center.X={top_center.X}"
+    assert top_center.Y > 0.5, f"F.SilkS glyph 'L' flipped vertically: center.Y={top_center.Y}"
+    assert top_bb.min.Z >= 0.800
+
+    # - B.SilkS bottom view (X_screen_bottom = -X_kicad, Y_screen_bottom = -Y_kicad)
+    #   requires center.X > 0 (so -X_kicad < 0 = stem left) and center.Y > 0 (foot bottom).
+    silk_bot = assembler.build_silkscreen("B.SilkS")
+    assert silk_bot is not None
+    bot_center = silk_bot.children[0].center()
+    bot_bb = silk_bot.bounding_box()
+    assert bot_center.X > 0.5, f"B.SilkS glyph 'L' mirrored horizontally in bottom view: center.X={bot_center.X}"
+    assert bot_center.Y > 0.5, f"B.SilkS glyph 'L' flipped vertically in bottom view: center.Y={bot_center.Y}"
+    assert bot_bb.max.Z <= -0.800
+
+
 @pytest.mark.slow
 def test_carrier_board_pcb_3d_assembler_performance():
     """Verify real carrier board 3D CAD assembly synthesizes in under 5.0 seconds."""
