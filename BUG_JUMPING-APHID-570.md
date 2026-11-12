@@ -522,10 +522,6 @@ face 46 ignored
 2026-11-12 12:49:03 [INFO] scope: 127.0.0.1 - - [12/Nov/2026 12:49:03] "GET /api/scope/projects HTTP/1.1" 200 -
 ```
 
-#### Attached Commits
-
-- `689ba756`
-
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:fa3400ac --> Open carrier board PCB view in Scope and verify F.SilkS labels (e.g. STATUS, RESET, Pin 1, U1) and flipped B.SilkS labels read left-to-right without horizontal mirroring | `python tools/scope.py carrier_board/carrier_board:pcb`
