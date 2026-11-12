@@ -1,13 +1,13 @@
-# 🟢 `[BUG-EMERALD-TICK-950]` Replace LMB hold with pan and MMB with zoom in PCB and Diagram views
+# 🔴 `[BUG-EMERALD-TICK-950]` Replace LMB hold with pan and MMB with zoom in PCB and Diagram views
 
 - **UUID**: `aec7c3de-fb60-446a-bef1-6fdbd40ea64a`
 - **ID**: `BUG-EMERALD-TICK-950`
-- **Status**: `RESOLVED`
+- **Status**: `OPEN`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-12 14:37:37 UTC`
-- **Resolved**: `2026-11-12 20:46:46 UTC`
+- **Rejected**: `2026-11-12 20:46:56 UTC`
 
 #### Description
 
@@ -531,6 +531,12 @@ face 46 ignored
 - [ ] <!-- task:8deaa611 --> Open cat fountain wiring diagram or carrier board PCB in Scope, verify that click-and-drag with LMB pans the view, dragging with MMB zooms the view, and orbit controls are disabled in HUD and quickbar | `python tools/scope.py cat_fountain/wiring:diagram`
 
 #### Resolution Notes
+
+Configure LMB hold to pan, MMB to zoom, and disable orbit/rotate in HUD and toolbar in PCB and Diagram views
+-This working for me: Configure LMB hold to pan
+- I also observed orbit/rotate were still enabled
+
+#### Rejection Feedback
 
 Configure LMB hold to pan, MMB to zoom, and disable orbit/rotate in HUD and toolbar in PCB and Diagram views
 -This working for me: Configure LMB hold to pan
