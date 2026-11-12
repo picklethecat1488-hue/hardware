@@ -1,12 +1,13 @@
-# 🔴 `[BUG-SWARMING-SILVERFISH-292]` Diagram view background dark with unreadable black text and non-SVG default camera
+# 🟢 `[BUG-SWARMING-SILVERFISH-292]` Diagram view background dark with unreadable black text and non-SVG default camera
 
 - **UUID**: `cfedf9ee-42c6-4e2f-85b9-c29cb7138a3a`
 - **ID**: `BUG-SWARMING-SILVERFISH-292`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-12 00:59:06 UTC`
+- **Resolved**: `2026-11-12 01:49:50 UTC`
 
 #### Description
 
@@ -527,3 +528,11 @@ ValueError: 'cad' is not a valid Section
 | :--- | :--- | :--- |
 | `image/png` | [snapshot.png](attachments/BUG-SWARMING-SILVERFISH-292/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
 | `text/plain` | [scope.log](attachments/BUG-SWARMING-SILVERFISH-292/scope.log) | Scope workstation execution logs |
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:c3df9ee1 --> Open cat fountain wiring diagram in Scope DIAGRAM mode, verify viewport background is pure white (#ffffff), text annotations are crisp black (#000000), and camera defaults to top orthographic projection matching SVG export | `python tools/scope.py cat_fountain/wiring:diagram`
+
+#### Resolution Notes
+
+Set white background, light theme, black text annotations, and top orthographic camera for diagram view
