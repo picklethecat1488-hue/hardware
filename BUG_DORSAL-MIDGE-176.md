@@ -1,4 +1,4 @@
-# 🔴 `[BUG-DORSAL-MIDGE-176]` [carrier_board/carrier_board] Defect in PCB view
+# 🔴 `[BUG-DORSAL-MIDGE-176]` PCB layer ordering, net labels on zoom, 2D pan/zoom controls, flip orientation, and KiCad color matching
 
 - **UUID**: `aada2cfa-f536-4cf7-9764-41d9662013b0`
 - **ID**: `BUG-DORSAL-MIDGE-176`
@@ -523,10 +523,3 @@ face 46 ignored
 2026-11-12 06:39:19 [INFO] scope: 127.0.0.1 - - [12/Nov/2026 06:39:19] "GET /api/scope/load?project=carrier_board&target=carrier_board&subassembly=&mode=PCB HTTP/1.1" 200 -
 2026-11-12 06:39:19 [INFO] scope: 127.0.0.1 - - [12/Nov/2026 06:39:19] "GET /api/scope/projects HTTP/1.1" 200 -
 ```
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-DORSAL-MIDGE-176/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
-| `text/plain` | [scope.log](attachments/BUG-DORSAL-MIDGE-176/scope.log) | Scope workstation execution logs |

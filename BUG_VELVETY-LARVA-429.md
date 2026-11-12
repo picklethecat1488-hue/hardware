@@ -1,4 +1,4 @@
-# 🔴 `[BUG-VELVETY-LARVA-429]` [cat_fountain/product] Defect in SIMULATE view
+# 🔴 `[BUG-VELVETY-LARVA-429]` Replace simulation timeline events and logs with METRICS panel and histograms
 
 - **UUID**: `a53de247-8838-4879-8ea0-cf2e30c7e3fc`
 - **ID**: `BUG-VELVETY-LARVA-429`

@@ -1,4 +1,4 @@
-# 🔴 `[BUG-EMERALD-TICK-950]` [cat_fountain/wiring] Defect in DIAGRAM view
+# 🔴 `[BUG-EMERALD-TICK-950]` Replace LMB hold with pan and MMB with zoom in PCB and Diagram views
 
 - **UUID**: `aec7c3de-fb60-446a-bef1-6fdbd40ea64a`
 - **ID**: `BUG-EMERALD-TICK-950`
@@ -520,10 +520,3 @@ face 46 ignored
 2026-11-12 06:36:01 [INFO] scope: 127.0.0.1 - - [12/Nov/2026 06:36:01] "GET /api/scope/load?project=cat_fountain&target=wiring&subassembly=&mode=DIAGRAM HTTP/1.1" 200 -
 2026-11-12 06:36:02 [INFO] scope: 127.0.0.1 - - [12/Nov/2026 06:36:02] "GET /api/scope/projects HTTP/1.1" 200 -
 ```
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-EMERALD-TICK-950/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
-| `text/plain` | [scope.log](attachments/BUG-EMERALD-TICK-950/scope.log) | Scope workstation execution logs |

@@ -1,4 +1,4 @@
-# 🔴 `[BUG-CREEPING-SCORPION-866]` [carrier_board/carrier_board] Defect in PCB view
+# 🔴 `[BUG-CREEPING-SCORPION-866]` Inaccurate click raycasting and entity picking for pads, traces, vias, and test points in PCB view
 
 - **UUID**: `42818030-2ca7-490c-9833-d157509017c3`
 - **ID**: `BUG-CREEPING-SCORPION-866`
@@ -520,10 +520,3 @@ face 46 ignored
 2026-11-12 06:39:19 [INFO] scope: 127.0.0.1 - - [12/Nov/2026 06:39:19] "GET /api/scope/projects HTTP/1.1" 200 -
 2026-11-12 06:41:48 [INFO] scope: 127.0.0.1 - - [12/Nov/2026 06:41:48] "POST /api/scope/target_bug HTTP/1.1" 200 -
 ```
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-CREEPING-SCORPION-866/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
-| `text/plain` | [scope.log](attachments/BUG-CREEPING-SCORPION-866/scope.log) | Scope workstation execution logs |
