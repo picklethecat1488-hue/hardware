@@ -522,13 +522,6 @@ ValueError: 'cad' is not a valid Section
 2026-11-11 16:58:16 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 16:58:16] "GET /api/scope/load?project=cat_fountain&target=wiring&subassembly=&mode=DIAGRAM HTTP/1.1" 200 -
 ```
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-SWARMING-SILVERFISH-292/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
-| `text/plain` | [scope.log](attachments/BUG-SWARMING-SILVERFISH-292/scope.log) | Scope workstation execution logs |
-
 #### Attached Commits
 
 - `3404dd39`

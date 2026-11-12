@@ -527,12 +527,6 @@ face 46 ignored
 2026-11-11 15:10:03 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 15:10:03] "GET /api/scope/load?project=carrier_board&target=product&subassembly=&mode=CAD HTTP/1.1" 200 -
 ```
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `document` | [scope_1.log](attachments/BUG-LUSTROUS-CICADA-558/scope_1.log) | Uploaded document scope.log |
-
 #### Attached Commits
 
 - `a006ca95`

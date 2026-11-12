@@ -17,10 +17,6 @@ I think the viewport is still messed up in PCB view. Silkscreen text is flipped 
 
 1. python tools/scope.py carrier_board/carrier_board:pcb
 
-#### Review Tasks & Functional Checklist
-
-- [ ] <!-- task:e9fa18c0 --> Open carrier board in Scope PCB mode, verify silkscreen text is right-reading and oriented matching KiCad CAM layout, and verify clicking PCB components/pads/traces selects them in Inspect view | `python tools/scope.py carrier_board/carrier_board:pcb`
-
 #### Execution / Console Logs
 
 ```text
@@ -525,6 +521,10 @@ face 46 ignored
 2026-11-11 16:50:44 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 16:50:44] "GET /api/scope/load?project=carrier_board&target=carrier_board&subassembly=&mode=PCB HTTP/1.1" 200 -
 2026-11-11 16:50:44 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 16:50:44] "GET /api/scope/projects HTTP/1.1" 200 -
 ```
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:e9fa18c0 --> Open carrier board in Scope PCB mode, verify silkscreen text is right-reading and oriented matching KiCad CAM layout, and verify clicking PCB components/pads/traces selects them in Inspect view | `python tools/scope.py carrier_board/carrier_board:pcb`
 
 #### Resolution Notes
 
