@@ -7,7 +7,7 @@
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-12 01:01:10 UTC`
-- **Resolved**: `2026-11-12 01:55:33 UTC`
+- **Resolved**: `2026-11-12 14:38:57 UTC`
 
 #### Description
 
@@ -540,3 +540,5 @@ face 46 ignored
 #### Resolution Notes
 
 Eliminate particle shimmer with circular soft sprite and velocity color ramp, fix playback control overlap with nowrap layout, add Save .rrd button, and genericize rerun events
+
+-I still see shimmering, I think the particles are too small. Can you repro this on the CLI?
