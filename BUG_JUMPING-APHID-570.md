@@ -520,10 +520,3 @@ face 46 ignored
 2026-11-12 12:49:03 [INFO] scope: 127.0.0.1 - - [12/Nov/2026 12:49:03] "GET /api/scope/load?project=carrier_board&target=carrier_board&subassembly=&mode=PCB HTTP/1.1" 200 -
 2026-11-12 12:49:03 [INFO] scope: 127.0.0.1 - - [12/Nov/2026 12:49:03] "GET /api/scope/projects HTTP/1.1" 200 -
 ```
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-JUMPING-APHID-570/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
-| `text/plain` | [scope.log](attachments/BUG-JUMPING-APHID-570/scope.log) | Scope workstation execution logs |

@@ -520,10 +520,3 @@ face 46 ignored
 [2m2026-11-12T20:44:08.395602Z[0m [33m WARN[0m [2mre_sorbet::sorbet_schema[0m[2m:[0m Sorbet batch version mismatch. Expected 0.1.3, got "0.1.4"
 2026-11-12 12:44:14 [INFO] scope: 127.0.0.1 - - [12/Nov/2026 12:44:14] "GET /api/scope/simulation_telemetry?project=cat_fountain&target=product HTTP/1.1" 200 -
 ```
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-CHITINOUS-GRUB-712/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
-| `text/plain` | [scope.log](attachments/BUG-CHITINOUS-GRUB-712/scope.log) | Scope workstation execution logs |

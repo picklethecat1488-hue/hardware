@@ -525,13 +525,6 @@ face 46 ignored
 2026-11-12 06:43:16 [INFO] scope: 127.0.0.1 - - [12/Nov/2026 06:43:16] "POST /api/scope/open_rerun?project=cat_fountain&target=product HTTP/1.1" 200 -
 ```
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-VELVETY-LARVA-429/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
-| `text/plain` | [scope.log](attachments/BUG-VELVETY-LARVA-429/scope.log) | Scope workstation execution logs |
-
 #### Attached Commits
 
 - `85668294`
