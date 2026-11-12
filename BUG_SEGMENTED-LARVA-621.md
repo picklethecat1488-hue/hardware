@@ -2,12 +2,13 @@
 
 - **UUID**: `b7325193-dee2-4129-9601-7f19c4e51981`
 - **ID**: `BUG-SEGMENTED-LARVA-621`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 23:05:20 UTC`
 - **Resolved**: `2026-11-12 00:55:01 UTC`
+- **Accepted**: `2026-11-12 00:55:09 UTC`
 
 #### Description
 
