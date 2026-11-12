@@ -2,12 +2,13 @@
 
 - **UUID**: `2839254b-278b-4212-8359-c0c6e6ab0c84`
 - **ID**: `BUG-ARMORED-LEAFHOPPER-983`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `daemon`
 - **Created**: `2026-11-12 17:48:20 UTC`
 - **Resolved**: `2026-11-12 20:52:07 UTC`
+- **Accepted**: `2026-11-12 20:52:17 UTC`
 
 #### Description
 
