@@ -1,6 +1,7 @@
 """Integration tests for CAD/PCB Scope HTTP Server and Target Bug API."""
 
 import gzip
+from html.parser import HTMLParser
 import json
 import logging
 import os
@@ -704,3 +705,50 @@ def test_regression_bug_tarsial_termite_773_cad_target_loading_and_lock_replacem
         "Prior Scope instance must be stopped when launching a new target"
     )
     assert len(spawned_cmds) == 1, "New Scope detached server must be spawned for the requested target"
+
+
+def test_regression_bug_emerald_tick_950_2d_mode_initial_dom_state(scope_server):
+    """Verify BUG-EMERALD-TICK-950: DIAGRAM and PCB UI responses set initial 2D body classes and mode pills."""
+
+    class ModeDomParser(HTMLParser):
+        """Extract body classes, active top-HUD mode pills, and element IDs from rendered Scope HTML."""
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.body_classes: list[str] = []
+            self.active_modes: list[str] = []
+            self.element_ids: set[str] = set()
+            self._in_modal = False
+
+        def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+            attr_map = dict(attrs)
+            el_id = attr_map.get("id")
+            if el_id:
+                self.element_ids.add(el_id)
+                if el_id == "modal-project-chooser":
+                    self._in_modal = True
+            classes = (attr_map.get("class") or "").split()
+            if tag == "body":
+                self.body_classes = classes
+            if tag == "button" and not self._in_modal and "mode-pill" in classes and "active" in classes:
+                data_mode = attr_map.get("data-mode")
+                if data_mode:
+                    self.active_modes.append(data_mode)
+
+    for mode, expected_body_class in (("DIAGRAM", "mode-diagram"), ("PCB", "mode-pcb"), ("CAD", "mode-cad")):
+        ui_url = f"http://127.0.0.1:{scope_server.actual_port}/?project=cat_fountain&target=wiring&mode={mode}"
+        html = urllib.request.urlopen(ui_url).read().decode("utf-8")
+        parser = ModeDomParser()
+        parser.feed(html)
+        assert expected_body_class in parser.body_classes
+        assert parser.active_modes == [mode]
+        for required_id in (
+            "explode-section",
+            "hud-row-orbit",
+            "hud-row-front",
+            "hud-row-right",
+            "hud-row-top",
+            "hud-row-ortho",
+            "hud-row-iso",
+        ):
+            assert required_id in parser.element_ids
