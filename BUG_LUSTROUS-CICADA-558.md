@@ -1,12 +1,13 @@
-# 🔴 `[BUG-LUSTROUS-CICADA-558]` CAD viewport mouse raycasting and object selection coordinates offset (carrier_board)
+# 🟢 `[BUG-LUSTROUS-CICADA-558]` CAD viewport mouse raycasting and object selection coordinates offset (carrier_board)
 
 - **UUID**: `dfaa3b31-f742-4aa2-8608-6848ded89564`
 - **ID**: `BUG-LUSTROUS-CICADA-558`
-- **Status**: `OPEN`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-11 23:11:29 UTC`
+- **Accepted**: `2026-11-12 01:01:33 UTC`
 - **Rejected**: `2026-11-12 00:57:10 UTC`
 
 #### Description
