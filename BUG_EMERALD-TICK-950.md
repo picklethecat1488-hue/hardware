@@ -1,12 +1,13 @@
-# 🔴 `[BUG-EMERALD-TICK-950]` Replace LMB hold with pan and MMB with zoom in PCB and Diagram views
+# 🟢 `[BUG-EMERALD-TICK-950]` Replace LMB hold with pan and MMB with zoom in PCB and Diagram views
 
 - **UUID**: `aec7c3de-fb60-446a-bef1-6fdbd40ea64a`
 - **ID**: `BUG-EMERALD-TICK-950`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-12 14:37:37 UTC`
+- **Resolved**: `2026-11-12 22:10:47 UTC`
 - **Rejected**: `2026-11-12 20:46:56 UTC`
 
 #### Description
@@ -532,9 +533,7 @@ face 46 ignored
 
 #### Resolution Notes
 
-Configure LMB hold to pan, MMB to zoom, and disable orbit/rotate in HUD and toolbar in PCB and Diagram views
--This working for me: Configure LMB hold to pan
-- I also observed orbit/rotate were still enabled
+Configured underlying Three.js CADTrackballControls/CADOrbitControls (r.controls.controls) in PCB and DIAGRAM modes with noRotate=true, enableRotate=false, staticMoving=true, and mouseButtons={LEFT: PAN, MIDDLE: DOLLY/ZOOM, RIGHT: PAN}; disabled 3D camera presets, ortho toggle, and orbit shortcuts across quickbar, sidebar, HUD, and keyboard handlers.
 
 #### Rejection Feedback
 
