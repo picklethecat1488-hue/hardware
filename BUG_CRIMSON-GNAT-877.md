@@ -2,12 +2,13 @@
 
 - **UUID**: `e9402466-d500-4551-9cfb-8da203f66b13`
 - **ID**: `BUG-CRIMSON-GNAT-877`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-12 20:50:05 UTC`
 - **Resolved**: `2026-11-12 22:27:55 UTC`
+- **Accepted**: `2026-11-12 22:28:06 UTC`
 
 #### Description
 
