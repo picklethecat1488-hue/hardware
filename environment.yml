@@ -35,3 +35,4 @@ dependencies:
     - cbor2
     - eel
     - pywebview
+    - oxlint

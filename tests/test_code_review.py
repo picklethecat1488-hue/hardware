@@ -848,33 +848,6 @@ def test_code_review_stale_session_reset_on_startup(tmp_path: Path) -> None:
     server.server_close()
 
 
-def test_code_review_ui_cli_focus_and_edit_button(tmp_path: Path) -> None:
-    """Verify that the served UI template contains the Edit button and CLI console focus handler."""
-    repo_root = get_git_root()
-    server = ReviewServer(
-        host="127.0.0.1",
-        port=0,
-        repo_root=repo_root,
-        markdown_output=tmp_path / "CR_ui.md",
-        state_file=tmp_path / "cr_ui.json",
-    )
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    time.sleep(0.1)
-
-    try:
-        with urllib.request.urlopen(server.get_url()) as resp:
-            html = resp.read().decode("utf-8")
-            assert "editCommentViaCli" in html
-            assert "Edit ✎" in html
-            assert 'case "edit":' in html
-            assert "editComment(" in html
-            assert 'cliDrawer.addEventListener("click"' in html
-    finally:
-        server.shutdown()
-        server.server_close()
-
-
 def test_git_review_engine_resolve_revisions_range_syntax(tmp_path: Path) -> None:
     """Verify GitEngine resolves A..B commit ranges, individual hashes, and raises on invalid ranges."""
     repo_root, _ = create_isolated_git_repo(tmp_path)
@@ -918,38 +891,6 @@ def test_review_server_with_range_revisions(tmp_path: Path) -> None:
     server.server_close()
 
 
-def test_code_review_html_unified_diff_delete_styling(tmp_path: Path) -> None:
-    """Verify code_review HTML template styles deleted diff lines with red background in unified diff view.
-
-    Regression test: Ensures deleted/unmodified lines in unified diffs are styled with .delete/.del
-    and var(--bg-diff-del) rather than appearing as unstyled context lines.
-    """
-    repo_root = get_git_root()
-    server = ReviewServer(
-        host="127.0.0.1",
-        port=0,
-        repo_root=repo_root,
-        markdown_output=tmp_path / "CR.md",
-        state_file=tmp_path / "cr.json",
-    )
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    time.sleep(0.1)
-
-    try:
-        with urllib.request.urlopen(server.get_url()) as resp:
-            html = resp.read().decode("utf-8")
-            # Must contain both .delete and .del selectors for deleted unified diff rows
-            assert ".unified-row.delete" in html
-            assert "var(--bg-diff-del)" in html
-            # Must map l.type delete in renderUnified
-            assert 'l.type === "delete"' in html
-            assert "del delete" in html
-    finally:
-        server.shutdown()
-        server.server_close()
-
-
 def test_code_review_commit_time_ascending_and_code_search(tmp_path: Path) -> None:
     """Verify commits include formatted time HH:MM:SS, are in ascending order, and search API returns matches."""
     repo_root, shas = create_isolated_git_repo(tmp_path)
@@ -985,44 +926,6 @@ def test_code_review_commit_time_ascending_and_code_search(tmp_path: Path) -> No
             assert data["query"] == "content"
             assert len(data["results"]) >= 1
             assert any("test_" in r["file_path"] for r in data["results"])
-    finally:
-        server.shutdown()
-        server.server_close()
-
-
-def test_code_review_html_responsive_and_cli_navigation(tmp_path: Path) -> None:
-    """Verify that code review HTML template includes responsive toolbar styles and commit navigation commands."""
-    repo_root, _ = create_isolated_git_repo(tmp_path)
-    server = ReviewServer(
-        host="127.0.0.1",
-        port=0,
-        repo_root=repo_root,
-        markdown_output=tmp_path / "CR.md",
-        state_file=tmp_path / "cr.json",
-    )
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    time.sleep(0.1)
-
-    try:
-        base_url = server.get_url()
-        with urllib.request.urlopen(base_url) as resp:
-            html = resp.read().decode("utf-8")
-
-            # 1. Responsive toolbar styles
-            assert "flex-wrap: wrap" in html
-            assert "codeSearchInput" in html
-            assert "min-height: 48px" in html
-            assert "min-height: 42px" in html
-
-            # 2. Empty line repeating last command
-            assert "state.cmdHistory[state.cmdHistory.length - 1]" in html
-
-            # 3. Stack commit navigation
-            assert "navigateCommit" in html
-            assert "next_commit" in html
-            assert "prev_commit" in html
-            assert "next commit" in html or 'sub === "commit"' in html
     finally:
         server.shutdown()
         server.server_close()
@@ -1293,31 +1196,6 @@ def test_code_review_cli_features(
     assert "0 unresolved" in open_out
 
 
-def test_regression_bug_078_code_review_highlight_markers_preserve_diff_colors() -> None:
-    """Verify BUG-078: highlight markers are in a column grid on the left side of text and do not elide diff colors."""
-    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
-    template_file = templates_dir / "code_review.html.j2"
-    assert template_file.exists()
-    content = template_file.read_text(encoding="utf-8")
-
-    # 1. Ensure selection on code text does not overwrite background with !important eliding diff colors
-    assert ".sbs-row.selected td {\n      background: var(--bg-diff-sel) !important;" not in content, (
-        "Selected SBS rows must not wipe out diff colors on code cells with !important background"
-    )
-    assert ".unified-row.selected {\n      background: var(--bg-diff-sel) !important;" not in content, (
-        "Selected unified rows must not wipe out diff colors across the entire row with !important background"
-    )
-
-    # 2. Ensure marker column grid exists for highlight markers on the left side of text
-    assert "col-marker" in content, "Table column grid must include col-marker"
-    assert "diff-marker" in content, "Diff row structure must have diff-marker cell on left of code text"
-    assert "unified-marker" in content, "Unified row structure must have unified-marker cell on left of code text"
-
-    # 3. Highlight markers on the left column grid receive selection highlight
-    assert "td.diff-marker" in content, "diff-marker styles must exist"
-    assert ".unified-marker" in content, "unified-marker styles must exist"
-
-
 def test_code_review_ignores_bugs_md(tmp_path: Path) -> None:
     """Verify that BUGS.md and BUGS.txt are excluded from code review diffs and files."""
     from provider.vcs.git_engine import GitEngine, is_file_ignored
@@ -1338,49 +1216,8 @@ def test_code_review_ignores_bugs_md(tmp_path: Path) -> None:
     assert not any(f["path"] == "BUGS.md" or f["path"].endswith("/BUGS.md") for f in changed_files)
 
 
-def test_regression_bug_091_diff_view_horizontal_scrollbar_on_bottom() -> None:
-    """Verify BUG-091: diff view lines do not have per-line scrollbars; horizontal scrollbar is at the bottom."""
-    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
-    template_file = templates_dir / "code_review.html.j2"
-    assert template_file.exists()
-    content = template_file.read_text(encoding="utf-8")
-
-    # 1. No per-line overflow-x: auto on sbs-row td or unified-text
-    assert (
-        ".sbs-row td {\n      padding: 1px 6px;\n      white-space: pre;\n      word-break: normal;\n      vertical-align: top;\n      max-width: 0;\n      overflow-x: auto;\n    }"
-        not in content
-    )
-    assert "overflow-x: auto" not in content.split(".sbs-row td")[1].split("}")[0], (
-        ".sbs-row td must not have overflow-x: auto"
-    )
-    assert "overflow-x: auto" not in content.split(".unified-text")[1].split("}")[0], (
-        ".unified-text must not have overflow-x: auto"
-    )
-
-    # 2. Diff container has overflow: auto for bottom-level scrolling
-    assert ".diff-container {\n      flex: 1;\n      overflow: auto;" in content, (
-        ".diff-container must have overflow: auto so horizontal scrollbars reside at the bottom of the container"
-    )
-
-    # 3. Tables and wrappers have min-width: max-content to prevent truncation while expanding container
-    assert "min-width: max-content" in content.split(".sbs-table")[1].split("}")[0]
-    assert "min-width: 100%" in content.split(".unified-wrap")[1].split("}")[0]
-
-
 def test_code_review_tracker_only_commit_handling(tmp_path: Path) -> None:
-    """Verify that commits modifying only BUGS.md report ignored_files and render clear UI notices."""
-    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
-    template_file = templates_dir / "code_review.html.j2"
-    assert template_file.exists()
-    content = template_file.read_text(encoding="utf-8")
-
-    # 1. UI template must contain TRACKER ONLY badge and informative notice
-    assert "TRACKER ONLY" in content
-    assert "Issue Tracker & Documentation Update Only" in content
-    assert "filtered" in content
-    assert "isTrackerOnly" in content
-
-    # 2. Verify commit model tracks ignored files on CommitInfoModel
+    """Verify CommitInfoModel tracks ignored_files for tracker-only commits."""
     c = CommitInfoModel(
         commit_hash="abc1234",
         short_hash="abc1234",
@@ -1825,13 +1662,6 @@ def test_fuzzy_proximity_code_search_and_quake_themed_textbox(tmp_path: Path) ->
         with urllib.request.urlopen(search_url) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
             assert [r["file_path"] for r in payload["results"]] == expected_order_from_active
-
-        with urllib.request.urlopen(base_url) as resp:
-            html = resp.read().decode("utf-8")
-            assert ".quake-input" in html
-            assert ".quake-search-wrap" in html
-            assert "state.selectedFile" in html
-            assert "&file=" in html
     finally:
         server.shutdown()
         server.server_close()

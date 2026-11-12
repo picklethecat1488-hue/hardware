@@ -32,7 +32,7 @@
   <script src="/static/highlight.min.js"></script>
   <script>
     if (typeof hljs === 'undefined') {
-      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"><\/script>');
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"><' + '/script>');
     }
   </script>
   <style>
@@ -3318,7 +3318,7 @@
       modal.style.display = "none";
       if (iframe) iframe.src = "about:blank";
       document.body.style.overflow = "";
-      fetchSession(false);
+      syncWorkingAndCommitsSilently();
     }
     window.closeWorkstationModal = closeWorkstationModal;
 

@@ -15,7 +15,10 @@ ruff format --check .
 # 4. Check linting rules
 ruff check .
 
-# 5. Run the fast test suite (excludes slow tests)
+# 5. Check JavaScript compilation & lint rules
+python tools/validate_js.py
+
+# 6. Run the fast test suite (excludes slow tests)
 pytest
 ```
 

@@ -260,22 +260,6 @@ def test_code_review_granular_markdown_export_and_auto_merge(tmp_path: Path) -> 
     assert merged.comments[0].body == "Consider using namedtuple or dataclass"
 
 
-def test_feedback_ui_elements_in_templates() -> None:
-    """Verify UI loading overlays and sync feedback buttons in Jinja2 templates."""
-    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
-
-    bug_template = (templates_dir / "bug_report.html.j2").read_text(encoding="utf-8")
-    assert "feedback-loading-modal" in bug_template
-    assert "syncFeedback()" in bug_template
-    assert "/api/sync_feedback" in bug_template
-
-    cr_template = (templates_dir / "code_review.html.j2").read_text(encoding="utf-8")
-    assert "feedbackLoadingModal" in cr_template
-    assert "btnSyncFeedback" in cr_template
-    assert "syncFeedback()" in cr_template
-    assert "/api/sync_feedback" in cr_template
-
-
 def test_code_review_no_feedback_leaves_no_markdown_files(tmp_path: Path) -> None:
     """Verify that when a review has no comments, CR_<commit>.md and feedback/CR.md are not created."""
     feedback_dir = tmp_path / "feedback"

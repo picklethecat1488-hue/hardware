@@ -1,0 +1,31 @@
+{
+  "env": {
+    "browser": true,
+    "es2024": true
+  },
+  "globals": {
+    "hljs": "readonly",
+    "eel": "readonly"
+  },
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "no-undef": "error",
+    "no-unreachable": "error",
+    "no-dupe-keys": "error",
+    "no-redeclare": "error",
+    "no-const-assign": "error",
+    "no-func-assign": "error",
+    "no-import-assign": "error",
+    "no-self-assign": "error",
+    "valid-typeof": "error",
+    "no-constant-condition": ["error", { "checkLoops": false }],
+    "no-control-regex": "off",
+    "no-unused-vars": "off"
+  },
+  "ignorePatterns": [
+    "**/highlight.min.js",
+    "**/three-cad-viewer.esm.js"
+  ]
+}
