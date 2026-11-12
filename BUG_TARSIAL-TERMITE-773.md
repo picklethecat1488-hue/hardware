@@ -2,12 +2,13 @@
 
 - **UUID**: `6a4a5316-242c-4b8f-b520-73300d26e1ff`
 - **ID**: `BUG-TARSIAL-TERMITE-773`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `CRITICAL`
 - **Category**: `CAD`
 - **Component**: `scope`
 - **Created**: `2026-11-12 18:51:22 UTC`
 - **Resolved**: `2026-11-12 20:54:36 UTC`
+- **Accepted**: `2026-11-12 20:54:47 UTC`
 
 #### Description
 
