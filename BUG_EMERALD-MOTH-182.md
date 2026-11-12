@@ -2,12 +2,13 @@
 
 - **UUID**: `bafe9f8c-d857-4073-b343-7cd1a5ed5f72`
 - **ID**: `BUG-EMERALD-MOTH-182`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `UI`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-12 17:40:50 UTC`
 - **Resolved**: `2026-11-12 18:12:34 UTC`
+- **Accepted**: `2026-11-12 20:51:13 UTC`
 - **Rejected**: `2026-11-12 17:57:13 UTC`
 
 #### Description
