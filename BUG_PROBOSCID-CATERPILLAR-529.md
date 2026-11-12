@@ -1,12 +1,13 @@
-# 🔴 `[BUG-PROBOSCID-CATERPILLAR-529]` Add button in inspect view to open KiCad PCB project (carrier_board)
+# 🟢 `[BUG-PROBOSCID-CATERPILLAR-529]` Add button in inspect view to open KiCad PCB project (carrier_board)
 
 - **UUID**: `a4fba4d7-e56a-47d0-8be5-11174c7bcba1`
 - **ID**: `BUG-PROBOSCID-CATERPILLAR-529`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-12 01:12:02 UTC`
+- **Resolved**: `2026-11-12 03:13:11 UTC`
 
 #### Description
 
@@ -521,9 +522,6 @@ face 46 ignored
 2026-11-11 17:10:39 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 17:10:39] "GET /api/scope/load?project=carrier_board&target=carrier_board&subassembly=&mode=PCB HTTP/1.1" 200 -
 ```
 
-#### Attachments & References
+#### Resolution Notes
 
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-PROBOSCID-CATERPILLAR-529/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
-| `text/plain` | [scope.log](attachments/BUG-PROBOSCID-CATERPILLAR-529/scope.log) | Scope workstation execution logs |
+Add Open in KiCad button in Inspect view header and backend handler to launch KiCad with carrier board project
