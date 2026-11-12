@@ -2,12 +2,13 @@
 
 - **UUID**: `39dd20f4-30de-464e-b9d4-b9ff827ed856`
 - **ID**: `BUG-SPRINGING-GRUB-126`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 23:22:45 UTC`
 - **Resolved**: `2026-11-12 01:01:49 UTC`
+- **Accepted**: `2026-11-12 01:01:57 UTC`
 
 #### Description
 
