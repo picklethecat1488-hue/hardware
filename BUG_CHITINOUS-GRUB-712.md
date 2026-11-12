@@ -520,3 +520,7 @@ face 46 ignored
 [2m2026-11-12T20:44:08.395602Z[0m [33m WARN[0m [2mre_sorbet::sorbet_schema[0m[2m:[0m Sorbet batch version mismatch. Expected 0.1.3, got "0.1.4"
 2026-11-12 12:44:14 [INFO] scope: 127.0.0.1 - - [12/Nov/2026 12:44:14] "GET /api/scope/simulation_telemetry?project=cat_fountain&target=product HTTP/1.1" 200 -
 ```
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:a4f505d1 --> Open cat_fountain simulation in Scope and verify water particles play smoothly without cross-bowl jumping or white streak artifacts, matching Rerun Viewer | `python tools/scope.py cat_fountain/product:simulate`
