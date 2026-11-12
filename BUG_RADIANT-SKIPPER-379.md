@@ -2,12 +2,13 @@
 
 - **UUID**: `ba1a0115-bea3-405a-bc29-4b4dc60cf46b`
 - **ID**: `BUG-RADIANT-SKIPPER-379`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `HIGH`
 - **Category**: `UI`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-12 18:04:04 UTC`
 - **Resolved**: `2026-11-12 20:53:06 UTC`
+- **Accepted**: `2026-11-12 20:53:17 UTC`
 
 #### Description
 
