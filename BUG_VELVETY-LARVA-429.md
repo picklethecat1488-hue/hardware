@@ -2,12 +2,13 @@
 
 - **UUID**: `a53de247-8838-4879-8ea0-cf2e30c7e3fc`
 - **ID**: `BUG-VELVETY-LARVA-429`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `CRITICAL`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-12 14:46:44 UTC`
 - **Resolved**: `2026-11-12 20:51:43 UTC`
+- **Accepted**: `2026-11-12 20:51:53 UTC`
 
 #### Description
 
