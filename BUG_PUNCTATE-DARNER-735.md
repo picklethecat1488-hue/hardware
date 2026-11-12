@@ -2,12 +2,13 @@
 
 - **UUID**: `3b039707-7c67-4406-bcbc-baa9b6fee23b`
 - **ID**: `BUG-PUNCTATE-DARNER-735`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 23:13:47 UTC`
 - **Resolved**: `2026-11-12 00:59:20 UTC`
+- **Accepted**: `2026-11-12 00:59:28 UTC`
 
 #### Description
 
