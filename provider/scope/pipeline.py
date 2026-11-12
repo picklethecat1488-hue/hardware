@@ -9,6 +9,7 @@ import threading
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+import numpy as np
 import orjson
 from pydantic import BaseModel, Field
 
@@ -39,6 +40,18 @@ from model.scope import (
 
 class ScopeGeometryPipeline:
     """Manages project discovery, geometry resolution, and tessellation caching."""
+
+    SIM_TELEMETRY_CACHE_VERSION = "v3"
+    MAX_TELEMETRY_PARTICLES = 4000
+    MM_PER_METER = 1000.0
+    DEFAULT_PARTICLE_RADIUS_MM = 2.0
+    SPATIAL_HASH_QUANT_MM = 0.5
+    HASH_PRIME_X = 73856093
+    HASH_PRIME_Y = 19349663
+    HASH_PRIME_Z = 83492791
+    HASH_MIX_MULT = 2654435761
+    UINT32_MAX = 0xFFFFFFFF
+    DEFAULT_WATER_RGBA = [0.502, 0.800, 1.000, 0.750]
 
     def __init__(
         self,
@@ -694,7 +707,7 @@ class ScopeGeometryPipeline:
 
     def load_simulation_telemetry(self, project: str, target: str) -> Dict[str, Any]:
         """Extract authentic fluid particle positions and raw provider metrics dynamically from Rerun recordings."""
-        cache_key = f"{project}_{target}_sim_telemetry_v2"
+        cache_key = f"{project}_{target}_sim_telemetry_{self.SIM_TELEMETRY_CACHE_VERSION}"
         cache_file = self.cache_dir / f"{cache_key}.json.gz"
 
         with self._lock:
@@ -764,31 +777,113 @@ class ScopeGeometryPipeline:
                 for m_name, val in m_dict.items():
                     metrics_series.setdefault(m_name, []).append({"step": step, "value": val})
 
-            frames = []
+            raw_frames: List[Tuple[int, np.ndarray, Optional[np.ndarray]]] = []
+            radius_mm = self.DEFAULT_PARTICLE_RADIUS_MM
+            uniform_u32_colors: set[int] = set()
+            has_varying_colors = False
+
             for c in particle_chunks:
                 rb = c.to_record_batch()
-                step = int(rb["step"].to_pylist()[0])
-                raw_pos = rb["Points3D:positions"].to_pylist()[0]
-                stride = max(1, len(raw_pos) // 600)
-                sampled = [
-                    [round(p[0] * 1000.0, 2), round(p[1] * 1000.0, 2), round(p[2] * 1000.0, 2)]
-                    for p in raw_pos[::stride][:600]
-                ]
-                frames.append(
-                    {
-                        "step": step,
-                        "positions": sampled,
-                        "metrics": dict(metrics_by_step.get(step, {})),
-                    }
-                )
+                step = int(rb["step"][0].as_py())
+                pos_col = rb["Points3D:positions"]
+                pos_mm = pos_col.values.values.to_numpy().reshape(-1, 3) * self.MM_PER_METER
 
-            frames.sort(key=lambda f: f["step"])
+                col_u32: Optional[np.ndarray] = None
+                if "Points3D:colors" in rb.schema.names:
+                    col_arr = rb["Points3D:colors"].values.to_numpy()
+                    if len(col_arr) > 0:
+                        first_c = int(col_arr[0])
+                        if not has_varying_colors and bool(np.all(col_arr == col_arr[0])):
+                            uniform_u32_colors.add(first_c)
+                            if len(uniform_u32_colors) > 1:
+                                has_varying_colors = True
+                                col_u32 = col_arr
+                        else:
+                            has_varying_colors = True
+                            col_u32 = col_arr
+
+                if radius_mm == self.DEFAULT_PARTICLE_RADIUS_MM and "Points3D:radii" in rb.schema.names:
+                    rad_arr = rb["Points3D:radii"].values.to_numpy()
+                    if len(rad_arr) > 0:
+                        radius_mm = round(float(rad_arr[0]) * self.MM_PER_METER, 3)
+
+                raw_frames.append((step, pos_mm, col_u32))
+
+            raw_frames.sort(key=lambda item: item[0])
+            counts = [len(pos_mm) for _, pos_mm, _ in raw_frames if len(pos_mm) > 0]
+            max_count = max(counts) if counts else 0
+            is_lagrangian = len(counts) > 0 and len(set(counts)) == 1
+
+            default_color = list(self.DEFAULT_WATER_RGBA)
+            if not has_varying_colors and len(uniform_u32_colors) == 1:
+                u32 = next(iter(uniform_u32_colors))
+                r_ch = ((u32 >> 24) & 0xFF) / 255.0
+                g_ch = ((u32 >> 16) & 0xFF) / 255.0
+                b_ch = ((u32 >> 8) & 0xFF) / 255.0
+                a_ch = (u32 & 0xFF) / 255.0
+                default_color = [round(r_ch, 4), round(g_ch, 4), round(b_ch, 4), round(a_ch, 4)]
+
+            fixed_lagrangian_idx: Optional[np.ndarray] = None
+            hash_threshold = self.UINT32_MAX
+            if max_count > self.MAX_TELEMETRY_PARTICLES:
+                if is_lagrangian:
+                    fixed_lagrangian_idx = np.linspace(0, max_count - 1, self.MAX_TELEMETRY_PARTICLES, dtype=np.int64)
+                else:
+                    hash_threshold = int(self.UINT32_MAX * (self.MAX_TELEMETRY_PARTICLES / float(max_count)))
+
+            frames = []
+            for step, pos_mm, col_u32 in raw_frames:
+                n_pts = len(pos_mm)
+                if n_pts == 0:
+                    sampled_pos = []
+                    sampled_cols = None
+                elif max_count <= self.MAX_TELEMETRY_PARTICLES:
+                    sampled_pos = np.round(pos_mm, 2).tolist()
+                    sampled_cols = col_u32
+                elif is_lagrangian and fixed_lagrangian_idx is not None:
+                    sampled_pos = np.round(pos_mm[fixed_lagrangian_idx], 2).tolist()
+                    sampled_cols = col_u32[fixed_lagrangian_idx] if col_u32 is not None else None
+                else:
+                    # Deterministic 3D spatial hash on quantized coordinates so Eulerian LBM
+                    # lattice cells remain 100% temporally stable instead of jumping on count changes.
+                    q = np.rint(pos_mm / self.SPATIAL_HASH_QUANT_MM).astype(np.int64) & self.UINT32_MAX
+                    h = (
+                        np.bitwise_xor(
+                            np.bitwise_xor(q[:, 0] * self.HASH_PRIME_X, q[:, 1] * self.HASH_PRIME_Y),
+                            q[:, 2] * self.HASH_PRIME_Z,
+                        )
+                        & self.UINT32_MAX
+                    )
+                    h = (np.bitwise_xor(h, h >> 16) * self.HASH_MIX_MULT) & self.UINT32_MAX
+                    h = np.bitwise_xor(h, h >> 16) & self.UINT32_MAX
+                    mask = h <= hash_threshold
+                    sampled_pos = np.round(pos_mm[mask], 2).tolist()
+                    sampled_cols = col_u32[mask] if col_u32 is not None else None
+
+                frame_dict: Dict[str, Any] = {
+                    "step": step,
+                    "positions": sampled_pos,
+                    "metrics": dict(metrics_by_step.get(step, {})),
+                }
+                if has_varying_colors and sampled_cols is not None:
+                    rgb_arr = np.column_stack(
+                        [
+                            ((sampled_cols >> 24) & 0xFF) / 255.0,
+                            ((sampled_cols >> 16) & 0xFF) / 255.0,
+                            ((sampled_cols >> 8) & 0xFF) / 255.0,
+                        ]
+                    )
+                    frame_dict["colors"] = np.round(rgb_arr, 3).tolist()
+                frames.append(frame_dict)
 
             payload = {
                 "status": "ok",
                 "recording": str(
                     rrd_file.relative_to(self.repo_root) if rrd_file.is_relative_to(self.repo_root) else rrd_file
                 ),
+                "is_lagrangian": is_lagrangian,
+                "radius_mm": radius_mm,
+                "default_color": default_color,
                 "frames_count": len(frames),
                 "max_steps": len(frames),
                 "frames": frames,

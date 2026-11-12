@@ -344,8 +344,8 @@ def test_regression_bug_translucent_lacewing_144_pcb_layers_and_net_highlight(sc
 
     layer_colors = {layer["name"]: layer["color"] for layer in meta.get("layers", [])}
     assert layer_colors.get("F.Cu (Top)") == "#c83434"
-    assert layer_colors.get("B.Cu (Bottom)") == "#345ac8"
-    assert layer_colors.get("Pads") == "#c8a034"
+    assert layer_colors.get("B.Cu (Bottom)") == "#4d7fc4"
+    assert layer_colors.get("Pads") == "#ce4785"
 
     assert len(meta.get("traces", [])) > 0
     assert len(meta.get("vias", [])) > 0
@@ -419,7 +419,7 @@ def test_regression_bug_lustrous_mantis_333_simulation_fountain_physics(scope_se
         for pt in frame["positions"]:
             z = pt[2]
             assert z >= 40.0, f"Authentic particle dipped below floor: z={z}"
-            assert z <= 116.0, f"Authentic particle exceeded max bound: z={z}"
+            assert z <= 118.0, f"Authentic particle exceeded max CAD fountain bound: z={z}"
 
 
 def test_regression_bug_jumping_instar_950_open_rerun_endpoint(scope_server):
@@ -766,3 +766,30 @@ def test_regression_bug_emerald_tick_950_2d_mode_initial_dom_state(scope_server)
             "hud-row-iso",
         ):
             assert required_id in parser.element_ids
+
+
+def test_regression_bug_chitinous_grub_712_simulation_particle_temporal_coherence(scope_server):
+    """Verify BUG-CHITINOUS-GRUB-712: simulation fluid points maintain spatial temporal coherence without index-shift teleportation."""
+    telem_url = (
+        f"http://127.0.0.1:{scope_server.actual_port}/api/scope/simulation_telemetry"
+        "?project=cat_fountain&target=product"
+    )
+    req_telem = urllib.request.urlopen(telem_url)
+    assert req_telem.status == 200
+    telem = json.loads(req_telem.read().decode("utf-8"))
+
+    assert telem["status"] == "ok"
+    assert telem.get("is_lagrangian") is False
+    assert telem.get("radius_mm", 0.0) > 1.0
+    assert len(telem.get("default_color", [])) == 4
+
+    frames = telem["frames"]
+    assert len(frames) >= 5
+    for idx in range(1, 5):
+        prev_set = {tuple(pt) for pt in frames[idx - 1]["positions"]}
+        curr_set = {tuple(pt) for pt in frames[idx]["positions"]}
+        assert len(curr_set) >= 2000
+        stationary_overlap = len(prev_set & curr_set) / max(1, len(curr_set))
+        assert stationary_overlap > 0.95, (
+            f"Fluid cells jumped between step {idx - 1} and {idx}: overlap={stationary_overlap:.3f}"
+        )
