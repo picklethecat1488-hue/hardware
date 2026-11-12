@@ -319,6 +319,11 @@ class ScopeRequestHandler(BaseHTTPRequestHandler):
                 project = query.get("project", [""])[0]
                 target = query.get("target", [""])[0]
                 self._handle_download_rrd(project, target)
+            case "/api/scope/open_kicad":
+                project = query.get("project", [""])[0]
+                target = query.get("target", [""])[0]
+                subassembly = query.get("subassembly", [None])[0] or None
+                self._handle_open_kicad(project, target, subassembly)
             case _:
                 self.send_error(404, f"Endpoint {path} not found")
 
@@ -340,6 +345,11 @@ class ScopeRequestHandler(BaseHTTPRequestHandler):
                 self._handle_target_bug(data)
             case "/api/scope/open_rerun":
                 self._handle_open_rerun(data, parsed)
+            case "/api/scope/open_kicad":
+                project = data.get("project", "")
+                target = data.get("target", "")
+                subassembly = data.get("subassembly")
+                self._handle_open_kicad(project, target, subassembly)
             case _:
                 self.send_error(404, f"Endpoint {path} not found")
 
@@ -535,6 +545,65 @@ class ScopeRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(content)
 
+    def _handle_open_kicad(self, project: str, target: str, subassembly: Optional[str] = None) -> None:
+        """Launch the local KiCad EDA application to view the active PCB project."""
+        sub = subassembly or (target if target != project else None)
+        sub_name = sub or project
+
+        candidates = [
+            Path(f"build/board/{project}/{sub_name}.kicad_pro"),
+            Path(f"build/board/{project}/{sub_name}.kicad_pcb"),
+            Path(f"build/board/{project}/{project}.kicad_pro"),
+            Path(f"build/board/{project}/{project}.kicad_pcb"),
+            Path(f"build/{project}_export.kicad_pcb"),
+            Path(f"build/pcb/{project}/{sub_name}.kicad_pcb"),
+        ]
+        kicad_file: Optional[Path] = None
+        for cand in candidates:
+            if cand.exists():
+                kicad_file = cand
+                break
+
+        if kicad_file is None:
+            board_dir = Path("build/board") / project
+            if board_dir.exists():
+                for ext in (".kicad_pro", ".kicad_pcb"):
+                    for f in board_dir.glob(f"*{ext}"):
+                        kicad_file = f
+                        break
+                    if kicad_file:
+                        break
+
+        if kicad_file is None:
+            self._send_json({"error": f"No KiCad project found for {project}/{target}"}, status=404)
+            return
+
+        try:
+            import subprocess
+            import shutil
+            import platform
+
+            resolved_path = str(kicad_file.resolve())
+            if platform.system() == "Darwin":
+                if shutil.which("kicad"):
+                    cmd = ["kicad", resolved_path]
+                else:
+                    cmd = ["open", resolved_path]
+            else:
+                kicad_bin = shutil.which("kicad") or "kicad"
+                cmd = [kicad_bin, resolved_path]
+
+            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self._send_json(
+                {
+                    "status": "ok",
+                    "message": f"Opened KiCad project: {kicad_file.name}",
+                    "file": resolved_path,
+                }
+            )
+        except Exception as err:
+            self._send_json({"error": f"Failed to launch KiCad: {err}"}, status=500)
+
 
 class ScopeServer(ThreadingHTTPServer):
     """Local Threading HTTP server for CAD/PCB Scope Workstation."""
@@ -581,6 +650,7 @@ class ScopeServer(ThreadingHTTPServer):
         step_index: Optional[int] = None,
     ) -> None:
         """Pre-warm geometry cache in a background daemon thread upon server startup."""
+        self._warm_up_error: Optional[Exception] = None
 
         def _warm_worker():
             try:
@@ -597,6 +667,7 @@ class ScopeServer(ThreadingHTTPServer):
                     "Background pre-warming completed for %s/%s in %.2fs", project, target, time.time() - t0
                 )
             except Exception as err:
+                self._warm_up_error = err
                 self.logger.warning("Background pre-warming error for %s/%s: %s", project, target, err)
 
         thread = threading.Thread(target=_warm_worker, daemon=True, name="ScopePrewarm")

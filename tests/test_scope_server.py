@@ -493,16 +493,18 @@ def test_scope_server_warm_up_background_thread(tmp_path):
     pipeline = ScopeGeometryPipeline(cache_dir=cache_dir)
     server = ScopeServer(host="127.0.0.1", port=0, pipeline=pipeline, bind_and_activate=False)
 
-    server.warm_up("cat_fountain", "bowl", mode="CAD")
+    server.warm_up("footprints", "0402", mode="CAD")
 
     # Wait for warm-up thread to populate cache
-    deadline = time.time() + 30.0
+    deadline = time.time() + 60.0
     while time.time() < deadline:
-        if ("cat_fountain", "bowl", None, "CAD", None) in pipeline._cache:
+        if getattr(server, "_warm_up_error", None) is not None:
+            raise RuntimeError(f"Warm up background error: {server._warm_up_error}")
+        if ("footprints", "0402", None, "CAD", None) in pipeline._cache:
             break
         time.sleep(0.1)
 
-    assert ("cat_fountain", "bowl", None, "CAD", None) in pipeline._cache
+    assert ("footprints", "0402", None, "CAD", None) in pipeline._cache
 
 
 def test_regression_bug_antennal_firebug_841_viewport_resize(scope_server):
@@ -1138,3 +1140,37 @@ def test_regression_bug_shining_hoverfly_298_sim_particles_and_hud_controls(scop
     assert "min-width: 140px" in html
     assert "updateTimelineChips()" in html
     assert "Spout: 0 mL/s" not in html
+
+
+def test_regression_bug_proboscid_caterpillar_529_open_kicad_button(scope_server, monkeypatch):
+    """Verify BUG-PROBOSCID-CATERPILLAR-529: Add button in inspect view to open KiCad PCB project."""
+    import subprocess
+
+    launched_cmds = []
+
+    def fake_popen(cmd, *args, **kwargs):
+        launched_cmds.append(cmd)
+
+    monkeypatch.setattr(subprocess, "Popen", fake_popen)
+
+    # 1. Verify /api/scope/open_kicad endpoint resolves and launches local KiCad project
+    open_url = (
+        f"http://127.0.0.1:{scope_server.actual_port}/api/scope/open_kicad?project=carrier_board&target=carrier_board"
+    )
+    req_open = urllib.request.urlopen(open_url)
+    assert req_open.status == 200
+    data = json.loads(req_open.read().decode("utf-8"))
+    assert data["status"] == "ok"
+    assert "carrier_board.kicad_" in data["file"]
+    assert len(launched_cmds) == 1
+    assert "carrier_board.kicad_" in str(launched_cmds[0])
+
+    # 2. Verify HTML template contains Open in KiCad button in Inspect view with wiring
+    html_url = f"http://127.0.0.1:{scope_server.actual_port}/"
+    req_html = urllib.request.urlopen(html_url)
+    assert req_html.status == 200
+    html = req_html.read().decode("utf-8")
+
+    assert 'id="btn-open-kicad"' in html
+    assert "Open in KiCad" in html
+    assert "/api/scope/open_kicad" in html

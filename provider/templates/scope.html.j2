@@ -1100,7 +1100,12 @@
 
         <!-- INSPECTOR PANE -->
         <div id="tab-inspect" class="tab-pane">
-          <div class="hud-label" style="margin-bottom: 8px;">Selected Object / Face:</div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div class="hud-label">Selected Object / Face:</div>
+            <button id="btn-open-kicad" class="hud-btn" style="padding: 3px 8px; font-size: 10px; background: rgba(56, 189, 248, 0.15); border: 1px solid var(--quake-cyan); color: var(--quake-cyan); font-weight: bold; border-radius: 3px; display: none;" title="Open KiCad PCB Project in local KiCad EDA application">
+              📂 Open in KiCad
+            </button>
+          </div>
           <div id="inspect-content" style="font-size: 11px; line-height: 1.6; color: var(--quake-text-muted);">
             Hover or click on geometry or PCB components to inspect details.
           </div>
@@ -2471,6 +2476,10 @@
       }
       if (tabBtnLogs) {
         tabBtnLogs.style.display = isSim ? "block" : "none";
+      }
+      const btnOpenKicad = document.getElementById("btn-open-kicad");
+      if (btnOpenKicad) {
+        btnOpenKicad.style.display = isPcb ? "inline-flex" : "none";
       }
 
       // If active tab is tab-layers in non-PCB mode, switch to tab-tree
@@ -4473,6 +4482,21 @@
       });
       document.getElementById("sim-timescale")?.addEventListener("change", (e) => {
         state.simTimescale = parseFloat(e.target.value) || 1.0;
+      });
+      document.getElementById("btn-open-kicad")?.addEventListener("click", () => {
+        showToast("Opening KiCad project...", 2000);
+        fetch(`/api/scope/open_kicad?project=${encodeURIComponent(state.currentProject)}&target=${encodeURIComponent(state.currentTarget)}${state.currentSub ? '&subassembly=' + encodeURIComponent(state.currentSub) : ''}`)
+          .then(r => r.json())
+          .then(data => {
+            if (data.status === "ok") {
+              showToast("✓ " + data.message, 3500);
+            } else {
+              showToast("Error: " + (data.error || "Failed to open KiCad"), 4000);
+            }
+          })
+          .catch(err => {
+            showToast("Failed to open KiCad: " + err, 4000);
+          });
       });
       document.getElementById("btn-open-rerun")?.addEventListener("click", () => {
         showToast("Launching Rerun Viewer...", 3000);
