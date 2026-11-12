@@ -1,12 +1,13 @@
-# 🔴 `[BUG-TRANSLUCENT-LACEWING-144]` PCB view silkscreen alignment, element inspection, and pad/trace Z-ordering (carrier_board)
+# 🟢 `[BUG-TRANSLUCENT-LACEWING-144]` PCB view silkscreen alignment, element inspection, and pad/trace Z-ordering (carrier_board)
 
 - **UUID**: `cf9a924c-9c73-4e4c-b249-6be0475c8f46`
 - **ID**: `BUG-TRANSLUCENT-LACEWING-144`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-11 13:59:20 UTC`
+- **Resolved**: `2026-11-12 00:33:34 UTC`
 - **Rejected**: `2026-11-11 23:21:02 UTC`
 
 #### Description
@@ -38,10 +39,7 @@ Net highlighting does not work. We should also use a high contrast color scheme 
 
 #### Resolution Notes
 
-Removed manual HC buttons and made KiCad high contrast theme always on in PCB mode, suppressed substrate highlighting and bounding box selection, implemented minimum-distance entity picking and live hover pointer tooltip, replaced carrier board silkscreen arrow with sleek diamond emblem, and added rounded cylinder caps to trace vertices while disabling wireframe edge outlines on copper layers.
--The diamond seems like misplaced silkscreening of the test board logo. Can you revert the geometry change, and figure out why the silkscreen is being placed on the wrong part of the board? 
--I am still able to highlight substrates, and unable to highlight anything else to show in edge inspector
--In the latest version, there is z ordering issue b/w pads and traces
+Revert silkscreen logo to rocket shape, preserve silkscreen polygon placement with align=None in PCB3DAssembler, elevate pads above traces to eliminate Z-fighting, and preserve copper layer edges for Edge Inspector
 
 #### Rejection Feedback
 
