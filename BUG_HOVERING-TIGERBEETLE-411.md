@@ -523,13 +523,6 @@ face 46 ignored
 2026-11-11 14:03:07 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 14:03:07] "GET /api/scope/load?project=exhaust_manifolds&target=part_positions&subassembly=&mode=CAD HTTP/1.1" 200 -
 ```
 
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-HOVERING-TIGERBEETLE-411/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
-| `text/plain` | [scope.log](attachments/BUG-HOVERING-TIGERBEETLE-411/scope.log) | Scope workstation execution logs |
-
 #### Attached Commits
 
 - `6033cc34`
