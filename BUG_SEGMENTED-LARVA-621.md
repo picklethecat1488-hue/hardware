@@ -520,3 +520,7 @@ face 46 ignored
 2026-11-11 15:03:49 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 15:03:49] "GET /api/scope/load?project=cat_fountain&target=product&subassembly=&mode=SIMULATE HTTP/1.1" 200 -
 2026-11-11 15:03:49 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 15:03:49] "GET /api/scope/projects HTTP/1.1" 200 -
 ```
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:15abdaad --> Open cat_fountain in Scope Simulate mode and inspect authentic SPH fluid particles draining through the lid drainage cutout into the reservoir | `python tools/scope.py cat_fountain/product:simulate`
