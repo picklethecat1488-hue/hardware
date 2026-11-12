@@ -1,12 +1,13 @@
-# 🔴 `[BUG-CRIMSON-GNAT-877]` [carrier_board/carrier_board] Defect in PCB view
+# 🟢 `[BUG-CRIMSON-GNAT-877]` [carrier_board/carrier_board] Defect in PCB view
 
 - **UUID**: `e9402466-d500-4551-9cfb-8da203f66b13`
 - **ID**: `BUG-CRIMSON-GNAT-877`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-12 20:50:05 UTC`
+- **Resolved**: `2026-11-12 22:23:41 UTC`
 
 #### Description
 
@@ -531,3 +532,7 @@ face 46 ignored
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:90df2a2d --> Open carrier board PCB view in Scope and verify Components layer is omitted from the viewport and PCB Layers list while pads, traces, vias, and silkscreen remain inspectable | `python tools/scope.py carrier_board/carrier_board:pcb`
+
+#### Resolution Notes
+
+Removed the 3D Components layer from Mode.PCB via include_components=False in PCB3DAssembler.get_display_items and omitted Components from pcb_metadata['layers'] while keeping component metadata for pad/inspector lookup and retaining 3D component bodies in Mode.CAD assemblies.
