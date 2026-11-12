@@ -740,8 +740,17 @@
     #sim-bar.visible {
       display: flex;
     }
+    #sim-bar > div {
+      white-space: nowrap;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    #sim-bar > div::-webkit-scrollbar {
+      display: none;
+    }
     .sim-slider {
       flex: 1;
+      min-width: 140px;
       accent-color: var(--quake-gold);
       cursor: pointer;
     }
@@ -1078,10 +1087,11 @@
         <!-- RERUN LOGS PANE (BUG-JUMPING-INSTAR-950) -->
         <div id="tab-logs" class="tab-pane">
           <div style="display: flex; gap: 6px; margin-bottom: 8px;">
-            <input type="text" id="rerun-search" class="form-input" placeholder="Query rerun logs (step, event, level)..." style="font-size: 11px; padding: 4px 8px; width: 100%;">
+            <input type="text" id="rerun-search" class="form-input" placeholder="Query rerun events (step, entity, level)..." style="font-size: 11px; padding: 4px 8px; flex: 1;">
+            <button id="btn-save-rrd" class="hud-btn" style="padding: 4px 8px; font-size: 11px; white-space: nowrap; flex-shrink: 0;" title="Download authentic Rerun .rrd recording">💾 Save .rrd</button>
           </div>
           <div id="rerun-logs-summary" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 10px; color: var(--quake-text-muted);">
-            <span id="rerun-logs-count">10 milestones logged</span>
+            <span id="rerun-logs-count">0 events</span>
             <button id="btn-rerun-clear-filter" class="hud-btn" style="padding: 1px 6px; font-size: 9px; display: none;">Clear</button>
           </div>
           <div id="rerun-logs-list" style="display: flex; flex-direction: column; gap: 5px; max-height: calc(100vh - 220px); overflow-y: auto;">
@@ -1198,7 +1208,7 @@
           <button id="btn-sim-prev" class="hud-btn" style="padding: 4px 8px;" title="Step Back (10 frames)">⏮</button>
           <button id="btn-sim-next" class="hud-btn" style="padding: 4px 8px;" title="Step Forward (10 frames)">⏭</button>
           <input id="sim-step-slider" type="range" class="sim-slider" min="0" max="1000" value="0">
-          <div id="sim-step-val" style="font-size: 11px; width: 68px; text-align: right; color: var(--quake-gold); font-weight: bold;">Step: 0</div>
+          <div id="sim-step-val" style="font-size: 11px; min-width: 120px; text-align: right; color: var(--quake-gold); font-weight: bold; white-space: nowrap; flex-shrink: 0; font-variant-numeric: tabular-nums;">Step: 0</div>
           <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0; white-space: nowrap;">
             <label class="hud-label" style="font-size: 10px;">Speed:</label>
             <select id="sim-timescale" class="hud-select" style="padding: 2px 6px; font-size: 11px; height: 24px;">
@@ -1214,17 +1224,10 @@
           </button>
         </div>
         <div id="sim-timeline-logs" style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 10px; white-space: nowrap; overflow-x: auto; gap: 8px;">
-          <div style="display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; white-space: nowrap; flex-shrink: 0;">
-            <span style="color: var(--quake-text-muted); font-size: 9px; font-weight: bold; white-space: nowrap; flex-shrink: 0;">RERUN LOGS:</span>
-            <button class="sim-log-chip active" data-step="0">t=0s: Init</button>
-            <button class="sim-log-chip" data-step="200">t=0.8s: Spout</button>
-            <button class="sim-log-chip" data-step="450">t=1.8s: Lid Sheet</button>
-            <button class="sim-log-chip" data-step="700">t=2.8s: Waterfall</button>
-            <button class="sim-log-chip" data-step="950">t=3.8s: Equilibrium</button>
+          <div id="sim-timeline-chips" style="display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; white-space: nowrap; flex-shrink: 0;">
+            <span style="color: var(--quake-text-muted); font-size: 9px; font-weight: bold; white-space: nowrap; flex-shrink: 0;">EVENTS:</span>
           </div>
-          <div id="sim-flow-metrics" style="color: var(--quake-cyan); font-size: 10px; font-weight: 500; white-space: nowrap; flex-shrink: 0;">
-            Spout: 0 mL/s | Waterfall: 0 mL/s | Reservoir: 1.50 L
-          </div>
+          <div id="sim-flow-metrics" style="color: var(--quake-cyan); font-size: 10px; font-weight: 500; white-space: nowrap; flex-shrink: 0;"></div>
         </div>
       </div>
     </div>
@@ -2421,6 +2424,7 @@
                 if (slider) slider.max = state.maxSteps - 1;
                 initSimulationParticles();
                 updateSimulationStep(state.simStep || 0);
+                updateTimelineChips();
                 renderRerunLogs();
               }
             })
@@ -3562,6 +3566,23 @@
     // SIMULATION ENGINE & FLUID DYNAMICS PARTICLES (BUG-LUSTROUS-MANTIS-333)
     let simParticlesMesh = null;
 
+    function createParticleTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 64;
+      canvas.height = 64;
+      const ctx = canvas.getContext("2d");
+      const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+      grad.addColorStop(0, "rgba(255, 255, 255, 1.0)");
+      grad.addColorStop(0.25, "rgba(230, 248, 255, 0.95)");
+      grad.addColorStop(0.55, "rgba(56, 189, 248, 0.65)");
+      grad.addColorStop(0.85, "rgba(14, 116, 144, 0.2)");
+      grad.addColorStop(1.0, "rgba(0, 0, 0, 0)");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 64, 64);
+      const texture = new window.THREE.CanvasTexture(canvas);
+      return texture;
+    }
+
     function initSimulationParticles() {
       if (!state.viewer || !state.viewer.rendered || !state.viewer.rendered.scene) return;
       if (simParticlesMesh) {
@@ -3585,8 +3606,8 @@
         positions[i * 3 + 1] = f0.positions[i][1];
         positions[i * 3 + 2] = f0.positions[i][2];
 
-        colors[i * 3] = 0.2 + (i % 10) * 0.01;
-        colors[i * 3 + 1] = 0.7 + (i % 10) * 0.02;
+        colors[i * 3] = 0.15;
+        colors[i * 3 + 1] = 0.60;
         colors[i * 3 + 2] = 0.95;
       }
 
@@ -3594,12 +3615,15 @@
       geometry.setAttribute("position", new window.THREE.BufferAttribute(positions, 3));
       geometry.setAttribute("color", new window.THREE.BufferAttribute(colors, 3));
 
+      const particleTexture = createParticleTexture();
       const material = new window.THREE.PointsMaterial({
-        size: 3.5,
+        size: 5.0,
+        map: particleTexture,
         vertexColors: true,
         transparent: true,
-        opacity: 0.88,
+        opacity: 0.90,
         depthWrite: false,
+        blending: window.THREE.AdditiveBlending,
       });
 
       simParticlesMesh = new window.THREE.Points(geometry, material);
@@ -3636,13 +3660,21 @@
         row.style.background = match ? "rgba(56, 189, 248, 0.15)" : "rgba(0,0,0,0.35)";
       });
 
-      // Update flow metrics readout from authentic telemetry
+      // Update generic simulation metrics readout from authentic telemetry
       const metricsEl = document.getElementById("sim-flow-metrics");
-      if (state.simTelemetry && state.simTelemetry.frames && state.simTelemetry.frames.length > 0) {
+      if (metricsEl && state.simTelemetry && state.simTelemetry.frames && state.simTelemetry.frames.length > 0) {
         const frameIdx = Math.min(step, state.simTelemetry.frames.length - 1);
         const frame = state.simTelemetry.frames[frameIdx];
-        if (metricsEl && frame.metrics) {
-          metricsEl.textContent = `Spout: ${frame.metrics.flow_spout.toFixed(1)} mL/s | Waterfall: ${frame.metrics.flow_waterfall.toFixed(1)} mL/s | Reservoir: ${frame.metrics.pool_volume.toFixed(2)} L | Drain: ${frame.metrics.drainage_cutout.toFixed(0)} pts`;
+        if (frame && frame.metrics && Object.keys(frame.metrics).length > 0) {
+          const parts = [];
+          for (const [k, v] of Object.entries(frame.metrics)) {
+            const label = k.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+            const valStr = typeof v === "number" ? v.toFixed(v % 1 === 0 ? 0 : 1) : v;
+            parts.push(`${label}: ${valStr}`);
+          }
+          metricsEl.textContent = parts.join(" | ");
+        } else {
+          metricsEl.textContent = "";
         }
       }
 
@@ -3658,20 +3690,39 @@
         });
       }
 
-      // Animate fluid particles from authentic Rerun simulation recording
+      // Animate fluid particles from authentic Rerun simulation recording with velocity-based color grading
       if (simParticlesMesh && state.simTelemetry && state.simTelemetry.frames && state.simTelemetry.frames.length > 0) {
         const frameIdx = Math.min(step, state.simTelemetry.frames.length - 1);
+        const prevIdx = Math.max(0, frameIdx - 1);
         const frame = state.simTelemetry.frames[frameIdx];
+        const prevFrame = state.simTelemetry.frames[prevIdx];
         if (frame && frame.positions) {
           const posAttr = simParticlesMesh.geometry.attributes.position;
+          const colAttr = simParticlesMesh.geometry.attributes.color;
           const arr = posAttr.array;
+          const colArr = colAttr ? colAttr.array : null;
           const count = Math.min(frame.positions.length, arr.length / 3);
           for (let i = 0; i < count; i++) {
-            arr[i * 3] = frame.positions[i][0];
-            arr[i * 3 + 1] = frame.positions[i][1];
-            arr[i * 3 + 2] = frame.positions[i][2];
+            const x = frame.positions[i][0];
+            const y = frame.positions[i][1];
+            const z = frame.positions[i][2];
+            arr[i * 3] = x;
+            arr[i * 3 + 1] = y;
+            arr[i * 3 + 2] = z;
+
+            if (colArr && prevFrame && prevFrame.positions && prevFrame.positions[i]) {
+              const dx = x - prevFrame.positions[i][0];
+              const dy = y - prevFrame.positions[i][1];
+              const dz = z - prevFrame.positions[i][2];
+              const speed = Math.sqrt(dx * dx + dy * dy + dz * dz);
+              const t = Math.min(1.0, speed / 8.0);
+              colArr[i * 3] = 0.15 + t * 0.70;
+              colArr[i * 3 + 1] = 0.60 + t * 0.38;
+              colArr[i * 3 + 2] = 0.95 + t * 0.05;
+            }
           }
           posAttr.needsUpdate = true;
+          if (colAttr) colAttr.needsUpdate = true;
         }
       }
 
@@ -3701,6 +3752,32 @@
       updateSimulationStep(nextStep);
       const delay = Math.max(10, Math.round(35 / (state.simTimescale || 1.0)));
       setTimeout(runSimLoop, delay);
+    }
+
+    function updateTimelineChips() {
+      const container = document.getElementById("sim-timeline-chips");
+      if (!container) return;
+      const logs = (state.simTelemetry && state.simTelemetry.logs) ? state.simTelemetry.logs : [];
+      if (logs.length === 0) {
+        container.innerHTML = `<span style="color: var(--quake-text-muted); font-size: 9px; font-weight: bold; white-space: nowrap; flex-shrink: 0;">EVENTS:</span><span style="color: var(--quake-text-muted); font-size: 9px;">None</span>`;
+        return;
+      }
+      container.innerHTML = `<span style="color: var(--quake-text-muted); font-size: 9px; font-weight: bold; white-space: nowrap; flex-shrink: 0;">EVENTS:</span>` +
+        logs.slice(0, 8).map((log, idx) => `
+          <button class="sim-log-chip ${idx === 0 ? 'active' : ''}" data-step="${log.step}" title="${log.msg || log.entity}">
+            ${log.time ? `${log.time}: ` : `s${log.step}: `}${log.entity}
+          </button>
+        `).join("");
+      container.querySelectorAll(".sim-log-chip").forEach(chip => {
+        chip.addEventListener("click", () => {
+          const chipStep = parseInt(chip.dataset.step);
+          if (!isNaN(chipStep)) {
+            if (!simParticlesMesh) initSimulationParticles();
+            updateSimulationStep(chipStep);
+            showToast(`Scrubbed to simulation event: ${chip.textContent.trim()}`);
+          }
+        });
+      });
     }
 
     // RERUN LOGS SYSTEM (BUG-JUMPING-INSTAR-950)
@@ -4412,13 +4489,10 @@
             showToast("Failed to launch Rerun Viewer: " + err, 4000);
           });
       });
-      document.querySelectorAll(".sim-log-chip").forEach(chip => {
-        chip.addEventListener("click", () => {
-          const step = parseInt(chip.dataset.step);
-          if (!simParticlesMesh) initSimulationParticles();
-          updateSimulationStep(step);
-          showToast(`Scrubbed to Rerun milestone: ${chip.textContent}`);
-        });
+      // Save / Download .rrd recording
+      document.getElementById("btn-save-rrd")?.addEventListener("click", () => {
+        window.location.href = `/api/scope/download_rrd?project=${encodeURIComponent(state.currentProject)}&target=${encodeURIComponent(state.currentTarget)}`;
+        showToast("Downloading simulation .rrd recording...", 3000);
       });
 
       // Rerun Logs Filter & Search (BUG-JUMPING-INSTAR-950)

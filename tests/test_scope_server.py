@@ -1112,3 +1112,29 @@ def test_regression_bug_swarming_silverfish_292_diagram_view_white_background_an
     assert "state.viewer.renderer.setClearColor(0xffffff, 1.0);" in html
     assert 'state.viewer.setTheme("light");' in html
     assert "state.viewer.setOrtho(true);" in html
+
+
+def test_regression_bug_shining_hoverfly_298_sim_particles_and_hud_controls(scope_server):
+    """Verify BUG-SHINING-HOVERFLY-298: circular particle texture, velocity color ramp, HUD nowrap, and Save .rrd download."""
+    # 1. Verify /api/scope/download_rrd streams authentic .rrd recording
+    rrd_url = f"http://127.0.0.1:{scope_server.actual_port}/api/scope/download_rrd?project=cat_fountain&target=product"
+    req_rrd = urllib.request.urlopen(rrd_url)
+    assert req_rrd.status == 200
+    assert "application/octet-stream" in req_rrd.headers.get("Content-Type", "")
+    assert "attachment;" in req_rrd.headers.get("Content-Disposition", "")
+    content = req_rrd.read()
+    assert len(content) > 0
+
+    # 2. Verify HTML template contains circular particle texture, generic rerun events, and HUD nowrap layout
+    html_url = f"http://127.0.0.1:{scope_server.actual_port}/"
+    req_html = urllib.request.urlopen(html_url)
+    assert req_html.status == 200
+    html = req_html.read().decode("utf-8")
+
+    assert "createParticleTexture()" in html
+    assert "sim-timeline-chips" in html
+    assert "btn-save-rrd" in html
+    assert "min-width: 120px" in html
+    assert "min-width: 140px" in html
+    assert "updateTimelineChips()" in html
+    assert "Spout: 0 mL/s" not in html

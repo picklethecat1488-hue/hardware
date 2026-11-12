@@ -315,6 +315,10 @@ class ScopeRequestHandler(BaseHTTPRequestHandler):
                     self._send_json(payload)
                 except Exception as err:
                     self._send_json({"error": str(err)}, status=500)
+            case "/api/scope/download_rrd":
+                project = query.get("project", [""])[0]
+                target = query.get("target", [""])[0]
+                self._handle_download_rrd(project, target)
             case _:
                 self.send_error(404, f"Endpoint {path} not found")
 
@@ -497,6 +501,39 @@ class ScopeRequestHandler(BaseHTTPRequestHandler):
             )
         except Exception as err:
             self._send_json({"error": f"Failed to launch Rerun Viewer: {err}"}, status=500)
+
+    def _handle_download_rrd(self, project: str, target: str) -> None:
+        """Stream the authentic Rerun .rrd recording file as an attachment download."""
+        candidates = [
+            Path(f"recordings/{project}_3blade.rrd"),
+            Path(f"recordings/{project}.rrd"),
+            Path(f"recordings/{project}_{target}.rrd"),
+        ]
+        rrd_path = None
+        for cand in candidates:
+            if cand.exists():
+                rrd_path = cand
+                break
+
+        if rrd_path is None or not rrd_path.exists():
+            recordings_dir = Path("recordings")
+            if recordings_dir.exists():
+                for f in recordings_dir.glob("*.rrd"):
+                    if project in f.name:
+                        rrd_path = f
+                        break
+
+        if rrd_path is None or not rrd_path.exists():
+            self._send_json({"error": f"No simulation recording found for {project}/{target}"}, status=404)
+            return
+
+        content = rrd_path.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Disposition", f'attachment; filename="{rrd_path.name}"')
+        self.send_header("Content-Length", str(len(content)))
+        self.end_headers()
+        self.wfile.write(content)
 
 
 class ScopeServer(ThreadingHTTPServer):
