@@ -1204,3 +1204,18 @@ def test_regression_bug_creeping_scorpion_866_pcb_entity_picking_and_test_points
     assert "test_points" in html
     assert "findPcbEntityAtPoint" in html
     assert "test_point" in html
+
+
+def test_regression_bug_emerald_tick_950_lmb_pan_mmb_zoom_pcb_diagram(scope_server):
+    """Verify BUG-EMERALD-TICK-950: Replace LMB hold with PAN and MMB with zoom in PCB and Diagram views."""
+    html_url = f"http://127.0.0.1:{scope_server.actual_port}/"
+    req_html = urllib.request.urlopen(html_url)
+    assert req_html.status == 200
+    html = req_html.read().decode("utf-8")
+
+    # 1. 2D navigation controls: LMB hold defaults to pan, MMB to zoom
+    assert "updateControlsForMode" in html
+    assert "enableRotate = !is2D" in html or "enableRotate = false" in html
+    assert "hud-row-orbit" in html
+    assert 'dragMode = "pan"' in html
+    assert 'dragMode = "zoom"' in html

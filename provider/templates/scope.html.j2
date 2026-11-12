@@ -1139,9 +1139,9 @@
               <tr><th>Action</th><th>Shortcut (Blender Convention)</th></tr>
             </thead>
             <tbody>
-              <tr><td>Orbit View</td><td><span class="kbd-badge">MMB Drag</span> (Middle Click)</td></tr>
-              <tr><td>Pan View</td><td><span class="kbd-badge">Shift + MMB Drag</span> or <span class="kbd-badge">RMB Drag</span></td></tr>
-              <tr><td>Zoom / Dolly</td><td><span class="kbd-badge">Scroll Wheel</span> or <span class="kbd-badge">Ctrl + MMB</span></td></tr>
+              <tr id="hud-row-orbit"><td>Orbit View</td><td><span class="kbd-badge">MMB Drag</span> (Middle Click)</td></tr>
+              <tr id="hud-row-pan"><td>Pan View</td><td><span class="kbd-badge">Shift + MMB Drag</span> or <span class="kbd-badge">RMB Drag</span></td></tr>
+              <tr id="hud-row-zoom"><td>Zoom / Dolly</td><td><span class="kbd-badge">Scroll Wheel</span> or <span class="kbd-badge">Ctrl + MMB</span></td></tr>
               <tr><td>Center View Pivot</td><td><span class="kbd-badge">Double Click</span> on surface</td></tr>
               <tr><td>Front / Back View</td><td><span class="kbd-badge">Numpad 1</span> / <span class="kbd-badge">Ctrl+1</span></td></tr>
               <tr><td>Right / Left View</td><td><span class="kbd-badge">Numpad 3</span> / <span class="kbd-badge">Ctrl+3</span></td></tr>
@@ -2069,15 +2069,48 @@
       container.addEventListener("mousedown", (e) => {
         downX = e.clientX;
         downY = e.clientY;
-        if (e.button === 1 || (e.button === 2 && e.shiftKey)) { // MMB or Shift+RMB
-          isDragging = true;
-          dragMode = e.shiftKey ? "pan" : "orbit";
-          lastX = e.clientX;
-          lastY = e.clientY;
-          if (state.viewer && state.viewer.rendered && state.viewer.rendered.controls) {
-            state.viewer.rendered.controls._isDragging = true;
+        const is2D = state.currentMode === "PCB" || state.currentMode === "DIAGRAM";
+
+        if (is2D) {
+          if (e.button === 0) { // LMB in 2D mode: default to PAN on drag!
+            isDragging = true;
+            dragMode = "pan";
+            lastX = e.clientX;
+            lastY = e.clientY;
+            if (state.viewer?.rendered?.controls) {
+              state.viewer.rendered.controls._isDragging = true;
+            }
+          } else if (e.button === 1) { // MMB in 2D mode: default to ZOOM!
+            isDragging = true;
+            dragMode = "zoom";
+            lastX = e.clientX;
+            lastY = e.clientY;
+            if (state.viewer?.rendered?.controls) {
+              state.viewer.rendered.controls._isDragging = true;
+            }
+            e.preventDefault();
+          } else if (e.button === 2) { // RMB in 2D mode: PAN
+            isDragging = true;
+            dragMode = "pan";
+            lastX = e.clientX;
+            lastY = e.clientY;
+            if (state.viewer?.rendered?.controls) {
+              state.viewer.rendered.controls._isDragging = true;
+            }
+            e.preventDefault();
           }
-          e.preventDefault();
+        } else {
+          // 3D modes (CAD, SIMULATE)
+          if (e.button === 1 || (e.button === 2 && e.shiftKey)) { // MMB or Shift+RMB
+            isDragging = true;
+            dragMode = e.shiftKey ? "pan" : "orbit";
+            lastX = e.clientX;
+            lastY = e.clientY;
+            if (state.viewer && state.viewer.rendered && state.viewer.rendered.controls) {
+              state.viewer.rendered.controls._isDragging = true;
+            }
+            e.preventDefault();
+          }
         }
       });
 
@@ -2106,6 +2139,25 @@
                   state.viewer.controls.pan(pendingDx, pendingDy);
                   state.viewer.controls.update();
                 }
+              } else if (dragMode === "zoom") {
+                const zoomFactor = Math.pow(0.99, pendingDy);
+                if (typeof state.viewer.controls.dollyIn === "function" && typeof state.viewer.controls.dollyOut === "function") {
+                  if (pendingDy > 0) state.viewer.controls.dollyOut(zoomFactor);
+                  else if (pendingDy < 0) state.viewer.controls.dollyIn(1 / zoomFactor);
+                } else if (typeof state.viewer.zoom === "function") {
+                  state.viewer.zoom(zoomFactor);
+                } else {
+                  const cam = getThreeCamera();
+                  if (cam) {
+                    if (cam.isOrthographicCamera) {
+                      cam.zoom = Math.max(0.01, cam.zoom * (pendingDy < 0 ? 1.05 : 0.95));
+                      cam.updateProjectionMatrix();
+                    } else {
+                      cam.position.addScaledVector(cam.getWorldDirection(new window.THREE.Vector3()), -pendingDy * 0.5);
+                    }
+                  }
+                }
+                if (state.viewer.controls.update) state.viewer.controls.update();
               }
             }
             pendingDx = 0;
@@ -2115,12 +2167,10 @@
       });
 
       window.addEventListener("mouseup", (e) => {
-        if (e.button === 1 || e.button === 2) {
-          isDragging = false;
-          dragMode = "none";
-          if (state.viewer && state.viewer.rendered && state.viewer.rendered.controls) {
-            state.viewer.rendered.controls._isDragging = false;
-          }
+        isDragging = false;
+        dragMode = "none";
+        if (state.viewer && state.viewer.rendered && state.viewer.rendered.controls) {
+          state.viewer.rendered.controls._isDragging = false;
         }
       });
 
@@ -2618,6 +2668,42 @@
         switchTabPane("tab-layers");
       } else if (!isSim && activeTab && activeTab.dataset.pane === "tab-logs") {
         switchTabPane(isPcb ? "tab-layers" : "tab-tree");
+      }
+      updateControlsForMode();
+    }
+
+    function updateControlsForMode() {
+      const is2D = state.currentMode === "PCB" || state.currentMode === "DIAGRAM";
+      if (state.viewer && state.viewer.controls) {
+        state.viewer.controls.enableRotate = !is2D;
+        if (is2D) {
+          state.viewer.controls.mouseButtons = { LEFT: 2, MIDDLE: 1, RIGHT: 2 };
+        } else {
+          state.viewer.controls.mouseButtons = { LEFT: 0, MIDDLE: 1, RIGHT: 2 };
+        }
+      }
+      const camIso = document.getElementById("cam-iso");
+      const camFront = document.getElementById("cam-front");
+      const camSide = document.getElementById("cam-side");
+      const camFlip = document.getElementById("cam-flip");
+      if (camIso) camIso.style.display = is2D ? "none" : "";
+      if (camFront) camFront.style.display = is2D ? "none" : "";
+      if (camSide) camSide.style.display = is2D ? "none" : "";
+      if (camFlip) camFlip.style.display = (state.currentMode === "PCB") ? "" : "none";
+
+      const rowOrbit = document.getElementById("hud-row-orbit");
+      const rowPan = document.getElementById("hud-row-pan");
+      const rowZoom = document.getElementById("hud-row-zoom");
+      if (rowOrbit) rowOrbit.style.display = is2D ? "none" : "";
+      if (rowPan) {
+        rowPan.innerHTML = is2D
+          ? '<td>Pan View</td><td><span class="kbd-badge">LMB Drag</span> or <span class="kbd-badge">RMB Drag</span></td>'
+          : '<td>Pan View</td><td><span class="kbd-badge">Shift + MMB Drag</span> or <span class="kbd-badge">RMB Drag</span></td>';
+      }
+      if (rowZoom) {
+        rowZoom.innerHTML = is2D
+          ? '<td>Zoom / Dolly</td><td><span class="kbd-badge">MMB Drag</span> or <span class="kbd-badge">Scroll Wheel</span></td>'
+          : '<td>Zoom / Dolly</td><td><span class="kbd-badge">Scroll Wheel</span> or <span class="kbd-badge">Ctrl + MMB</span></td>';
       }
     }
 
