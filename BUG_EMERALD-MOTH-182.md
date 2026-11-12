@@ -7,7 +7,7 @@
 - **Category**: `UI`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-12 17:40:50 UTC`
-- **Resolved**: `2026-11-12 17:41:06 UTC`
+- **Resolved**: `2026-11-12 17:57:03 UTC`
 
 #### Description
 
@@ -24,3 +24,4 @@ Target (#btn-open-chooser) and Sync (#btn-sync) buttons in the scope CAD viewer 
 #### Resolution Notes
 
 Separated DOM event listener attachment into synchronous initEventListeners called on DOMContentLoaded so Target and Sync buttons are immediately responsive without waiting for async geometry compilation. Updated openProjectChooserModal to asynchronously fetch projects if empty, and added unconfigured target/project fallback handling to the Sync button.
+-Tried a couple times, this still isn’t working for me :-(
