@@ -1,12 +1,13 @@
-# 🔴 `[BUG-SHINING-HOVERFLY-298]` Simulation water particles shimmer/motion blur and STEPS/SCALE playback control text overlap
+# 🟢 `[BUG-SHINING-HOVERFLY-298]` Simulation water particles shimmer/motion blur and STEPS/SCALE playback control text overlap
 
 - **UUID**: `3707fc5c-39a2-48c2-89a9-73c07ca08d9c`
 - **ID**: `BUG-SHINING-HOVERFLY-298`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-12 01:01:10 UTC`
+- **Resolved**: `2026-11-12 17:28:04 UTC`
 - **Rejected**: `2026-11-12 14:39:06 UTC`
 
 #### Description
@@ -533,9 +534,7 @@ face 46 ignored
 
 #### Resolution Notes
 
-Eliminate particle shimmer with circular soft sprite and velocity color ramp, fix playback control overlap with nowrap layout, add Save .rrd button, and genericize rerun events
-
--I still see shimmering, I think the particles are too small. Can you repro this on the CLI?
+Added hydrodynamic motion blur streamlines, soft non-shimmering particle point sprites with smooth radial texture and normal blending, and grouped playback STEPS and SCALE into a bordered badge preventing text overlap.
 
 #### Rejection Feedback
 
