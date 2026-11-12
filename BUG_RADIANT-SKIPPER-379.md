@@ -13,6 +13,10 @@
 
 In provider/templates/scope.html.j2, uiScaleSelect lacked the selected attribute on option 100%, causing browsers to default to the first option (75%). Additionally, html and body were styled with 100vw and 100vh instead of 100%, preventing proper zoom viewport scaling, and localStorage persisted the false 75% state across reloads.
 
+#### Attached Commits
+
+- `5774f536`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:07ccb8f5 --> Verify UI scale selector defaults to 100% and scales properly | `python tools/scope.py`
