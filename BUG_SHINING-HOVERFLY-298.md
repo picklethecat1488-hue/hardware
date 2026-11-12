@@ -2,12 +2,13 @@
 
 - **UUID**: `3707fc5c-39a2-48c2-89a9-73c07ca08d9c`
 - **ID**: `BUG-SHINING-HOVERFLY-298`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-12 01:01:10 UTC`
 - **Resolved**: `2026-11-12 20:45:27 UTC`
+- **Accepted**: `2026-11-12 20:45:38 UTC`
 - **Rejected**: `2026-11-12 14:39:06 UTC`
 
 #### Description
