@@ -522,6 +522,10 @@ face 46 ignored
 2026-11-12 06:36:02 [INFO] scope: 127.0.0.1 - - [12/Nov/2026 06:36:02] "GET /api/scope/projects HTTP/1.1" 200 -
 ```
 
+#### Attached Commits
+
+- `0e8b9905`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:8deaa611 --> Open cat fountain wiring diagram or carrier board PCB in Scope, verify that click-and-drag with LMB pans the view, dragging with MMB zooms the view, and orbit controls are disabled in HUD and quickbar | `python tools/scope.py cat_fountain/wiring:diagram`
