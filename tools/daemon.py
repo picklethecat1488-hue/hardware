@@ -81,7 +81,7 @@ RELOAD_PREFIXES = (
     "list",
     "build",
     "config",
-    "view",
+    "scope",
     "daemon",
 )
 EXIT_CODE_TOKEN = "__DAEMON_EXIT_CODE__"
