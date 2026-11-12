@@ -7,7 +7,7 @@
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-12 14:41:48 UTC`
-- **Resolved**: `2026-11-12 15:27:42 UTC`
+- **Resolved**: `2026-11-12 20:48:39 UTC`
 
 #### Description
 
@@ -536,3 +536,7 @@ face 46 ignored
 #### Resolution Notes
 
 Align PCB layer stack with Components above Substrate, match KiCad theme colors, orient +Y downward matching KiCad, disable 3D rotate controls in 2D mode, and render net labels on pads and traces when zoomed in
+-Rejected:
+-Pallette doesn’t match the kicad pallete
+-Rotate is still enabled
+-Net labels are not being rerendered when I rotate the PCB
