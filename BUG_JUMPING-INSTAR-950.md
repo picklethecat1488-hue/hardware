@@ -2,12 +2,13 @@
 
 - **UUID**: `f9bfa2d4-b45b-4fec-849a-c63b9ce5e153`
 - **ID**: `BUG-JUMPING-INSTAR-950`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-11 22:06:16 UTC`
 - **Resolved**: `2026-11-12 00:54:20 UTC`
+- **Accepted**: `2026-11-12 00:54:29 UTC`
 - **Rejected**: `2026-11-11 23:07:04 UTC`
 
 #### Description
