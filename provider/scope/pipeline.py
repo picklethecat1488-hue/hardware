@@ -18,6 +18,7 @@ from provider import ProviderManager, Section, Mode, Room, Provider
 from target_parser import TargetParser
 from provider.pcb.cad_assembler import PCB3DAssembler
 from model.pcb import resolve_subassembly_pcb_config
+from build123d import Plane, Compound
 
 try:
     from ocp_vscode.config import config as ocp_config
@@ -529,6 +530,13 @@ class ScopeGeometryPipeline:
                 results = self.manager.router.run(parsed_targets)
                 for p_name, room in results:
                     display_items.append((room.compound, f"{p_name}_diagram", None, 1.0))
+                    # Project and append diagram text annotation labels so they render in 3D viewport
+                    if hasattr(room, "_project_labels") and hasattr(room, "_labels") and room._labels:
+                        labels = room._project_labels(Plane.XY)
+                        if labels:
+                            display_items.append(
+                                (Compound(children=labels), f"{p_name}_labels", (0.95, 0.95, 0.95), 1.0)
+                            )
 
             else:
                 # Default CAD mode (VIEW or PART)

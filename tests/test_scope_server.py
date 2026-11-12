@@ -979,3 +979,20 @@ def test_regression_bug_lustrous_cicada_558_canvas_relative_raycasting(scope_ser
     # Verify canvas-relative coordinates are passed into idPicker and Three.js Raycaster
     assert "const coords = getCanvasRelativeCoords(e);" in html
     assert "const mouse = new window.THREE.Vector2(coords.ndcX, coords.ndcY);" in html
+
+
+def test_regression_bug_punctate_darner_735_diagram_view_labels():
+    """Verify that diagram view text annotation labels are projected and tessellated for 3D inspection."""
+    from provider.scope.pipeline import ScopeGeometryPipeline
+
+    pipeline = ScopeGeometryPipeline()
+    payload = pipeline.load_geometry("cat_fountain", "wiring", mode="DIAGRAM")
+
+    parts = payload.get("shapes", {}).get("parts", [])
+    part_names = [p.get("name") for p in parts]
+    assert "cat_fountain_diagram" in part_names
+    assert "cat_fountain_labels" in part_names
+
+    # Ensure label meshes were tessellated into instances (text sketches contain hundreds of face instances)
+    instances = payload.get("instances", [])
+    assert len(instances) > 50
