@@ -409,6 +409,98 @@
       justify-content: center;
       align-items: center;
     }
+    /* Quake Stone-Trench Search & Text Inputs */
+    .quake-input,
+    #commitSearchInput,
+    #fileSearchInput {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.02em;
+      color: var(--quake-text-light);
+      background: linear-gradient(180deg, #0d0704 0%, #160d07 100%);
+      border: 1px solid var(--quake-border-mid);
+      border-top-color: #120a05;
+      border-left-color: #120a05;
+      border-radius: 3px;
+      padding: 4px 8px;
+      width: 100%;
+      box-shadow: inset 1px 1px 4px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(141, 93, 51, 0.22);
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    }
+    .quake-input::placeholder,
+    #commitSearchInput::placeholder,
+    #fileSearchInput::placeholder {
+      color: var(--quake-text-dim);
+      opacity: 1;
+    }
+    .quake-input:hover,
+    #commitSearchInput:hover,
+    #fileSearchInput:hover {
+      border-color: var(--quake-border-light);
+    }
+    .quake-input:focus,
+    #commitSearchInput:focus,
+    #fileSearchInput:focus {
+      border-color: var(--quake-gold);
+      background: linear-gradient(180deg, #120a05 0%, #1d1109 100%);
+      box-shadow: inset 1px 1px 4px rgba(0, 0, 0, 0.95), 0 0 8px rgba(255, 184, 0, 0.32);
+    }
+    .quake-search-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      background: linear-gradient(180deg, #0d0704 0%, #160d07 100%);
+      border: 1px solid var(--quake-border-mid);
+      border-top-color: #120a05;
+      border-left-color: #120a05;
+      border-radius: 3px;
+      box-shadow: inset 1px 1px 4px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(141, 93, 51, 0.25);
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      height: 24px;
+      padding: 0 6px;
+      gap: 5px;
+    }
+    .quake-search-wrap:hover {
+      border-color: var(--quake-border-light);
+    }
+    .quake-search-wrap:focus-within {
+      border-color: var(--quake-gold);
+      box-shadow: inset 1px 1px 4px rgba(0, 0, 0, 0.95), 0 0 8px rgba(255, 184, 0, 0.35);
+    }
+    .quake-search-icon {
+      color: var(--quake-copper);
+      font-size: 10px;
+      line-height: 1;
+      pointer-events: none;
+      user-select: none;
+    }
+    .quake-search-wrap:focus-within .quake-search-icon {
+      color: var(--quake-gold);
+      text-shadow: 0 0 4px rgba(255, 184, 0, 0.5);
+    }
+    .quake-search-wrap .quake-input {
+      border: none !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      padding: 2px 2px;
+      width: 145px;
+      height: 100%;
+    }
+    .quake-search-clear {
+      background: none;
+      border: none;
+      color: var(--quake-text-dim);
+      font-size: 9px;
+      cursor: pointer;
+      padding: 0 2px;
+      line-height: 1;
+      display: none;
+    }
+    .quake-search-clear:hover {
+      color: var(--quake-gold);
+    }
+
     .search-result-row {
       padding: 6px 10px;
       border: 1px solid var(--quake-border-mid);
@@ -416,18 +508,48 @@
       cursor: pointer;
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 3px;
       border-radius: 3px;
-      transition: background 0.15s;
+      transition: background 0.15s, border-color 0.15s;
     }
-    .search-result-row:hover {
+    .search-result-row:hover,
+    .search-result-row.active-hit {
       background: var(--quake-panel-hover);
       border-color: var(--quake-gold);
+    }
+    .search-result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
     }
     .search-result-loc {
       color: var(--quake-gold);
       font-size: 9px;
       font-weight: 700;
+    }
+    .search-proximity-badge {
+      font-size: 7.5px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .search-proximity-active {
+      background: rgba(255, 184, 0, 0.18);
+      border: 1px solid var(--quake-gold);
+      color: var(--quake-gold);
+    }
+    .search-proximity-near {
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid var(--quake-cyan);
+      color: var(--quake-cyan);
+    }
+    .search-proximity-other {
+      background: rgba(158, 138, 120, 0.12);
+      border: 1px solid var(--quake-border-mid);
+      color: var(--quake-text-muted);
     }
     .search-result-content {
       color: var(--quake-text-light);
@@ -1545,8 +1667,12 @@
     </div>
 
     <div class="diff-toolbar-right">
-      <input id="codeSearchInput" class="quake-input" style="width: 125px; font-size: 9px; padding: 3px 6px; background: #130a05; border: 1px solid var(--quake-border-mid); color: var(--quake-text-light);" placeholder="🔍 Search... (Enter)" onkeydown="if (event.key === 'Enter') executeCodeSearch()">
-      <button class="quake-btn quake-btn-default" onclick="executeCodeSearch()" title="Search code/symbol references">Find</button>
+      <div class="quake-search-wrap" title="Fuzzy search symbols & files (ranked nearest to active file)">
+        <span class="quake-search-icon">⌕</span>
+        <input id="codeSearchInput" type="text" class="quake-input" placeholder="Fuzzy search... (Enter)" autocomplete="off" oninput="document.getElementById('codeSearchClearBtn').style.display = this.value ? 'inline-block' : 'none'" onkeydown="if (event.key === 'Enter') executeCodeSearch(); else if (event.key === 'Escape') { this.value=''; document.getElementById('codeSearchClearBtn').style.display='none'; closeCodeSearchModal(); }">
+        <button id="codeSearchClearBtn" type="button" class="quake-search-clear" title="Clear search" onclick="const inp=document.getElementById('codeSearchInput'); inp.value=''; this.style.display='none'; inp.focus();">✕</button>
+      </div>
+      <button class="quake-btn quake-btn-default" onclick="executeCodeSearch()" title="Fuzzy search code/symbol references (nearest to active file first)">Find</button>
       <button class="quake-btn quake-btn-default" onclick="copyFilePath()" title="Copy file path">📋 Copy</button>
       <button class="quake-btn quake-btn-default" onclick="loadDiff()" title="Reload Diff">🔄</button>
     </div>
@@ -1572,7 +1698,7 @@
           <span>Commit Stream</span>
           <button class="quake-btn quake-btn-default" style="padding: 2px 6px;" onclick="togglePane('commits')" title="Collapse Pane (Shortcut: [)">◀</button>
         </div>
-        <input type="text" id="commitSearchInput" placeholder="Filter commits, hash, author..." oninput="filterCommits()">
+        <input type="text" id="commitSearchInput" class="quake-input" placeholder="Filter commits, hash, author..." oninput="filterCommits()">
       </div>
       <ul id="commitsList" class="commits-list">
         <!-- Rendered dynamically -->
@@ -1589,7 +1715,7 @@
           <span id="filesCountHeader">Changed Files (0)</span>
           <button class="quake-btn quake-btn-default" style="padding: 2px 6px;" onclick="togglePane('files')" title="Collapse Pane (Shortcut: ])">◀</button>
         </div>
-        <input type="text" id="fileSearchInput" placeholder="Filter files by name..." oninput="filterFiles()">
+        <input type="text" id="fileSearchInput" class="quake-input" placeholder="Fuzzy filter files..." oninput="filterFiles()">
       </div>
       <ul id="filesList" class="files-list">
         <!-- Rendered dynamically -->
@@ -2260,10 +2386,46 @@
       document.getElementById("filesCountHeader").innerText = `Changed Files (${state.files.length})`;
       listEl.innerHTML = "";
 
-      const filter = (document.getElementById("fileSearchInput").value || "").toLowerCase();
+      const filter = (document.getElementById("fileSearchInput").value || "").trim().toLowerCase();
 
-      state.files.forEach(f => {
-        if (filter && !f.path.toLowerCase().includes(filter)) return;
+      function isFuzzySubseq(needle, haystack) {
+        let idx = 0;
+        for (let i = 0; i < haystack.length && idx < needle.length; i++) {
+          if (haystack[i] === needle[idx]) idx++;
+        }
+        return idx === needle.length;
+      }
+
+      function fileProximityDist(candPath, currPath) {
+        if (!currPath) return 0;
+        if (candPath === currPath) return 0;
+        const cDirs = currPath.includes("/") ? currPath.split("/").slice(0, -1) : [];
+        const dDirs = candPath.includes("/") ? candPath.split("/").slice(0, -1) : [];
+        let common = 0;
+        while (common < cDirs.length && common < dDirs.length && cDirs[common] === dDirs[common]) {
+          common++;
+        }
+        return 1 + (cDirs.length - common) + (dDirs.length - common);
+      }
+
+      let displayFiles = state.files.slice();
+      if (filter) {
+        const tokens = filter.split(/\s+/).filter(Boolean);
+        displayFiles = displayFiles.filter(f => {
+          const lp = f.path.toLowerCase();
+          return tokens.every(tok => lp.includes(tok) || isFuzzySubseq(tok, lp));
+        });
+        displayFiles.sort((a, b) => {
+          const da = fileProximityDist(a.path, state.selectedFile || "");
+          const db = fileProximityDist(b.path, state.selectedFile || "");
+          if (da !== db) return da - db;
+          const aExact = a.path.toLowerCase().includes(filter) ? 0 : 1;
+          const bExact = b.path.toLowerCase().includes(filter) ? 0 : 1;
+          return aExact - bExact;
+        });
+      }
+
+      displayFiles.forEach(f => {
 
         const comments = (state.session?.comments || []).filter(c => c.file_path === f.path);
 
@@ -2306,47 +2468,99 @@
       });
     }
 
+    let activeSearchHitIndex = -1;
+
     async function executeCodeSearch() {
       const inputEl = document.getElementById("codeSearchInput");
       const query = (inputEl.value || "").trim();
       if (!query) return;
 
-      logCli(`Searching code references for: "${query}"...`, "cyan");
+      const activeFile = state.selectedFile || "";
+      logCli(`Fuzzy searching code references for: "${query}"${activeFile ? ` (nearest to ${activeFile})` : ""}...`, "cyan");
       const modal = document.getElementById("codeSearchResultsModal");
       const listEl = document.getElementById("codeSearchResultsList");
       const titleEl = document.getElementById("codeSearchTitle");
-      titleEl.innerText = `Search Results for "${query}"`;
+      titleEl.innerText = activeFile
+        ? `Fuzzy Search: "${query}" — Nearest to ${activeFile}`
+        : `Fuzzy Search Results for "${query}"`;
       listEl.innerHTML = `<div style="padding: 15px; color: var(--quake-text-dim);">Searching...</div>`;
       modal.style.display = "flex";
+      activeSearchHitIndex = -1;
 
       try {
         const commit = state.selectedCommit || "working";
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}&commit=${encodeURIComponent(commit)}`);
+        const res = await fetch(
+          `/api/search?q=${encodeURIComponent(query)}&commit=${encodeURIComponent(commit)}&file=${encodeURIComponent(activeFile)}`
+        );
         const data = await res.json();
         const results = data.results || [];
         if (results.length === 0) {
-          listEl.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--quake-text-dim);">No occurrences found.</div>`;
+          listEl.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--quake-text-dim);">No fuzzy occurrences found.</div>`;
           return;
         }
 
         listEl.innerHTML = "";
-        results.forEach(m => {
+        results.forEach((m, idx) => {
           const row = document.createElement("div");
-          row.className = "search-result-row";
+          row.className = "search-result-row" + (idx === 0 ? " active-hit" : "");
           row.onclick = () => {
             goto(`${m.file_path}:${m.line_number}`);
             closeCodeSearchModal();
           };
+
+          let proxBadge = "";
+          if (activeFile) {
+            const dist = typeof m.proximity_distance === "number" ? m.proximity_distance : 99;
+            if (dist === 0 || m.file_path === activeFile) {
+              proxBadge = `<span class="search-proximity-badge search-proximity-active">ACTIVE FILE</span>`;
+            } else if (dist === 1) {
+              proxBadge = `<span class="search-proximity-badge search-proximity-near">SAME DIR</span>`;
+            } else if (dist <= 3) {
+              proxBadge = `<span class="search-proximity-badge search-proximity-near">NEARBY</span>`;
+            } else {
+              proxBadge = `<span class="search-proximity-badge search-proximity-other">${dist - 1} HOPS</span>`;
+            }
+          }
+
           row.innerHTML = `
-            <div class="search-result-loc">${m.file_path}:${m.line_number}</div>
+            <div class="search-result-header">
+              <div class="search-result-loc">${escapeHtml(m.file_path)}:${m.line_number}</div>
+              ${proxBadge}
+            </div>
             <div class="search-result-content">${escapeHtml(m.line_content)}</div>
           `;
           listEl.appendChild(row);
         });
+        activeSearchHitIndex = 0;
       } catch (e) {
         listEl.innerHTML = `<div style="padding: 15px; color: var(--quake-red);">Error searching code: ${e.message}</div>`;
       }
     }
+
+    document.addEventListener("keydown", (e) => {
+      const modal = document.getElementById("codeSearchResultsModal");
+      if (!modal || modal.style.display === "none") return;
+      const rows = Array.from(document.querySelectorAll("#codeSearchResultsList .search-result-row"));
+      if (e.key === "Escape") {
+        closeCodeSearchModal();
+        e.preventDefault();
+      } else if (e.key === "ArrowDown" && rows.length > 0) {
+        activeSearchHitIndex = (activeSearchHitIndex + 1) % rows.length;
+        rows.forEach((r, i) => r.classList.toggle("active-hit", i === activeSearchHitIndex));
+        rows[activeSearchHitIndex].scrollIntoView({ block: "nearest" });
+        e.preventDefault();
+      } else if (e.key === "ArrowUp" && rows.length > 0) {
+        activeSearchHitIndex = (activeSearchHitIndex - 1 + rows.length) % rows.length;
+        rows.forEach((r, i) => r.classList.toggle("active-hit", i === activeSearchHitIndex));
+        rows[activeSearchHitIndex].scrollIntoView({ block: "nearest" });
+        e.preventDefault();
+      } else if (e.key === "Enter" && rows.length > 0 && document.activeElement?.id !== "codeSearchInput") {
+        if (activeSearchHitIndex >= 0 && activeSearchHitIndex < rows.length) {
+          rows[activeSearchHitIndex].click();
+          e.preventDefault();
+        }
+      }
+    });
 
     function closeCodeSearchModal() {
       const modal = document.getElementById("codeSearchResultsModal");

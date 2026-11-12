@@ -87,8 +87,9 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
             case "/api/search":
                 q = query.get("q", [""])[0]
                 commit = query.get("commit", ["working"])[0]
-                results = self.server.git_engine.search_code(q, commit=commit)
-                self._send_json({"query": q, "commit": commit, "results": results})
+                current_file = query.get("file", [""])[0]
+                results = self.server.git_engine.search_code(q, commit=commit, current_file=current_file)
+                self._send_json({"query": q, "commit": commit, "current_file": current_file, "results": results})
             case "/api/raw":
                 commit = query.get("commit", ["working"])[0]
                 file_path = query.get("file", [""])[0]

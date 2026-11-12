@@ -1751,3 +1751,87 @@ def test_large_diff_handling_without_hanging_three_cad_viewer(tmp_path: Path) ->
     assert len(diff.hunks) == 1
     assert diff.additions == 5000
     assert diff.deletions == 0
+
+
+def test_fuzzy_proximity_code_search_and_quake_themed_textbox(tmp_path: Path) -> None:
+    """Verify fuzzy code search, proximity ordering nearest to viewed file, and Quake search textbox theming."""
+    repo_dir = tmp_path / "fuzzy_search_repo"
+    repo_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "user@workspace"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "User"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=repo_dir, check=True, capture_output=True)
+
+    files_to_create = {
+        "unrelated/deep/nested/far.py": "def calculate_flux_density(val):\n    return val * 2.0\n",
+        "pkg/other_sub/cousin.py": "def calculate_flux_density(val):\n    return val * 1.5\n",
+        "pkg/parent_helper.py": "def calculate_flux_density(val):\n    return val * 1.2\n",
+        "pkg/sub/sibling_file.py": "def calculate_flux_density(val):\n    return val * 1.1\n",
+        "pkg/sub/active.py": "def calculate_flux_density(val):\n    return val * 1.0\n",
+    }
+    for rel_path, content in files_to_create.items():
+        full_p = repo_dir / rel_path
+        full_p.parent.mkdir(parents=True, exist_ok=True)
+        full_p.write_text(content, encoding="utf-8")
+
+    subprocess.run(["git", "add", "."], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Add flux modules"], cwd=repo_dir, check=True, capture_output=True)
+    head_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo_dir, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+    engine = GitEngine(repo_root=repo_dir)
+
+    expected_order_from_active = [
+        "pkg/sub/active.py",
+        "pkg/sub/sibling_file.py",
+        "pkg/parent_helper.py",
+        "pkg/other_sub/cousin.py",
+        "unrelated/deep/nested/far.py",
+    ]
+
+    # 1. Exact query ordered nearest to current_file ("pkg/sub/active.py") first
+    exact_hits = engine.search_code("calculate_flux_density", commit="working", current_file="pkg/sub/active.py")
+    assert [h["file_path"] for h in exact_hits] == expected_order_from_active
+
+    # 2. Fuzzy subsequence / abbreviated query ("calc_flx_dens") ordered nearest to current_file first
+    fuzzy_subseq_hits = engine.search_code("calc_flx_dens", commit="working", current_file="pkg/sub/active.py")
+    assert [h["file_path"] for h in fuzzy_subseq_hits] == expected_order_from_active
+
+    # 3. Fuzzy typo-tolerant query ("calculat_flux_densty") ordered nearest to current_file first
+    fuzzy_typo_hits = engine.search_code("calculat_flux_densty", commit="working", current_file="pkg/sub/active.py")
+    assert [h["file_path"] for h in fuzzy_typo_hits] == expected_order_from_active
+
+    # 4. Changing current_file re-ranks proximity relative to the newly viewed file on commit SHA
+    cousin_hits = engine.search_code("calc_flx", commit=head_sha, current_file="pkg/other_sub/cousin.py")
+    assert cousin_hits[0]["file_path"] == "pkg/other_sub/cousin.py"
+    assert cousin_hits[1]["file_path"] == "pkg/parent_helper.py"
+
+    # 5. Verify HTTP /api/search endpoint & Quake-themed search textbox CSS in ReviewServer
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        markdown_output=tmp_path / "CR.md",
+        state_file=tmp_path / "cr_state.json",
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.05)
+
+    try:
+        base_url = server.get_url()
+        search_url = f"{base_url}api/search?q=calc_flx&commit=working&file=pkg/sub/active.py"
+        with urllib.request.urlopen(search_url) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+            assert [r["file_path"] for r in payload["results"]] == expected_order_from_active
+
+        with urllib.request.urlopen(base_url) as resp:
+            html = resp.read().decode("utf-8")
+            assert ".quake-input" in html
+            assert ".quake-search-wrap" in html
+            assert "state.selectedFile" in html
+            assert "&file=" in html
+    finally:
+        server.shutdown()
+        server.server_close()
