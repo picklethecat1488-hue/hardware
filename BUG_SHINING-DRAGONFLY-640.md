@@ -2,12 +2,13 @@
 
 - **UUID**: `5f192f47-2012-42d4-b07e-262ad0aa5a05`
 - **ID**: `BUG-SHINING-DRAGONFLY-640`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-12 00:52:30 UTC`
 - **Resolved**: `2026-11-12 14:35:30 UTC`
+- **Accepted**: `2026-11-12 14:35:39 UTC`
 
 #### Description
 
