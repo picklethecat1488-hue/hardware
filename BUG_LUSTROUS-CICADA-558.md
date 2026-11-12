@@ -526,6 +526,14 @@ face 46 ignored
 2026-11-11 15:10:03 [INFO] scope: 127.0.0.1 - - [11/Nov/2026 15:10:03] "GET /api/scope/load?project=carrier_board&target=product&subassembly=&mode=CAD HTTP/1.1" 200 -
 ```
 
+#### Attached Commits
+
+- `a006ca95`
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:c1cad401 --> Open carrier_board in Scope CAD mode, hover and click over carrier board components, top cover, and battery cover, and verify the hovered and inspected element aligns sub-pixel accurately with the mouse cursor position | `python tools/scope.py carrier_board/product:cad`
+
 #### Resolution Notes
 
 Replaced container-based mouse offset calculations with getCanvasRelativeCoords() against active WebGL canvas, eliminated wrapper container margin/left offsets, and synchronized camera raycasting and idPicker to exact canvas dimensions.
