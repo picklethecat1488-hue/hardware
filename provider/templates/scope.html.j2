@@ -4346,29 +4346,34 @@
       if (subSel) subSel.disabled = isLoading;
     }
 
-    function openProjectChooserModal() {
+    async function openProjectChooserModal() {
       const modal = document.getElementById("modal-project-chooser");
       const projSel = document.getElementById("chooser-project");
       const targetSel = document.getElementById("chooser-target");
 
+      if (modal) modal.classList.add("visible");
+
       if (state.projects.length === 0) {
-        projSel.innerHTML = '<option value="">(Loading workspace projects...)</option>';
-        targetSel.innerHTML = '<option value="">(Loading targets...)</option>';
+        if (projSel) projSel.innerHTML = '<option value="">(Loading workspace projects...)</option>';
+        if (targetSel) targetSel.innerHTML = '<option value="">(Loading targets...)</option>';
         setChooserLoading(true, "Scanning workspace projects and targets...", 35);
+        await loadProjects(false);
       } else {
         setChooserLoading(false);
-        projSel.innerHTML = "";
-        state.projects.forEach(p => {
-          const opt = document.createElement("option");
-          opt.value = p.name;
-          opt.textContent = p.name;
-          if (p.name === state.currentProject) opt.selected = true;
-          projSel.appendChild(opt);
-        });
+        if (projSel) {
+          projSel.innerHTML = "";
+          state.projects.forEach(p => {
+            const opt = document.createElement("option");
+            opt.value = p.name;
+            opt.textContent = p.name;
+            if (p.name === state.currentProject) opt.selected = true;
+            projSel.appendChild(opt);
+          });
 
-        if (!state.currentProject && state.projects.length > 0) {
-          state.currentProject = state.projects[0].name;
-          if (projSel.options.length > 0) projSel.selectedIndex = 0;
+          if (!state.currentProject && state.projects.length > 0) {
+            state.currentProject = state.projects[0].name;
+            if (projSel.options.length > 0) projSel.selectedIndex = 0;
+          }
         }
 
         const maxStepsSel = document.getElementById("chooser-max-steps");
@@ -4378,8 +4383,6 @@
 
         updateChooserTargets();
       }
-
-      modal.classList.add("visible");
     }
 
     function closeProjectChooserModal() {
@@ -4687,43 +4690,11 @@
     }
 
     // EVENT LISTENERS & DOM HOOKUPS
-    document.addEventListener("DOMContentLoaded", async () => {
-      try {
-        initUiScale();
-        initSidebarResizer();
-        initCadViewer();
-        resizeViewport();
-        updateActiveTargetHudBadge();
-
-        if (state.currentProject && state.currentTarget) {
-          showSyncProgress("INITIALIZING WORKSTATION");
-          updateSyncProgress(25, "Loading Workstation...", `Preparing ${state.currentProject}/${state.currentTarget}`);
-          await Promise.all([
-            loadProjects(false),
-            loadActiveGeometry(true),
-          ]);
-          hideSyncProgress();
-        } else {
-          // When run with no arguments, immediately pop up Target Chooser Modal before displaying anything
-          openProjectChooserModal();
-          await loadProjects(false);
-        }
-      } catch (err) {
-        hideSyncProgress();
-        showToast("Initialization error: " + err, 4000);
-      }
-
-      // Check for URL query parameter overrides
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.has("max_steps")) {
-        const parsedSteps = parseInt(urlParams.get("max_steps"));
-        if (!isNaN(parsedSteps) && parsedSteps > 0) {
-          state.maxSteps = parsedSteps;
-        }
-      }
-
+    function initEventListeners() {
       // Chooser Modal Listeners
-      document.getElementById("btn-open-chooser")?.addEventListener("click", openProjectChooserModal);
+      document.getElementById("btn-open-chooser")?.addEventListener("click", () => {
+        openProjectChooserModal();
+      });
       document.getElementById("btn-close-chooser")?.addEventListener("click", closeProjectChooserModal);
       document.getElementById("btn-chooser-cancel")?.addEventListener("click", closeProjectChooserModal);
       document.getElementById("chooser-project")?.addEventListener("change", updateChooserTargets);
@@ -4748,8 +4719,8 @@
         const subSel = document.getElementById("chooser-sub");
         const activePill = document.querySelector("#chooser-mode-pills .mode-pill.active");
 
-        const selectedProj = projSel.value;
-        const selectedTarget = targetSel.value;
+        const selectedProj = projSel ? projSel.value : "";
+        const selectedTarget = targetSel ? targetSel.value : "";
         if (!selectedProj || !selectedTarget) {
           showToast("Please select a project and target to inspect", 3000);
           return;
@@ -4757,7 +4728,7 @@
 
         state.currentProject = selectedProj;
         state.currentTarget = selectedTarget;
-        state.currentSub = subSel.value || "";
+        state.currentSub = (subSel ? subSel.value : "") || "";
         state.currentMode = activePill ? activePill.dataset.mode : "CAD";
 
         if (state.currentMode === "SIMULATE") {
@@ -4785,7 +4756,7 @@
         }
       });
 
-      document.getElementById("btn-sync").addEventListener("click", async () => {
+      document.getElementById("btn-sync")?.addEventListener("click", async () => {
         showSyncProgress("SYNCHRONIZING WORKSTATION");
         try {
           updateSyncProgress(20, "Invalidating Caches...", "Flushing provider manifests and geometry cache");
@@ -4794,11 +4765,17 @@
           updateSyncProgress(45, "Discovering Assets...", "Querying registered targets and components");
           await loadProjects(false);
 
-          updateSyncProgress(70, "Compiling Geometry...", `Generating 3D model for ${state.currentTarget || state.currentProject}`);
-          await loadActiveGeometry(true);
+          if (state.currentProject && state.currentTarget) {
+            updateSyncProgress(70, "Compiling Geometry...", `Generating 3D model for ${state.currentTarget || state.currentProject}`);
+            await loadActiveGeometry(true);
 
-          updateSyncProgress(100, "Synchronized", "Workstation ready");
-          showToast("Workstation synchronized.", 2000);
+            updateSyncProgress(100, "Synchronized", "Workstation ready");
+            showToast("Workstation synchronized.", 2000);
+          } else {
+            updateSyncProgress(100, "Projects refreshed", "Choose a target to inspect");
+            showToast("Projects refreshed. Please select a target.", 2500);
+            openProjectChooserModal();
+          }
         } catch (err) {
           showToast(`Sync failed: ${err}`, 4000);
         } finally {
@@ -5040,6 +5017,50 @@
           }
         }
       });
+    }
+
+    async function initWorkstationData() {
+      try {
+        if (state.currentProject && state.currentTarget) {
+          showSyncProgress("INITIALIZING WORKSTATION");
+          updateSyncProgress(25, "Loading Workstation...", `Preparing ${state.currentProject}/${state.currentTarget}`);
+          await Promise.all([
+            loadProjects(false),
+            loadActiveGeometry(true),
+          ]);
+          hideSyncProgress();
+        } else {
+          // When run with no arguments, immediately pop up Target Chooser Modal before displaying anything
+          await openProjectChooserModal();
+        }
+      } catch (err) {
+        hideSyncProgress();
+        showToast("Initialization error: " + err, 4000);
+      }
+    }
+
+    // EVENT LISTENERS & DOM HOOKUPS
+    document.addEventListener("DOMContentLoaded", () => {
+      initUiScale();
+      initSidebarResizer();
+      initCadViewer();
+      resizeViewport();
+      updateActiveTargetHudBadge();
+
+      // Check for URL query parameter overrides
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.has("max_steps")) {
+        const parsedSteps = parseInt(urlParams.get("max_steps"));
+        if (!isNaN(parsedSteps) && parsedSteps > 0) {
+          state.maxSteps = parsedSteps;
+        }
+      }
+
+      // Synchronously attach all DOM event listeners immediately on load
+      initEventListeners();
+
+      // Initiate asynchronous data loading in background
+      initWorkstationData();
     });
   </script>
 </body>

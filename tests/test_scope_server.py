@@ -1324,3 +1324,29 @@ def test_regression_bug_velvety_larva_429_metrics_panel_and_histograms(scope_ser
     assert "renderSimulationMetrics" in html
     assert "metric-card" in html
     assert "hist-bar" in html
+
+
+def test_regression_bug_emerald_moth_182_target_and_sync_synchronous_initialization(scope_server):
+    """Verify target and sync buttons are bound synchronously on DOMContentLoaded and handle empty project state (BUG-EMERALD-MOTH-182)."""
+    url = f"http://127.0.0.1:{scope_server.actual_port}/"
+    req = urllib.request.urlopen(url)
+    assert req.status == 200
+    html = req.read().decode("utf-8")
+
+    # 1. Verify synchronous initialization separation
+    assert "function initEventListeners()" in html
+    assert "async function initWorkstationData()" in html
+    assert "initEventListeners();" in html
+    assert "initWorkstationData();" in html
+
+    # 2. Verify btn-open-chooser and btn-sync are registered inside initEventListeners
+    assert 'document.getElementById("btn-open-chooser")?.addEventListener("click"' in html
+    assert 'document.getElementById("btn-sync")?.addEventListener("click"' in html
+
+    # 3. Verify openProjectChooserModal handles empty state asynchronously by awaiting loadProjects
+    assert "async function openProjectChooserModal()" in html
+    assert "await loadProjects(false);" in html
+
+    # 4. Verify sync button has unconfigured project/target fallback to prevent 400/500 errors
+    assert "if (state.currentProject && state.currentTarget)" in html
+    assert "openProjectChooserModal();" in html
