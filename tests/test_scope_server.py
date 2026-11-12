@@ -1079,4 +1079,36 @@ def test_regression_bug_shining_dragonfly_640_silkscreen_text_orientation_and_pc
 
     assert "function getThreeCamera()" in html
     assert "raycaster.setFromCamera(mouse, threeCam);" in html
-    assert 'defaultPreset = (state.currentMode === "PCB" || state.currentMode === "DIAGRAM") ? "top" : "iso";' in html
+    assert '(state.currentMode === "PCB" || state.currentMode === "DIAGRAM") ? "top" : "iso"' in html
+
+
+def test_regression_bug_swarming_silverfish_292_diagram_view_white_background_and_camera(scope_server):
+    """Verify BUG-SWARMING-SILVERFISH-292: diagram view uses white background, black text, and SVG view_from preset."""
+    # 1. Verify Scope API serves diagram payload with SVG camera preset and black text annotations
+    load_url = (
+        f"http://127.0.0.1:{scope_server.actual_port}/api/scope/load?project=cat_fountain&target=wiring&mode=DIAGRAM"
+    )
+    req_load = urllib.request.urlopen(load_url)
+    assert req_load.status == 200
+    data = json.loads(req_load.read().decode("utf-8"))
+    assert data["type"] == "data"
+    assert data["mode"] == "DIAGRAM"
+    assert data["view_from"] == "top"
+
+    # Verify labels part exists and has black text (#000000)
+    labels_part = next((p for p in data["shapes"]["parts"] if "label" in p["name"].lower()), None)
+    assert labels_part is not None
+    assert len(labels_part.get("parts", [])) > 0
+    assert labels_part["parts"][0].get("color") == "#000000"
+
+    # 2. Verify Scope HTML template contains white background CSS and theme/ortho camera switching
+    html_url = f"http://127.0.0.1:{scope_server.actual_port}/"
+    req_html = urllib.request.urlopen(html_url)
+    assert req_html.status == 200
+    html = req_html.read().decode("utf-8")
+
+    assert "body.mode-diagram #cad-view" in html
+    assert "--tcv-bg-color: #ffffff !important;" in html
+    assert "state.viewer.renderer.setClearColor(0xffffff, 1.0);" in html
+    assert 'state.viewer.setTheme("light");' in html
+    assert "state.viewer.setOrtho(true);" in html

@@ -300,6 +300,7 @@ class ScopeGeometryPipeline:
 
             display_items: List[Tuple[Any, str, Optional[Tuple[float, float, float]], float]] = []
             pcb_metadata: Optional[Dict[str, Any]] = None
+            view_from: Optional[str] = "top" if mode_upper == "DIAGRAM" else None
 
             provider = self._resolve_provider(project)
             full_target = f"{project}/{target}"
@@ -529,14 +530,24 @@ class ScopeGeometryPipeline:
                 parsed_targets = self.target_parser.resolve(full_target, Section.DIAGRAM)
                 results = self.manager.router.run(parsed_targets)
                 for p_name, room in results:
-                    display_items.append((room.compound, f"{p_name}_diagram", None, 1.0))
+                    if isinstance(room, Room):
+                        options = getattr(room, "diagram_options", None)
+                        if options is None:
+                            prov = next((p for p in self.manager.router.providers if p.name == p_name), None)
+                            if prov:
+                                options = getattr(prov.settings, "diagram_options", None)
+                        if options and getattr(options, "view_from", None):
+                            view_from = str(options.view_from).lower()
+
+                    display_items.append(
+                        (room.compound if isinstance(room, Room) else room, f"{p_name}_diagram", None, 1.0)
+                    )
+
                     # Project and append diagram text annotation labels so they render in 3D viewport
                     if hasattr(room, "_project_labels") and hasattr(room, "_labels") and room._labels:
                         labels = room._project_labels(Plane.XY)
                         if labels:
-                            display_items.append(
-                                (Compound(children=labels), f"{p_name}_labels", (0.95, 0.95, 0.95), 1.0)
-                            )
+                            display_items.append((Compound(children=labels), f"{p_name}_labels", (0.0, 0.0, 0.0), 1.0))
 
             else:
                 # Default CAD mode (VIEW or PART)
@@ -591,6 +602,7 @@ class ScopeGeometryPipeline:
                 "target": full_target,
                 "project": project,
                 "mode": mode_upper,
+                "view_from": view_from,
                 "stats": {
                     "parts_count": len(shapes.get("parts", [])),
                     "bb": shapes.get("bb"),

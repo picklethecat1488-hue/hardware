@@ -653,6 +653,18 @@
       filter: contrast(1.12) brightness(1.05);
     }
 
+    /* DIAGRAM VIEWPORT WHITE BACKGROUND (BUG-SWARMING-SILVERFISH-292) */
+    body.mode-diagram #cad-view,
+    body.diagram-mode #cad-view,
+    body.mode-diagram #cad-view .tcv,
+    body.diagram-mode #cad-view .tcv,
+    body.mode-diagram #cad-view canvas,
+    body.diagram-mode #cad-view canvas {
+      --tcv-bg-color: #ffffff !important;
+      background: #ffffff !important;
+      background-color: #ffffff !important;
+    }
+
     /* FLOATING MARKUP TOOLBAR */
     #markup-toolbar {
       position: absolute;
@@ -1746,7 +1758,7 @@
         treeWidth: 0,
         glass: true,
         tools: true,
-        theme: "dark",
+        theme: state.currentMode === "DIAGRAM" ? "light" : "dark",
         measureTools: true,
         selectTool: true,
         explodeTool: true,
@@ -1754,6 +1766,9 @@
       };
 
       container.setAttribute("data-theme", "dark");
+      if (state.currentMode === "DIAGRAM") {
+        container.setAttribute("data-theme", "light");
+      }
       state.display = new Display(container, displayOptions);
       state.viewer = new Viewer(state.display, {
         ambientIntensity: 1.0,
@@ -1817,7 +1832,13 @@
       }
 
       if (state.viewer && state.viewer.renderer && typeof state.viewer.renderer.setClearColor === "function") {
-        state.viewer.renderer.setClearColor(0x120c08, 1.0);
+        if (state.currentMode === "DIAGRAM") {
+          state.viewer.renderer.setClearColor(0xffffff, 1.0);
+        } else if (state.currentMode === "PCB") {
+          state.viewer.renderer.setClearColor(0x101413, 1.0);
+        } else {
+          state.viewer.renderer.setClearColor(0x120c08, 1.0);
+        }
       }
 
       setupBlenderControls();
@@ -2322,11 +2343,16 @@
 
         if (state.viewer && shapes) {
           state.viewer.render(shapes, data.config || {}, {});
-          const defaultPreset = (state.currentMode === "PCB" || state.currentMode === "DIAGRAM") ? "top" : "iso";
+          const defaultPreset = data.view_from || ((state.currentMode === "PCB" || state.currentMode === "DIAGRAM") ? "top" : "iso");
           if (typeof state.viewer.presetCamera === "function") {
             state.viewer.presetCamera(defaultPreset);
           } else if (typeof state.viewer.setView === "function") {
             state.viewer.setView(defaultPreset);
+          }
+          if (state.currentMode === "DIAGRAM") {
+            if (typeof state.viewer.setOrtho === "function") {
+              state.viewer.setOrtho(true);
+            }
           }
           resizeViewport();
           requestAnimationFrame(() => {
@@ -2335,15 +2361,38 @@
         }
 
         state.pcbMetadata = data.pcb_metadata;
-        if (state.currentMode === "PCB") {
+        if (state.currentMode === "DIAGRAM") {
+          document.body.classList.remove("pcb-high-contrast");
+          document.body.classList.add("diagram-mode");
+          if (state.viewer && state.viewer.renderer && typeof state.viewer.renderer.setClearColor === "function") {
+            state.viewer.renderer.setClearColor(0xffffff, 1.0);
+          }
+          if (state.viewer && typeof state.viewer.setTheme === "function") {
+            state.viewer.setTheme("light");
+          }
+        } else if (state.currentMode === "PCB") {
+          document.body.classList.remove("diagram-mode");
           document.body.classList.add("pcb-high-contrast");
           if (state.viewer && state.viewer.renderer && typeof state.viewer.renderer.setClearColor === "function") {
             state.viewer.renderer.setClearColor(0x101413, 1.0);
           }
+          if (state.viewer && typeof state.viewer.setTheme === "function") {
+            state.viewer.setTheme("dark");
+          }
+          if (state.viewer && typeof state.viewer.setOrtho === "function") {
+            state.viewer.setOrtho(false);
+          }
         } else {
+          document.body.classList.remove("diagram-mode");
           document.body.classList.remove("pcb-high-contrast");
           if (state.viewer && state.viewer.renderer && typeof state.viewer.renderer.setClearColor === "function") {
             state.viewer.renderer.setClearColor(0x120c08, 1.0);
+          }
+          if (state.viewer && typeof state.viewer.setTheme === "function") {
+            state.viewer.setTheme("dark");
+          }
+          if (state.viewer && typeof state.viewer.setOrtho === "function") {
+            state.viewer.setOrtho(false);
           }
         }
         updateSidebarModeTabs();
