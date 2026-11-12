@@ -873,6 +873,34 @@ def test_regression_bug_jumping_instar_950_simulate_view_max_steps_physics_inspe
     assert "recordings/cat_fountain_3blade.rrd" in open_data["recording"]
 
 
+def test_regression_bug_segmented_larva_621_simulation_lid_drainage(scope_server):
+    """Verify BUG-SEGMENTED-LARVA-621: simulation fluid particles drain through the lid drainage hole into reservoir bowl."""
+    telem_url = f"http://127.0.0.1:{scope_server.actual_port}/api/scope/simulation_telemetry?project=cat_fountain&target=product"
+    req_telem = urllib.request.urlopen(telem_url)
+    assert req_telem.status == 200
+    telem = json.loads(req_telem.read().decode("utf-8"))
+
+    assert telem["status"] == "ok"
+    assert len(telem["frames"]) > 0
+
+    # Verify that the authentic SPH telemetry records drainage cutout particles
+    drainage_cutout_metrics = [f["metrics"]["drainage_cutout"] for f in telem["frames"]]
+    assert any(count > 0 for count in drainage_cutout_metrics), "No particles registered in drainage cutout metric"
+    assert max(drainage_cutout_metrics) > 100, (
+        f"Expected > 100 particles draining through lid hole, got {max(drainage_cutout_metrics)}"
+    )
+
+    # Verify that particles are sampled passing through the lid hole column (x in [-20, 20], y in [45, 80], z in [50, 105])
+    lid_drain_particles = []
+    for f in telem["frames"]:
+        for pt in f["positions"]:
+            x, y, z = pt[0], pt[1], pt[2]
+            if -20.0 <= x <= 20.0 and 45.0 <= y <= 80.0 and 50.0 <= z <= 105.0:
+                lid_drain_particles.append(pt)
+
+    assert len(lid_drain_particles) > 0, "No particles detected draining through lid cutout region"
+
+
 def test_shortcuts_toggle_cad_viewport_overlay(scope_server):
     """Verify that Shortcuts button toggles the in-viewport HUD overlay inside the CAD viewport."""
     html_url = f"http://127.0.0.1:{scope_server.actual_port}/"
