@@ -3621,11 +3621,13 @@
         metricsEl.textContent = `Spout: ${flowSpout} mL/s | Waterfall: ${flowWaterfall} mL/s | Reservoir: ${poolVol} L`;
       }
 
-      // Animate impeller rotation
+      // Animate rotating parts (impeller and drive hub / rotor) while keeping motor stator and motor base bracket stationary
       if (state.viewer && state.viewer.rendered && state.viewer.rendered.scene) {
         state.viewer.rendered.scene.traverse((obj) => {
           const lower = (obj.name || "").toLowerCase();
-          if (lower.includes("impeller") || lower.includes("motor") || lower.includes("hub") || lower.includes("rotor")) {
+          const isRotatingPart = (lower.includes("impeller") || lower.includes("drive_hub") || lower.includes("rotor"))
+            && !lower.includes("base") && !lower.includes("bracket") && !lower.includes("mount") && !lower.includes("stator") && !lower.includes("motor_hub");
+          if (isRotatingPart) {
             obj.rotation.z = step * 0.08;
           }
         });

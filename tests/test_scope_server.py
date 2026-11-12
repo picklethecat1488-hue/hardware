@@ -996,3 +996,39 @@ def test_regression_bug_punctate_darner_735_diagram_view_labels():
     # Ensure label meshes were tessellated into instances (text sketches contain hundreds of face instances)
     instances = payload.get("instances", [])
     assert len(instances) > 50
+
+
+def test_regression_bug_springing_grub_126_motor_base_fixed_and_impeller_rotating(scope_server):
+    """Verify BUG-SPRINGING-GRUB-126: Motor and motor base remain fixed while impeller and drive hub rotate."""
+    url = f"http://127.0.0.1:{scope_server.actual_port}/"
+    req = urllib.request.urlopen(url)
+    html = req.read().decode("utf-8")
+
+    # Verify rotation animation logic specifically filters rotating parts from stationary motor body and base bracket
+    assert "const isRotatingPart =" in html
+    assert '!lower.includes("motor_hub")' in html
+    assert '!lower.includes("base")' in html
+
+    def check_rotation(name: str) -> bool:
+        lower = name.lower()
+        return (
+            ("impeller" in lower or "drive_hub" in lower or "rotor" in lower)
+            and "base" not in lower
+            and "bracket" not in lower
+            and "mount" not in lower
+            and "stator" not in lower
+            and "motor_hub" not in lower
+        )
+
+    # Stationary parts: must NOT rotate
+    assert not check_rotation("cat_fountain/motor_hub")
+    assert not check_rotation("cat_fountain/motor")
+    assert not check_rotation("cat_fountain/motor_pcb")
+    assert not check_rotation("cat_fountain/motor_base")
+    assert not check_rotation("cat_fountain/bowl")
+    assert not check_rotation("cat_fountain/bottom_cover")
+
+    # Rotating parts: MUST rotate
+    assert check_rotation("cat_fountain/impeller")
+    assert check_rotation("cat_fountain/drive_hub")
+    assert check_rotation("cat_fountain/motor_rotor")
