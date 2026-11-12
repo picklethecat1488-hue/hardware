@@ -19,13 +19,13 @@ class PCB3DAssembler:
     mechanical CAD assemblies.
     """
 
-    DEFAULT_SOLDERMASK_COLOR = (0.04, 0.18, 0.08)  # KiCad rich dark green soldermask
-    DEFAULT_COMPONENT_COLOR = (0.12, 0.13, 0.16)  # Molded epoxy IC / passive dark charcoal
-    DEFAULT_PAD_COLOR = (1.0, 0.82, 0.15)  # Brilliant ENIG gold surface finish
-    DEFAULT_TOP_TRACE_COLOR = (0.92, 0.20, 0.20)  # F.Cu KiCad vivid red copper ribbon
-    DEFAULT_BOTTOM_TRACE_COLOR = (0.18, 0.50, 0.95)  # B.Cu KiCad contrasting vivid blue ribbon
-    DEFAULT_VIA_COLOR = (0.88, 0.75, 0.35)  # Copper/gold through-hole via barrels
-    DEFAULT_SILKSCREEN_COLOR = (0.95, 0.95, 0.95)  # High-contrast crisp white silkscreen legend
+    DEFAULT_SOLDERMASK_COLOR = (0.04, 0.14, 0.06)  # KiCad rich dark green soldermask (#0a2410)
+    DEFAULT_COMPONENT_COLOR = (0.165, 0.180, 0.208)  # Molded epoxy IC / passive dark charcoal (#2a2e35)
+    DEFAULT_PAD_COLOR = (0.784, 0.627, 0.204)  # Brilliant ENIG gold surface finish (#c8a034)
+    DEFAULT_TOP_TRACE_COLOR = (0.784, 0.204, 0.204)  # F.Cu KiCad vivid red copper ribbon (#c83434)
+    DEFAULT_BOTTOM_TRACE_COLOR = (0.204, 0.353, 0.784)  # B.Cu KiCad contrasting vivid blue ribbon (#345ac8)
+    DEFAULT_VIA_COLOR = (0.706, 0.627, 0.235)  # Copper/gold through-hole via barrels (#b4a03c)
+    DEFAULT_SILKSCREEN_COLOR = (0.90, 0.90, 0.90)  # High-contrast crisp white silkscreen legend (#e6e6e6)
     Z_PAD_OFFSET = 0.015  # Solder pads sit proud of trace ribbons to prevent Z-fighting (BUG-TRANSLUCENT-LACEWING-144)
     Z_SILK_OFFSET = 0.030  # Silkscreen legends sit proud of copper pads to guarantee clean visibility
 
@@ -528,15 +528,15 @@ class PCB3DAssembler:
         pfx = prefix or self.pcb_name
         items: List[Tuple[Any, str, Tuple[float, float, float], float]] = []
 
-        # 1. Substrate
-        substrate = self.build_substrate()
-        if substrate is not None:
-            items.append((substrate, f"{pfx}_substrate", self.substrate_color, 1.0))
-
-        # 2. Components
+        # 1. Components (above Substrate on layer stack)
         comps, pads = self.build_components_and_pads()
         if comps is not None:
             items.append((comps, f"{pfx}_components", self.DEFAULT_COMPONENT_COLOR, 1.0))
+
+        # 2. Substrate
+        substrate = self.build_substrate()
+        if substrate is not None:
+            items.append((substrate, f"{pfx}_substrate", self.substrate_color, 1.0))
 
         # 3. Copper Pads
         if pads is not None:

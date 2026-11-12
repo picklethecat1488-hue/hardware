@@ -1219,3 +1219,52 @@ def test_regression_bug_emerald_tick_950_lmb_pan_mmb_zoom_pcb_diagram(scope_serv
     assert "hud-row-orbit" in html
     assert 'dragMode = "pan"' in html
     assert 'dragMode = "zoom"' in html
+
+
+def test_regression_bug_dorsal_midge_176_pcb_layer_order_colors_orientation_net_labels(scope_server):
+    """Verify BUG-DORSAL-MIDGE-176: Layer stack ordering, KiCad palette colors, net labels on zoom, and orientation."""
+    # 1. Verify PCB metadata layers: Components above Substrate and KiCad hex colors
+    load_url = f"http://127.0.0.1:{scope_server.actual_port}/api/scope/load?project=carrier_board&target=carrier_board&mode=PCB"
+    req_load = urllib.request.urlopen(load_url)
+    assert req_load.status == 200
+    data = json.loads(req_load.read().decode("utf-8"))
+    assert "pcb_metadata" in data
+    layers = data["pcb_metadata"]["layers"]
+
+    layer_names = [l["name"] for l in layers]
+    assert "Components" in layer_names
+    assert "Substrate" in layer_names
+    assert layer_names.index("Components") < layer_names.index("Substrate")
+
+    layer_colors = {l["name"]: l["color"].lower() for l in layers}
+    assert layer_colors["Components"] == "#2a2e35"
+    assert layer_colors["Substrate"] == "#0a2410"
+    assert layer_colors["Pads"] == "#c8a034"
+    assert layer_colors["F.Cu (Top)"] == "#c83434"
+    assert layer_colors["B.Cu (Bottom)"] == "#345ac8"
+    assert layer_colors["Vias"] == "#b4a03c"
+    assert layer_colors["F.SilkS"] == "#e6e6e6"
+    assert layer_colors["B.SilkS"] == "#e6e6e6"
+
+    # 2. Verify CAD Assembler default constants
+    from provider.pcb.cad_assembler import PCB3DAssembler
+
+    assert PCB3DAssembler.DEFAULT_COMPONENT_COLOR == (0.165, 0.180, 0.208)
+    assert PCB3DAssembler.DEFAULT_SOLDERMASK_COLOR == (0.04, 0.14, 0.06)
+    assert PCB3DAssembler.DEFAULT_PAD_COLOR == (0.784, 0.627, 0.204)
+    assert PCB3DAssembler.DEFAULT_TOP_TRACE_COLOR == (0.784, 0.204, 0.204)
+    assert PCB3DAssembler.DEFAULT_BOTTOM_TRACE_COLOR == (0.204, 0.353, 0.784)
+    assert PCB3DAssembler.DEFAULT_VIA_COLOR == (0.706, 0.627, 0.235)
+    assert PCB3DAssembler.DEFAULT_SILKSCREEN_COLOR == (0.90, 0.90, 0.90)
+
+    # 3. Verify HTML template invariants: KiCad orientation flip and net labels on zoom
+    html_url = f"http://127.0.0.1:{scope_server.actual_port}/"
+    req_html = urllib.request.urlopen(html_url)
+    assert req_html.status == 200
+    html = req_html.read().decode("utf-8")
+
+    assert "setupPcbOrientation" in html
+    assert "drawPcbNetLabels" in html
+    assert "cam.top = -Math.abs(halfH)" in html
+    assert "cam.bottom = Math.abs(halfH)" in html
+    assert 'camRight.style.display = is2D ? "none" : ""' in html

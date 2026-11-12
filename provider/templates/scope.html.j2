@@ -1506,6 +1506,9 @@
         } catch {
           // Suppress unrendered resize errors during initialization
         }
+        if (state.currentMode === "PCB" && typeof setupPcbOrientation === "function") {
+          setupPcbOrientation();
+        }
       }
     }
     window.addEventListener("resize", resizeViewport);
@@ -1531,6 +1534,9 @@
       if (!state.pcbMetadata) return null;
 
       const useScreen = screenX != null && screenY != null && threeCam && canvasWidth && canvasHeight && window.THREE;
+      if (useScreen && typeof threeCam.updateMatrixWorld === "function") {
+        threeCam.updateMatrixWorld(true);
+      }
       let bestEntity = null;
       let bestScore = Infinity;
 
@@ -1547,14 +1553,15 @@
       if (state.pcbMetadata.test_points) {
         for (const tp of state.pcbMetadata.test_points) {
           const tpRadius = (tp.dia || 1.4) / 2.0;
+          const zVal = tp.layer === "B.Cu" ? -0.8 : 0.8;
           let effDist = Infinity;
           if (useScreen) {
-            const sc = toScreen(tp.x, tp.y, 0.8);
-            const scEdge = toScreen(tp.x + tpRadius, tp.y, 0.8);
+            const sc = toScreen(tp.x, tp.y, zVal);
+            const scEdge = toScreen(tp.x + tpRadius, tp.y, zVal);
             const rPx = Math.max(5, Math.hypot(scEdge.x - sc.x, scEdge.y - sc.y));
             const pDist = Math.hypot(screenX - sc.x, screenY - sc.y);
             effDist = Math.max(0, pDist - rPx);
-            if (effDist <= 18 && effDist < bestScore) {
+            if (effDist <= 20 && effDist < bestScore) {
               bestScore = effDist;
               bestEntity = {
                 type: "test_point",
@@ -1566,7 +1573,7 @@
           } else {
             const d = Math.hypot(x - tp.x, y - tp.y);
             effDist = Math.max(0, d - tpRadius);
-            if (effDist <= 1.2 && effDist < bestScore) {
+            if (effDist <= 1.5 && effDist < bestScore) {
               bestScore = effDist;
               bestEntity = {
                 type: "test_point",
@@ -1584,16 +1591,17 @@
         for (const p of state.pcbMetadata.pads) {
           const halfW = (p.w || 0.8) / 2.0;
           const halfH = (p.h || 0.8) / 2.0;
+          const zVal = p.layer === "B.Cu" ? -0.8 : 0.8;
           if (useScreen) {
-            const sc = toScreen(p.x, p.y, 0.8);
-            const scW = toScreen(p.x + halfW, p.y, 0.8);
-            const scH = toScreen(p.x, p.y + halfH, 0.8);
+            const sc = toScreen(p.x, p.y, zVal);
+            const scW = toScreen(p.x + halfW, p.y, zVal);
+            const scH = toScreen(p.x, p.y + halfH, zVal);
             const wPx = Math.max(4, Math.abs(scW.x - sc.x));
             const hPx = Math.max(4, Math.abs(scH.y - sc.y));
             const dxPx = Math.max(0, Math.abs(screenX - sc.x) - wPx);
             const dyPx = Math.max(0, Math.abs(screenY - sc.y) - hPx);
             const effDist = Math.hypot(dxPx, dyPx);
-            if (effDist <= 16 && effDist < bestScore) {
+            if (effDist <= 18 && effDist < bestScore) {
               bestScore = effDist;
               bestEntity = {
                 type: p.is_test_point ? "test_point" : "pad",
@@ -1607,7 +1615,7 @@
             const dx = Math.max(0, Math.abs(x - p.x) - halfW);
             const dy = Math.max(0, Math.abs(y - p.y) - halfH);
             const d = Math.hypot(dx, dy);
-            if (d <= 1.0 && d < bestScore) {
+            if (d <= 1.2 && d < bestScore) {
               bestScore = d;
               bestEntity = {
                 type: p.is_test_point ? "test_point" : "pad",
@@ -1631,7 +1639,7 @@
             const rPx = Math.max(3, Math.hypot(scR.x - sc.x, scR.y - sc.y));
             const pDist = Math.hypot(screenX - sc.x, screenY - sc.y);
             const effDist = Math.max(0, pDist - rPx);
-            if (effDist <= 16 && effDist < bestScore) {
+            if (effDist <= 18 && effDist < bestScore) {
               bestScore = effDist;
               bestEntity = {
                 type: "via",
@@ -1643,7 +1651,7 @@
           } else {
             const d = Math.hypot(x - v.pos[0], y - v.pos[1]);
             const effDist = Math.max(0, d - viaRadius);
-            if (effDist <= 1.0 && effDist < bestScore) {
+            if (effDist <= 1.2 && effDist < bestScore) {
               bestScore = effDist;
               bestEntity = {
                 type: "via",
@@ -1660,14 +1668,15 @@
       if (state.pcbMetadata.traces) {
         for (const t of state.pcbMetadata.traces) {
           const traceRadius = (t.width || 0.25) / 2.0;
+          const zVal = t.layer === "B.Cu" ? -0.8 : 0.8;
           if (useScreen) {
-            const s1 = toScreen(t.start[0], t.start[1], 0.8);
-            const s2 = toScreen(t.end[0], t.end[1], 0.8);
-            const sR = toScreen(t.start[0] + traceRadius, t.start[1], 0.8);
+            const s1 = toScreen(t.start[0], t.start[1], zVal);
+            const s2 = toScreen(t.end[0], t.end[1], zVal);
+            const sR = toScreen(t.start[0] + traceRadius, t.start[1], zVal);
             const rPx = Math.max(2, Math.hypot(sR.x - s1.x, sR.y - s1.y));
             const segDist = distanceToSegment(screenX, screenY, s1.x, s1.y, s2.x, s2.y);
             const effDist = Math.max(0, segDist - rPx);
-            if (effDist <= 14 && effDist < bestScore) {
+            if (effDist <= 20 && effDist < bestScore) {
               bestScore = effDist;
               bestEntity = {
                 type: "trace",
@@ -1679,7 +1688,7 @@
           } else {
             const d = distanceToSegment(x, y, t.start[0], t.start[1], t.end[0], t.end[1]);
             const effDist = Math.max(0, d - traceRadius);
-            if (effDist <= 0.8 && effDist < bestScore) {
+            if (effDist <= 1.0 && effDist < bestScore) {
               bestScore = effDist;
               bestEntity = {
                 type: "trace",
@@ -2021,14 +2030,17 @@
             raycaster.setFromCamera(mouse, threeCam);
 
             let worldPoint = null;
-            const plane = new window.THREE.Plane(new window.THREE.Vector3(0, 0, 1), -0.8);
-            worldPoint = new window.THREE.Vector3();
-            raycaster.ray.intersectPlane(plane, worldPoint);
-            if (!worldPoint && state.viewer.rendered.scene) {
+            if (state.viewer?.rendered?.scene) {
               const hits = raycaster.intersectObjects(state.viewer.rendered.scene.children, true);
               if (hits && hits.length > 0) worldPoint = hits[0].point;
             }
-            if (!worldPoint) worldPoint = new window.THREE.Vector3(0, 0, 0.8);
+            if (!worldPoint) {
+              const zPlane = pcbIsFlipped ? 0.8 : -0.8;
+              const plane = new window.THREE.Plane(new window.THREE.Vector3(0, 0, 1), zPlane);
+              worldPoint = new window.THREE.Vector3();
+              raycaster.ray.intersectPlane(plane, worldPoint);
+            }
+            if (!worldPoint) worldPoint = new window.THREE.Vector3(0, 0, pcbIsFlipped ? -0.8 : 0.8);
 
             const entity = findPcbEntityAtPoint(
               worldPoint.x, worldPoint.y, worldPoint.z,
@@ -2066,56 +2078,49 @@
         container.style.cursor = "";
       });
 
+      let isMouseDown = false;
       container.addEventListener("mousedown", (e) => {
         downX = e.clientX;
         downY = e.clientY;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        isMouseDown = true;
+        isDragging = false;
         const is2D = state.currentMode === "PCB" || state.currentMode === "DIAGRAM";
 
         if (is2D) {
           if (e.button === 0) { // LMB in 2D mode: default to PAN on drag!
-            isDragging = true;
             dragMode = "pan";
-            lastX = e.clientX;
-            lastY = e.clientY;
-            if (state.viewer?.rendered?.controls) {
-              state.viewer.rendered.controls._isDragging = true;
-            }
           } else if (e.button === 1) { // MMB in 2D mode: default to ZOOM!
-            isDragging = true;
             dragMode = "zoom";
-            lastX = e.clientX;
-            lastY = e.clientY;
-            if (state.viewer?.rendered?.controls) {
-              state.viewer.rendered.controls._isDragging = true;
-            }
             e.preventDefault();
           } else if (e.button === 2) { // RMB in 2D mode: PAN
-            isDragging = true;
             dragMode = "pan";
-            lastX = e.clientX;
-            lastY = e.clientY;
-            if (state.viewer?.rendered?.controls) {
-              state.viewer.rendered.controls._isDragging = true;
-            }
             e.preventDefault();
           }
         } else {
           // 3D modes (CAD, SIMULATE)
           if (e.button === 1 || (e.button === 2 && e.shiftKey)) { // MMB or Shift+RMB
-            isDragging = true;
             dragMode = e.shiftKey ? "pan" : "orbit";
-            lastX = e.clientX;
-            lastY = e.clientY;
-            if (state.viewer && state.viewer.rendered && state.viewer.rendered.controls) {
-              state.viewer.rendered.controls._isDragging = true;
-            }
             e.preventDefault();
           }
         }
       });
 
       window.addEventListener("mousemove", (e) => {
-        if (!isDragging) return;
+        if (!isMouseDown) return;
+        if (!isDragging) {
+          if (Math.hypot(e.clientX - downX, e.clientY - downY) > 5) {
+            isDragging = true;
+            lastX = e.clientX;
+            lastY = e.clientY;
+            if (state.viewer?.rendered?.controls) {
+              state.viewer.rendered.controls._isDragging = true;
+            }
+          } else {
+            return;
+          }
+        }
         const dx = e.clientX - lastX;
         const dy = e.clientY - lastY;
         lastX = e.clientX;
@@ -2167,6 +2172,7 @@
       });
 
       window.addEventListener("mouseup", (e) => {
+        isMouseDown = false;
         isDragging = false;
         dragMode = "none";
         if (state.viewer && state.viewer.rendered && state.viewer.rendered.controls) {
@@ -2178,7 +2184,7 @@
       container.addEventListener("click", (e) => {
         if (state.markup && state.markup.active) return;
         const dist = Math.hypot(e.clientX - downX, e.clientY - downY);
-        if (dist > 5) return; // Ignore drag release
+        if (dist > 8) return; // Ignore drag release
 
         const coords = getCanvasRelativeCoords(e);
         const rect = coords.rect;
@@ -2188,19 +2194,25 @@
         // Dedicated PCB View Click & Inspection Handler
         const threeCam = getThreeCamera();
         if (state.currentMode === "PCB" && state.pcbMetadata && threeCam && window.THREE) {
+          if (typeof threeCam.updateMatrixWorld === "function") {
+            threeCam.updateMatrixWorld(true);
+          }
           const mouse = new window.THREE.Vector2(coords.ndcX, coords.ndcY);
           const raycaster = new window.THREE.Raycaster();
           raycaster.setFromCamera(mouse, threeCam);
 
           let worldPoint = null;
-          const plane = new window.THREE.Plane(new window.THREE.Vector3(0, 0, 1), -0.8);
-          worldPoint = new window.THREE.Vector3();
-          raycaster.ray.intersectPlane(plane, worldPoint);
-          if (!worldPoint && state.viewer.rendered.scene) {
+          if (state.viewer?.rendered?.scene) {
             const hits = raycaster.intersectObjects(state.viewer.rendered.scene.children, true);
             if (hits && hits.length > 0) worldPoint = hits[0].point;
           }
-          if (!worldPoint) worldPoint = new window.THREE.Vector3(0, 0, 0.8);
+          if (!worldPoint) {
+            const zPlane = pcbIsFlipped ? 0.8 : -0.8;
+            const plane = new window.THREE.Plane(new window.THREE.Vector3(0, 0, 1), zPlane);
+            worldPoint = new window.THREE.Vector3();
+            raycaster.ray.intersectPlane(plane, worldPoint);
+          }
+          if (!worldPoint) worldPoint = new window.THREE.Vector3(0, 0, pcbIsFlipped ? -0.8 : 0.8);
 
           const entity = findPcbEntityAtPoint(
             worldPoint.x, worldPoint.y, worldPoint.z,
@@ -2314,6 +2326,12 @@
         }
       });
 
+      container.addEventListener("wheel", () => {
+        if (state.currentMode === "PCB") {
+          requestAnimationFrame(redrawMarkups);
+        }
+      }, { passive: true });
+
       // Keyboard shortcuts
       window.addEventListener("keydown", (e) => {
         if (["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
@@ -2381,6 +2399,27 @@
       });
     }
 
+    function setupPcbOrientation() {
+      if (state.currentMode !== "PCB" || !state.viewer) return;
+      if (typeof state.viewer.setOrtho === "function") {
+        state.viewer.setOrtho(true);
+      }
+      const r = getViewerRendered();
+      if (!r || !r.camera) return;
+      const cam = r.camera.oCamera || (r.camera.camera && r.camera.camera.isOrthographicCamera ? r.camera.camera : null);
+      if (cam && cam.isOrthographicCamera) {
+        // KiCad orientation: top is -Y, bottom is +Y, left is -X, right is +X.
+        // Invert top and bottom in Orthographic camera so +Y increases downward.
+        const halfH = Math.abs(cam.top - cam.bottom) / 2.0 || 60;
+        cam.top = -Math.abs(halfH);
+        cam.bottom = Math.abs(halfH);
+        cam.updateProjectionMatrix();
+        if (state.viewer.controls && state.viewer.controls.update) {
+          state.viewer.controls.update();
+        }
+      }
+    }
+
     function setCameraPreset(viewName) {
       if (!state.viewer) return;
       if (typeof state.viewer.presetCamera === "function") {
@@ -2400,6 +2439,10 @@
         c.lookAt(0, 0, 0);
         state.viewer.controls.update();
       }
+      if (state.currentMode === "PCB") {
+        setupPcbOrientation();
+      }
+      redrawMarkups();
     }
 
     function toggleProjection() {
@@ -2566,8 +2609,9 @@
             state.viewer.setTheme("dark");
           }
           if (state.viewer && typeof state.viewer.setOrtho === "function") {
-            state.viewer.setOrtho(false);
+            state.viewer.setOrtho(true);
           }
+          setupPcbOrientation();
         } else {
           document.body.classList.remove("diagram-mode");
           document.body.classList.remove("pcb-high-contrast");
@@ -2681,14 +2725,24 @@
         } else {
           state.viewer.controls.mouseButtons = { LEFT: 0, MIDDLE: 1, RIGHT: 2 };
         }
+        if (!state.viewer.controls._pcbChangeAttached && typeof state.viewer.controls.addEventListener === "function") {
+          state.viewer.controls._pcbChangeAttached = true;
+          state.viewer.controls.addEventListener("change", () => {
+            if (state.currentMode === "PCB") {
+              requestAnimationFrame(redrawMarkups);
+            }
+          });
+        }
       }
       const camIso = document.getElementById("cam-iso");
       const camFront = document.getElementById("cam-front");
       const camSide = document.getElementById("cam-side");
+      const camRight = document.getElementById("cam-right");
       const camFlip = document.getElementById("cam-flip");
       if (camIso) camIso.style.display = is2D ? "none" : "";
       if (camFront) camFront.style.display = is2D ? "none" : "";
       if (camSide) camSide.style.display = is2D ? "none" : "";
+      if (camRight) camRight.style.display = is2D ? "none" : "";
       if (camFlip) camFlip.style.display = (state.currentMode === "PCB") ? "" : "none";
 
       const rowOrbit = document.getElementById("hud-row-orbit");
@@ -3452,8 +3506,100 @@
       state.isDrawing = false;
     });
 
+    function drawPcbNetLabels() {
+      if (!state.pcbMetadata || state.currentMode !== "PCB") return;
+      const threeCam = getThreeCamera();
+      if (!threeCam || !window.THREE) return;
+      if (typeof threeCam.updateMatrixWorld === "function") {
+        threeCam.updateMatrixWorld(true);
+      }
+
+      const w = markupCanvas.width;
+      const h = markupCanvas.height;
+      if (w <= 0 || h <= 0) return;
+
+      function toScreen(px, py, pz) {
+        const v = new window.THREE.Vector3(px, py, pz != null ? pz : 0.8).project(threeCam);
+        return {
+          x: ((v.x + 1) / 2) * w,
+          y: ((-v.y + 1) / 2) * h,
+          inView: v.x >= -1.05 && v.x <= 1.05 && v.y >= -1.05 && v.y <= 1.05 && v.z >= -1 && v.z <= 1,
+        };
+      }
+
+      // Check zoom level: calculate screen pixels per mm
+      const pOrigin = toScreen(0, 0, 0.8);
+      const p1mm = toScreen(1, 0, 0.8);
+      const pxPerMm = Math.hypot(p1mm.x - pOrigin.x, p1mm.y - pOrigin.y);
+
+      // Only show net labels when zoomed in sufficiently (at least 12 pixels per mm)
+      if (pxPerMm < 12) return;
+
+      markupCtx.save();
+      markupCtx.textAlign = "center";
+      markupCtx.textBaseline = "middle";
+
+      // 1. Draw net names on copper pads
+      if (state.pcbMetadata.pads) {
+        for (const p of state.pcbMetadata.pads) {
+          if (!p.net || p.net === "" || p.net === "unconnected") continue;
+          const halfW = (p.w || 0.8) / 2.0;
+          const padWidthPx = halfW * 2.0 * pxPerMm;
+          if (padWidthPx < 16) continue;
+
+          const zVal = p.layer === "B.Cu" ? -0.8 : 0.8;
+          const sc = toScreen(p.x, p.y, zVal);
+          if (!sc.inView) continue;
+
+          const label = p.net;
+          const fontSize = Math.min(11, Math.max(7, Math.round(padWidthPx * 0.28)));
+          markupCtx.font = `bold ${fontSize}px sans-serif`;
+
+          // Drop shadow/halo for legibility against copper
+          markupCtx.fillStyle = "rgba(0, 0, 0, 0.85)";
+          markupCtx.fillText(label, sc.x + 0.5, sc.y + 0.5);
+          markupCtx.fillStyle = "#ffffff";
+          markupCtx.fillText(label, sc.x, sc.y);
+        }
+      }
+
+      // 2. Draw net names on traces
+      if (state.pcbMetadata.traces) {
+        for (const t of state.pcbMetadata.traces) {
+          if (!t.net || t.net === "" || t.net === "unconnected") continue;
+          const zVal = t.layer === "B.Cu" ? -0.8 : 0.8;
+          const s1 = toScreen(t.start[0], t.start[1], zVal);
+          const s2 = toScreen(t.end[0], t.end[1], zVal);
+          const segLen = Math.hypot(s2.x - s1.x, s2.y - s1.y);
+          if (segLen < 35) continue;
+
+          const midX = (s1.x + s2.x) / 2.0;
+          const midY = (s1.y + s2.y) / 2.0;
+          if (midX < 0 || midX > w || midY < 0 || midY > h) continue;
+
+          const angle = Math.atan2(s2.y - s1.y, s2.x - s1.x);
+          const normAngle = (angle > Math.PI / 2 || angle < -Math.PI / 2) ? angle + Math.PI : angle;
+
+          markupCtx.save();
+          markupCtx.translate(midX, midY);
+          markupCtx.rotate(normAngle);
+          markupCtx.font = "bold 8px sans-serif";
+          markupCtx.fillStyle = "rgba(0, 0, 0, 0.85)";
+          markupCtx.fillText(t.net, 0.5, -3.5);
+          markupCtx.fillStyle = "#38bdf8";
+          markupCtx.fillText(t.net, 0, -4);
+          markupCtx.restore();
+        }
+      }
+
+      markupCtx.restore();
+    }
+
     function redrawMarkups() {
       markupCtx.clearRect(0, 0, markupCanvas.width, markupCanvas.height);
+      if (state.currentMode === "PCB" && state.pcbMetadata) {
+        drawPcbNetLabels();
+      }
       state.markups.forEach((m) => renderLiveStroke(m));
       renderAnnotations();
     }
