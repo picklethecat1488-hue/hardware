@@ -1,12 +1,13 @@
-# 🔴 `[BUG-METALLIC-LOCUST-110]` [carrier_board/carrier_board] Defect in PCB view
+# 🟢 `[BUG-METALLIC-LOCUST-110]` [carrier_board/carrier_board] Defect in PCB view
 
 - **UUID**: `b34a1fed-53de-4ca0-acd6-4e2dfa61c57e`
 - **ID**: `BUG-METALLIC-LOCUST-110`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-13 00:11:25 UTC`
+- **Resolved**: `2026-11-13 00:35:57 UTC`
 
 #### Description
 
@@ -531,3 +532,7 @@ face 46 ignored
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:91bdb6d4 --> Open carrier_board PCB view, activate the Ruler tool via the quickbar 📏 button or M key, measure distances between snapped pads/vias/test points and arbitrary substrate points (with Shift) across Top and Bottom views, and verify crisp mm/mil + ΔX/ΔY readouts that track pan/zoom | `python tools/scope.py carrier_board/carrier_board:pcb`
+
+#### Resolution Notes
+
+Replaced three-cad-viewer's solid-pair DistanceMeasurement tool with a dedicated world-space millimeter Ruler controller in scope.html.j2 supporting magnetic pad/via/test-point/trace-endpoint snapping in PCB view (Top & Bottom), Shift free-point override, orthogonal ΔX/ΔY guides, graduated mm ticks, high-contrast Quake HUD mm/mil readout pills, and 3D B-rep/mesh surface picking.
