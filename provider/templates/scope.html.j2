@@ -1260,7 +1260,7 @@
               <tr id="hud-row-focus"><td>Frame / Reset View</td><td id="hud-cell-focus">{% if active_mode == 'PCB' %}<span class="kbd-badge">.</span> or <span class="kbd-badge">Home</span>{% else %}<span class="kbd-badge">F</span>, <span class="kbd-badge">.</span>, or <span class="kbd-badge">Home</span>{% endif %}</td></tr>
               <tr id="hud-row-iso"><td>Reset Isometric</td><td><span class="kbd-badge">0</span></td></tr>
               <tr id="hud-row-planar-pan"><td>Keyboard Pan</td><td><span class="kbd-badge">W</span> <span class="kbd-badge">A</span> <span class="kbd-badge">S</span> <span class="kbd-badge">D</span> or <span class="kbd-badge">Arrow Keys</span></td></tr>
-              <tr id="hud-row-ruler"><td>Measure Distance (mm)</td><td><span class="kbd-badge">M</span></td></tr>
+              <tr id="hud-row-ruler"><td>Measure Distance (mm)</td><td><span class="kbd-badge">M</span> (<span class="kbd-badge">Shift</span> no-snap · <span class="kbd-badge">Esc</span> clear)</td></tr>
               <tr id="hud-row-wire"><td>Toggle Wireframe</td><td><span class="kbd-badge">Z</span></td></tr>
               <tr><td>Undo / Clear Markup</td><td><span class="kbd-badge">Cmd/Ctrl + Z</span> · <span class="kbd-badge">X</span> / <span class="kbd-badge">Del</span></td></tr>
               <tr><td>UI Scale</td><td><span class="kbd-badge">Cmd/Ctrl +</span> / <span class="kbd-badge">-</span> / <span class="kbd-badge">0</span></td></tr>
@@ -1535,6 +1535,12 @@
       isDrawing: false,
       currentStroke: null,
       pcbMetadata: null,
+      ruler: {
+        active: false,
+        p1: null,
+        p2: null,
+        hoverPoint: null,
+      },
       simPlaying: false,
       simStep: 0,
       maxSteps: {{ init_max_steps | default(1000) }},
@@ -2055,12 +2061,22 @@
         roughness: 0.65,
         preserveDrawingBuffer: true,
       }, (change) => {
-        if (state.currentMode === "PCB") {
+        if (state.currentMode === "PCB" || state.ruler.active || state.ruler.p1) {
           requestAnimationFrame(redrawMarkups);
-        } else if (state.currentMode === "SIMULATE") {
+        }
+        if (state.currentMode === "SIMULATE") {
           updateSimParticlePointSize();
         }
         if (change && change.lastPick) {
+          if (state.ruler.active) {
+            if (state.viewer && typeof state.viewer.removeLastBbox === "function") {
+              state.viewer.removeLastBbox();
+            }
+            if (state.viewer && typeof state.viewer.clearSelection === "function") {
+              state.viewer.clearSelection();
+            }
+            return;
+          }
           const pick = change.lastPick.new || change.lastPick;
           const pName = (pick.name || pick.path || "").toLowerCase();
           if (state.currentMode === "PCB" && pName.includes("substrate")) {
@@ -2094,10 +2110,19 @@
         }
       });
 
-      // Prevent substrate hover/pick/selection highlighting in PCB mode
+      // Prevent substrate hover/pick/selection highlighting in PCB mode (and suppress picks while ruler is active)
       const origHandlePick = state.viewer.handlePick;
       if (typeof origHandlePick === "function") {
         state.viewer.handlePick = function(path, name, meta, shift, alt, point, nodeType, tree) {
+          if (state.ruler.active) {
+            if (typeof state.viewer.removeLastBbox === "function") {
+              state.viewer.removeLastBbox();
+            }
+            if (typeof state.viewer.clearSelection === "function") {
+              state.viewer.clearSelection();
+            }
+            return;
+          }
           if (state.currentMode === "PCB") {
             const target = `${path}/${name}`.toLowerCase();
             if (target.includes("substrate")) {
@@ -2176,7 +2201,27 @@
 
       let hoverRaf = false;
       container.addEventListener("pointermove", (e) => {
-        if (state.currentMode !== "PCB" || isDragging || (state.markup && state.markup.active)) {
+        if (isDragging || markupCanvas.classList.contains("active")) {
+          if (hoverTooltipEl) hoverTooltipEl.style.display = "none";
+          if (!state.ruler.active) container.style.cursor = "";
+          return;
+        }
+
+        if (state.ruler.active) {
+          if (hoverTooltipEl) hoverTooltipEl.style.display = "none";
+          container.style.cursor = "crosshair";
+          if (!hoverRaf) {
+            hoverRaf = true;
+            requestAnimationFrame(() => {
+              hoverRaf = false;
+              state.ruler.hoverPoint = resolveRulerPoint(e);
+              redrawMarkups();
+            });
+          }
+          return;
+        }
+
+        if (state.currentMode !== "PCB") {
           if (hoverTooltipEl) hoverTooltipEl.style.display = "none";
           container.style.cursor = "";
           return;
@@ -2240,7 +2285,12 @@
 
       container.addEventListener("pointerleave", () => {
         if (hoverTooltipEl) hoverTooltipEl.style.display = "none";
-        container.style.cursor = "";
+        if (state.ruler.active) {
+          state.ruler.hoverPoint = null;
+          redrawMarkups();
+        } else {
+          container.style.cursor = "";
+        }
       });
 
       let isMouseDown = false;
@@ -2309,6 +2359,9 @@
                   ctrls.update();
                 }
               }
+              if (state.ruler.active || state.ruler.p1) {
+                redrawMarkups();
+              }
             }
             pendingDx = 0;
             pendingDy = 0;
@@ -2325,11 +2378,40 @@
         }
       });
 
+      container.addEventListener("contextmenu", (e) => {
+        if (!state.ruler.active) return;
+        const dist = Math.hypot(e.clientX - downX, e.clientY - downY);
+        if (dist <= 8) {
+          e.preventDefault();
+          if (state.ruler.p1) {
+            clearRulerMeasurement();
+            showToast("Ruler measurement cleared", 1800);
+          } else {
+            setRulerActive(false);
+          }
+        }
+      });
+
       // Viewport Click Handler for Object / Face Inspection (BUG-PINCERED-COCOON-242)
       container.addEventListener("click", (e) => {
-        if (state.markup && state.markup.active) return;
+        if (markupCanvas.classList.contains("active")) return;
         const dist = Math.hypot(e.clientX - downX, e.clientY - downY);
         if (dist > 8) return; // Ignore drag release
+
+        if (state.ruler.active) {
+          const pt = resolveRulerPoint(e);
+          if (!pt) return;
+          if (!state.ruler.p1 || (state.ruler.p1 && state.ruler.p2)) {
+            state.ruler.p1 = pt;
+            state.ruler.p2 = null;
+            state.ruler.hoverPoint = pt;
+          } else {
+            state.ruler.p2 = pt;
+            state.ruler.hoverPoint = pt;
+          }
+          redrawMarkups();
+          return;
+        }
 
         const coords = getCanvasRelativeCoords(e);
         const rect = coords.rect;
@@ -2472,7 +2554,7 @@
       });
 
       container.addEventListener("wheel", () => {
-        if (state.currentMode === "PCB") {
+        if (state.currentMode === "PCB" || state.ruler.active || state.ruler.p1) {
           requestAnimationFrame(redrawMarkups);
         }
       }, { passive: true });
@@ -2598,6 +2680,15 @@
             break;
           case "ESCAPE":
             toggleShortcuts(false);
+            if (state.ruler.active) {
+              if (state.ruler.p1) {
+                clearRulerMeasurement();
+                showToast("Ruler measurement cleared (press Esc again to exit ruler)", 2000);
+              } else {
+                setRulerActive(false);
+              }
+              break;
+            }
             if (state.currentMode === "PCB" && state.selectedNet) {
               clearNetHighlight();
             }
@@ -3160,6 +3251,7 @@
         }
 
         state.pcbMetadata = data.pcb_metadata;
+        clearRulerMeasurement();
         const rRendered = getViewerRendered();
         if (state.currentMode !== "PCB" && rRendered?.nestedGroup?.rootGroup && rRendered.nestedGroup.rootGroup.scale.y !== 1) {
           rRendered.nestedGroup.rootGroup.scale.set(1, 1, 1);
@@ -3337,7 +3429,7 @@
         if (!innerCtrls._pcbChangeAttached && typeof innerCtrls.addEventListener === "function") {
           innerCtrls._pcbChangeAttached = true;
           innerCtrls.addEventListener("change", () => {
-            if (state.currentMode === "PCB") {
+            if (state.currentMode === "PCB" || state.ruler.active || state.ruler.p1) {
               requestAnimationFrame(redrawMarkups);
             }
           });
@@ -3345,7 +3437,7 @@
         if (r.controls.domElement && !r.controls.domElement._pcbWheelAttached) {
           r.controls.domElement._pcbWheelAttached = true;
           r.controls.domElement.addEventListener("wheel", () => {
-            if (state.currentMode === "PCB") {
+            if (state.currentMode === "PCB" || state.ruler.active || state.ruler.p1) {
               requestAnimationFrame(redrawMarkups);
             }
           }, { passive: true });
@@ -4245,6 +4337,456 @@
       markupCtx.restore();
     }
 
+    function clearRulerMeasurement() {
+      state.ruler.p1 = null;
+      state.ruler.p2 = null;
+      state.ruler.hoverPoint = null;
+      redrawMarkups();
+    }
+
+    function setRulerActive(flag) {
+      const active = Boolean(flag);
+      state.ruler.active = active;
+      const rulerBtn = document.getElementById("cam-ruler");
+      if (rulerBtn) {
+        rulerBtn.classList.toggle("active", active);
+      }
+      if (state.display && typeof state.display.setTool === "function") {
+        state.display.setTool("distance", false);
+        if (state.display.clickButtons && state.display.clickButtons["distance"]) {
+          state.display.clickButtons["distance"].set(false);
+        }
+      }
+      if (active) {
+        const tb = document.getElementById("markup-toolbar");
+        if (tb && tb.classList.contains("visible")) {
+          tb.classList.remove("visible");
+          markupCanvas.classList.remove("active");
+        }
+        const hoverTooltipEl = document.getElementById("pcb-hover-tooltip");
+        if (hoverTooltipEl) hoverTooltipEl.style.display = "none";
+        container.style.cursor = "crosshair";
+        showToast("📏 Ruler active (mm): Click start & end points · Hold Shift to disable snap · Esc clears");
+      } else {
+        state.ruler.p1 = null;
+        state.ruler.p2 = null;
+        state.ruler.hoverPoint = null;
+        container.style.cursor = "";
+        showToast("Ruler tool deactivated", 1600);
+      }
+      redrawMarkups();
+    }
+
+    function resolveRulerPoint(e) {
+      const coords = getCanvasRelativeCoords(e);
+      const threeCam = getThreeCamera();
+      if (!threeCam || !window.THREE) return null;
+      if (typeof threeCam.updateMatrixWorld === "function") {
+        threeCam.updateMatrixWorld(true);
+      }
+      const mouse = new window.THREE.Vector2(coords.ndcX, coords.ndcY);
+      const raycaster = new window.THREE.Raycaster();
+      raycaster.setFromCamera(mouse, threeCam);
+
+      if (state.currentMode === "PCB") {
+        const activeZ = pcbIsFlipped ? -0.8 : 0.8;
+        const plane = new window.THREE.Plane(new window.THREE.Vector3(0, 0, 1), -activeZ);
+        const hitPt = new window.THREE.Vector3();
+        if (!raycaster.ray.intersectPlane(plane, hitPt)) return null;
+
+        let pcbX = hitPt.x;
+        let pcbY = -hitPt.y;
+        let snapLabel = "";
+        let snapped = false;
+
+        if (!e.shiftKey && state.pcbMetadata) {
+          const visibleLayerTypes = getVisiblePcbLayerTypes();
+          const toScreen = (px, py, pz) => {
+            const v = new window.THREE.Vector3(px, -py, pz).project(threeCam);
+            return {
+              x: ((v.x + 1) / 2) * coords.width,
+              y: ((-v.y + 1) / 2) * coords.height,
+            };
+          };
+
+          let bestDistPx = 13.0;
+          let bestSnap = null;
+
+          if (state.pcbMetadata.test_points && visibleLayerTypes.has("Pads")) {
+            for (const tp of state.pcbMetadata.test_points) {
+              const tpLayer = tp.layer || "F.Cu";
+              if (!isPcbCopperSideVisible(tpLayer, visibleLayerTypes)) continue;
+              const sc = toScreen(tp.x, tp.y, tpLayer === "B.Cu" ? -0.8 : 0.8);
+              const dPx = Math.hypot(coords.x - sc.x, coords.y - sc.y);
+              if (dPx < bestDistPx) {
+                bestDistPx = dPx;
+                bestSnap = { x: tp.x, y: tp.y, label: tp.name || "TP" };
+              }
+            }
+          }
+
+          if (state.pcbMetadata.pads && visibleLayerTypes.has("Pads")) {
+            for (const p of state.pcbMetadata.pads) {
+              const padLayer = p.layer || "F.Cu";
+              if (!isPcbCopperSideVisible(padLayer, visibleLayerTypes)) continue;
+              const sc = toScreen(p.x, p.y, padLayer === "B.Cu" ? -0.8 : 0.8);
+              const dPx = Math.hypot(coords.x - sc.x, coords.y - sc.y);
+              if (dPx < bestDistPx) {
+                bestDistPx = dPx;
+                const padLabel = (p.comp && p.pin) ? `${p.comp}.${p.pin}` : (p.net || "Pad");
+                bestSnap = { x: p.x, y: p.y, label: padLabel };
+              }
+            }
+          }
+
+          if (state.pcbMetadata.vias && visibleLayerTypes.has("Vias")) {
+            for (const v of state.pcbMetadata.vias) {
+              const sc = toScreen(v.pos[0], v.pos[1], activeZ);
+              const dPx = Math.hypot(coords.x - sc.x, coords.y - sc.y);
+              if (dPx < bestDistPx) {
+                bestDistPx = dPx;
+                bestSnap = { x: v.pos[0], y: v.pos[1], label: v.net ? `Via (${v.net})` : "Via" };
+              }
+            }
+          }
+
+          if (!bestSnap && state.pcbMetadata.traces) {
+            let bestTracePx = 10.0;
+            for (const t of state.pcbMetadata.traces) {
+              const traceLayer = t.layer || "F.Cu";
+              if (!visibleLayerTypes.has(traceLayer) || !isPcbCopperSideVisible(traceLayer, visibleLayerTypes)) continue;
+              const zVal = traceLayer === "B.Cu" ? -0.8 : 0.8;
+              for (const ep of [t.start, t.end]) {
+                if (!ep) continue;
+                const sc = toScreen(ep[0], ep[1], zVal);
+                const dPx = Math.hypot(coords.x - sc.x, coords.y - sc.y);
+                if (dPx < bestTracePx) {
+                  bestTracePx = dPx;
+                  bestSnap = { x: ep[0], y: ep[1], label: t.net || "" };
+                }
+              }
+            }
+          }
+
+          if (bestSnap) {
+            pcbX = bestSnap.x;
+            pcbY = bestSnap.y;
+            snapLabel = bestSnap.label;
+            snapped = true;
+          }
+        }
+
+        return {
+          worldX: pcbX,
+          worldY: -pcbY,
+          worldZ: activeZ,
+          x: pcbX,
+          y: pcbY,
+          z: 0,
+          is2D: true,
+          snapped,
+          label: snapLabel,
+        };
+      }
+
+      if (state.currentMode === "DIAGRAM") {
+        const plane = new window.THREE.Plane(new window.THREE.Vector3(0, 0, 1), 0);
+        const hitPt = new window.THREE.Vector3();
+        if (!raycaster.ray.intersectPlane(plane, hitPt)) return null;
+        return {
+          worldX: hitPt.x,
+          worldY: hitPt.y,
+          worldZ: 0,
+          x: hitPt.x,
+          y: hitPt.y,
+          z: 0,
+          is2D: true,
+          snapped: false,
+          label: "",
+        };
+      }
+
+      // 3D CAD & SIMULATE modes: prefer exact B-rep surface pick, then scene mesh raycast, then view plane
+      let hitPoint = null;
+      let hitLabel = "";
+      let hitSurface = false;
+
+      if (!e.shiftKey && state.viewer && state.viewer.idPicker) {
+        try {
+          const pickHit = state.viewer.idPicker.pickAt(coords.x, coords.y);
+          if (pickHit && pickHit.point) {
+            hitPoint = pickHit.point;
+            hitLabel = pickHit.info?.name || pickHit.info?.leaf?.name || "";
+            hitSurface = true;
+          }
+        } catch {
+          // Ignore picker fallback errors
+        }
+      }
+
+      if (!hitPoint && state.viewer?.rendered?.scene) {
+        const hits = raycaster.intersectObjects(state.viewer.rendered.scene.children, true);
+        const validHit = hits.find((h) => h.object && h.object.visible && h.object.isMesh && h.point);
+        if (validHit) {
+          hitPoint = validHit.point;
+          hitLabel = validHit.object.name || validHit.object.parent?.name || "";
+          hitSurface = true;
+        }
+      }
+
+      if (!hitPoint) {
+        const r = getViewerRendered();
+        const target = r?.controls?.controls?.target || r?.camera?.target || new window.THREE.Vector3(0, 0, 0);
+        const camDir = new window.THREE.Vector3();
+        threeCam.getWorldDirection(camDir);
+        const fallbackPlane = new window.THREE.Plane().setFromNormalAndCoplanarPoint(camDir, target);
+        const planePt = new window.THREE.Vector3();
+        if (!raycaster.ray.intersectPlane(fallbackPlane, planePt)) return null;
+        hitPoint = planePt;
+      }
+
+      return {
+        worldX: hitPoint.x,
+        worldY: hitPoint.y,
+        worldZ: hitPoint.z,
+        x: hitPoint.x,
+        y: hitPoint.y,
+        z: hitPoint.z,
+        is2D: false,
+        snapped: hitSurface,
+        label: hitLabel,
+      };
+    }
+
+    function drawRulerOverlay() {
+      if (!state.ruler.active && !state.ruler.p1) return;
+      const threeCam = getThreeCamera();
+      if (!threeCam || !window.THREE) return;
+      if (typeof threeCam.updateMatrixWorld === "function") {
+        threeCam.updateMatrixWorld(true);
+      }
+
+      const w = markupCanvas.width;
+      const h = markupCanvas.height;
+      if (w <= 0 || h <= 0) return;
+
+      const projectWorld = (wx, wy, wz) => {
+        const v = new window.THREE.Vector3(wx, wy, wz).project(threeCam);
+        return {
+          x: ((v.x + 1) / 2) * w,
+          y: ((-v.y + 1) / 2) * h,
+        };
+      };
+
+      const drawTargetMarker = (sx, sy, color, snapped) => {
+        markupCtx.save();
+        markupCtx.strokeStyle = "rgba(0, 0, 0, 0.9)";
+        markupCtx.lineWidth = 4;
+        markupCtx.beginPath();
+        markupCtx.arc(sx, sy, snapped ? 6.5 : 5, 0, Math.PI * 2);
+        markupCtx.stroke();
+
+        markupCtx.strokeStyle = color;
+        markupCtx.lineWidth = 2;
+        markupCtx.beginPath();
+        markupCtx.arc(sx, sy, snapped ? 6.5 : 5, 0, Math.PI * 2);
+        markupCtx.stroke();
+
+        markupCtx.beginPath();
+        markupCtx.moveTo(sx - 9, sy);
+        markupCtx.lineTo(sx + 9, sy);
+        markupCtx.moveTo(sx, sy - 9);
+        markupCtx.lineTo(sx, sy + 9);
+        markupCtx.stroke();
+        markupCtx.restore();
+      };
+
+      markupCtx.save();
+
+      // Hover preview crosshair before P1 is placed (or after P2 is locked)
+      if (state.ruler.active && state.ruler.hoverPoint && (!state.ruler.p1 || state.ruler.p2)) {
+        const hp = state.ruler.hoverPoint;
+        const sh = projectWorld(hp.worldX, hp.worldY, hp.worldZ);
+        const hoverCol = hp.snapped ? "#ffb800" : "#38bdf8";
+        drawTargetMarker(sh.x, sh.y, hoverCol, hp.snapped);
+
+        const coordStr = hp.label
+          ? `${hp.label} (${hp.x.toFixed(2)}, ${hp.y.toFixed(2)} mm)`
+          : (hp.is2D ? `(${hp.x.toFixed(2)}, ${hp.y.toFixed(2)}) mm` : `(${hp.x.toFixed(2)}, ${hp.y.toFixed(2)}, ${hp.z.toFixed(2)}) mm`);
+        markupCtx.font = "bold 11px monospace";
+        const tagW = markupCtx.measureText(coordStr).width + 14;
+        const tagX = Math.min(w - tagW - 8, Math.max(8, sh.x + 12));
+        const tagY = Math.min(h - 26, Math.max(8, sh.y - 26));
+        markupCtx.fillStyle = "rgba(20, 13, 8, 0.94)";
+        markupCtx.strokeStyle = hoverCol;
+        markupCtx.lineWidth = 1.25;
+        markupCtx.beginPath();
+        markupCtx.roundRect(tagX, tagY, tagW, 20, 4);
+        markupCtx.fill();
+        markupCtx.stroke();
+        markupCtx.fillStyle = "#f8fafc";
+        markupCtx.textBaseline = "middle";
+        markupCtx.fillText(coordStr, tagX + 7, tagY + 10);
+      }
+
+      const p1 = state.ruler.p1;
+      const p2 = state.ruler.p2 || state.ruler.hoverPoint;
+      if (!p1 || !p2) {
+        markupCtx.restore();
+        return;
+      }
+
+      const isLocked = Boolean(state.ruler.p2);
+      const accentColor = isLocked ? "#ffb800" : "#38bdf8";
+      const s1 = projectWorld(p1.worldX, p1.worldY, p1.worldZ);
+      const s2 = projectWorld(p2.worldX, p2.worldY, p2.worldZ);
+
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const dz = p2.z - p1.z;
+      const distMm = Math.hypot(dx, dy, dz);
+
+      // Orthogonal ΔX / ΔY right-triangle guide legs in 2D modes
+      if (p1.is2D && p2.is2D && Math.abs(dx) > 0.005 && Math.abs(dy) > 0.005) {
+        const sCorner = projectWorld(p2.worldX, p1.worldY, p1.worldZ);
+        markupCtx.save();
+        markupCtx.setLineDash([5, 4]);
+        markupCtx.strokeStyle = "rgba(0, 0, 0, 0.8)";
+        markupCtx.lineWidth = 3.5;
+        markupCtx.beginPath();
+        markupCtx.moveTo(s1.x, s1.y);
+        markupCtx.lineTo(sCorner.x, sCorner.y);
+        markupCtx.lineTo(s2.x, s2.y);
+        markupCtx.stroke();
+
+        markupCtx.strokeStyle = "rgba(56, 189, 248, 0.85)";
+        markupCtx.lineWidth = 1.5;
+        markupCtx.beginPath();
+        markupCtx.moveTo(s1.x, s1.y);
+        markupCtx.lineTo(sCorner.x, sCorner.y);
+        markupCtx.lineTo(s2.x, s2.y);
+        markupCtx.stroke();
+        markupCtx.restore();
+      }
+
+      // Main ruler measurement line with dark contrast halo
+      const segPx = Math.hypot(s2.x - s1.x, s2.y - s1.y);
+      const angle = Math.atan2(s2.y - s1.y, s2.x - s1.x);
+      const nx = -Math.sin(angle);
+      const ny = Math.cos(angle);
+
+      markupCtx.strokeStyle = "rgba(0, 0, 0, 0.88)";
+      markupCtx.lineWidth = 5;
+      markupCtx.beginPath();
+      markupCtx.moveTo(s1.x, s1.y);
+      markupCtx.lineTo(s2.x, s2.y);
+      markupCtx.stroke();
+
+      markupCtx.strokeStyle = accentColor;
+      markupCtx.lineWidth = 2.4;
+      markupCtx.beginPath();
+      markupCtx.moveTo(s1.x, s1.y);
+      markupCtx.lineTo(s2.x, s2.y);
+      markupCtx.stroke();
+
+      // Perpendicular witness ticks & millimeter graduation marks
+      if (segPx > 6) {
+        for (const sp of [s1, s2]) {
+          markupCtx.strokeStyle = "rgba(0, 0, 0, 0.88)";
+          markupCtx.lineWidth = 4;
+          markupCtx.beginPath();
+          markupCtx.moveTo(sp.x - nx * 8, sp.y - ny * 8);
+          markupCtx.lineTo(sp.x + nx * 8, sp.y + ny * 8);
+          markupCtx.stroke();
+
+          markupCtx.strokeStyle = accentColor;
+          markupCtx.lineWidth = 2;
+          markupCtx.beginPath();
+          markupCtx.moveTo(sp.x - nx * 8, sp.y - ny * 8);
+          markupCtx.lineTo(sp.x + nx * 8, sp.y + ny * 8);
+          markupCtx.stroke();
+        }
+
+        if (distMm > 0.05 && segPx > 28) {
+          const pxPerMm = segPx / distMm;
+          const stepMm = pxPerMm >= 24 ? 0.5 : (pxPerMm >= 8 ? 1.0 : (pxPerMm >= 2 ? 5.0 : 10.0));
+          const maxTicks = 80;
+          const tickCount = Math.min(maxTicks, Math.floor(distMm / stepMm));
+          markupCtx.strokeStyle = accentColor;
+          markupCtx.lineWidth = 1.4;
+          for (let i = 1; i <= tickCount; i++) {
+            const frac = (i * stepMm) / distMm;
+            if (frac >= 0.995) break;
+            const tx = s1.x + (s2.x - s1.x) * frac;
+            const ty = s1.y + (s2.y - s1.y) * frac;
+            const isMajor = (i % 5 === 0);
+            const tickHalf = isMajor ? 5.5 : 3.0;
+            markupCtx.beginPath();
+            markupCtx.moveTo(tx - nx * tickHalf, ty - ny * tickHalf);
+            markupCtx.lineTo(tx + nx * tickHalf, ty + ny * tickHalf);
+            markupCtx.stroke();
+          }
+        }
+      }
+
+      drawTargetMarker(s1.x, s1.y, accentColor, p1.snapped);
+      drawTargetMarker(s2.x, s2.y, accentColor, p2.snapped);
+
+      // High-contrast Quake HUD measurement readout box
+      const milsStr = state.currentMode === "PCB" ? `  (${(distMm * 39.3700787).toFixed(1)} mil)` : "";
+      const primaryLine = `📏 ${distMm.toFixed(2)} mm${milsStr}`;
+      const fmtSigned = (v) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}`;
+      const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
+      const deltaLine = (p1.is2D && p2.is2D)
+        ? `ΔX: ${fmtSigned(dx)}  ΔY: ${fmtSigned(dy)} mm  ∠${angleDeg.toFixed(1)}°`
+        : `ΔX: ${fmtSigned(dx)}  ΔY: ${fmtSigned(dy)}  ΔZ: ${fmtSigned(dz)} mm`;
+      const hasLabels = Boolean(p1.label || p2.label);
+      const endpointLine = hasLabels
+        ? `${p1.label || `(${p1.x.toFixed(2)}, ${p1.y.toFixed(2)})`} ➔ ${p2.label || `(${p2.x.toFixed(2)}, ${p2.y.toFixed(2)})`}`
+        : "";
+
+      markupCtx.font = "bold 12.5px monospace";
+      const w1 = markupCtx.measureText(primaryLine).width;
+      markupCtx.font = "600 10.5px monospace";
+      const w2 = markupCtx.measureText(deltaLine).width;
+      const w3 = endpointLine ? markupCtx.measureText(endpointLine).width : 0;
+
+      const boxW = Math.ceil(Math.max(w1, w2, w3)) + 20;
+      const boxH = endpointLine ? 56 : 40;
+      const midX = (s1.x + s2.x) / 2.0;
+      const midY = (s1.y + s2.y) / 2.0;
+      const offsetSign = ny < 0 ? 1 : -1;
+      const rawBoxX = midX + nx * 24 * offsetSign - boxW / 2;
+      const rawBoxY = midY + ny * 24 * offsetSign - boxH - 8;
+      const boxX = Math.min(w - boxW - 8, Math.max(8, rawBoxX));
+      const boxY = Math.min(h - boxH - 8, Math.max(8, rawBoxY));
+
+      markupCtx.fillStyle = "rgba(20, 13, 8, 0.96)";
+      markupCtx.strokeStyle = accentColor;
+      markupCtx.lineWidth = 1.6;
+      markupCtx.beginPath();
+      markupCtx.roundRect(boxX, boxY, boxW, boxH, 6);
+      markupCtx.fill();
+      markupCtx.stroke();
+
+      markupCtx.textAlign = "left";
+      markupCtx.textBaseline = "middle";
+      markupCtx.font = "bold 12.5px monospace";
+      markupCtx.fillStyle = accentColor;
+      markupCtx.fillText(primaryLine, boxX + 10, boxY + 13);
+
+      markupCtx.font = "600 10.5px monospace";
+      markupCtx.fillStyle = "#f8fafc";
+      markupCtx.fillText(deltaLine, boxX + 10, boxY + 29);
+
+      if (endpointLine) {
+        markupCtx.fillStyle = "#38bdf8";
+        markupCtx.fillText(endpointLine, boxX + 10, boxY + 45);
+      }
+
+      markupCtx.restore();
+    }
+
     function redrawMarkups() {
       markupCtx.clearRect(0, 0, markupCanvas.width, markupCanvas.height);
       if (state.currentMode === "PCB" && state.pcbMetadata) {
@@ -4252,6 +4794,7 @@
       }
       state.markups.forEach((m) => renderLiveStroke(m));
       renderAnnotations();
+      drawRulerOverlay();
     }
 
     function renderLiveStroke(stroke) {
@@ -5568,18 +6111,9 @@
       document.getElementById("btn-all-layers")?.addEventListener("click", () => setAllLayersVisible(true));
       document.getElementById("btn-flip-pcb")?.addEventListener("click", flipPcbView);
       const rulerBtn = document.getElementById("cam-ruler");
-      let rulerActive = false;
       if (rulerBtn) {
         rulerBtn.addEventListener("click", () => {
-          rulerActive = !rulerActive;
-          rulerBtn.classList.toggle("active", rulerActive);
-          if (state.display && typeof state.display.setTool === "function") {
-            state.display.setTool("distance", rulerActive);
-            if (state.display.clickButtons && state.display.clickButtons["distance"]) {
-              state.display.clickButtons["distance"].set(rulerActive);
-            }
-          }
-          showToast(rulerActive ? "Ruler tool active (mm): Click two points to measure distance" : "Ruler tool deactivated");
+          setRulerActive(!state.ruler.active);
         });
       }
 
@@ -5609,8 +6143,12 @@
       // Markup Toolbar Toggles & Buttons
       document.getElementById("btn-toggle-markup")?.addEventListener("click", () => {
         const tb = document.getElementById("markup-toolbar");
-        tb.classList.toggle("visible");
-        markupCanvas.classList.toggle("active", tb.classList.contains("visible"));
+        const willBeVisible = !tb.classList.contains("visible");
+        if (willBeVisible && state.ruler.active) {
+          setRulerActive(false);
+        }
+        tb.classList.toggle("visible", willBeVisible);
+        markupCanvas.classList.toggle("active", willBeVisible);
       });
 
       document.querySelectorAll(".tool-btn[data-tool]").forEach(btn => {
