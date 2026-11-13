@@ -498,6 +498,33 @@
       visibility: visible !important;
       z-index: 100 !important;
     }
+    body.mode-pcb #cad-view .tcv_cad_inset,
+    body.pcb-high-contrast #cad-view .tcv_cad_inset,
+    body.mode-diagram #cad-view .tcv_cad_inset,
+    body.diagram-mode #cad-view .tcv_cad_inset {
+      background: rgba(20, 13, 8, 0.94) !important;
+      border: 1.5px solid var(--quake-gold-dim) !important;
+      border-radius: 8px !important;
+      margin: 10px !important;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.75) !important;
+    }
+    #cad-view .tcv_status_line,
+    #cad-view .tcv_tick_size,
+    #cad-view .tcv_cad_info_glass {
+      background: rgba(20, 13, 8, 0.96) !important;
+      color: #f8fafc !important;
+      border: 1px solid var(--quake-gold-dim) !important;
+      border-radius: 5px !important;
+      padding: 3px 8px !important;
+      font-family: var(--font-mono) !important;
+      font-weight: 600 !important;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.75) !important;
+    }
+    body.mode-pcb #cad-view .tcv_status_line,
+    body.mode-diagram #cad-view .tcv_status_line {
+      bottom: 14px !important;
+      left: 102px !important;
+    }
 
     /* NETLIST ITEM STYLING */
     .net-item {
@@ -606,43 +633,44 @@
       position: absolute;
       top: 16px;
       right: 16px;
-      background: rgba(19, 23, 32, 0.85);
-      border: 1px solid var(--quake-border);
+      background: rgba(20, 13, 8, 0.96);
+      border: 1.5px solid var(--quake-gold-dim);
       border-radius: 6px;
       backdrop-filter: blur(8px);
       display: flex !important;
       flex-direction: column;
-      gap: 4px;
+      gap: 5px;
       padding: 6px;
       z-index: 50 !important;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.82), 0 0 0 1px rgba(0, 0, 0, 0.85);
     }
     .cam-btn {
-      background: #0d1017;
-      border: 1px solid var(--quake-border);
-      color: var(--quake-text);
-      width: 32px;
+      background: #140d08;
+      border: 1px solid var(--quake-border-bright);
+      color: #f8fafc;
+      width: 34px;
       height: 32px;
       border-radius: 4px;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 11px;
-      font-weight: 700;
+      font-weight: 800;
       font-family: var(--font-mono);
       cursor: pointer;
       transition: all 0.15s ease;
     }
     .cam-btn:hover {
-      border-color: var(--quake-cyan);
-      color: var(--quake-cyan);
-      box-shadow: 0 0 8px rgba(0, 229, 255, 0.4);
+      background: #261a0f;
+      border-color: var(--quake-gold);
+      color: var(--quake-gold);
+      box-shadow: 0 0 8px rgba(255, 184, 0, 0.45);
     }
     .cam-btn.active {
-      background: var(--quake-cyan);
+      background: var(--quake-gold);
       color: #000;
-      border-color: var(--quake-cyan);
-      box-shadow: 0 0 10px rgba(0, 229, 255, 0.6);
+      border-color: var(--quake-gold);
+      box-shadow: 0 0 10px rgba(255, 184, 0, 0.65);
     }
     .layer-btn-solo.active {
       background: #ffb800 !important;
@@ -652,6 +680,11 @@
     body.pcb-high-contrast #cad-view canvas,
     body.mode-pcb #cad-view canvas {
       background-color: #001023 !important;
+    }
+    body.mode-diagram #top-hud,
+    body.diagram-mode #top-hud {
+      border-bottom: 2px solid var(--quake-gold-dim);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
     }
 
     /* DIAGRAM VIEWPORT WHITE BACKGROUND (BUG-SWARMING-SILVERFISH-292) */
@@ -666,11 +699,14 @@
       background-color: #ffffff !important;
     }
 
-    /* 2D MODE ORBIT/ROTATE CONTROL LOCKS (BUG-EMERALD-TICK-950) */
+    /* 2D MODE ORBIT/ROTATE CONTROL LOCKS & MODE-SCOPED HUD ROWS (BUG-EMERALD-TICK-950) */
+    body.mode-cad #cam-flip,
+    body.mode-simulate #cam-flip,
     body.mode-pcb #cam-iso,
     body.mode-pcb #cam-front,
     body.mode-pcb #cam-right,
     body.mode-pcb #cam-ortho,
+    body.mode-pcb #cam-wire,
     body.mode-diagram #cam-iso,
     body.mode-diagram #cam-top,
     body.mode-diagram #cam-bottom,
@@ -678,11 +714,13 @@
     body.mode-diagram #cam-front,
     body.mode-diagram #cam-right,
     body.mode-diagram #cam-ortho,
+    body.mode-diagram #cam-wire,
     body.mode-pcb #btn-view-iso,
     body.mode-pcb #btn-view-front,
     body.mode-pcb #btn-view-right,
     body.mode-pcb #btn-view-left,
     body.mode-pcb #btn-view-ortho,
+    body.mode-pcb #btn-view-wire,
     body.mode-pcb #explode-section,
     body.mode-diagram #btn-view-iso,
     body.mode-diagram #btn-view-top,
@@ -691,18 +729,32 @@
     body.mode-diagram #btn-view-right,
     body.mode-diagram #btn-view-left,
     body.mode-diagram #btn-view-ortho,
+    body.mode-diagram #btn-view-wire,
     body.mode-diagram #explode-section,
     body.mode-pcb #hud-row-orbit,
+    body.mode-pcb #hud-row-pivot,
     body.mode-pcb #hud-row-front,
     body.mode-pcb #hud-row-right,
     body.mode-pcb #hud-row-ortho,
     body.mode-pcb #hud-row-iso,
+    body.mode-pcb #hud-row-wire,
+    body.mode-pcb #hud-row-sim,
     body.mode-diagram #hud-row-orbit,
+    body.mode-diagram #hud-row-pivot,
     body.mode-diagram #hud-row-front,
     body.mode-diagram #hud-row-right,
     body.mode-diagram #hud-row-top,
     body.mode-diagram #hud-row-ortho,
-    body.mode-diagram #hud-row-iso {
+    body.mode-diagram #hud-row-iso,
+    body.mode-diagram #hud-row-wire,
+    body.mode-diagram #hud-row-sim,
+    body.mode-diagram #hud-row-flip,
+    body.mode-diagram #hud-row-inspect-pcb,
+    body.mode-cad #hud-row-flip,
+    body.mode-cad #hud-row-inspect-pcb,
+    body.mode-cad #hud-row-sim,
+    body.mode-simulate #hud-row-flip,
+    body.mode-simulate #hud-row-inspect-pcb {
       display: none !important;
     }
 
@@ -712,8 +764,8 @@
       bottom: 24px;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(19, 23, 32, 0.95);
-      border: 1px solid var(--quake-border-bright);
+      background: rgba(20, 13, 8, 0.97);
+      border: 1.5px solid var(--quake-gold);
       border-radius: 8px;
       backdrop-filter: blur(12px);
       display: none;
@@ -721,7 +773,7 @@
       gap: 8px;
       padding: 8px 16px;
       z-index: 40;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8);
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.88), 0 0 0 1px rgba(0, 0, 0, 0.85);
     }
     #markup-toolbar.visible {
       display: flex;
@@ -918,28 +970,41 @@
       border-collapse: collapse;
       font-size: 11px;
       white-space: nowrap;
+      color: #f8fafc;
     }
     .shortcuts-table th {
       text-align: left;
       color: var(--quake-gold);
-      padding: 6px;
-      border-bottom: 1px solid var(--quake-border);
+      padding: 6px 8px;
+      border-bottom: 1.5px solid var(--quake-border-bright);
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
       white-space: nowrap;
     }
     .shortcuts-table td {
-      padding: 6px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 6px 8px;
+      border-bottom: 1px solid rgba(255, 184, 0, 0.14);
+      color: #f3f4f6;
       white-space: nowrap;
     }
+    .shortcuts-table td:first-child {
+      font-weight: 700;
+      color: #ffffff;
+    }
+    .shortcuts-table tbody tr:hover {
+      background: rgba(255, 184, 0, 0.08);
+    }
     .kbd-badge {
-      background: #090b0e;
-      border: 1px solid var(--quake-border-bright);
-      color: var(--quake-cyan);
+      background: #0b111c;
+      border: 1px solid #38bdf8;
+      color: #7dd3fc;
       padding: 2px 6px;
       border-radius: 3px;
       font-size: 10px;
-      font-weight: 700;
+      font-weight: 800;
       white-space: nowrap;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
     }
 
     /* CAD VIEWPORT SHORTCUTS HUD OVERLAY */
@@ -947,17 +1012,17 @@
       position: absolute;
       top: 16px;
       right: 68px;
-      width: 480px;
-      max-width: calc(100% - 80px);
+      width: 500px;
+      max-width: calc(100% - 84px);
       max-height: calc(100% - 32px);
-      background: rgba(13, 16, 23, 0.94);
-      border: 1px solid var(--quake-border-bright);
-      border-radius: 6px;
-      backdrop-filter: blur(12px);
+      background: rgba(20, 13, 8, 0.98);
+      border: 2px solid var(--quake-gold);
+      border-radius: 8px;
+      backdrop-filter: blur(14px);
       z-index: 45;
       display: none;
       flex-direction: column;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8), 0 0 1px rgba(255, 170, 0, 0.4);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.92), 0 0 0 1px rgba(0, 0, 0, 0.88);
       white-space: nowrap;
     }
     #cad-shortcuts-hud.visible {
@@ -967,27 +1032,26 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 8px 12px;
-      background: rgba(255, 170, 0, 0.08);
-      border-bottom: 1px solid var(--quake-border);
-      border-radius: 5px 5px 0 0;
+      padding: 9px 12px;
+      background: linear-gradient(180deg, #2e1d12 0%, #1d120a 100%);
+      border-bottom: 1px solid var(--quake-border-bright);
+      border-radius: 6px 6px 0 0;
       white-space: nowrap;
       flex-shrink: 0;
     }
     .hud-panel-header .hud-title {
       font-size: 11px;
       font-weight: 800;
+      color: var(--quake-gold);
+      letter-spacing: 0.06em;
+      font-family: var(--font-mono);
       white-space: nowrap;
       flex-shrink: 0;
     }
-      color: var(--quake-gold);
-      letter-spacing: 0.05em;
-      font-family: var(--font-mono);
-    }
     .hud-panel-body {
-      padding: 8px 12px;
+      padding: 8px 12px 10px 12px;
       overflow-y: auto;
-      max-height: calc(100vh - 180px);
+      max-height: calc(100vh - 160px);
     }
     #btn-shortcuts.active {
       background: rgba(255, 170, 0, 0.2) !important;
@@ -1174,32 +1238,35 @@
       <!-- CAD VIEWPORT SHORTCUTS HUD OVERLAY -->
       <div id="cad-shortcuts-hud">
         <div class="hud-panel-header">
-          <div class="hud-title">◈ KEYBOARD & MOUSE CONTROLS ◈</div>
-          <button id="btn-close-shortcuts-hud" class="hud-btn" style="padding: 1px 6px; font-size: 10px;" title="Hide shortcuts overlay">✕</button>
+          <div id="shortcuts-hud-title" class="hud-title">{% if active_mode == 'PCB' %}◈ PCB 2D CONTROLS &amp; SHORTCUTS ◈{% elif active_mode == 'DIAGRAM' %}◈ DIAGRAM 2D CONTROLS &amp; SHORTCUTS ◈{% elif active_mode == 'SIMULATE' %}◈ SIMULATION CONTROLS &amp; SHORTCUTS ◈{% else %}◈ KEYBOARD &amp; MOUSE CONTROLS ◈{% endif %}</div>
+          <button id="btn-close-shortcuts-hud" class="hud-btn" style="padding: 1px 6px; font-size: 10px;" title="Hide shortcuts overlay (Esc)">✕</button>
         </div>
         <div class="hud-panel-body">
           <table class="shortcuts-table">
             <thead>
-              <tr><th>Action</th><th>Shortcut (Blender Convention)</th></tr>
+              <tr><th>Action</th><th id="shortcuts-col-header">{% if active_mode == 'PCB' %}Shortcut (2D PCB){% elif active_mode == 'DIAGRAM' %}Shortcut (2D Diagram){% else %}Shortcut (3D Viewport){% endif %}</th></tr>
             </thead>
             <tbody>
-              <tr id="hud-row-orbit"><td>Orbit View</td><td><span class="kbd-badge">MMB Drag</span> (Middle Click)</td></tr>
-              <tr id="hud-row-pan"><td>Pan View</td><td><span class="kbd-badge">Shift + MMB Drag</span> or <span class="kbd-badge">RMB Drag</span></td></tr>
-              <tr id="hud-row-zoom"><td>Zoom / Dolly</td><td><span class="kbd-badge">Scroll Wheel</span> or <span class="kbd-badge">Ctrl + MMB</span></td></tr>
+              <tr id="hud-row-inspect-pcb"><td>Inspect Pad / Trace / Net</td><td><span class="kbd-badge">LMB Click</span> (<span class="kbd-badge">Esc</span> clears net)</td></tr>
+              <tr id="hud-row-orbit"><td>Orbit View</td><td><span class="kbd-badge">LMB Drag</span> or <span class="kbd-badge">MMB Drag</span></td></tr>
+              <tr id="hud-row-pan"><td>Pan View</td><td id="hud-cell-pan">{% if active_mode in ['PCB', 'DIAGRAM'] %}<span class="kbd-badge">LMB Drag</span> or <span class="kbd-badge">RMB Drag</span>{% else %}<span class="kbd-badge">RMB Drag</span> or <span class="kbd-badge">Shift + MMB</span>{% endif %}</td></tr>
+              <tr id="hud-row-zoom"><td>Zoom In / Out</td><td id="hud-cell-zoom">{% if active_mode in ['PCB', 'DIAGRAM'] %}<span class="kbd-badge">Scroll Wheel</span>, <span class="kbd-badge">MMB Drag</span>, or <span class="kbd-badge">+</span> / <span class="kbd-badge">-</span>{% else %}<span class="kbd-badge">Scroll Wheel</span> or <span class="kbd-badge">+</span> / <span class="kbd-badge">-</span>{% endif %}</td></tr>
+              <tr id="hud-row-flip"><td>Flip Board (Top / Bottom)</td><td><span class="kbd-badge">F</span></td></tr>
               <tr id="hud-row-pivot"><td>Center View Pivot</td><td><span class="kbd-badge">Double Click</span> on surface</td></tr>
-              <tr id="hud-row-front"><td>Front / Back View</td><td><span class="kbd-badge">Numpad 1</span> / <span class="kbd-badge">Ctrl+1</span></td></tr>
-              <tr id="hud-row-right"><td>Right / Left View</td><td><span class="kbd-badge">Numpad 3</span> / <span class="kbd-badge">Ctrl+3</span></td></tr>
-              <tr id="hud-row-top"><td>Top / Bottom View</td><td><span class="kbd-badge">Numpad 7</span> / <span class="kbd-badge">Ctrl+7</span></td></tr>
-              <tr id="hud-row-ortho"><td>Toggle Ortho / Persp</td><td><span class="kbd-badge">Numpad 5</span></td></tr>
-              <tr id="hud-row-focus"><td>Frame / Focus Target</td><td><span class="kbd-badge">Numpad .</span> or <span class="kbd-badge">F</span></td></tr>
-              <tr id="hud-row-iso"><td>Reset Isometric</td><td><span class="kbd-badge">Numpad 0</span></td></tr>
-              <tr><td>Planar Pan</td><td><span class="kbd-badge">W</span> / <span class="kbd-badge">A</span> / <span class="kbd-badge">S</span> / <span class="kbd-badge">D</span></td></tr>
-              <tr><td>Toggle Wireframe</td><td><span class="kbd-badge">Z</span></td></tr>
-              <tr><td>Clear Markup Drawings</td><td><span class="kbd-badge">X</span> or <span class="kbd-badge">Delete</span> / <span class="kbd-badge">Backspace</span></td></tr>
-              <tr><td>Undo Markup Stroke</td><td><span class="kbd-badge">Ctrl + Z</span></td></tr>
-              <tr><td>Trigger Target Bug</td><td><span class="kbd-badge">B</span></td></tr>
-              <tr><td>Toggle Shortcuts Help</td><td><span class="kbd-badge">?</span> or <span class="kbd-badge">H</span></td></tr>
-              <tr><td>Simulation Play/Pause</td><td><span class="kbd-badge">Space</span></td></tr>
+              <tr id="hud-row-front"><td>Front / Rear View</td><td><span class="kbd-badge">1</span> / <span class="kbd-badge">Ctrl + 1</span></td></tr>
+              <tr id="hud-row-right"><td>Right / Left View</td><td><span class="kbd-badge">3</span> / <span class="kbd-badge">Ctrl + 3</span></td></tr>
+              <tr id="hud-row-top"><td id="hud-label-top">{% if active_mode == 'PCB' %}Top (F.Cu) / Bottom (B.Cu){% else %}Top / Bottom View{% endif %}</td><td id="hud-cell-top">{% if active_mode == 'PCB' %}<span class="kbd-badge">7</span> (Top) / <span class="kbd-badge">1</span> (Bottom){% else %}<span class="kbd-badge">7</span> / <span class="kbd-badge">Ctrl + 7</span>{% endif %}</td></tr>
+              <tr id="hud-row-ortho"><td>Toggle Ortho / Persp</td><td><span class="kbd-badge">5</span></td></tr>
+              <tr id="hud-row-focus"><td>Frame / Reset View</td><td id="hud-cell-focus">{% if active_mode == 'PCB' %}<span class="kbd-badge">.</span> or <span class="kbd-badge">Home</span>{% else %}<span class="kbd-badge">F</span>, <span class="kbd-badge">.</span>, or <span class="kbd-badge">Home</span>{% endif %}</td></tr>
+              <tr id="hud-row-iso"><td>Reset Isometric</td><td><span class="kbd-badge">0</span></td></tr>
+              <tr id="hud-row-planar-pan"><td>Keyboard Pan</td><td><span class="kbd-badge">W</span> <span class="kbd-badge">A</span> <span class="kbd-badge">S</span> <span class="kbd-badge">D</span> or <span class="kbd-badge">Arrow Keys</span></td></tr>
+              <tr id="hud-row-ruler"><td>Measure Distance (mm)</td><td><span class="kbd-badge">M</span></td></tr>
+              <tr id="hud-row-wire"><td>Toggle Wireframe</td><td><span class="kbd-badge">Z</span></td></tr>
+              <tr><td>Undo / Clear Markup</td><td><span class="kbd-badge">Cmd/Ctrl + Z</span> · <span class="kbd-badge">X</span> / <span class="kbd-badge">Del</span></td></tr>
+              <tr><td>UI Scale</td><td><span class="kbd-badge">Cmd/Ctrl +</span> / <span class="kbd-badge">-</span> / <span class="kbd-badge">0</span></td></tr>
+              <tr><td>Report Target Bug</td><td><span class="kbd-badge">B</span></td></tr>
+              <tr><td>Toggle Shortcuts Help</td><td><span class="kbd-badge">?</span> or <span class="kbd-badge">H</span> (<span class="kbd-badge">Esc</span> closes)</td></tr>
+              <tr id="hud-row-sim"><td>Simulation Play / Pause</td><td><span class="kbd-badge">Space</span></td></tr>
             </tbody>
           </table>
         </div>
@@ -1207,16 +1274,16 @@
 
       <!-- FLOATING CAMERA TOOLBAR -->
       <div id="cam-toolbar">
-        <button class="cam-btn" id="cam-iso" title="Isometric View (Numpad 0)">Iso</button>
-        <button class="cam-btn" id="cam-top" title="Top View (F.Cu) (Numpad 7)">Top</button>
-        <button class="cam-btn" id="cam-bottom" title="Bottom View (B.Cu) (Numpad 1)">Bot</button>
-        <button class="cam-btn" id="cam-flip" title="Flip Board Top/Bottom (F)">Flip</button>
-        <button class="cam-btn" id="cam-front" title="Front View">Frn</button>
-        <button class="cam-btn" id="cam-right" title="Right View (Numpad 3)">Rgt</button>
-        <button class="cam-btn" id="cam-ortho" title="Toggle Ortho/Persp (Numpad 5)">Or</button>
-        <button class="cam-btn" id="cam-focus" title="Focus Selection (Numpad . / F)">🎯</button>
-        <button class="cam-btn" id="cam-wire" title="Toggle Wireframe (Z)">Z</button>
-        <button class="cam-btn" id="cam-ruler" title="Toggle Ruler / Distance Measurement in mm (M)">📏</button>
+        <button class="cam-btn" id="cam-iso" title="Isometric View [0]">Iso</button>
+        <button class="cam-btn" id="cam-top" title="Top View (F.Cu) [7]">Top</button>
+        <button class="cam-btn" id="cam-bottom" title="Bottom View (B.Cu) [1 in PCB / Ctrl+7 in CAD]">Bot</button>
+        <button class="cam-btn" id="cam-flip" title="Flip Board Top/Bottom [F]">Flip</button>
+        <button class="cam-btn" id="cam-front" title="Front View [1]">Frn</button>
+        <button class="cam-btn" id="cam-right" title="Right View [3]">Rgt</button>
+        <button class="cam-btn" id="cam-ortho" title="Toggle Ortho/Persp [5]">Or</button>
+        <button class="cam-btn" id="cam-focus" title="Frame / Reset View [. or Home]">🎯</button>
+        <button class="cam-btn" id="cam-wire" title="Toggle Wireframe [Z]">Z</button>
+        <button class="cam-btn" id="cam-ruler" title="Measure Distance in mm [M]">📏</button>
       </div>
 
       <!-- FLOATING MARKUP TOOLBAR -->
@@ -2383,25 +2450,72 @@
 
       // Keyboard shortcuts
       window.addEventListener("keydown", (e) => {
-        if (["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
+        if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
 
         const key = e.key.toUpperCase();
         const is2D = state.currentMode === "PCB" || state.currentMode === "DIAGRAM";
+
+        if ((e.ctrlKey || e.metaKey) && key === "Z") {
+          undoMarkup();
+          e.preventDefault();
+          return;
+        }
+
+        // Let Cmd/Ctrl +/-/0 handle UI scale without triggering viewport actions
+        if (e.metaKey && !e.ctrlKey) return;
+
+        if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+          if (key === "W" || e.key === "ArrowUp") {
+            panViewportByKey(0, 1);
+            e.preventDefault();
+            return;
+          }
+          if (key === "S" || e.key === "ArrowDown") {
+            panViewportByKey(0, -1);
+            e.preventDefault();
+            return;
+          }
+          if (key === "A" || e.key === "ArrowLeft") {
+            panViewportByKey(-1, 0);
+            e.preventDefault();
+            return;
+          }
+          if (key === "D" || e.key === "ArrowRight") {
+            panViewportByKey(1, 0);
+            e.preventDefault();
+            return;
+          }
+          if (e.key === "=" || e.key === "+" || e.code === "NumpadAdd") {
+            zoomViewportByFactor(1.2);
+            e.preventDefault();
+            return;
+          }
+          if (e.key === "-" || e.key === "_" || e.code === "NumpadSubtract") {
+            zoomViewportByFactor(1.0 / 1.2);
+            e.preventDefault();
+            return;
+          }
+        }
+
         switch (key) {
           case "1":
             if (state.currentMode === "PCB") {
               setCameraPreset("bottom");
             } else if (!is2D) {
-              setCameraPreset("front");
+              setCameraPreset(e.ctrlKey ? "rear" : "front");
             }
             break;
           case "3":
             if (!is2D) {
-              setCameraPreset("right");
+              setCameraPreset(e.ctrlKey ? "left" : "right");
             }
             break;
           case "7":
-            setCameraPreset("top");
+            if (state.currentMode === "PCB") {
+              setCameraPreset("top");
+            } else if (!is2D) {
+              setCameraPreset(e.ctrlKey ? "bottom" : "top");
+            }
             break;
           case "5":
             if (!is2D) {
@@ -2409,24 +2523,28 @@
             }
             break;
           case "0":
-            if (!is2D) {
+            if (!is2D && !e.ctrlKey && !e.metaKey) {
               setCameraPreset("iso");
             }
             break;
           case ".":
-            if (state.viewer && state.viewer.controls && state.viewer.controls.reset) {
-              state.viewer.controls.reset();
-            }
+          case "HOME":
+            resetViewportCamera();
+            e.preventDefault();
             break;
           case "F":
-            if (state.currentMode === "PCB") {
-              flipPcbView();
-            } else if (state.viewer && state.viewer.controls && state.viewer.controls.reset) {
-              state.viewer.controls.reset();
+            if (!e.ctrlKey && !e.metaKey) {
+              if (state.currentMode === "PCB") {
+                flipPcbView();
+              } else {
+                resetViewportCamera();
+              }
             }
             break;
           case "Z":
-            toggleWireframe();
+            if (!is2D && !e.ctrlKey && !e.metaKey) {
+              toggleWireframe();
+            }
             break;
           case "X":
           case "DELETE":
@@ -2434,29 +2552,164 @@
             clearMarkups();
             break;
           case "B":
-            openTargetBugModal();
+            if (!e.ctrlKey && !e.metaKey) {
+              openTargetBugModal();
+            }
             break;
           case "M":
-            document.getElementById("cam-ruler")?.click();
+            if (!e.ctrlKey && !e.metaKey) {
+              document.getElementById("cam-ruler")?.click();
+            }
             break;
           case "H":
           case "?":
-            toggleShortcuts();
+            if (!e.ctrlKey && !e.metaKey) {
+              toggleShortcuts();
+            }
             break;
           case "ESCAPE":
             toggleShortcuts(false);
+            if (state.currentMode === "PCB" && state.selectedNet) {
+              clearNetHighlight();
+            }
             break;
           case " ":
-            toggleSimPlay();
-            e.preventDefault();
+            if (state.currentMode === "SIMULATE") {
+              toggleSimPlay();
+              e.preventDefault();
+            }
             break;
         }
-
-        if (e.ctrlKey && key === "Z") {
-          undoMarkup();
-          e.preventDefault();
-        }
       });
+    }
+
+    function syncModeClassesAndHud() {
+      const mode = (state.currentMode || "CAD").toUpperCase();
+      document.body.classList.remove("mode-cad", "mode-pcb", "mode-simulate", "mode-diagram");
+      document.body.classList.add("mode-" + mode.toLowerCase());
+      document.body.classList.toggle("pcb-high-contrast", mode === "PCB");
+      document.body.classList.toggle("diagram-mode", mode === "DIAGRAM");
+
+      const titleEl = document.getElementById("shortcuts-hud-title");
+      const colHeaderEl = document.getElementById("shortcuts-col-header");
+      const panCell = document.getElementById("hud-cell-pan");
+      const zoomCell = document.getElementById("hud-cell-zoom");
+      const topLabel = document.getElementById("hud-label-top");
+      const topCell = document.getElementById("hud-cell-top");
+      const focusCell = document.getElementById("hud-cell-focus");
+      const is2D = mode === "PCB" || mode === "DIAGRAM";
+
+      if (titleEl) {
+        if (mode === "PCB") titleEl.textContent = "◈ PCB 2D CONTROLS & SHORTCUTS ◈";
+        else if (mode === "DIAGRAM") titleEl.textContent = "◈ DIAGRAM 2D CONTROLS & SHORTCUTS ◈";
+        else if (mode === "SIMULATE") titleEl.textContent = "◈ SIMULATION CONTROLS & SHORTCUTS ◈";
+        else titleEl.textContent = "◈ KEYBOARD & MOUSE CONTROLS ◈";
+      }
+      if (colHeaderEl) {
+        if (mode === "PCB") colHeaderEl.textContent = "Shortcut (2D PCB)";
+        else if (mode === "DIAGRAM") colHeaderEl.textContent = "Shortcut (2D Diagram)";
+        else colHeaderEl.textContent = "Shortcut (3D Viewport)";
+      }
+      if (panCell) {
+        panCell.innerHTML = is2D
+          ? '<span class="kbd-badge">LMB Drag</span> or <span class="kbd-badge">RMB Drag</span>'
+          : '<span class="kbd-badge">RMB Drag</span> or <span class="kbd-badge">Shift + MMB</span>';
+      }
+      if (zoomCell) {
+        zoomCell.innerHTML = is2D
+          ? '<span class="kbd-badge">Scroll Wheel</span>, <span class="kbd-badge">MMB Drag</span>, or <span class="kbd-badge">+</span> / <span class="kbd-badge">-</span>'
+          : '<span class="kbd-badge">Scroll Wheel</span> or <span class="kbd-badge">+</span> / <span class="kbd-badge">-</span>';
+      }
+      if (topLabel) {
+        topLabel.textContent = mode === "PCB" ? "Top (F.Cu) / Bottom (B.Cu)" : "Top / Bottom View";
+      }
+      if (topCell) {
+        topCell.innerHTML = mode === "PCB"
+          ? '<span class="kbd-badge">7</span> (Top) / <span class="kbd-badge">1</span> (Bottom)'
+          : '<span class="kbd-badge">7</span> / <span class="kbd-badge">Ctrl + 7</span>';
+      }
+      if (focusCell) {
+        focusCell.innerHTML = mode === "PCB"
+          ? '<span class="kbd-badge">.</span> or <span class="kbd-badge">Home</span>'
+          : '<span class="kbd-badge">F</span>, <span class="kbd-badge">.</span>, or <span class="kbd-badge">Home</span>';
+      }
+    }
+
+    function resetViewportCamera() {
+      if (!state.viewer) return;
+      if (state.currentMode === "PCB") {
+        if (typeof state.viewer.reset === "function") {
+          state.viewer.reset();
+        }
+        setupPcbOrientation(true);
+        updateControlsForMode();
+        requestAnimationFrame(redrawMarkups);
+        return;
+      }
+      if (state.currentMode === "DIAGRAM") {
+        if (typeof state.viewer.reset === "function") {
+          state.viewer.reset();
+        }
+        setCameraPreset("top");
+        requestAnimationFrame(redrawMarkups);
+        return;
+      }
+      if (typeof state.viewer.reset === "function") {
+        state.viewer.reset();
+      } else {
+        const r = getViewerRendered();
+        if (r && r.controls && typeof r.controls.reset === "function") {
+          r.controls.reset();
+        }
+      }
+      redrawMarkups();
+    }
+
+    function panViewportByKey(dxDir, dyDir) {
+      const r = getViewerRendered();
+      const threeCam = getThreeCamera();
+      if (!r || !threeCam || !window.THREE) return;
+      const innerCtrls = r.controls?.controls || r.controls;
+      const target = innerCtrls?.target || r.camera?.target;
+      if (!target) return;
+
+      const stepWorld = threeCam.isOrthographicCamera
+        ? (Math.abs(threeCam.top - threeCam.bottom) / Math.max(0.01, threeCam.zoom || 1)) * 0.08
+        : Math.max(5.0, threeCam.position.distanceTo(target) * 0.08);
+
+      const rightVec = new window.THREE.Vector3(1, 0, 0).applyQuaternion(threeCam.quaternion);
+      const upVec = new window.THREE.Vector3(0, 1, 0).applyQuaternion(threeCam.quaternion);
+      const delta = rightVec.multiplyScalar(-dxDir * stepWorld).addScaledVector(upVec, -dyDir * stepWorld);
+
+      threeCam.position.add(delta);
+      target.add(delta);
+      if (r.camera?.target && r.camera.target !== target) {
+        r.camera.target.copy(target);
+      }
+      if (typeof r.controls?.update === "function") {
+        r.controls.update();
+      }
+      if (typeof state.viewer?.update === "function") {
+        state.viewer.update(true, false);
+      }
+      requestAnimationFrame(redrawMarkups);
+    }
+
+    function zoomViewportByFactor(factor) {
+      if (!state.viewer) return;
+      if (typeof state.viewer.getCameraZoom === "function" && typeof state.viewer.setCameraZoom === "function") {
+        const curZoom = state.viewer.getCameraZoom() || 1.0;
+        const nextZoom = Math.min(50.0, Math.max(0.05, curZoom * factor));
+        state.viewer.setCameraZoom(nextZoom, true);
+      } else {
+        const threeCam = getThreeCamera();
+        if (threeCam && threeCam.isOrthographicCamera) {
+          threeCam.zoom = Math.min(50.0, Math.max(0.05, (threeCam.zoom || 1.0) * factor));
+          threeCam.updateProjectionMatrix();
+          state.viewer.update?.(true, false);
+        }
+      }
+      requestAnimationFrame(redrawMarkups);
     }
 
     function setupPcbOrientation(resetTarget = false) {
@@ -2839,18 +3092,15 @@
             }
           }
         }
+        syncModeClassesAndHud();
         if (state.currentMode === "DIAGRAM") {
-          document.body.classList.remove("pcb-high-contrast");
-          document.body.classList.add("diagram-mode");
+          if (state.viewer && typeof state.viewer.setTheme === "function") {
+            state.viewer.setTheme("dark");
+          }
           if (state.viewer && state.viewer.renderer && typeof state.viewer.renderer.setClearColor === "function") {
             state.viewer.renderer.setClearColor(0xffffff, 1.0);
           }
-          if (state.viewer && typeof state.viewer.setTheme === "function") {
-            state.viewer.setTheme("light");
-          }
         } else if (state.currentMode === "PCB") {
-          document.body.classList.remove("diagram-mode");
-          document.body.classList.add("pcb-high-contrast");
           if (state.viewer && typeof state.viewer.setTheme === "function") {
             state.viewer.setTheme("dark");
           }
@@ -2863,8 +3113,6 @@
           setupPcbOrientation(true);
           applyPcbUnlitShading();
         } else {
-          document.body.classList.remove("diagram-mode");
-          document.body.classList.remove("pcb-high-contrast");
           if (state.viewer && state.viewer.renderer && typeof state.viewer.renderer.setClearColor === "function") {
             state.viewer.renderer.setClearColor(0x120c08, 1.0);
           }
@@ -3054,19 +3302,7 @@
       }
       const camFlip = document.getElementById("cam-flip");
       if (camFlip) camFlip.style.display = isPcb ? "" : "none";
-
-      const rowPan = document.getElementById("hud-row-pan");
-      const rowZoom = document.getElementById("hud-row-zoom");
-      if (rowPan) {
-        rowPan.innerHTML = is2D
-          ? '<td>Pan View</td><td><span class="kbd-badge">LMB Drag</span> or <span class="kbd-badge">RMB Drag</span></td>'
-          : '<td>Pan View</td><td><span class="kbd-badge">Shift + MMB Drag</span> or <span class="kbd-badge">RMB Drag</span></td>';
-      }
-      if (rowZoom) {
-        rowZoom.innerHTML = is2D
-          ? '<td>Zoom / Dolly</td><td><span class="kbd-badge">MMB Drag</span> or <span class="kbd-badge">Scroll Wheel</span></td>'
-          : '<td>Zoom / Dolly</td><td><span class="kbd-badge">Scroll Wheel</span> or <span class="kbd-badge">Ctrl + MMB</span></td>';
-      }
+      syncModeClassesAndHud();
     }
 
     let soloActiveLayer = null;
@@ -5158,6 +5394,8 @@
         state.currentTarget = selectedTarget;
         state.currentSub = (subSel ? subSel.value : "") || "";
         state.currentMode = activePill ? activePill.dataset.mode : "CAD";
+        syncModeClassesAndHud();
+        document.getElementById("sim-bar")?.classList.toggle("visible", state.currentMode === "SIMULATE");
 
         if (state.currentMode === "SIMULATE") {
           const stepsSel = document.getElementById("chooser-max-steps");
@@ -5221,7 +5459,7 @@
           });
           pill.classList.add("active");
           state.currentMode = pill.dataset.mode;
-          document.body.className = "mode-" + state.currentMode.toLowerCase();
+          syncModeClassesAndHud();
 
           // Toggle Sim Bar
           document.getElementById("sim-bar").classList.toggle("visible", state.currentMode === "SIMULATE");
@@ -5244,9 +5482,7 @@
       document.getElementById("cam-right")?.addEventListener("click", () => setCameraPreset("right"));
       document.getElementById("cam-ortho")?.addEventListener("click", toggleProjection);
       document.getElementById("cam-wire")?.addEventListener("click", toggleWireframe);
-      document.getElementById("cam-focus")?.addEventListener("click", () => {
-        if (state.viewer && state.viewer.controls && state.viewer.controls.reset) state.viewer.controls.reset();
-      });
+      document.getElementById("cam-focus")?.addEventListener("click", resetViewportCamera);
 
       // PCB Layer & Mode Control Buttons
       document.getElementById("btn-all-layers")?.addEventListener("click", () => setAllLayersVisible(true));
@@ -5472,7 +5708,7 @@
 
     // EVENT LISTENERS & DOM HOOKUPS
     function initWorkstation() {
-      document.body.className = "mode-" + state.currentMode.toLowerCase();
+      syncModeClassesAndHud();
       initUiScale();
       initSidebarResizer();
       try {

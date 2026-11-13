@@ -722,17 +722,31 @@ def test_regression_bug_tarsial_termite_773_cad_target_loading_and_lock_replacem
 
 
 def test_regression_bug_emerald_tick_950_2d_mode_initial_dom_state(scope_server):
-    """Verify BUG-EMERALD-TICK-950: DIAGRAM and PCB UI responses set initial 2D body classes and mode pills."""
+    """Verify BUG-EMERALD-TICK-950: DIAGRAM and PCB UI responses set initial 2D body classes, mode pills, and HUD shortcuts."""
 
     class ModeDomParser(HTMLParser):
-        """Extract body classes, active top-HUD mode pills, and element IDs from rendered Scope HTML."""
+        """Extract body classes, active top-HUD mode pills, element IDs, and HUD cell text from rendered Scope HTML."""
+
+        TRACKED_TEXT_IDS = frozenset(
+            {
+                "shortcuts-hud-title",
+                "shortcuts-col-header",
+                "hud-cell-pan",
+                "hud-cell-zoom",
+                "hud-cell-top",
+                "hud-cell-focus",
+            }
+        )
 
         def __init__(self) -> None:
             super().__init__()
             self.body_classes: list[str] = []
             self.active_modes: list[str] = []
             self.element_ids: set[str] = set()
+            self.text_by_id: dict[str, str] = {}
             self._in_modal = False
+            self._active_tracked_id: str | None = None
+            self._tracked_depth = 0
 
         def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
             attr_map = dict(attrs)
@@ -741,6 +755,12 @@ def test_regression_bug_emerald_tick_950_2d_mode_initial_dom_state(scope_server)
                 self.element_ids.add(el_id)
                 if el_id == "modal-project-chooser":
                     self._in_modal = True
+            if self._active_tracked_id is not None:
+                self._tracked_depth += 1
+            elif el_id in self.TRACKED_TEXT_IDS:
+                self._active_tracked_id = el_id
+                self._tracked_depth = 1
+                self.text_by_id[el_id] = ""
             classes = (attr_map.get("class") or "").split()
             if tag == "body":
                 self.body_classes = classes
@@ -748,6 +768,17 @@ def test_regression_bug_emerald_tick_950_2d_mode_initial_dom_state(scope_server)
                 data_mode = attr_map.get("data-mode")
                 if data_mode:
                     self.active_modes.append(data_mode)
+
+        def handle_data(self, data: str) -> None:
+            if self._active_tracked_id is not None:
+                self.text_by_id[self._active_tracked_id] += data
+
+        def handle_endtag(self, tag: str) -> None:
+            if self._active_tracked_id is not None:
+                self._tracked_depth -= 1
+                if self._tracked_depth <= 0:
+                    self._active_tracked_id = None
+                    self._tracked_depth = 0
 
     for mode, expected_body_class in (("DIAGRAM", "mode-diagram"), ("PCB", "mode-pcb"), ("CAD", "mode-cad")):
         ui_url = f"http://127.0.0.1:{scope_server.actual_port}/?project=cat_fountain&target=wiring&mode={mode}"
@@ -758,14 +789,31 @@ def test_regression_bug_emerald_tick_950_2d_mode_initial_dom_state(scope_server)
         assert parser.active_modes == [mode]
         for required_id in (
             "explode-section",
+            "hud-row-inspect-pcb",
             "hud-row-orbit",
+            "hud-row-flip",
             "hud-row-front",
             "hud-row-right",
             "hud-row-top",
             "hud-row-ortho",
             "hud-row-iso",
+            "hud-row-planar-pan",
+            "hud-row-wire",
         ):
             assert required_id in parser.element_ids
+        if mode in ("PCB", "DIAGRAM"):
+            assert "LMB Drag" in parser.text_by_id["hud-cell-pan"]
+            assert "MMB Drag" in parser.text_by_id["hud-cell-zoom"]
+            assert "Shift + MMB" not in parser.text_by_id["hud-cell-pan"]
+        else:
+            assert "Shift + MMB" in parser.text_by_id["hud-cell-pan"]
+        if mode == "PCB":
+            assert "PCB 2D" in parser.text_by_id["shortcuts-hud-title"]
+            assert "7 (Top) / 1 (Bottom)" == parser.text_by_id["hud-cell-top"].strip()
+            assert "F," not in parser.text_by_id["hud-cell-focus"]
+        elif mode == "DIAGRAM":
+            assert "DIAGRAM 2D" in parser.text_by_id["shortcuts-hud-title"]
+            assert "F" in parser.text_by_id["hud-cell-focus"]
 
 
 def test_regression_bug_chitinous_grub_712_simulation_particle_temporal_coherence(scope_server):
