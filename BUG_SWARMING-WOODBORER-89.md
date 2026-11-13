@@ -522,6 +522,10 @@ face 46 ignored
 2026-11-12 15:45:15 [INFO] scope: 127.0.0.1 - - [12/Nov/2026 15:45:15] "GET /api/scope/projects HTTP/1.1" 200 -
 ```
 
+#### Attached Commits
+
+- `b3b1dd81`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:a5392bf9 --> Open carrier_board PCB view, pan/zoom away from origin, click TOP, BOT, and FLIP in the quickbar, and verify zero diagonal board rotation and no front-side net labels bleeding onto the back side | `python tools/scope.py carrier_board/carrier_board:pcb`
