@@ -1,12 +1,13 @@
-# 🔴 `[BUG-SWARMING-WOODBORER-89]` [carrier_board/carrier_board] Defect in PCB view
+# 🟢 `[BUG-SWARMING-WOODBORER-89]` [carrier_board/carrier_board] Defect in PCB view
 
 - **UUID**: `9e1a3053-f744-4f85-8164-cb7f6b3970da`
 - **ID**: `BUG-SWARMING-WOODBORER-89`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-12 23:45:54 UTC`
+- **Resolved**: `2026-11-13 00:24:33 UTC`
 
 #### Description
 
@@ -524,3 +525,7 @@ face 46 ignored
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:a5392bf9 --> Open carrier_board PCB view, pan/zoom away from origin, click TOP, BOT, and FLIP in the quickbar, and verify zero diagonal board rotation and no front-side net labels bleeding onto the back side | `python tools/scope.py carrier_board/carrier_board:pcb`
+
+#### Resolution Notes
+
+Synchronized 2D camera up-axis to Y-up (eliminating OrbitControls Z-pole gimbal lock) and synced OrbitControls.target with camera.target across TOP, BOT, and FLIP presets while preserving pan offset; suppressed opposite-side copper net labels and hover hits when Substrate is opaque.
