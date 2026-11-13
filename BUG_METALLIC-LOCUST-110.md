@@ -529,6 +529,10 @@ face 46 ignored
 | `image/png` | [snapshot.png](attachments/BUG-METALLIC-LOCUST-110/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
 | `text/plain` | [scope.log](attachments/BUG-METALLIC-LOCUST-110/scope.log) | Scope workstation execution logs |
 
+#### Attached Commits
+
+- `b51bcb85`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:91bdb6d4 --> Open carrier_board PCB view, activate the Ruler tool via the quickbar 📏 button or M key, measure distances between snapped pads/vias/test points and arbitrary substrate points (with Shift) across Top and Bottom views, and verify crisp mm/mil + ΔX/ΔY readouts that track pan/zoom | `python tools/scope.py carrier_board/carrier_board:pcb`
