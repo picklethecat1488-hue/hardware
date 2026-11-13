@@ -419,7 +419,9 @@ class ScopeGeometryPipeline:
                             "footprint": getattr(c, "package", ""),
                             "value": str(getattr(c, "value", "") or ""),
                             "mpn": str(getattr(c, "mpn", "") or ""),
-                            "side": getattr(c, "layer", "F.Cu"),
+                            "side": "B.Cu"
+                            if (getattr(c, "layer", "F.Cu") == "B.Cu" or c.position[2] < 0.0)
+                            else "F.Cu",
                             "position": [round(c.position[0], 3), round(c.position[1], 3), round(c.position[2], 3)],
                             "size": [dx, dy],
                             "yaw": round(c.rotation[2], 2),
@@ -477,7 +479,8 @@ class ScopeGeometryPipeline:
 
                 pads_data = []
                 for c in footprints:
-                    cx, cy, _ = c.position
+                    cx, cy, cz = c.position
+                    comp_layer = "B.Cu" if (getattr(c, "layer", "F.Cu") == "B.Cu" or cz < 0.0) else "F.Cu"
                     yaw = c.rotation[2]
                     rad = math.radians(yaw)
                     cos_a = math.cos(rad)
@@ -500,7 +503,7 @@ class ScopeGeometryPipeline:
                                     "comp": c.name,
                                     "pin": p.name,
                                     "net": pin_net_map.get(pin_id, ""),
-                                    "layer": getattr(c, "layer", "F.Cu"),
+                                    "layer": comp_layer,
                                 }
                             )
 

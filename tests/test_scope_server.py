@@ -422,8 +422,15 @@ def test_regression_bug_lustrous_mantis_333_simulation_fountain_physics(scope_se
             assert z <= 118.0, f"Authentic particle exceeded max CAD fountain bound: z={z}"
 
 
-def test_regression_bug_jumping_instar_950_open_rerun_endpoint(scope_server):
-    """Verify BUG-JUMPING-INSTAR-950: POST /api/scope/open_rerun resolves the recording path."""
+def test_regression_bug_jumping_instar_950_open_rerun_endpoint(scope_server, monkeypatch):
+    """Verify BUG-JUMPING-INSTAR-950: POST /api/scope/open_rerun resolves the recording path without spawning a GUI window."""
+    launched_cmds: list[list[str]] = []
+
+    def fake_popen(cmd, *_args, **_kwargs):
+        launched_cmds.append(cmd)
+
+    monkeypatch.setattr(subprocess, "Popen", fake_popen)
+
     open_req = urllib.request.Request(
         f"http://127.0.0.1:{scope_server.actual_port}/api/scope/open_rerun",
         data=json.dumps({"project": "cat_fountain", "target": "product"}).encode("utf-8"),
@@ -435,6 +442,8 @@ def test_regression_bug_jumping_instar_950_open_rerun_endpoint(scope_server):
     open_data = json.loads(open_res.read().decode("utf-8"))
     assert open_data["status"] == "ok"
     assert "recordings/cat_fountain_3blade.rrd" in open_data["recording"]
+    assert len(launched_cmds) == 1
+    assert any("cat_fountain_3blade.rrd" in str(arg) for arg in launched_cmds[0])
 
 
 def test_regression_bug_segmented_larva_621_simulation_lid_drainage(scope_server):

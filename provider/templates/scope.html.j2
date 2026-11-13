@@ -1641,9 +1641,30 @@
       return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
     }
 
+    function getVisiblePcbLayerTypes() {
+      const visibleLayerTypes = new Set();
+      if (state.pcbMetadata && state.pcbMetadata.layers) {
+        for (const layer of state.pcbMetadata.layers) {
+          const cb = document.querySelector(`#layers-list input[data-layer-id="${layer.id}"]`);
+          if (!cb || cb.checked) {
+            visibleLayerTypes.add(layer.type);
+          }
+        }
+      }
+      return visibleLayerTypes;
+    }
+
+    function isPcbCopperSideVisible(layerName, visibleLayerTypes) {
+      const side = layerName === "B.Cu" ? "B.Cu" : "F.Cu";
+      const substrateOpaque = visibleLayerTypes.has("Substrate");
+      const activeSide = pcbIsFlipped ? "B.Cu" : "F.Cu";
+      return !substrateOpaque || side === activeSide;
+    }
+
     function findPcbEntityAtPoint(x, y, z, screenX, screenY, threeCam, canvasWidth, canvasHeight) {
       if (!state.pcbMetadata) return null;
 
+      const visibleLayerTypes = getVisiblePcbLayerTypes();
       const useScreen = screenX != null && screenY != null && threeCam && canvasWidth && canvasHeight && window.THREE;
       if (useScreen && typeof threeCam.updateMatrixWorld === "function") {
         threeCam.updateMatrixWorld(true);
@@ -1662,10 +1683,12 @@
       }
 
       // 0. Check test points (Highest Priority: explicit probe targets)
-      if (state.pcbMetadata.test_points) {
+      if (state.pcbMetadata.test_points && visibleLayerTypes.has("Pads")) {
         for (const tp of state.pcbMetadata.test_points) {
+          const tpLayer = tp.layer || "F.Cu";
+          if (!isPcbCopperSideVisible(tpLayer, visibleLayerTypes)) continue;
           const tpRadius = (tp.dia || 1.4) / 2.0;
-          const zVal = tp.layer === "B.Cu" ? -0.8 : 0.8;
+          const zVal = tpLayer === "B.Cu" ? -0.8 : 0.8;
           let effDist = Infinity;
           if (useScreen) {
             const sc = toScreen(tp.x, tp.y, zVal);
@@ -1699,11 +1722,13 @@
       }
 
       // 1. Check copper pads (High Priority)
-      if (state.pcbMetadata.pads) {
+      if (state.pcbMetadata.pads && visibleLayerTypes.has("Pads")) {
         for (const p of state.pcbMetadata.pads) {
+          const padLayer = p.layer || "F.Cu";
+          if (!isPcbCopperSideVisible(padLayer, visibleLayerTypes)) continue;
           const halfW = (p.w || 0.8) / 2.0;
           const halfH = (p.h || 0.8) / 2.0;
-          const zVal = p.layer === "B.Cu" ? -0.8 : 0.8;
+          const zVal = padLayer === "B.Cu" ? -0.8 : 0.8;
           if (useScreen) {
             const sc = toScreen(p.x, p.y, zVal);
             const scW = toScreen(p.x + halfW, p.y, zVal);
@@ -1742,7 +1767,7 @@
       }
 
       // 2. Check vias (High Priority)
-      if (state.pcbMetadata.vias) {
+      if (state.pcbMetadata.vias && visibleLayerTypes.has("Vias")) {
         for (const v of state.pcbMetadata.vias) {
           const viaRadius = (v.pad || 0.6) / 2.0;
           if (useScreen) {
@@ -1779,8 +1804,11 @@
       // 3. Check copper traces (search for closest trace segment)
       if (state.pcbMetadata.traces) {
         for (const t of state.pcbMetadata.traces) {
+          const traceLayer = t.layer || "F.Cu";
+          if (!visibleLayerTypes.has(traceLayer)) continue;
+          if (!isPcbCopperSideVisible(traceLayer, visibleLayerTypes)) continue;
           const traceRadius = (t.width || 0.25) / 2.0;
-          const zVal = t.layer === "B.Cu" ? -0.8 : 0.8;
+          const zVal = traceLayer === "B.Cu" ? -0.8 : 0.8;
           if (useScreen) {
             const s1 = toScreen(t.start[0], t.start[1], zVal);
             const s2 = toScreen(t.end[0], t.end[1], zVal);
@@ -1817,6 +1845,7 @@
       if (state.pcbMetadata.components && bestEntity === null) {
         for (const c of state.pcbMetadata.components) {
           if (!c.position) continue;
+          if (!isPcbCopperSideVisible(c.side || "F.Cu", visibleLayerTypes)) continue;
           const cx = c.position[0];
           const cy = c.position[1];
           const halfW = (c.size ? c.size[0] : 3.0) / 2.0;
@@ -2712,7 +2741,32 @@
       requestAnimationFrame(redrawMarkups);
     }
 
-    function setupPcbOrientation(resetTarget = false) {
+    function sync2DCameraUpAxis(r, is2D) {
+      if (!r || !r.camera || !window.THREE) return;
+      const upVec = is2D ? new window.THREE.Vector3(0, 1, 0) : new window.THREE.Vector3(0, 0, 1);
+      if (r.camera.pCamera?.up) r.camera.pCamera.up.copy(upVec);
+      if (r.camera.oCamera?.up) r.camera.oCamera.up.copy(upVec);
+      const threeCam = getThreeCamera();
+      if (threeCam?.up) threeCam.up.copy(upVec);
+      const innerCtrls = r.controls?.controls || r.controls;
+      if (innerCtrls) {
+        innerCtrls.screenSpacePanning = true;
+        if (innerCtrls._quat && innerCtrls._quatInverse) {
+          innerCtrls._quat.setFromUnitVectors(upVec, new window.THREE.Vector3(0, 1, 0));
+          innerCtrls._quatInverse.copy(innerCtrls._quat).invert();
+        }
+        if (is2D) {
+          if (innerCtrls._sphericalDelta && typeof innerCtrls._sphericalDelta.set === "function") {
+            innerCtrls._sphericalDelta.set(0, 0, 0);
+          }
+          if (innerCtrls._panOffset && typeof innerCtrls._panOffset.set === "function") {
+            innerCtrls._panOffset.set(0, 0, 0);
+          }
+        }
+      }
+    }
+
+    function setupPcbOrientation(resetTarget = false, preservePan = false) {
       if (state.currentMode !== "PCB" || !state.viewer) return;
       const r = getViewerRendered();
       if (!r || !r.camera) return;
@@ -2720,8 +2774,11 @@
         state.viewer.setOrtho(true);
       }
       if (r._origTargetY === undefined && r.camera.target) {
+        r._origTargetX = r.camera.target.x;
         r._origTargetY = r.camera.target.y;
+        r._origTargetZ = r.camera.target.z;
       }
+      sync2DCameraUpAxis(r, true);
       if (r.nestedGroup && r.nestedGroup.rootGroup) {
         r.nestedGroup.rootGroup.scale.set(1, -1, 1);
         if (typeof r.nestedGroup.rootGroup.updateMatrixWorld === "function") {
@@ -2738,21 +2795,38 @@
         cam.bottom = -Math.abs(halfH);
         cam.updateProjectionMatrix();
       }
-      if (resetTarget && r.camera.target) {
-        r.camera.target.y = -(r._origTargetY || 0);
-        if (typeof r.camera.presetCamera === "function") {
-          r.camera.presetCamera(pcbIsFlipped ? "bottom" : "top");
-          if (pcbIsFlipped && window.THREE && typeof r.camera.setQuaternion === "function") {
-            r.camera.setQuaternion(new window.THREE.Quaternion(0, 1, 0, 0));
-          }
+      if (resetTarget && r.camera.target && window.THREE) {
+        const innerCtrls = r.controls?.controls || r.controls;
+        const origX = r._origTargetX || 0;
+        const origY = -(r._origTargetY || 0);
+        const origZ = r._origTargetZ || 0;
+        const desiredTarget = (preservePan && innerCtrls?.target)
+          ? new window.THREE.Vector3(innerCtrls.target.x, innerCtrls.target.y, origZ)
+          : new window.THREE.Vector3(origX, origY, origZ);
+
+        r.camera.target.copy(desiredTarget);
+        if (typeof r.controls?.setTarget === "function") {
+          r.controls.setTarget(desiredTarget);
         }
-        if (r.controls) {
-          if (r.controls.target && typeof r.controls.target.copy === "function") {
-            r.controls.target.copy(r.camera.target);
-          }
-          if (typeof r.controls.update === "function") {
+        if (innerCtrls?.target && typeof innerCtrls.target.copy === "function") {
+          innerCtrls.target.copy(desiredTarget);
+        }
+
+        const threeCam = getThreeCamera();
+        if (threeCam) {
+          const dist = r.camera.camera_distance || Math.max(100, threeCam.position.distanceTo(desiredTarget));
+          threeCam.position.set(desiredTarget.x, desiredTarget.y, desiredTarget.z + (pcbIsFlipped ? -dist : dist));
+          const exactQuat = pcbIsFlipped
+            ? new window.THREE.Quaternion(0, 1, 0, 0)
+            : new window.THREE.Quaternion(0, 0, 0, 1);
+          threeCam.quaternion.copy(exactQuat);
+          if (typeof r.controls?.update === "function") {
             r.controls.update();
           }
+          threeCam.quaternion.copy(exactQuat);
+          threeCam.updateMatrixWorld(true);
+        } else if (typeof r.controls?.update === "function") {
+          r.controls.update();
         }
         if (typeof state.viewer.update === "function") {
           state.viewer.update(true, false);
@@ -2892,7 +2966,7 @@
         } else {
           return;
         }
-        setupPcbOrientation(true);
+        setupPcbOrientation(true, true);
         updateControlsForMode();
         redrawMarkups();
         return;
@@ -2904,8 +2978,15 @@
         if (typeof state.viewer.setOrtho === "function") {
           state.viewer.setOrtho(true);
         }
+        sync2DCameraUpAxis(r, true);
         if (typeof state.viewer.presetCamera === "function") {
           state.viewer.presetCamera("top");
+        }
+        const threeCam = getThreeCamera();
+        if (threeCam && window.THREE) {
+          threeCam.quaternion.set(0, 0, 0, 1);
+          threeCam.updateMatrixWorld(true);
+          state.viewer.update?.(true, false);
         }
         updateControlsForMode();
         redrawMarkups();
@@ -3110,7 +3191,8 @@
           if (rRendered && typeof state.viewer.setOrtho === "function") {
             state.viewer.setOrtho(true);
           }
-          setupPcbOrientation(true);
+          pcbIsFlipped = false;
+          setupPcbOrientation(true, false);
           applyPcbUnlitShading();
         } else {
           if (state.viewer && state.viewer.renderer && typeof state.viewer.renderer.setClearColor === "function") {
@@ -3248,6 +3330,7 @@
           if (innerCtrls.keyState === 0) innerCtrls.keyState = -1;
           if (innerCtrls.state === 0) innerCtrls.state = -1;
         }
+        sync2DCameraUpAxis(r, is2D);
         if (typeof r.controls.handleResize === "function") {
           r.controls.handleResize();
         }
@@ -4086,36 +4169,31 @@
       }
 
       // Check zoom level: calculate screen pixels per mm
-      const pOrigin = toScreen(0, 0, 0.8);
-      const p1mm = toScreen(1, 0, 0.8);
+      const activeZ = pcbIsFlipped ? -0.8 : 0.8;
+      const pOrigin = toScreen(0, 0, activeZ);
+      const p1mm = toScreen(1, 0, activeZ);
       const pxPerMm = Math.hypot(p1mm.x - pOrigin.x, p1mm.y - pOrigin.y);
 
       // Only show net labels when zoomed in sufficiently (at least 10 pixels per mm)
       if (pxPerMm < 10) return;
 
-      const visibleLayerTypes = new Set();
-      if (state.pcbMetadata.layers) {
-        for (const layer of state.pcbMetadata.layers) {
-          const cb = document.querySelector(`#layers-list input[data-layer-id="${layer.id}"]`);
-          if (!cb || cb.checked) {
-            visibleLayerTypes.add(layer.type);
-          }
-        }
-      }
+      const visibleLayerTypes = getVisiblePcbLayerTypes();
 
       markupCtx.save();
       markupCtx.textAlign = "center";
       markupCtx.textBaseline = "middle";
 
-      // 1. Draw net names on copper pads
+      // 1. Draw net names on copper pads (only on the currently visible board side unless Substrate is hidden)
       if (state.pcbMetadata.pads && visibleLayerTypes.has("Pads")) {
         for (const p of state.pcbMetadata.pads) {
           if (!p.net || p.net === "" || p.net === "unconnected") continue;
+          const padLayer = p.layer || "F.Cu";
+          if (!isPcbCopperSideVisible(padLayer, visibleLayerTypes)) continue;
           const halfW = (p.w || 0.8) / 2.0;
           const padWidthPx = halfW * 2.0 * pxPerMm;
           if (padWidthPx < 16) continue;
 
-          const zVal = p.layer === "B.Cu" ? -0.8 : 0.8;
+          const zVal = padLayer === "B.Cu" ? -0.8 : 0.8;
           const sc = toScreen(p.x, p.y, zVal);
           if (!sc.inView) continue;
 
@@ -4131,12 +4209,14 @@
         }
       }
 
-      // 2. Draw net names centered inside copper traces (matching KiCad GAL net labels)
+      // 2. Draw net names centered inside copper traces (only on the currently visible board side unless Substrate is hidden)
       if (state.pcbMetadata.traces) {
         for (const t of state.pcbMetadata.traces) {
           if (!t.net || t.net === "" || t.net === "unconnected") continue;
-          if (!visibleLayerTypes.has(t.layer || "F.Cu")) continue;
-          const zVal = t.layer === "B.Cu" ? -0.8 : 0.8;
+          const traceLayer = t.layer || "F.Cu";
+          if (!visibleLayerTypes.has(traceLayer)) continue;
+          if (!isPcbCopperSideVisible(traceLayer, visibleLayerTypes)) continue;
+          const zVal = traceLayer === "B.Cu" ? -0.8 : 0.8;
           const s1 = toScreen(t.start[0], t.start[1], zVal);
           const s2 = toScreen(t.end[0], t.end[1], zVal);
           const segLen = Math.hypot(s2.x - s1.x, s2.y - s1.y);
