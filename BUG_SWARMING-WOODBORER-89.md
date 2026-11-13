@@ -2,12 +2,13 @@
 
 - **UUID**: `9e1a3053-f744-4f85-8164-cb7f6b3970da`
 - **ID**: `BUG-SWARMING-WOODBORER-89`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-12 23:45:54 UTC`
 - **Resolved**: `2026-11-13 00:44:39 UTC`
+- **Accepted**: `2026-11-13 00:44:50 UTC`
 
 #### Description
 
