@@ -2,12 +2,13 @@
 
 - **UUID**: `b34a1fed-53de-4ca0-acd6-4e2dfa61c57e`
 - **ID**: `BUG-METALLIC-LOCUST-110`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-13 00:11:25 UTC`
 - **Resolved**: `2026-11-13 00:43:12 UTC`
+- **Accepted**: `2026-11-13 00:43:23 UTC`
 
 #### Description
 
