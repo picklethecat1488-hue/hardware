@@ -2,12 +2,13 @@
 
 - **UUID**: `1c463b08-84eb-4cf3-b9fb-df2ff30ab72e`
 - **ID**: `BUG-LUSTROUS-TICK-848`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `LOW`
 - **Category**: `SIMULATION`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-14 21:24:32 UTC`
 - **Resolved**: `2026-11-15 03:09:01 UTC`
+- **Accepted**: `2026-11-15 03:09:15 UTC`
 
 #### Description
 
