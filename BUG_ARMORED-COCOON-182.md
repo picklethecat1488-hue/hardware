@@ -2,12 +2,13 @@
 
 - **UUID**: `c7052c76-8539-4350-a7de-32f3827581fb`
 - **ID**: `BUG-ARMORED-COCOON-182`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-14 21:25:01 UTC`
 - **Resolved**: `2026-11-15 03:07:56 UTC`
+- **Accepted**: `2026-11-15 03:08:10 UTC`
 
 #### Description
 
