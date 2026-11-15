@@ -1,12 +1,13 @@
-# 🔴 `[BUG-PINCERED-TARANTULA-172]` [cat_fountain/wiring] Defect Summary
+# 🟢 `[BUG-PINCERED-TARANTULA-172]` [cat_fountain/wiring] Defect Summary
 
 - **UUID**: `0e1fc697-8bb8-4966-9435-fe8b6bb8b551`
 - **ID**: `BUG-PINCERED-TARANTULA-172`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-14 21:25:35 UTC`
+- **Resolved**: `2026-11-15 02:48:05 UTC`
 
 #### Description
 
@@ -531,3 +532,7 @@ face 46 ignored
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:46839842 --> Verify cat_fountain/wiring diagram renders all routed nets and key swatches in vivid per-wire colors (red, black, blue, green, purple, orange, brown, teal, yellow, magenta) | `python tools/scope.py cat_fountain/wiring --mode diagram`
+
+#### Resolution Notes
+
+Exported individual colored Room items in ScopeGeometryPipeline DIAGRAM mode (bumping DIAGRAM_RENDER_VERSION=3), added BROWN/TEAL/WHITE ColorType entries in get_rgba_color, and rendered 1D Wire/Edge leaves in CadSceneManager with crisp per-wire colored LineMaterial instead of black silhouette edges.
