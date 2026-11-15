@@ -6,6 +6,9 @@
  - **tools/config.py** - Automated utility for part placement and geometry optimization.
  - **tools/scope.py** - Interactive CAD/PCB Scope workstation for 3D inspection and debugging.
  - **tools/forge.py** - Unified Quake-themed workstation integrating VCS Diff Viewer, Smartlog DAG tree, Code Review, and Bug Tracker.
+ - **tools/validate_js.py** - Oxlint-backed JavaScript zero-globals linter, Jinja2 HTML template verifier, and parallel JS test validator.
+ - **js/** - Canonical zero-globals ES modules (`core/`, `scope/`, `diff/`, `vcs/`, `review/`, `tracker/`) and unminified vendor Three.js engine (`js/static/vendor/three/`). See [docs/javascript_style_architecture.md](docs/javascript_style_architecture.md).
+ - **tests/js/** - Isolated Node (`node --test`) behavioral unit test suites (`*.test.mjs`).
  - **model/** - Core application data models and configuration schemas.
  - **provider/** - Framework for geometry generation and build orchestration.
  - **projects/** - Specific geometry provider implementations.

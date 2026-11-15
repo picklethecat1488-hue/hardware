@@ -7,6 +7,7 @@ Guidelines for Quake VCS dashboard, Jinja2 templating, code review persistence, 
 * **Dedicated Templates Directory**: All templated script files (`.py.j2`, `.yaml.j2`, `.urdf.j2`, `.sh.j2`) MUST be stored in a dedicated `templates/` folder nested within the respective package or module (e.g., `provider/templates/`).
 * **Clean Rendering & Context Separation**: Render external Jinja2 templates via `jinja2.Environment(loader=jinja2.FileSystemLoader(...), trim_blocks=True, lstrip_blocks=True)` or package loaders, passing configuration parameters as explicit dictionaries or strongly typed models.
 * **No Silent Exception Swallowing in Templates**: Templated scripts (`.py.j2`) MUST follow standard code quality standards. Never generate `try/except/pass` fallback ladders inside Jinja2 templates; inspect environment capabilities deterministically via template variables.
+* **Zero Inline Workstation JavaScript**: HTML workstation templates (`diff_view.html.j2`, `diff_component.html.j2`, `code_review.html.j2`, `bug_report.html.j2`, `scope.html.j2`) MUST contain zero inline executable `<script>` blocks and zero inline HTML `on*="..."` attributes. Serialize server boot data exclusively via `<script id="app-boot-config" type="application/json">{{ boot_config | tojson }}</script>` and load modular ES entrypoints from `/js/*` (see [JavaScript Style, Zero-Globals & CAD Viewport Architecture](javascript_style_architecture.md)).
 
 ## 2. Review Session Feedback & SQLite Persistence
 * **Review Persistence**: The interactive code review web dashboard (`forge.py /review`) and server (`DashboardServer` / `ReviewServer`) MUST persist session feedback, comments, and file review statuses across server restarts.
@@ -28,7 +29,8 @@ Guidelines for Quake VCS dashboard, Jinja2 templating, code review persistence, 
 * **Automatic Cross-Repository Synchronization**: Any bug fix, feature enhancement, styling update, or refactoring applied to developer scripts, tooling, or dashboard components in one repository (`firmware` or `hardware`) that is applicable to the other repository MUST be automatically cross-patched and mirrored into that repository, and vice versa.
 * **Synchronized Subsystems**: This includes, but is not limited to:
   - Remote cloud runner and lifecycle orchestration (`tools/anvil`, `tools/vast_manager.py`, `~/.anvil.env`, `~/.anvil.lock`).
-  - VCS web workstation and dashboard backends (`tools/forge.py`, `provider/vcs/git_engine.py`, `provider/worm_report/`, `provider/bug_report/`).
+  - VCS web workstation and dashboard backends (`tools/forge.py`, `provider/http_static.py`, `provider/vcs/git_engine.py`, `provider/worm_report/`, `provider/bug_report/`).
+  - Shared JavaScript ES modules and parallel unit tests (`js/{core,diff,vcs,review,tracker}/` <-> `tools/js/{core,diff,vcs,review,tracker}/` and `tests/js/shared_*.test.mjs` <-> `tools/tests/js/shared_*.test.mjs`), with zero `.js` exclusions in `GitEngine`.
   - Shared workstation templates (`diff_view.html.j2`, `diff_component.html.j2`, `code_review.html.j2`, `worm_report.html.j2`, `bug_report.html.j2`).
   - Smartlog DAG tree rendering, commit selection, node highlighting, and author identity sanitization.
 * **Zero Disparity**: Never allow dashboard bug fixes or tooling improvements (such as node highlighting, reverse-proxying, detached branch persistence, or SSH port handling) to remain isolated in one repository when the other repository shares the same architecture or template.

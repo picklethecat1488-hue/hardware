@@ -15,10 +15,13 @@ ruff format --check .
 # 4. Check linting rules
 ruff check .
 
-# 5. Check JavaScript compilation & lint rules
+# 5. Check JavaScript compilation & zero-globals lint rules
 python tools/validate_js.py
 
-# 6. Run the fast test suite (excludes slow tests)
+# 6. Run parallel JavaScript ES module unit tests
+node --test --test-concurrency=4 tests/js/*.test.mjs
+
+# 7. Run the fast Python test suite (excludes slow tests)
 pytest
 ```
 
@@ -57,13 +60,13 @@ Host anvil
 ## Core Architecture & Code Invariants
 
 ### 1. Test Isolation & Regression Unit Testing
-* Unit tests MUST be completely isolated from implementation code. Core framework tests go in [tests/](tests/) and project-specific tests go in [projects/tests/](projects/tests/).
+* Unit tests MUST be completely isolated from implementation code. Core Python framework tests go in [tests/](tests/), project-specific Python tests go in [projects/tests/](projects/tests/), and JavaScript ES module unit tests go in [tests/js/](tests/js/) (`*.test.mjs`, executed in parallel via `node --test --test-concurrency=<WORKERS>`).
 * **Slow Tests**: 3D CAD boolean checks, PyBullet physics simulations, and JAX SPH fluid dynamics tests are highly resource-intensive and must be decorated with `@pytest.mark.slow` (or have `slow` in their test markers) so they do not block fast pre-commit checks:
   ```bash
   pytest -m "slow"
   ```
 * **Regression Unit Testing Mandate**: Whenever a regression is identified, investigated, or bisected to a prior change, you MUST introduce dedicated regression unit tests (or add active regression assertions to existing test suites) that explicitly guard against the identified regression before concluding the task.
-* **Functional Behavioral Testing Mandate**: All test code (Python unit/integration tests, CAD validation, and physics simulation suites) MUST test the actual functionality and runtime behavioral invariants of the code being run (e.g. verifying state transitions, execution outcomes, geometric properties, and physical boundary interactions). Tests must NOT verify behavior by simply inspecting source files for the existence of specific statements, strings, or AST tokens.
+* **Functional Behavioral Testing Mandate**: All test code (Python unit/integration tests, JavaScript `node --test` suites, CAD validation, and physics simulation suites) MUST test the actual functionality and runtime behavioral invariants of the code being run (e.g. verifying state transitions, execution outcomes, DOM/renderer interactions via `createMockRuntimeContext()`, geometric properties, and physical boundary interactions). Tests must NOT verify behavior by simply inspecting source files for the existence of specific statements, strings, or AST tokens.
 * **Prohibition on Redundant Wrapper Tests**: Regression tests must assert new behavioral invariants directly against the code under test. Do NOT create shallow wrapper tests (such as test functions that merely invoke other test suites or test commands via subprocess) without exercising new functionality.
 * **Update Existing Tests Directly Over Duplicate Tests**: If an existing test case intended to guard an invariant does not properly check for a bug, update the original test case directly to assert the missing invariant rather than creating redundant wrapper or duplicate test listings.
 * **Omit Tests When Invariant Cannot Be Unit Tested**: If it is not possible to unit test a regression fix and existing test suites already verify logical invariants, omit adding an artificial regression test rather than introducing a meaningless test that merely wraps other tests.
@@ -94,10 +97,11 @@ Host anvil
 * **Parameter & Signature Hygiene**: When modifying, refactoring, or simplifying functions, subroutines, or methods, any parameters that become unused MUST be immediately pruned from both the function signature and all caller invocations with each change.
 * **Error Handling Guardrails**: Use explicit bounds checking and validation rather than generic `try/except` blocks. Do NOT use `try/except` structures in core computation or logic paths except to guard I/O operations (filesystem, network, database). Never silently ignore errors with `try/except/pass` blocks; exceptions must be logged, raised descriptively, or allowed to propagate.
 
-### 5. Documentation & Lint Style
-* Code documentation MUST be PEP-257 compliant and comprehensive. Write docstrings for all custom classes, methods, functions, and properties.
-* **String Enums for Keys**: Prefer defining structured string enums (subclassing `str` and `Enum`) over passing raw string literals directly for dictionary keys, joint/link labels, or configuration modes.
-* **Named Constant Formatting**: Constant values in production code must be assigned to module-level or class-level `ALL_CAPS` named constant variables rather than being embedded as inline magic literals.
+### 5. Documentation, JavaScript Zero-Globals & Lint Style
+* Code documentation MUST be comprehensive: PEP-257 docstrings in Python and JSDoc (`/** ... */`) docstrings in JavaScript for all custom classes, methods, exported functions, and properties.
+* **JavaScript Canonical Root & Strict Zero-Globals Rule**: All browser ES modules and static assets reside under [js/](js/) (including unminified Three.js and style-compliant addons under `js/static/vendor/three/`). Jinja2 workstation templates (`.html.j2`) must contain zero inline executable `<script>` blocks and zero inline `on*="..."` HTML attributes, passing server state solely via `<script id="app-boot-config" type="application/json">`. Only `js/core/runtime_context.js` may touch `globalThis` (`getRuntimeContext()` / `createMockRuntimeContext()`); feature and modifiable vendor modules must never access `window`, `document`, `localStorage`, `fetch`, or `requestAnimationFrame` directly, nor attach globals onto `window.*`. Never use CSS `zoom` on `html`/`body` (use `--ui-scale` and physical `devicePixelRatio` canvas backing stores).
+* **String Enums for Keys**: Prefer defining structured string enums (subclassing `str` and `Enum` in Python, or `Object.freeze({ ... })` in JavaScript) over passing raw string literals directly for dictionary keys, joint/link labels, or configuration modes.
+* **Named Constant Formatting**: Constant values in production Python and JavaScript code must be assigned to module-level or class-level `ALL_CAPS` named constant variables rather than being embedded as inline magic literals.
 * **Idiomatic Iteration & Pattern Matching**: Prefer looping over sequences directly or using `enumerate(...)` rather than indexing by integer range bounds. Prefer Python `match / case` pattern matching syntax when comparing against multiple variants or enum branches.
 * **Import Placement**: Imports should be placed at the top of the file, unless doing so would cause circular dependencies.
 * **Markdown Preview Asset Location**: All markdown preview galleries, rendered frame previews, inspection figures, and simulation snapshots intended for visual evaluation MUST be placed inside the workspace under `recordings/previews/` using relative image paths.
@@ -140,7 +144,8 @@ Host anvil
 * **Automatic Cross-Repository Synchronization**: Any bug fix, feature enhancement, styling update, or refactoring applied to developer scripts, tooling, or dashboard components in one repository (`firmware` or `hardware`) that is applicable to the other repository MUST be automatically cross-patched and mirrored into that repository, and vice versa.
 * **Synchronized Subsystems**: This includes, but is not limited to:
   - Remote cloud runner and lifecycle orchestration (`tools/anvil`, `tools/vast_manager.py`, `~/.anvil.env`, `~/.anvil.lock`).
-  - VCS web workstation and dashboard backends (`tools/forge.py`, `provider/vcs/git_engine.py`, `provider/worm_report/`, `provider/bug_report/`).
+  - VCS web workstation and dashboard backends (`tools/forge.py`, `provider/http_static.py`, `provider/vcs/git_engine.py`, `provider/worm_report/`, `provider/bug_report/`).
+  - Shared JavaScript ES modules and parallel unit tests (`js/{core,diff,vcs,review,tracker}/` <-> `tools/js/{core,diff,vcs,review,tracker}/` and `tests/js/shared_*.test.mjs` <-> `tools/tests/js/shared_*.test.mjs`).
   - Shared workstation templates (`diff_view.html.j2`, `diff_component.html.j2`, `code_review.html.j2`, `worm_report.html.j2`, `bug_report.html.j2`).
   - Smartlog DAG tree rendering, commit selection, node highlighting, and author identity sanitization.
 * **Zero Disparity**: Never allow dashboard bug fixes or tooling improvements (such as node highlighting, reverse-proxying, detached branch persistence, or SSH port handling) to remain isolated in one repository when the other repository shares the same architecture or template.
@@ -178,4 +183,10 @@ To minimize global context overhead and prevent unnecessary token burn, domain- 
    - Dynamic `/workspace` persistent storage detection and fallback paths.
    - Remote dependency bootstrapping (`build-essential`, Rust, Miniforge, CUDA).
    - Activity lock tracking (`~/.anvil.lock`), port forwarding, and COB auto-release protocols.
+
+6. [JavaScript Style, Zero-Globals & CAD Viewport Architecture](docs/javascript_style_architecture.md)
+   - Single canonical `js/` root, zero inline template JS/`on*` attributes, and typed `#app-boot-config` JSON payloads.
+   - Strict zero-globals isolation via `js/core/runtime_context.js` (`oxlint --deny-warnings`) and modifiable vendor addon parity.
+   - Native Retina `devicePixelRatio` rendering, `--ui-scale` HUD sizing, coalesced single-RAF viewport, GPU SDF PCB instancing, and exact world-space simulation voxels.
+   - Full Diff View visibility (zero `.js` exclusions in `GitEngine`) and parallel `node --test` functional unit suites.
 
