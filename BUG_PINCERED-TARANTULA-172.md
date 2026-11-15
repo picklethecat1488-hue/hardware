@@ -2,12 +2,13 @@
 
 - **UUID**: `0e1fc697-8bb8-4966-9435-fe8b6bb8b551`
 - **ID**: `BUG-PINCERED-TARANTULA-172`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-14 21:25:35 UTC`
 - **Resolved**: `2026-11-15 03:00:20 UTC`
+- **Accepted**: `2026-11-15 03:00:41 UTC`
 
 #### Description
 
