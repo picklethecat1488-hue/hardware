@@ -23,7 +23,6 @@ EPHEMERAL_PORT = 0
 HTTP_OK = 200
 HTTP_TIMEOUT_SECONDS = 30.0
 MIN_PCB_PAD_COUNT = 100
-PCB_RENDER_VERSION = 2
 MAX_NODE_CONCURRENCY = 8
 
 
@@ -178,7 +177,7 @@ class TestSmoke:
             pcb_payload: Dict[str, Any] = json.loads(pcb_bytes.decode("utf-8"))
             assert len(pcb_payload["shapes"]["parts"]) == 1
             pcb_meta = pcb_payload["pcb_metadata"]
-            assert pcb_meta["render_version"] == PCB_RENDER_VERSION
+            assert pcb_meta["render_version"] == ScopeGeometryPipeline.PCB_METADATA_RENDER_VERSION
             assert len(pcb_meta["pads"]) >= MIN_PCB_PAD_COUNT
 
             sim_status, _, sim_bytes = _http_get(
