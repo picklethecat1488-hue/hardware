@@ -520,3 +520,7 @@ face 46 ignored
 2026-11-14 13:19:50 [INFO] scope: 127.0.0.1 - - [14/Nov/2026 13:19:50] "GET /api/scope/load?project=carrier_board&target=carrier_board&mode=CAD HTTP/1.1" 200 -
 2026-11-14 13:21:32 [INFO] scope: 127.0.0.1 - - [14/Nov/2026 13:21:32] "POST /api/scope/target_bug HTTP/1.1" 200 -
 ```
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:41ea76d9 --> Zoom into carrier_board in 3D CAD view and verify traces appear as continuous metallic copper wires cleanly overlaid beneath bright white silkscreen | `python tools/scope.py carrier_board/carrier_board`
