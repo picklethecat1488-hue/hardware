@@ -1,12 +1,13 @@
-# 🔴 `[BUG-LUSTROUS-TICK-848]` [cat_fountain/product] Defect Summary
+# 🟢 `[BUG-LUSTROUS-TICK-848]` [cat_fountain/product] Defect Summary
 
 - **UUID**: `1c463b08-84eb-4cf3-b9fb-df2ff30ab72e`
 - **ID**: `BUG-LUSTROUS-TICK-848`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `LOW`
 - **Category**: `SIMULATION`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-14 21:24:32 UTC`
+- **Resolved**: `2026-11-15 02:30:49 UTC`
 
 #### Description
 
@@ -524,3 +525,7 @@ face 46 ignored
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:08d3c1ef --> Verify translucent bowl renders cleanly over water voxels without vertical clipping stripes and two-finger trackpad scroll/pinch zooms smoothly | `python tools/scope.py cat_fountain/product --mode simulate`
+
+#### Resolution Notes
+
+Culled internal back-facing cavity walls on closed translucent 3D solids (FrontSide when renderback=false), added fluid ShaderMaterial polygonOffset, and calibrated OrbitControls wheel/trackpad dolly base (0.86), normalizer (45px), and ctrlKey pinch multiplier (3.5x).
