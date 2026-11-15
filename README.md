@@ -127,21 +127,36 @@ python tools/build.py cat_fountain/wiring
 ```
 ---
 
-## Running Tests
+## Pre-Commit Verification & Running Tests
 
-This project uses `pytest` for testing.
+Run `./tools/verify.sh` to execute the full pre-commit verification pipeline (Python syntax compilation, Ruff formatting & linting, JavaScript zero-globals & Jinja2 template linting, parallel `node --test` ES module suites, and parallel `pytest`):
 
-To run the default test suite (skips slow tests for a fast local feedback loop):
 ```bash
+# Full pre-commit verification (auto-resolves the cq conda environment):
+./tools/verify.sh
+
+# Auto-format & auto-fix Ruff lint issues before running verification:
+./tools/verify.sh --fix
+
+# Fast static + JS lint + parallel JS unit tests only (skips pytest):
+./tools/verify.sh --quick
+
+# Offload full pre-commit verification to the remote anvil cloud server:
+tools/anvil verify
+```
+
+You can also invoke individual test runners directly:
+
+```bash
+# Run parallel JavaScript ES module unit tests:
+node --test --test-concurrency=4 tests/js/*.test.mjs
+
+# Run the default Python test suite (skips slow tests for a fast local feedback loop):
 pytest
-```
 
-To run only the slow geometry validation tests (which perform expensive 3D CAD boolean checks):
-```bash
+# Run only the slow geometry & physics validation tests (3D CAD booleans, PyBullet, JAX SPH):
 pytest -m "slow"
-```
 
-To run all tests (both fast and slow):
-```bash
-pytest -m "slow or not slow"
+# Run all Python tests (both fast and slow):
+./tools/verify.sh --slow
 ```

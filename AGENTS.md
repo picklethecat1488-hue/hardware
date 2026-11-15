@@ -1,6 +1,20 @@
 # Workspace Rules: Pre-Commit Validation
 
-Before finalizing any task, committing changes, or proposing modifications to the codebase, you MUST run formatting, linting, compile check, and the tests to ensure the codebase remains healthy:
+Before finalizing any task, committing changes, or proposing modifications to the codebase, you MUST run formatting, linting, compile check, and the tests via `./tools/verify.sh` (or `tools/anvil verify` remotely) to ensure the codebase remains healthy:
+
+```bash
+# Run the full automated pre-commit verification suite (auto-resolves cq conda env):
+./tools/verify.sh
+
+# Useful options:
+./tools/verify.sh --fix       # Auto-format & auto-fix Ruff lint issues before running checks
+./tools/verify.sh --quick     # Fast static + JS compilation/lint + parallel JS tests (skips pytest)
+./tools/verify.sh --slow      # Include @pytest.mark.slow 3D CAD & physics simulation suites
+./tools/verify.sh --smoke     # Also run integration smoke tests (python tools/smoke.py)
+tools/anvil verify            # Offload full ./tools/verify.sh suite to the remote anvil server
+```
+
+Under the hood, `./tools/verify.sh` executes the following mandatory stages in order:
 
 ```bash
 # 1. Activate the conda environment
@@ -26,11 +40,11 @@ pytest
 ```
 
 ## Validation Guidelines
-1. **Execution**: Prefer offloading test suites (`pytest`, `pytest -m "slow"`, `python tools/smoke.py`) and pre-commit validation to the `anvil` cloud server (e.g., via `tools/anvil run "PYTHONPATH=.:tools /home/ubuntu/miniforge3/envs/cq/bin/pytest"` or `ssh anvil`) to free up local CPU/GPU compute for rapid iteration, CAD generation, and interactive experiments. When running locally, activate the `cq` conda environment.
-2. **Outcome Verification**: Confirm that all checks (format, lint, compile, and pytest) pass with exit code `0`.
-3. **Resolution**: If any component fails (such as syntax error, ruff failure, or failing test), you must address the failure and re-run the check before concluding your work.
-4. **Integration Smoke Tests**: The integration smoke tests (`python tools/smoke.py`) are highly resource-intensive and should always be run on `anvil`.
-5. **Process Management & Rerun Hygiene**: When restarting or re-running test suites (`pytest`, `pytest -m "slow"`, `tools/anvil pytest`, `python tools/smoke.py`, etc.), you MUST explicitly terminate/kill any preceding running instances of that test or task before launching a new execution. Never allow multiple overlapping runs of the same test command.
+1. **Execution**: Run `./tools/verify.sh` locally or offload pre-commit validation and test suites (`tools/anvil verify`, `tools/anvil pytest`, `pytest -m "slow"`, `python tools/smoke.py`) to the `anvil` cloud server to free up local CPU/GPU compute for rapid iteration, CAD generation, and interactive experiments. `./tools/verify.sh` automatically resolves the `cq` conda environment; when invoking individual tools manually, activate `cq` first.
+2. **Outcome Verification**: Confirm that `./tools/verify.sh` (compileall, ruff format, ruff check, JS lint, JS unit tests, and pytest) exits with code `0`.
+3. **Resolution**: If any component fails (such as syntax error, ruff failure, JS lint error, or failing test), you must address the failure and re-run `./tools/verify.sh` before concluding your work.
+4. **Integration Smoke Tests**: The integration smoke tests (`python tools/smoke.py` / `./tools/verify.sh --smoke`) are resource-intensive and should preferably be run on `anvil` (`tools/anvil smoke`).
+5. **Process Management & Rerun Hygiene**: When restarting or re-running test suites (`./tools/verify.sh`, `pytest`, `pytest -m "slow"`, `tools/anvil verify`, `tools/anvil pytest`, `python tools/smoke.py`, etc.), you MUST explicitly terminate/kill any preceding running instances of that test or task before launching a new execution. Never allow multiple overlapping runs of the same test command.
 6. **GitHub CI Monitoring & Local Stack Remediation**: When commits have been pushed to a remote feature branch or when instructed to inspect CI, you may inspect GitHub Actions CI workflow results (e.g. via `gh run list --limit 5`, `gh pr checks`, or `gh run view <run-id> --log-failed`) and resolve any reported failures. However, the agent MUST NOT autonomously create pull requests (`gh pr create`) or merge pull requests (`gh pr merge`).
 
 ---

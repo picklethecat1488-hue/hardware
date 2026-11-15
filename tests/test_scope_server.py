@@ -516,13 +516,13 @@ def test_regression_bug_segmented_larva_621_simulation_lid_drainage(scope_server
 
 
 def test_regression_bug_punctate_darner_735_diagram_view_labels():
-    """Verify that diagram view text annotation labels are projected and tessellated for 3D inspection."""
+    """Verify that diagram view text annotation labels and individual diagram items are tessellated."""
     pipeline = ScopeGeometryPipeline()
     payload = pipeline.load_geometry("cat_fountain", "wiring", mode="DIAGRAM")
 
     parts = payload.get("shapes", {}).get("parts", [])
     part_names = [p.get("name") for p in parts]
-    assert "cat_fountain_diagram" in part_names
+    assert "bowl_outline" in part_names
     assert "cat_fountain_labels" in part_names
 
     instances = payload.get("instances", [])
