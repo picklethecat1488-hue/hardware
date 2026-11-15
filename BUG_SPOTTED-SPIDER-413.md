@@ -2,12 +2,13 @@
 
 - **UUID**: `92854592-e9dc-496e-9aee-9f1110ab49eb`
 - **ID**: `BUG-SPOTTED-SPIDER-413`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-14 21:22:22 UTC`
 - **Resolved**: `2026-11-15 03:10:56 UTC`
+- **Accepted**: `2026-11-15 03:11:10 UTC`
 
 #### Description
 
