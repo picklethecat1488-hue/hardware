@@ -9,18 +9,42 @@
 | **Review Date** | `2026-11-08 11:45:41 UTC` |
 | **Revisions** | `working` |
 | **Overall Verdict** | **`CHANGES_REQUESTED`** |
-| **Review Progress** | `0/118 files reviewed (0%)` |
-| **Total Comments** | `26 findings` |
+| **Review Progress** | `0/132 files reviewed (0%)` |
+| **Total Comments** | `28 findings` |
 
 ## Findings by Severity
 
 | Severity | Count | Meaning |
 | :--- | :---: | :--- |
-| **[MUST FIX]** | 26 | Must be resolved before merge; bugs, defects, or safety regressions. |
+| **[MUST FIX]** | 28 | Must be resolved before merge; bugs, defects, or safety regressions. |
 | **[PROPOSAL]** | 0 | Architecture ideas, design proposals, or optional enhancements. |
 | **[NIT]** | 0 | Minor formatting, naming, or cosmetic cleanups. |
 
 ## File-by-File Review Findings
+
+### [`js/scope/pcb_renderer.js`](file:///Users/<username>/gh/hardware/js/scope/pcb_renderer.js) — ⏳ `PENDING`
+
+#### **[MUST FIX]** [js/scope/pcb_renderer.js:L53](file:///Users/<username>/gh/hardware/js/scope/pcb_renderer.js#L53)
+<!-- comment-uuid: 9a706a32-6231-4105-902b-6ac39d76f02d -->
+<!-- comment-commit: working -->
+
+```javascript
+const TRACE_CAPSULE_VERTEX_SHADER = /* glsl */ `
+```
+
+> **Reviewer (Reviewer)**: i’d prefer if the shader code was imported direct from files instead of inline
+
+### [`js/scope/sim_renderer.js`](file:///Users/<username>/gh/hardware/js/scope/sim_renderer.js) — ⏳ `PENDING`
+
+#### **[MUST FIX]** [js/scope/sim_renderer.js:L35](file:///Users/<username>/gh/hardware/js/scope/sim_renderer.js#L35)
+<!-- comment-uuid: 8a9fe25e-cff2-42fe-bc9a-7f65afbec553 -->
+<!-- comment-commit: working -->
+
+```javascript
+const FLUID_VERTEX_SHADER = /* glsl */ `
+```
+
+> **Reviewer (Reviewer)**: i’d prefer if the shader code was imported direct from files instead of inline
 
 ### [`model/wiring.py`](file:///Users/<username>/gh/hardware/model/wiring.py) — ⏳ `PENDING`
 
@@ -2994,3 +3018,5 @@ if wiring is None:
 - [x] **[MUST FIX]** [`provider/templates/scope.html.j2:L1524`](file:///Users/<username>/gh/hardware/provider/templates/scope.html.j2#L1524): we should be doing this server side. can we update our learnings about rerun that we should only present the user data out of a captured rerun session, and not create our own facade of rerun? <!-- uuid:967809a5-da28-44f8-97d9-85b3d1e1b6a0 -->
 - [x] **[MUST FIX]** [`provider/vcs/git_engine.py:L35-L37`](file:///Users/<username>/gh/hardware/provider/vcs/git_engine.py#L35-L37): pls remove this limit and stop the git engine from hanging on large files instead, or show a progress bar for large file <!-- uuid:3f57a99f-6e20-42b5-abad-682ad8805a70 -->
 - [x] **[MUST FIX]** [`tools/build.py:L563-L566`](file:///Users/<username>/gh/hardware/tools/build.py#L563-L566): let’s remove the wiring_path fallback logic here <!-- uuid:9c4d7eb9-dbe4-4f4e-97f4-6dc2b3f8216f -->
+- [x] **[MUST FIX]** [`js/scope/pcb_renderer.js:L53`](file:///Users/<username>/gh/hardware/js/scope/pcb_renderer.js#L53): i’d prefer if the shader code was imported direct from files instead of inline <!-- uuid:9a706a32-6231-4105-902b-6ac39d76f02d -->
+- [x] **[MUST FIX]** [`js/scope/sim_renderer.js:L35`](file:///Users/<username>/gh/hardware/js/scope/sim_renderer.js#L35): i’d prefer if the shader code was imported direct from files instead of inline <!-- uuid:8a9fe25e-cff2-42fe-bc9a-7f65afbec553 -->
