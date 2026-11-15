@@ -521,9 +521,6 @@ face 46 ignored
 2026-11-14 13:16:57 [INFO] scope: 127.0.0.1 - - [14/Nov/2026 13:16:57] "GET /api/scope/load?project=carrier_board&target=carrier_board&mode=PCB HTTP/1.1" 200 -
 ```
 
-#### Attachments & References
+#### Review Tasks & Functional Checklist
 
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-MIMIC-PLANTHOPPER-550/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
-| `text/plain` | [scope.log](attachments/BUG-MIMIC-PLANTHOPPER-550/scope.log) | Scope workstation execution logs |
+- [ ] <!-- task:773272b2 --> Inspect the crisp yellow Edge.Cuts rounded board perimeter & mounting holes and toggle In1.Cu–In4.Cu inner copper layers via the PCB Layers panel or quickbar pills | `python tools/scope.py carrier_board/carrier_board --mode pcb`
