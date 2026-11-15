@@ -1,12 +1,13 @@
-# 🔴 `[BUG-STRIDULATING-SCARAB-621]` [carrier_board/carrier_board] Defect Summary
+# 🟢 `[BUG-STRIDULATING-SCARAB-621]` [carrier_board/carrier_board] Defect Summary
 
 - **UUID**: `cd9a5e76-d677-43c5-a9b5-1f419f719775`
 - **ID**: `BUG-STRIDULATING-SCARAB-621`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-14 21:21:32 UTC`
+- **Resolved**: `2026-11-15 01:59:17 UTC`
 
 #### Description
 
@@ -524,3 +525,7 @@ face 46 ignored
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:5a93691d --> Verify bright matte studio CAD shading, collapse/expand CAD rooms in the Tree tab, and fuzzy-search CAD objects (e.g. cmpu1 or substrate) | `python tools/scope.py carrier_board/carrier_board`
+
+#### Resolution Notes
+
+Calibrated ScopeViewport studio lighting intensities for Three.js r184 physically-correct diffuse BRDF units, raised default CAD material roughness to 0.78 with low metalness (0.04) to eliminate glossy glare, and added collapsible CAD room nodes (Expand All / Collapse All / chevron toggles) plus fuzzyFilterAndRank search in #tab-tree.
