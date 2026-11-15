@@ -16,15 +16,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
   <link rel="shortcut icon" href="/static/favicon.ico">
   <link rel="stylesheet" href="/static/common.css">
-  <script src="/static/common.js"></script>
-  <script>
-    if (window.self !== window.top) {
-      document.documentElement.classList.add("in-iframe");
-      window.addEventListener("DOMContentLoaded", () => {
-        if (document.body) document.body.classList.add("in-iframe");
-      });
-    }
-  </script>
+  <script src="/static/vendor/highlight/highlight.js"></script>
   <style>
     html { font-size: 80%; }
     /* =========================================================
@@ -659,6 +651,50 @@
       display: none;
       z-index: 1000;
     }
+    /* Markdown Preview Box */
+    .md-preview-box {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--quake-border-mid);
+      border-radius: 2px;
+      padding: 10px 12px;
+      min-height: 80px;
+      font-size: 11px;
+      line-height: 1.55;
+      color: var(--quake-text-light);
+      overflow-x: auto;
+    }
+    .md-preview-box h1, .md-preview-box h2, .md-preview-box h3, .md-preview-box h4 {
+      color: var(--quake-gold);
+      margin: 6px 0 4px 0;
+    }
+    .md-preview-box p, .md-preview-box ul, .md-preview-box ol, .md-preview-box blockquote {
+      margin: 4px 0 8px 0;
+    }
+    .md-preview-box ul, .md-preview-box ol {
+      padding-left: 18px;
+    }
+    .md-preview-box blockquote {
+      border-left: 3px solid var(--quake-gold);
+      padding-left: 8px;
+      color: var(--quake-text-muted);
+    }
+    .md-preview-box .md-code-block {
+      background: #080503;
+      border: 1px solid var(--quake-border-mid);
+      border-radius: 2px;
+      padding: 8px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      overflow-x: auto;
+      margin: 6px 0;
+    }
+    .md-preview-box .md-inline-code {
+      background: rgba(0, 0, 0, 0.5);
+      padding: 1px 4px;
+      border-radius: 2px;
+      font-family: var(--font-mono);
+      color: var(--quake-gold);
+    }
   </style>
 </head>
 <body>
@@ -677,7 +713,7 @@
       <!-- UI Scale Selector (8715cab2) -->
       <div style="display:flex;align-items:center;gap:4px;margin-right:4px;">
         <span style="font-size:8px;color:var(--quake-text-dim);">SCALE:</span>
-        <select id="uiScaleSelect" class="quake-select" onchange="onUiScaleChange(this.value)" title="UI Scale (Shortcuts: Cmd/Ctrl +/- or 0 to reset)" style="padding: 2px 4px; font-size: 8.5px; height: 22px;">
+        <select id="uiScaleSelect" class="quake-select" title="UI Scale (Shortcuts: Cmd/Ctrl +/- or 0 to reset)" style="padding: 2px 4px; font-size: 8.5px; height: 22px;">
           <option value="75%">75%</option>
           <option value="80%">80%</option>
           <option value="90%">90%</option>
@@ -688,10 +724,10 @@
         </select>
       </div>
       <span class="quake-badge" style="background:#1b120c; border:1px solid var(--quake-gold); color:var(--quake-gold); font-size:9.5px; padding:3px 8px;">Branch: <strong>bugs</strong></span>
-      <button class="quake-btn quake-btn-default" onclick="syncFeedback()">🔄 Sync Feedback</button>
-      <button class="quake-btn quake-btn-default" onclick="newBug()">+ New Bug</button>
-      <button class="quake-btn quake-btn-gold" id="btn-save-exit" onclick="saveAndExit()">💾 Save and Exit</button>
-      <a href="/" target="hardware_vcs_diff_viewer" onclick="returnToDashboard(event)" class="quake-btn quake-btn-default modal-close-btn" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;font-size:13px;padding:2px 10px;line-height:1;" title="Close workstation (Esc)">✕</a>
+      <button class="quake-btn quake-btn-default" data-action="sync-feedback">🔄 Sync Feedback</button>
+      <button class="quake-btn quake-btn-default" data-action="new-issue">+ New Bug</button>
+      <button class="quake-btn quake-btn-gold" id="btn-save-exit" data-action="save-exit">💾 Save and Exit</button>
+      <a href="/" target="hardware_vcs_diff_viewer" data-action="close-workstation" class="quake-btn quake-btn-default modal-close-btn" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;font-size:13px;padding:2px 10px;line-height:1;" title="Close workstation (Esc)">✕</a>
     </div>
   </header>
 
@@ -740,17 +776,17 @@
     <!-- Sidebar -->
     <div class="sidebar">
       <div class="sidebar-header" style="flex-direction:column; gap:8px;">
-        <input type="text" id="search-input" class="sidebar-search" placeholder="Search bugs..." oninput="renderBugList()">
+        <input type="text" id="search-input" class="sidebar-search" placeholder="Search bugs...">
         <div class="filter-pills" style="display:flex; gap:6px; width:100%;">
-          <button id="filter-open" class="quake-btn quake-btn-default quake-btn-active" style="flex:1; padding:4px 6px; font-size:8px;" onclick="setBugFilter('open')">OPEN</button>
-          <button id="filter-planned" class="quake-btn quake-btn-default" style="flex:1; padding:4px 6px; font-size:8px;" onclick="setBugFilter('planned')">PLANNED</button>
-          <button id="filter-all" class="quake-btn quake-btn-default" style="flex:1; padding:4px 6px; font-size:8px;" onclick="setBugFilter('all')">ALL</button>
-          <button id="filter-resolved" class="quake-btn quake-btn-default" style="flex:1; padding:4px 6px; font-size:8px;" onclick="setBugFilter('resolved')">RESOLVED</button>
+          <button id="filter-open" class="quake-btn quake-btn-default quake-btn-active" style="flex:1; padding:4px 6px; font-size:8px;" data-action="set-filter" data-filter="open">OPEN</button>
+          <button id="filter-planned" class="quake-btn quake-btn-default" style="flex:1; padding:4px 6px; font-size:8px;" data-action="set-filter" data-filter="planned">PLANNED</button>
+          <button id="filter-all" class="quake-btn quake-btn-default" style="flex:1; padding:4px 6px; font-size:8px;" data-action="set-filter" data-filter="all">ALL</button>
+          <button id="filter-resolved" class="quake-btn quake-btn-default" style="flex:1; padding:4px 6px; font-size:8px;" data-action="set-filter" data-filter="resolved">RESOLVED</button>
         </div>
         <div style="display:flex; gap:6px; width:100%;">
           <div style="flex:1; display:flex; flex-direction:column; gap:2px;">
             <label style="font-size:7.5px;">Category</label>
-            <select id="select-filter-category" onchange="onFilterCategoryChanged(this.value)" style="width:100%; padding:4px; font-size:8px;">
+            <select id="select-filter-category" style="width:100%; padding:4px; font-size:8px;">
               <option value="ALL">ALL</option>
               {% for cat in categories %}
               <option value="{{ cat }}">{{ cat }}</option>
@@ -759,7 +795,7 @@
           </div>
           <div style="flex:1; display:flex; flex-direction:column; gap:2px;">
             <label style="font-size:7.5px;">Severity</label>
-            <select id="select-filter-severity" onchange="onFilterSeverityChanged(this.value)" style="width:100%; padding:4px; font-size:8px;">
+            <select id="select-filter-severity" style="width:100%; padding:4px; font-size:8px;">
               <option value="ALL">ALL</option>
               {% for sev in severities %}
               <option value="{{ sev }}">{{ sev }}</option>
@@ -769,7 +805,7 @@
         </div>
         <div style="display:flex; flex-direction:column; gap:2px; width:100%;">
           <label style="font-size:7.5px;">Sort By</label>
-          <select id="select-bug-sort" onchange="onBugSortChanged(this.value)" style="width:100%; padding:4px; font-size:8px;">
+          <select id="select-bug-sort" style="width:100%; padding:4px; font-size:8px;">
             <option value="id_desc">ID (Newest first)</option>
             <option value="id_asc">ID (Oldest first)</option>
             <option value="severity">Severity (Critical first)</option>
@@ -797,8 +833,8 @@
             </div>
           </div>
           <div style="display:flex; gap:10px;">
-            <button class="quake-btn quake-btn-green" style="font-weight:700; padding:6px 16px; font-size:10px;" onclick="acceptActiveBug()">✔ ACCEPT FIX</button>
-            <button class="quake-btn quake-btn-red" style="font-weight:700; padding:6px 16px; font-size:10px;" onclick="rejectActiveBug()">✖ REJECT FIX</button>
+            <button class="quake-btn quake-btn-green" style="font-weight:700; padding:6px 16px; font-size:10px;" data-action="accept-issue">✔ ACCEPT FIX</button>
+            <button class="quake-btn quake-btn-red" style="font-weight:700; padding:6px 16px; font-size:10px;" data-action="reject-issue">✖ REJECT FIX</button>
           </div>
         </div>
       </div>
@@ -826,11 +862,11 @@
           <span style="display:flex; align-items:center; gap:8px;">
             <span>Issue Identity</span>
             <span id="active-bug-id-display" style="color:var(--quake-gold); font-size:10px;"></span>
-            <button id="btn-copy-active-bug" class="copy-icon-btn copy-badge-btn" onclick="copyActiveBugId()" title="Copy active bug ID" style="display:none;">📋</button>
+            <button id="btn-copy-active-bug" class="copy-icon-btn copy-badge-btn" data-action="copy-active-id" title="Copy active bug ID" style="display:none;">📋</button>
           </span>
           <div style="display:flex; gap:8px;">
-            <button id="btn-save" class="quake-btn quake-btn-green" onclick="saveActiveBug()">Save Bug</button>
-            <button id="btn-delete" class="quake-btn quake-btn-red" onclick="deleteActiveBug()">Delete</button>
+            <button id="btn-save" class="quake-btn quake-btn-green" data-action="save-issue">Save Bug</button>
+            <button id="btn-delete" class="quake-btn quake-btn-red" data-action="delete-issue">Delete</button>
           </div>
         </div>
         <div class="row">
@@ -887,11 +923,15 @@
       <div class="form-section quake-card">
         <div class="section-title">
           <span>Description & Details</span>
-          <button class="panel-expand-btn quake-btn quake-btn-default" onclick="toggleExpandPanel(this)" title="Extend panel vertically">⤢ Expand</button>
+          <div style="display:flex; gap:6px;">
+            <button type="button" class="panel-expand-btn quake-btn quake-btn-default" data-action="toggle-md-preview" data-target-textarea="bug-description" data-target-preview="bug-description-preview" title="Toggle Markdown preview">👁 Preview</button>
+            <button type="button" class="panel-expand-btn quake-btn quake-btn-default" data-action="toggle-expand-panel" title="Extend panel vertically">⤢ Expand</button>
+          </div>
         </div>
         <div class="col">
           <label>Problem Description</label>
           <textarea id="bug-description" placeholder="Comprehensive explanation of defect or invariant failure..."></textarea>
+          <div id="bug-description-preview" class="md-preview-box" style="display:none;"></div>
         </div>
         <div class="col">
           <label>Reproduction Steps (one per line)</label>
@@ -913,7 +953,7 @@
       <div class="form-section quake-card">
         <div class="section-title">
           <span>Execution Logs & Tracebacks</span>
-          <button class="panel-expand-btn quake-btn quake-btn-default" onclick="toggleExpandPanel(this)" title="Extend panel vertically">⤢ Expand</button>
+          <button class="panel-expand-btn quake-btn quake-btn-default" data-action="toggle-expand-panel" title="Extend panel vertically">⤢ Expand</button>
         </div>
         <div class="col">
           <label>Console Output / Python Traceback</label>
@@ -926,17 +966,17 @@
         <div class="section-title">
           <span>Attachments & References</span>
           <div style="display:flex; gap:8px;">
-            <button class="quake-btn quake-btn-default" onclick="pasteFromClipboard()">📋 Paste from Clipboard</button>
-            <button class="quake-btn quake-btn-default" onclick="document.getElementById('file-upload').click()">📁 Browse Files</button>
+            <button class="quake-btn quake-btn-default" data-action="paste-clipboard">📋 Paste from Clipboard</button>
+            <button class="quake-btn quake-btn-default" data-action="browse-files">📁 Browse Files</button>
           </div>
         </div>
         <div class="attachment-lfs-notice">
           <span>ℹ️ <strong>GitHub LFS Storage:</strong> Attachments are stored in Git LFS and are considered public / non-confidential. Do not include passwords, private tokens, or proprietary secrets.</span>
         </div>
-        <div id="dropzone" class="dropzone" onclick="document.getElementById('file-upload').click()">
+        <div id="dropzone" class="dropzone">
           <span class="dropzone-prompt">📋 DRAG & DROP OR PASTE (⌘V / Ctrl+V) SCREENSHOTS & DOCUMENTS</span>
           <span class="dropzone-hint">Supports Images (.png, .jpg, .svg), Documents (.pdf, .txt, .log, .md, .json, .yaml), or Clipboard files</span>
-          <input type="file" id="file-upload" multiple style="display:none;" onchange="handleFileUpload(this.files)">
+          <input type="file" id="file-upload" multiple style="display:none;">
         </div>
         <div id="attachments-grid" class="attachments-grid"></div>
       </div>
@@ -945,11 +985,15 @@
       <div class="form-section quake-card">
         <div class="section-title">
           <span>Resolution Notes</span>
-          <button class="panel-expand-btn quake-btn quake-btn-default" onclick="toggleExpandPanel(this)" title="Extend panel vertically">⤢ Expand</button>
+          <div style="display:flex; gap:6px;">
+            <button type="button" class="panel-expand-btn quake-btn quake-btn-default" data-action="toggle-md-preview" data-target-textarea="bug-resolution" data-target-preview="bug-resolution-preview" title="Toggle Markdown preview">👁 Preview</button>
+            <button type="button" class="panel-expand-btn quake-btn quake-btn-default" data-action="toggle-expand-panel" title="Extend panel vertically">⤢ Expand</button>
+          </div>
         </div>
         <div class="col">
           <label>Fix Details & Commit References</label>
           <textarea id="bug-resolution" placeholder="Document root cause, code changes made, and test regression verifications..."></textarea>
+          <div id="bug-resolution-preview" class="md-preview-box" style="display:none;"></div>
         </div>
       </div>
 
@@ -960,7 +1004,7 @@
         </div>
         <div style="display:flex; gap:8px; margin-bottom:10px;">
           <input type="text" id="input-attach-commit" placeholder="Git commit SHA (e.g. 7f3b89a)..." style="flex:1;">
-          <button class="quake-btn quake-btn-default" onclick="attachCommitToActiveBug()">+ Attach Commit</button>
+          <button class="quake-btn quake-btn-default" data-action="attach-commit">+ Attach Commit</button>
         </div>
         <div id="attached-commits-list" class="commits-list" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
       </div>
@@ -973,7 +1017,7 @@
         <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
           <input type="text" id="input-task-title" placeholder="Task title / verification requirement..." style="flex:2; min-width:200px;">
           <input type="text" id="input-task-command" placeholder="Demo command (e.g. python tools/scope.py cat_fountain/product:simulate)..." style="flex:3; min-width:250px; font-family:var(--font-mono);">
-          <button class="quake-btn quake-btn-default" onclick="addTaskToActiveBug()">+ Add Task</button>
+          <button class="quake-btn quake-btn-default" data-action="add-review-task">+ Add Task</button>
         </div>
         <div id="review-tasks-list" class="tasks-list"></div>
       </div>
@@ -982,1456 +1026,30 @@
 
   <div id="toast"></div>
 
-  <script>
-    let db = {{ database_json | safe }};
-    let activeBugId = null;
-    let currentFilter = sessionStorage.getItem("bug_filter_status") || 'open';
-    let currentCategoryFilter = sessionStorage.getItem("bug_filter_category") || 'ALL';
-    let currentSeverityFilter = sessionStorage.getItem("bug_filter_severity") || 'ALL';
-    let currentBugSort = sessionStorage.getItem("bug_sort") || 'id_desc';
-
-    const severityOrder = { "CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3 };
-    const statusOrder = { "OPEN": 0, "IN_PROGRESS": 1, "PLANNED": 2, "RESOLVED": 3, "CLOSED": 4 };
-
-    // Feedback Loading Modal Management
-    let feedbackLoadingTracker = null;
-    let feedbackLoadingInterval = null;
-    function showFeedbackLoading(title, description, stepText) {
-      const modal = document.getElementById("feedback-loading-modal");
-      if (!modal) return;
-      const titleEl = modal.querySelector("h3");
-      const descEl = document.getElementById("loading-status-text");
-      const stepEl = document.getElementById("loading-step-text");
-      const barEl = document.getElementById("loading-progress-bar");
-      const pctEl = document.getElementById("loading-progress-percent");
-
-      if (titleEl && title) titleEl.textContent = title;
-      if (descEl && description) descEl.textContent = description;
-      if (stepEl && stepText) stepEl.textContent = stepText;
-
-      modal.style.display = "flex";
-
-      const stages = [
-        { at: 35, text: "Scanning feedback/ directory for BUG_*.md files..." },
-        { at: 65, text: "Parsing issue metadata and verification checklists..." },
-        { at: 85, text: "Reconciling SQLite database store and feedback worktree..." },
-        { at: 96, text: "Finalizing synchronized records..." },
-      ];
-
-      if (feedbackLoadingTracker) {
-        feedbackLoadingTracker.stop();
-      }
-
-      if (window.Forge && window.Forge.createProgressBar) {
-        feedbackLoadingTracker = window.Forge.createProgressBar({
-          barEl,
-          percentEl: pctEl,
-          statusEl: stepEl,
-          initialProgress: 14,
-          maxProgress: 95,
-          stages,
-        });
-        feedbackLoadingTracker.start();
-      }
+  <script id="app-boot-config" type="application/json">
+    {
+      "repoName": "hardware",
+      "entityKind": "bug",
+      "entityLabel": "BUG",
+      "entityTitle": "Bug",
+      "collectionKey": "bugs",
+      "fieldPrefix": "bug",
+      "apiBase": "/api/bugs",
+      "databaseEndpoint": "/api/database",
+      "nextIdEndpoint": "/api/next_bug_id",
+      "uploadEndpoint": "/api/upload",
+      "syncEndpoint": "/api/sync_feedback",
+      "exitEndpoint": "/api/exit",
+      "versionEndpoint": "/api/version",
+      "defaultCategory": "PCB",
+      "fileInputId": "file-upload",
+      "itemIcon": "",
+      "entityIdParam": "bug_id",
+      "reviewFromParam": "bugs"
     }
-
-    function hideFeedbackLoading() {
-      const modal = document.getElementById("feedback-loading-modal");
-      if (feedbackLoadingTracker) {
-        feedbackLoadingTracker.finish("✓ Synchronized!", () => {
-          if (modal) modal.style.display = "none";
-        }, 250);
-        feedbackLoadingTracker = null;
-        return;
-      }
-      if (!modal) return;
-      const barEl = document.getElementById("loading-progress-bar");
-      const pctEl = document.getElementById("loading-progress-percent");
-      const stepEl = document.getElementById("loading-step-text");
-      if (barEl) barEl.style.width = "100%";
-      if (pctEl) pctEl.textContent = "100%";
-      if (stepEl) stepEl.textContent = "✓ Synchronized!";
-      setTimeout(() => {
-        modal.style.display = "none";
-      }, 250);
-    }
-
-    // Action Progress Modal Management (BUG-327)
-    let actionProgressDepth = 0;
-    let actionProgressTimer = null;
-    let actionProgressInterval = null;
-
-    async function runWithActionModal(options, asyncFn) {
-      if (window.Forge && window.Forge.performActionWithProgress) {
-        return await window.Forge.performActionWithProgress(asyncFn, options);
-      }
-      if (actionProgressDepth > 0) {
-        actionProgressDepth++;
-        try {
-          return await asyncFn();
-        } finally {
-          actionProgressDepth--;
-        }
-      }
-
-      actionProgressDepth = 1;
-      const thresholdMs = (options && options.delayMs !== undefined) ? options.delayMs : 1000;
-      const overlay = document.getElementById("actionProgressModalOverlay");
-      const titleEl = document.getElementById("actionProgressTitle");
-      const descEl = document.getElementById("actionProgressDescription");
-      const statusEl = document.getElementById("actionProgressStatus");
-      const elapsedEl = document.getElementById("actionProgressElapsed");
-      const barEl = document.getElementById("actionProgressBar");
-      const percentEl = document.getElementById("actionProgressPercent");
-      const iconEl = document.getElementById("actionProgressIcon");
-
-      let isModalVisible = false;
-      const startTime = Date.now();
-      let progress = 14;
-
-      if (actionProgressTimer) {
-        clearTimeout(actionProgressTimer);
-        actionProgressTimer = null;
-      }
-      if (actionProgressInterval) {
-        clearInterval(actionProgressInterval);
-        actionProgressInterval = null;
-      }
-
-      const getStageMessage = (pct) => {
-        if (options && options.stages && Array.isArray(options.stages)) {
-          for (const s of options.stages) {
-            if (pct <= s.at) return s.text;
-          }
-          return options.stages[options.stages.length - 1].text;
-        }
-
-        const titleUpper = ((options && options.title) || "").toUpperCase();
-        if (titleUpper.includes("SYNC") || titleUpper.includes("MERG")) {
-          if (pct < 30) return "Scanning feedback/ directory for issue markdown files...";
-          if (pct < 60) return "Parsing report fields, review tasks, and attachments...";
-          if (pct < 85) return "Reconciling SQLite database store and feedback worktree...";
-          return "Updating active bug views...";
-        } else if (titleUpper.includes("SAVE") || titleUpper.includes("PERSIST")) {
-          if (pct < 30) return "Validating issue schema and task invariants...";
-          if (pct < 65) return "Writing changes to SQLite store and feedback worktree...";
-          if (pct < 88) return "Regenerating markdown export reports...";
-          return "Finalizing persistent state...";
-        } else if (titleUpper.includes("DELETE") || titleUpper.includes("REJECT") || titleUpper.includes("ACCEPT")) {
-          if (pct < 40) return "Updating issue lifecycle status...";
-          if (pct < 80) return "Synchronizing changes across database...";
-          return "Refreshing workspace view...";
-        }
-
-        if (pct < 30) return (options && options.stepText) || "Initializing operation...";
-        if (pct < 60) return "Executing operation...";
-        if (pct < 85) return "Reconciling data models...";
-        return "Finalizing updates...";
-      };
-
-      actionProgressTimer = setTimeout(() => {
-        if (!overlay) return;
-        isModalVisible = true;
-        if (titleEl) titleEl.textContent = (options && options.title) || "PROCESSING ACTION";
-        if (descEl) descEl.textContent = (options && options.description) || "Please wait while the operation completes...";
-        if (statusEl) statusEl.textContent = (options && options.stepText) || getStageMessage(progress);
-        if (iconEl && options && options.icon) iconEl.textContent = options.icon;
-        if (barEl) barEl.style.width = "14%";
-        if (percentEl) percentEl.textContent = "14%";
-        if (elapsedEl) elapsedEl.textContent = "0.0s";
-        overlay.style.display = "flex";
-
-        actionProgressInterval = setInterval(() => {
-          const elapsedSec = (Date.now() - startTime) / 1000;
-          if (elapsedEl) elapsedEl.textContent = `${elapsedSec.toFixed(1)}s`;
-
-          // Continuous asymptotic progression
-          if (progress < 94) {
-            if (elapsedSec < 1.0) {
-              progress = 14 + (elapsedSec / 1.0) * 26; // 14% to 40%
-            } else if (elapsedSec < 3.0) {
-              progress = 40 + ((elapsedSec - 1.0) / 2.0) * 32; // 40% to 72%
-            } else if (elapsedSec < 7.0) {
-              progress = 72 + ((elapsedSec - 3.0) / 4.0) * 18; // 72% to 90%
-            } else {
-              progress += (96 - progress) * 0.015; // Asymptotic up to 96%
-            }
-          }
-          const pct = Math.min(96, Math.floor(progress));
-          if (barEl) barEl.style.width = `${pct}%`;
-          if (percentEl) percentEl.textContent = `${pct}%`;
-          if (statusEl) statusEl.textContent = getStageMessage(pct);
-        }, 50);
-      }, thresholdMs);
-
-      try {
-        const result = await asyncFn();
-        return result;
-      } finally {
-        actionProgressDepth--;
-        if (actionProgressTimer) {
-          clearTimeout(actionProgressTimer);
-          actionProgressTimer = null;
-        }
-        if (actionProgressInterval) {
-          clearInterval(actionProgressInterval);
-          actionProgressInterval = null;
-        }
-        if (isModalVisible && overlay) {
-          if (barEl) barEl.style.width = "100%";
-          if (percentEl) percentEl.textContent = "100%";
-          const totalElapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-          if (statusEl) statusEl.textContent = `✓ Complete in ${totalElapsed}s`;
-          setTimeout(() => {
-            overlay.style.display = "none";
-          }, 250);
-        }
-      }
-    }
-
-    function init() {
-      initUiScale();
-      // Disambiguate duplicate IDs if any exist in in-memory state
-      const seenIds = new Set();
-      (db.bugs || []).forEach(b => {
-        if (seenIds.has(b.id)) {
-          b.id = generateNextBugId();
-        }
-        seenIds.add(b.id);
-      });
-
-      // Restore dropdown UI selections
-      const sortSel = document.getElementById("select-bug-sort");
-      if (sortSel) sortSel.value = currentBugSort;
-      const catSel = document.getElementById("select-filter-category");
-      if (catSel) catSel.value = currentCategoryFilter;
-      const sevSel = document.getElementById("select-filter-severity");
-      if (sevSel) sevSel.value = currentSeverityFilter;
-
-      const visibleBugs = getFilteredAndSortedBugs();
-      if (visibleBugs.length > 0) {
-        activeBugId = visibleBugs[0].id;
-      } else if (db.bugs && db.bugs.length > 0) {
-        activeBugId = db.bugs[0].id;
-      }
-      updateMetrics();
-      updateComponentDatalist();
-      setBugFilter(currentFilter);
-      loadActiveBug();
-      autoResizeAllTextareas();
-      setupPasteDrop();
-    }
-
-    function onBugSortChanged(val) {
-      currentBugSort = val;
-      sessionStorage.setItem("bug_sort", val);
-      renderBugList();
-    }
-
-    function onFilterCategoryChanged(val) {
-      currentCategoryFilter = val;
-      sessionStorage.setItem("bug_filter_category", val);
-      renderBugList();
-      ensureActiveBugVisible();
-    }
-
-    function onFilterSeverityChanged(val) {
-      currentSeverityFilter = val;
-      sessionStorage.setItem("bug_filter_severity", val);
-      renderBugList();
-      ensureActiveBugVisible();
-    }
-
-    function ensureActiveBugVisible() {
-      const visibleBugs = getFilteredAndSortedBugs();
-      if (visibleBugs.length > 0 && !visibleBugs.some(b => b.id === activeBugId)) {
-        selectBug(visibleBugs[0].id);
-      }
-    }
-
-    function setBugFilter(filter) {
-      currentFilter = filter;
-      sessionStorage.setItem("bug_filter_status", filter);
-      const btnOpen = document.getElementById("filter-open");
-      const btnPlanned = document.getElementById("filter-planned");
-      const btnAll = document.getElementById("filter-all");
-      const btnResolved = document.getElementById("filter-resolved");
-      if (btnOpen) btnOpen.classList.toggle("quake-btn-active", filter === "open");
-      if (btnPlanned) btnPlanned.classList.toggle("quake-btn-active", filter === "planned");
-      if (btnAll) btnAll.classList.toggle("quake-btn-active", filter === "all");
-      if (btnResolved) btnResolved.classList.toggle("quake-btn-active", filter === "resolved");
-      renderBugList();
-      ensureActiveBugVisible();
-    }
-
-    function showToast(msg) {
-      const t = document.getElementById("toast");
-      t.innerText = msg;
-      t.style.display = "block";
-      setTimeout(() => { t.style.display = "none"; }, 3500);
-    }
-
-    function copyText(text) {
-      if (!text) return;
-      if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(text).then(() => {
-          showToast(`Copied: ${text}`);
-        }).catch(() => fallbackCopy(text));
-      } else {
-        fallbackCopy(text);
-      }
-    }
-
-    function fallbackCopy(text) {
-      try {
-        const ta = document.createElement("textarea");
-        ta.value = text;
-        ta.style.position = "fixed";
-        ta.style.opacity = "0";
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
-        showToast(`Copied: ${text}`);
-      } catch (err) {
-        console.error("Failed to copy", err);
-      }
-    }
-
-    function copyActiveBugId() {
-      if (activeBugId) {
-        copyText(activeBugId);
-      }
-    }
-
-    function updateMetrics() {
-      const total = db.bugs.length;
-      const open = db.bugs.filter(b => b.status === "OPEN" || b.status === "IN_PROGRESS").length;
-      const resolved = db.bugs.filter(b => b.status === "RESOLVED" || b.status === "CLOSED").length;
-      document.getElementById("m-total").innerText = total;
-      document.getElementById("m-open").innerText = open;
-      document.getElementById("m-resolved").innerText = resolved;
-    }
-
-    function updateComponentDatalist() {
-      const datalist = document.getElementById("bug-component-list") || document.getElementById("component-list");
-      if (!datalist) return;
-      const items = (db.bugs || db.worms || []);
-      const comps = new Set();
-      items.forEach(item => {
-        if (item && item.component && typeof item.component === "string") {
-          const c = item.component.trim();
-          if (c) comps.add(c);
-        }
-      });
-      const sortedComps = Array.from(comps).sort((a, b) => a.localeCompare(b));
-      datalist.innerHTML = "";
-      sortedComps.forEach(c => {
-        const opt = document.createElement("option");
-        opt.value = c;
-        datalist.appendChild(opt);
-      });
-    }
-
-    function getFilteredAndSortedBugs() {
-      const searchInput = document.getElementById("search-input");
-      const query = (searchInput ? searchInput.value || "" : "").toLowerCase();
-      let list = (db.bugs || []).filter(bug => {
-        if (currentFilter === "open" && (bug.status === "CLOSED" || bug.status === "PLANNED")) return false;
-        if (currentFilter === "planned" && bug.status !== "PLANNED") return false;
-        if (currentFilter === "resolved" && (bug.status !== "RESOLVED" && bug.status !== "CLOSED")) return false;
-        if (currentCategoryFilter && currentCategoryFilter !== "ALL" && bug.category !== currentCategoryFilter) return false;
-        if (currentSeverityFilter && currentSeverityFilter !== "ALL" && bug.severity !== currentSeverityFilter) return false;
-        if (query && !bug.title.toLowerCase().includes(query) && !bug.id.toLowerCase().includes(query) && !(bug.component || "").toLowerCase().includes(query)) {
-          return false;
-        }
-        return true;
-      });
-
-      list.sort((a, b) => {
-        switch (currentBugSort) {
-          case "id_asc": {
-            const timeA = a.created_at ? (Date.parse(a.created_at.replace(" UTC", "Z")) || a.created_at) : "";
-            const timeB = b.created_at ? (Date.parse(b.created_at.replace(" UTC", "Z")) || b.created_at) : "";
-            if (timeA && timeB && timeA !== timeB) {
-              return timeA < timeB ? -1 : 1;
-            }
-            if (timeA && !timeB) return -1;
-            if (!timeA && timeB) return 1;
-            const numA = parseInt((a.id || "").replace(/\D/g, ""), 10) || 0;
-            const numB = parseInt((b.id || "").replace(/\D/g, ""), 10) || 0;
-            if (numA !== numB) return numA - numB;
-            return (a.id || "").localeCompare(b.id || "");
-          }
-          case "id_desc": {
-            const timeA = a.created_at ? (Date.parse(a.created_at.replace(" UTC", "Z")) || a.created_at) : "";
-            const timeB = b.created_at ? (Date.parse(b.created_at.replace(" UTC", "Z")) || b.created_at) : "";
-            if (timeA && timeB && timeA !== timeB) {
-              return timeA > timeB ? -1 : 1;
-            }
-            if (timeA && !timeB) return -1;
-            if (!timeA && timeB) return 1;
-            const numA = parseInt((a.id || "").replace(/\D/g, ""), 10) || 0;
-            const numB = parseInt((b.id || "").replace(/\D/g, ""), 10) || 0;
-            if (numA !== numB) return numB - numA;
-            return (b.id || "").localeCompare(a.id || "");
-          }
-          case "severity": {
-            const rankA = severityOrder[a.severity] !== undefined ? severityOrder[a.severity] : 99;
-            const rankB = severityOrder[b.severity] !== undefined ? severityOrder[b.severity] : 99;
-            if (rankA !== rankB) return rankA - rankB;
-            const timeA = a.created_at ? (Date.parse(a.created_at.replace(" UTC", "Z")) || a.created_at) : "";
-            const timeB = b.created_at ? (Date.parse(b.created_at.replace(" UTC", "Z")) || b.created_at) : "";
-            if (timeA && timeB && timeA !== timeB) return timeA > timeB ? -1 : 1;
-            return (b.id || "").localeCompare(a.id || "");
-          }
-          case "status": {
-            const rankA = statusOrder[a.status] !== undefined ? statusOrder[a.status] : 99;
-            const rankB = statusOrder[b.status] !== undefined ? statusOrder[b.status] : 99;
-            if (rankA !== rankB) return rankA - rankB;
-            const timeA = a.created_at ? (Date.parse(a.created_at.replace(" UTC", "Z")) || a.created_at) : "";
-            const timeB = b.created_at ? (Date.parse(b.created_at.replace(" UTC", "Z")) || b.created_at) : "";
-            if (timeA && timeB && timeA !== timeB) return timeA > timeB ? -1 : 1;
-            return (b.id || "").localeCompare(a.id || "");
-          }
-          case "component": {
-            const compA = (a.component || "").toLowerCase();
-            const compB = (b.component || "").toLowerCase();
-            return compA.localeCompare(compB);
-          }
-          case "title": {
-            const titleA = (a.title || "").toLowerCase();
-            const titleB = (b.title || "").toLowerCase();
-            return titleA.localeCompare(titleB);
-          }
-          default:
-            return 0;
-        }
-      });
-
-      return list;
-    }
-
-    function renderBugList() {
-      const list = document.getElementById("bug-list");
-      list.innerHTML = "";
-      const visibleBugs = getFilteredAndSortedBugs();
-
-      visibleBugs.forEach(bug => {
-        const li = document.createElement("li");
-        li.className = "bug-item" + (bug.id === activeBugId ? " active" : "");
-        li.onclick = () => selectBug(bug.id);
-
-        let sevBadgeClass = "quake-badge quake-badge-muted";
-        if (bug.severity === "CRITICAL") sevBadgeClass = "quake-badge quake-badge-red";
-        else if (bug.severity === "HIGH") sevBadgeClass = "quake-badge quake-badge-amber";
-        else if (bug.severity === "MEDIUM") sevBadgeClass = "quake-badge quake-badge-gold";
-        else if (bug.severity === "LOW") sevBadgeClass = "quake-badge quake-badge-muted";
-
-        let stBadgeClass = "quake-badge quake-badge-amber";
-        let stDisplay = bug.status;
-        if (bug.status === "RESOLVED") {
-          stBadgeClass = "quake-badge quake-badge-gold";
-          stDisplay = "AWAITING REVIEW";
-        } else if (bug.status === "CLOSED") {
-          stBadgeClass = "quake-badge quake-badge-green";
-        } else if (bug.status === "PLANNED") {
-          stBadgeClass = "quake-badge quake-badge-muted";
-        }
-
-        li.innerHTML = `
-          <div class="bug-item-top">
-            <span class="bug-id">${bug.id} <button class="copy-icon-btn copy-badge-btn" onclick="event.stopPropagation(); copyText('${bug.id}')" title="Copy Bug ID ${bug.id}">📋</button></span>
-            <span class="${sevBadgeClass}">${bug.severity}</span>
-            <span class="${stBadgeClass}">${stDisplay}</span>
-          </div>
-          <div class="bug-item-title">${bug.title || "Untitled Bug"}</div>
-        `;
-        list.appendChild(li);
-      });
-    }
-
-    function selectBug(id) {
-      activeBugId = id;
-      renderBugList();
-      loadActiveBug();
-    }
-
-    function loadActiveBug() {
-      const bug = db.bugs.find(b => b.id === activeBugId);
-      if (!bug) return;
-
-      const bugIdDisp = document.getElementById("active-bug-id-display");
-      const btnCopyActiveBug = document.getElementById("btn-copy-active-bug");
-      if (bugIdDisp) bugIdDisp.textContent = `[${bug.id}]`;
-      if (btnCopyActiveBug) btnCopyActiveBug.style.display = "inline-flex";
-
-      // Functional Review Action Banner
-      const reviewBanner = document.getElementById("review-action-banner");
-      if (reviewBanner) {
-        reviewBanner.style.display = (bug.status === "RESOLVED") ? "block" : "none";
-      }
-
-      // Rejection Feedback Alert
-      const rejCard = document.getElementById("rejection-feedback-card");
-      const rejText = document.getElementById("rejection-feedback-text");
-      if (rejCard && rejText) {
-        if (bug.rejection_notes && bug.rejection_notes.trim()) {
-          rejCard.style.display = "block";
-          const rejTime = bug.rejected_at ? `[${bug.rejected_at}]\n` : "";
-          rejText.textContent = `${rejTime}${bug.rejection_notes}`;
-        } else {
-          rejCard.style.display = "none";
-        }
-      }
-
-      // Accepted Feedback Alert
-      const accCard = document.getElementById("accepted-feedback-card");
-      const accTime = document.getElementById("accepted-timestamp-display");
-      if (accCard) {
-        if (bug.status === "CLOSED") {
-          accCard.style.display = "block";
-          if (accTime) {
-            accTime.textContent = bug.accepted_at ? `ACCEPTED ${bug.accepted_at}` : "CLOSED";
-          }
-        } else {
-          accCard.style.display = "none";
-        }
-      }
-
-      document.getElementById("bug-title").value = bug.title || "";
-      document.getElementById("bug-severity").value = bug.severity || "MEDIUM";
-      document.getElementById("bug-status").value = bug.status || "OPEN";
-      document.getElementById("bug-category").value = bug.category || "PCB";
-      document.getElementById("bug-component").value = bug.component || "";
-      document.getElementById("bug-description").value = bug.description || "";
-      document.getElementById("bug-steps").value = (bug.reproduction_steps || []).join("\n");
-      document.getElementById("bug-expected").value = bug.expected_behavior || "";
-      document.getElementById("bug-actual").value = bug.actual_behavior || "";
-      document.getElementById("bug-logs").value = bug.logs || "";
-      document.getElementById("bug-resolution").value = bug.resolution_notes || "";
-
-      renderAttachments(bug.attachments || []);
-      renderAttachedCommits(bug.commit_ids || []);
-      renderReviewTasks(bug.review_tasks || []);
-      autoResizeAllTextareas();
-    }
-
-    async function acceptActiveBug() {
-      if (!activeBugId) return;
-      return await runWithActionModal({
-        title: "ACCEPTING BUG REPORT",
-        description: `Marking bug ${activeBugId} as verified / closed...`,
-        stepText: `Accepting ${activeBugId}...`,
-        icon: "✓"
-      }, async () => {
-        try {
-          await saveActiveBug();
-          const res = await fetch("/api/bugs/accept", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: activeBugId, notes: "" })
-          });
-          const data = await res.json();
-          if (data.status === "ok") {
-            const bug = db.bugs.find(b => b.id === activeBugId);
-            if (bug) {
-              bug.status = "CLOSED";
-              bug.accepted_at = data.bug.accepted_at;
-              if (data.bug.resolution_notes) bug.resolution_notes = data.bug.resolution_notes;
-            }
-            loadActiveBug();
-            renderBugList();
-            updateMetrics();
-            showToast(`Bug [${activeBugId}] accepted and closed.`);
-          } else {
-            showToast(data.error || "Failed to accept bug");
-          }
-        } catch (err) {
-          showToast("Error accepting bug: " + err);
-        }
-      });
-    }
-
-    async function rejectActiveBug() {
-      if (!activeBugId) return;
-      return await runWithActionModal({
-        title: "REJECTING BUG REPORT",
-        description: `Reopening bug ${activeBugId} and saving review notes...`,
-        stepText: `Rejecting ${activeBugId}...`,
-        icon: "✕"
-      }, async () => {
-        try {
-          const currentNotes = document.getElementById("bug-resolution") ? document.getElementById("bug-resolution").value.trim() : "";
-          await saveActiveBug();
-          const res = await fetch("/api/bugs/reject", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: activeBugId, notes: currentNotes })
-          });
-          const data = await res.json();
-          if (data.status === "ok") {
-            const bug = db.bugs.find(b => b.id === activeBugId);
-            if (bug) {
-              bug.status = "OPEN";
-              bug.rejected_at = data.bug.rejected_at;
-              bug.rejection_notes = data.bug.rejection_notes;
-            }
-            loadActiveBug();
-            renderBugList();
-            updateMetrics();
-            showToast(`Bug [${activeBugId}] rejected and reopened.`);
-          } else {
-            showToast(data.error || "Failed to reject bug");
-          }
-        } catch (err) {
-          showToast("Error rejecting bug: " + err);
-        }
-      });
-    }
-
-    async function attachCommitToActiveBug() {
-      if (!activeBugId) return;
-      const input = document.getElementById("input-attach-commit");
-      const commitSha = (input ? input.value : "").trim();
-      if (!commitSha) {
-        showToast("Please enter a commit SHA");
-        return;
-      }
-      return await runWithActionModal({
-        title: "ATTACHING COMMIT",
-        description: `Linking commit ${commitSha} to ${activeBugId}...`,
-        stepText: "Updating bug commit linkages...",
-        icon: "🔗"
-      }, async () => {
-        try {
-          const res = await fetch("/api/bugs/attach_commit", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: activeBugId, commit_id: commitSha })
-          });
-          const data = await res.json();
-          if (data.status === "ok") {
-            const bug = db.bugs.find(b => b.id === activeBugId);
-            if (bug) bug.commit_ids = data.bug.commit_ids || [];
-            input.value = "";
-            renderAttachedCommits(bug.commit_ids || []);
-            showToast(`Attached commit ${commitSha}`);
-          } else {
-            showToast(data.error || "Failed to attach commit");
-          }
-        } catch (err) {
-          showToast("Error attaching commit: " + err);
-        }
-      });
-    }
-
-    function renderAttachedCommits(commitIds) {
-      const container = document.getElementById("attached-commits-list");
-      if (!container) return;
-      container.innerHTML = "";
-      if (!commitIds || !commitIds.length) {
-        container.innerHTML = '<span style="font-size:10px; color:var(--quake-text-dim);">No commits attached yet.</span>';
-        return;
-      }
-      commitIds.forEach(cid => {
-        const chip = document.createElement("div");
-        chip.style.cssText = "display:inline-flex; align-items:center; gap:6px; background:#1b120c; border:1px solid var(--quake-gold); border-radius:3px; padding:4px 8px; font-family:var(--font-mono); font-size:10px;";
-        const bugParam = activeBugId ? `&bug_id=${encodeURIComponent(activeBugId)}` : "";
-        const crUrl = `/review?revisions=${encodeURIComponent(cid)}&from=bugs${bugParam}`;
-        chip.innerHTML = `
-          <a href="${crUrl}" onclick="openCommitInCodeReview(event, '${cid}')" style="color:var(--quake-gold); text-decoration:none; font-weight:700; cursor:pointer;" title="Review commit ${cid.slice(0, 10)} in Code Review">🔍 ${cid.slice(0, 10)}</a>
-          <button class="copy-icon-btn copy-badge-btn" onclick="copyText('${cid}')" title="Copy commit SHA">📋</button>
-        `;
-        container.appendChild(chip);
-      });
-    }
-
-    async function openCommitInCodeReview(event, commitHash) {
-      if (event) {
-        if (event.metaKey || event.ctrlKey || event.shiftKey) return;
-        event.preventDefault();
-      }
-      if (!commitHash) return;
-      const bugParam = activeBugId ? `&bug_id=${encodeURIComponent(activeBugId)}` : "";
-      const targetUrl = `/review?revisions=${encodeURIComponent(commitHash)}&from=bugs${bugParam}`;
-      const targetName = "hardware_code_review";
-
-      try {
-        await fetch("/api/open_code_review", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ commits: [commitHash] })
-        });
-      } catch (err) {}
-
-      if (window.parent && window.parent !== window && typeof window.parent.openWorkstationModal === "function") {
-        window.parent.openWorkstationModal(targetUrl, targetName);
-      } else {
-        window.location.href = targetUrl;
-      }
-    }
-
-    async function addTaskToActiveBug() {
-      if (!activeBugId) return;
-      const titleInput = document.getElementById("input-task-title");
-      const cmdInput = document.getElementById("input-task-command");
-      const title = (titleInput ? titleInput.value : "").trim();
-      const cmd = (cmdInput ? cmdInput.value : "").trim();
-      if (!title) {
-        showToast("Task title is required");
-        return;
-      }
-      try {
-        const res = await fetch("/api/bugs/add_task", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: activeBugId, title: title, command: cmd })
-        });
-        const data = await res.json();
-        if (data.status === "ok") {
-          const bug = db.bugs.find(b => b.id === activeBugId);
-          if (bug) bug.review_tasks = data.bug.review_tasks || [];
-          if (titleInput) titleInput.value = "";
-          if (cmdInput) cmdInput.value = "";
-          renderReviewTasks(bug.review_tasks || []);
-          showToast("Task added.");
-        } else {
-          showToast(data.error || "Failed to add task");
-        }
-      } catch (err) {
-        showToast("Error adding task: " + err);
-      }
-    }
-
-    async function toggleTaskStatus(taskId, currentStatus) {
-      if (!activeBugId) return;
-      const newStatus = (currentStatus === "COMPLETED") ? "PENDING" : "COMPLETED";
-      try {
-        const res = await fetch("/api/bugs/update_task", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: activeBugId, task_id: taskId, status: newStatus })
-        });
-        const data = await res.json();
-        if (data.status === "ok") {
-          const bug = db.bugs.find(b => b.id === activeBugId);
-          if (bug) bug.review_tasks = data.bug.review_tasks || [];
-          renderReviewTasks(bug.review_tasks || []);
-        }
-      } catch (err) {
-        showToast("Error updating task: " + err);
-      }
-    }
-
-    async function runTaskCommand(taskId, command) {
-      const outBox = document.getElementById(`task-output-${taskId}`);
-      if (outBox) {
-        outBox.style.display = "block";
-        outBox.textContent = "▶ Executing command...";
-      }
-      try {
-        const res = await fetch("/api/bugs/run_command", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: activeBugId, command: command })
-        });
-        const data = await res.json();
-        if (outBox) {
-          const text = (data.stdout || "") + (data.stderr ? "\n[STDERR]\n" + data.stderr : "");
-          outBox.textContent = `[Exit Code ${data.exit_code}]\n` + (text || "(No output)");
-        }
-        if (data.status === "ok") {
-          showToast("Command succeeded.");
-        } else {
-          showToast("Command completed with error.");
-        }
-      } catch (err) {
-        if (outBox) outBox.textContent = "Error executing command: " + err;
-        showToast("Execution failed: " + err);
-      }
-    }
-
-    function renderReviewTasks(tasks) {
-      const container = document.getElementById("review-tasks-list");
-      if (!container) return;
-      container.innerHTML = "";
-      if (!tasks || !tasks.length) {
-        container.innerHTML = '<span style="font-size:10px; color:var(--quake-text-dim);">No review tasks defined yet.</span>';
-        return;
-      }
-      tasks.forEach(task => {
-        const isDone = task.status === "COMPLETED";
-        const item = document.createElement("div");
-        item.style.cssText = "background:#120a05; border:1px solid #331f0f; border-radius:3px; padding:8px 10px; margin-bottom:8px;";
-        const cmdPart = task.command ? `
-          <div style="display:flex; align-items:center; gap:8px; margin-top:6px; background:#000; border:1px solid #222; border-radius:2px; padding:4px 8px;">
-            <code style="font-family:var(--font-mono); font-size:10px; color:var(--quake-gold); flex:1; overflow-x:auto;">${task.command}</code>
-            <button class="quake-btn quake-btn-default" style="font-size:9px; padding:2px 8px;" onclick="copyText('${task.command.replace(/'/g, "\\'")}')">Copy</button>
-            <button class="quake-btn quake-btn-green" style="font-size:9px; padding:2px 8px;" onclick="runTaskCommand('${task.id}', '${task.command.replace(/'/g, "\\'")}')">▶ Run Demo</button>
-          </div>
-          <pre id="task-output-${task.id}" style="display:none; margin-top:6px; background:#080503; border:1px solid #331f0f; padding:6px; font-family:var(--font-mono); font-size:9.5px; color:#ccc; max-height:160px; overflow-y:auto; white-space:pre-wrap;"></pre>
-        ` : '';
-        item.innerHTML = `
-          <div style="display:flex; align-items:center; gap:8px;">
-            <input type="checkbox" ${isDone ? "checked" : ""} onchange="toggleTaskStatus('${task.id}', '${task.status}')" style="cursor:pointer; width:14px; height:14px;">
-            <span style="font-size:11px; font-weight:600; color:${isDone ? "var(--quake-text-dim)" : "#fff"}; text-decoration:${isDone ? "line-through" : "none"}; flex:1;">${task.title}</span>
-            <span class="quake-badge ${isDone ? "quake-badge-green" : (task.status === "FAILED" ? "quake-badge-red" : "quake-badge-muted")}">${task.status}</span>
-          </div>
-          ${cmdPart}
-        `;
-        container.appendChild(item);
-      });
-    }
-
-
-    function renderAttachments(attachments) {
-      const grid = document.getElementById("attachments-grid");
-      grid.innerHTML = "";
-      attachments.forEach((att, idx) => {
-        const card = document.createElement("div");
-        card.className = "attachment-card";
-        const fname = att.filename.toLowerCase();
-        const isImg = fname.endsWith(".png") || fname.endsWith(".jpg") || fname.endsWith(".jpeg") || fname.endsWith(".svg") || fname.endsWith(".gif") || fname.endsWith(".webp");
-        const isPdf = fname.endsWith(".pdf");
-
-        let previewHtml = "";
-        if (isImg) {
-          previewHtml = `<a href="/${att.file_path}" target="_blank"><img src="/${att.file_path}?t=${encodeURIComponent(att.created_at || Date.now())}" class="attachment-preview" alt="${att.filename}"></a>`;
-        } else {
-          const icon = isPdf ? "📕" : "📄";
-          const docTypeLabel = isPdf ? "PDF DOCUMENT" : (att.file_type ? att.file_type.toUpperCase() : "DOCUMENT");
-          previewHtml = `
-            <a href="/${att.file_path}" target="_blank" style="text-decoration:none;">
-              <div class="document-preview-box">
-                <div class="doc-icon">${icon}</div>
-                <div class="doc-type">${docTypeLabel}</div>
-              </div>
-            </a>
-          `;
-        }
-
-        const sizeStr = att.size_bytes ? (att.size_bytes > 1024 ? Math.round(att.size_bytes / 1024) + " KB" : att.size_bytes + " B") : "";
-
-        card.innerHTML = `
-          ${previewHtml}
-          <div class="attachment-name" title="${att.filename}">${att.filename}</div>
-          <div class="attachment-footer">
-            <span>${sizeStr}</span>
-            <button class="quake-btn quake-btn-red" style="font-size:9.5px;padding:2px 6px;" onclick="removeAttachment(${idx})">Remove</button>
-          </div>
-        `;
-        grid.appendChild(card);
-      });
-    }
-
-    const DOCKER_ADJS = "AGILE AMBER ANTENNAL ARMORED BANDED BARBED BRIGHT BRISTLY BUZZING CAMOUFLAGED CHITINOUS CLICKING CREEPING CRIMSON DARTING DIURNAL DORSAL EMERALD FAST FEATHERED FIERCE FLEET FLITTING FLYING GLOWING GOLDEN HAIRY HARVEST HOVERING HUNTER IRIDESCENT JUMPING LEAPING LUMINESCENT LUSTROUS MANDIBLED METALLIC MIMIC MOTTLED NIMBLE NOCTURNAL OBSIDIAN PINCERED PLUMED POLLEN PROBOSCID PUNCTATE QUICK RADIANT RUSTY SCALED SEGMENTED SERRATED SHINING SILKEN SPECKLED SPOTTED SPRINGING STINGING STRIDULATING STRIPED SWARMING SWIFT TARSIAL THORACIC TRANSLUCENT VELVETY VIBRANT WINGED".split(" ");
-    const DOCKER_NOUNS = "ANT APHID BACKSWIMMER BEE BEETLE BLOWFLY BUMBLEBEE BUTTERFLY CADDISFLY CATERPILLAR CENTIPEDE CHRYSALIS CICADA COCKROACH COCOON CRICKET DAMSELFLY DARNER DOBSONFLY DRAGONFLY EARWIG FIREBUG FIREFLY FLEA FLY FRUITFLY GNAT GRASSHOPPER GRUB HARVESTMAN HORNET HORSEFLY HOVERFLY INSTAR JEWELBEETLE KATYDID LACEWING LADYBUG LARVA LEAFHOPPER LOCUST LONGHORN MANTIS MAYFLY MIDGE MILLIPEDE MITE MOSQUITO MOTH NYMPH PLANTHOPPER PUPA ROACH ROVEBEETLE SAWFLY SCARAB SCORPION SILVERFISH SKIPPER SPIDER SPRINGTAIL STAGBEETLE STINKBUG STONEFLY TARANTULA TERMITE THRIPS TICK TIGERBEETLE TREEHOPPER WASP WATERSTRIDER WEEVIL WOODBORER".split(" ");
-
-    function generateNextBugId() {
-      const cryptoObj = window.crypto || window.msCrypto;
-      const randArr = new Uint32Array(3);
-      if (cryptoObj && cryptoObj.getRandomValues) {
-        cryptoObj.getRandomValues(randArr);
-      } else {
-        randArr[0] = Math.floor(Math.random() * 1000000);
-        randArr[1] = Math.floor(Math.random() * 1000000);
-        randArr[2] = Math.floor(Math.random() * 1000000);
-      }
-      const adj = DOCKER_ADJS[randArr[0] % DOCKER_ADJS.length];
-      const noun = DOCKER_NOUNS[randArr[1] % DOCKER_NOUNS.length];
-      const num = (randArr[2] % 999) + 1;
-      let nextId = `BUG-${adj}-${noun}-${num}`;
-      let attempts = 0;
-      while (db.bugs && db.bugs.some(b => b.id === nextId) && attempts < 100) {
-        attempts++;
-        const nextNum = Math.floor(Math.random() * 999) + 1;
-        nextId = `BUG-${adj}-${noun}-${nextNum}`;
-      }
-      return nextId;
-    }
-
-    async function newBug() {
-      let newId = generateNextBugId();
-      try {
-        const res = await fetch("/api/next_bug_id");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.next_id && !db.bugs.some(b => b.id === data.next_id)) {
-            newId = data.next_id;
-          }
-        }
-      } catch (e) {
-        // Fallback to locally calculated generateNextBugId
-      }
-
-      const now = new Date();
-      const pad = (n) => String(n).padStart(2, '0');
-      const nowStr = `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}-${pad(now.getUTCDate())} ${pad(now.getUTCHours())}:${pad(now.getUTCMinutes())}:${pad(now.getUTCSeconds())} UTC`;
-
-      const bug = {
-        id: newId,
-        title: "New Bug Report",
-        status: "OPEN",
-        severity: "MEDIUM",
-        category: "PCB",
-        component: "",
-        description: "",
-        reproduction_steps: [],
-        expected_behavior: "",
-        actual_behavior: "",
-        logs: "",
-        attachments: [],
-        created_at: nowStr,
-        resolution_notes: ""
-      };
-      db.bugs.unshift(bug);
-      activeBugId = newId;
-      updateMetrics();
-      renderBugList();
-      loadActiveBug();
-      saveActiveBug();
-    }
-
-    async function saveActiveBug() {
-      const bug = db.bugs.find(b => b.id === activeBugId);
-      if (!bug) return;
-
-      return await runWithActionModal({
-        title: "SAVING BUG REPORT",
-        description: `Persisting bug ${bug.id} changes and synchronizing markdown files...`,
-        stepText: `Saving ${bug.id}...`,
-        icon: "💾"
-      }, async () => {
-        bug.title = document.getElementById("bug-title").value;
-        bug.severity = document.getElementById("bug-severity").value;
-        bug.status = document.getElementById("bug-status").value;
-        bug.category = document.getElementById("bug-category").value;
-        bug.component = document.getElementById("bug-component").value;
-        bug.description = document.getElementById("bug-description").value;
-        bug.reproduction_steps = document.getElementById("bug-steps").value.split("\n").filter(s => s.trim());
-        bug.expected_behavior = document.getElementById("bug-expected").value;
-        bug.actual_behavior = document.getElementById("bug-actual").value;
-        bug.logs = document.getElementById("bug-logs").value;
-        bug.resolution_notes = document.getElementById("bug-resolution").value;
-
-        const res = await fetch("/api/bugs", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(bug)
-        });
-        const saved = await res.json();
-        updateMetrics();
-        renderBugList();
-        updateComponentDatalist();
-        showToast("Saved bug " + saved.id);
-        return saved;
-      });
-    }
-
-    async function deleteActiveBug() {
-      if (!confirm("Are you sure you want to delete this bug report?")) return;
-      return await runWithActionModal({
-        title: "DELETING BUG REPORT",
-        description: `Deleting ${activeBugId} and removing associated entries...`,
-        stepText: `Deleting ${activeBugId}...`,
-        icon: "🗑️"
-      }, async () => {
-        await fetch("/api/bugs/delete", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: activeBugId })
-        });
-        db.bugs = db.bugs.filter(b => b.id !== activeBugId);
-        activeBugId = db.bugs.length > 0 ? db.bugs[0].id : null;
-        updateMetrics();
-        renderBugList();
-        updateComponentDatalist();
-        loadActiveBug();
-        showToast("Deleted bug");
-      });
-    }
-
-    function returnToDashboard(e) {
-      if (e) e.preventDefault();
-      closeWorkstation();
-    }
-
-    function closeWorkstation() {
-      if (window.parent && window.parent !== window && typeof window.parent.closeWorkstationModal === "function") {
-        window.parent.closeWorkstationModal();
-      } else if (window.opener && !window.opener.closed) {
-        window.opener.focus();
-        window.close();
-      } else {
-        if (window.top && window.top !== window) {
-          window.top.location.href = "/";
-        } else {
-          window.location.href = "/";
-        }
-      }
-      try {
-        window.parent.postMessage({ action: "close_workstation", type: "close_modal" }, "*");
-      } catch (err) {}
-    }
-
-    // UI Scale Management (8715cab2)
-    const UI_SCALES = ["75%", "80%", "90%", "100%", "110%", "125%", "150%"];
-    const UI_SCALE_KEY = "ui_scale";
-
-    function isInsideIframe() {
-      try {
-        return window.self !== window.top;
-      } catch (e) {
-        return true;
-      }
-    }
-
-    function applyUiScale(scale) {
-      if (!UI_SCALES.includes(scale)) {
-        scale = "100%";
-      }
-      try {
-        localStorage.setItem(UI_SCALE_KEY, scale);
-      } catch (e) {}
-      const sel = document.getElementById("uiScaleSelect");
-      if (sel && sel.value !== scale) {
-        sel.value = scale;
-      }
-      if (isInsideIframe()) {
-        if (document.documentElement) {
-          document.documentElement.style.zoom = "";
-          document.documentElement.style.width = "";
-          document.documentElement.style.height = "";
-        }
-        return;
-      }
-      const factor = parseInt(scale, 10) / 100;
-      if (document.documentElement) {
-        document.documentElement.style.zoom = factor;
-        if (factor === 1.0) {
-          document.documentElement.style.width = "";
-          document.documentElement.style.height = "";
-        } else {
-          document.documentElement.style.width = (window.innerWidth / factor) + "px";
-          document.documentElement.style.height = (window.innerHeight / factor) + "px";
-        }
-      }
-    }
-
-    window.addEventListener("resize", () => {
-      if (isInsideIframe()) return;
-      let current = "100%";
-      try {
-        current = localStorage.getItem(UI_SCALE_KEY) || "100%";
-      } catch (e) {}
-      applyUiScale(current);
-    });
-
-    function onUiScaleChange(scale) {
-      applyUiScale(scale);
-    }
-
-    function adjustUiScale(delta) {
-      let current = "100%";
-      try {
-        current = localStorage.getItem(UI_SCALE_KEY) || "100%";
-      } catch (e) {}
-      let idx = UI_SCALES.indexOf(current);
-      if (idx === -1) idx = UI_SCALES.indexOf("100%");
-      const nextIdx = Math.max(0, Math.min(UI_SCALES.length - 1, idx + delta));
-      applyUiScale(UI_SCALES[nextIdx]);
-    }
-
-    function resetUiScale() {
-      applyUiScale("100%");
-    }
-
-    function initUiScale() {
-      let saved = "100%";
-      try {
-        saved = localStorage.getItem(UI_SCALE_KEY) || "100%";
-      } catch (e) {}
-      applyUiScale(saved);
-    }
-
-    window.addEventListener("keydown", (e) => {
-      if (e.metaKey || e.ctrlKey) {
-        if (e.key === "=" || e.key === "+" || e.code === "Equal" || e.code === "NumpadAdd") {
-          e.preventDefault();
-          adjustUiScale(1);
-          return;
-        }
-        if (e.key === "-" || e.key === "_" || e.code === "Minus" || e.code === "NumpadSubtract") {
-          e.preventDefault();
-          adjustUiScale(-1);
-          return;
-        }
-        if (e.key === "0" || e.code === "Digit0" || e.code === "Numpad0") {
-          e.preventDefault();
-          resetUiScale();
-          return;
-        }
-      }
-      if (e.key === "Escape") {
-        const loadingModal = document.getElementById("feedback-loading-modal");
-        if (!loadingModal || loadingModal.style.display === "none") {
-          closeWorkstation();
-        }
-      }
-    });
-
-    async function saveAndExit() {
-      const btn = document.getElementById("btn-save-exit");
-      btn.innerText = "⏳ Saving...";
-      btn.disabled = true;
-
-      try {
-        await saveActiveBug();
-        await fetch("/api/exit", { method: "POST" });
-        showToast("Bug state saved. Returning to Dashboard...");
-      } catch (err) {
-        showToast("Saved state. Returning to Dashboard...");
-      }
-
-      setTimeout(() => {
-        closeWorkstation();
-      }, 500);
-    }
-
-    function removeAttachment(idx) {
-      const bug = db.bugs.find(b => b.id === activeBugId);
-      if (bug && bug.attachments) {
-        bug.attachments.splice(idx, 1);
-        renderAttachments(bug.attachments);
-        saveActiveBug();
-      }
-    }
-
-    function setupPasteDrop() {
-      const dz = document.getElementById("dropzone");
-      dz.ondragover = (e) => { e.preventDefault(); dz.classList.add("dragover"); };
-      dz.ondragleave = () => dz.classList.remove("dragover");
-      dz.ondrop = (e) => {
-        e.preventDefault();
-        dz.classList.remove("dragover");
-        handleFileUpload(e.dataTransfer.files);
-      };
-
-      // Global and targeted paste event handler supporting screenshots & documents
-      window.addEventListener("paste", (e) => {
-        // If the focused element is a text input and clipboard has ONLY plain text, allow standard paste
-        const activeElem = document.activeElement;
-        const isTextInput = activeElem && (activeElem.tagName === "INPUT" || activeElem.tagName === "TEXTAREA");
-        const hasFiles = e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0;
-
-        if (isTextInput && !hasFiles) {
-          // If the user is specifically pasting inside dropzone or attachments, capture text as document
-          if (activeElem.closest && activeElem.closest("#attachments-section")) {
-            e.preventDefault();
-            const text = e.clipboardData.getData("text");
-            if (text && text.trim()) {
-              uploadTextDocument(text, "clipboard_doc_" + Date.now() + ".txt");
-            }
-          }
-          return;
-        }
-
-        if (hasFiles) {
-          e.preventDefault();
-          handleFileUpload(e.clipboardData.files, true);
-          return;
-        }
-
-        // Check clipboard items
-        if (e.clipboardData && e.clipboardData.items) {
-          let handled = false;
-          for (let item of e.clipboardData.items) {
-            if (item.kind === "file") {
-              const blob = item.getAsFile();
-              if (blob) {
-                const isGeneric = !blob.name || blob.name === "image.png" || blob.name === "blob" || blob.name === "screenshot.png";
-                const randSuffix = Math.random().toString(36).slice(2, 7);
-                const fname = (!isGeneric && blob.name) ? blob.name : (blob.type.startsWith("image/") ? "screenshot_paste_" + Date.now() + "_" + randSuffix + ".png" : "doc_paste_" + Date.now() + "_" + randSuffix + ".txt");
-                const ftype = blob.type.startsWith("image/") ? "screenshot" : "document";
-                uploadBlob(blob, fname, ftype);
-                handled = true;
-              }
-            }
-          }
-          if (handled) {
-            e.preventDefault();
-            return;
-          }
-        }
-
-        // If target is dropzone and clipboard has text, save text document
-        if (e.clipboardData) {
-          const text = e.clipboardData.getData("text");
-          if (text && text.trim() && (!isTextInput || activeElem.id === "dropzone")) {
-            e.preventDefault();
-            uploadTextDocument(text, "clipboard_text_" + Date.now() + ".txt");
-          }
-        }
-      });
-    }
-
-    async function pasteFromClipboard() {
-      try {
-        if (navigator.clipboard && navigator.clipboard.read) {
-          const clipboardItems = await navigator.clipboard.read();
-          for (const item of clipboardItems) {
-            for (const type of item.types) {
-              const randSuffix = Math.random().toString(36).slice(2, 7);
-              if (type.startsWith("image/")) {
-                const blob = await item.getType(type);
-                uploadBlob(blob, "pasted_screenshot_" + Date.now() + "_" + randSuffix + ".png", "screenshot");
-                return;
-              } else if (type === "application/pdf") {
-                const blob = await item.getType(type);
-                uploadBlob(blob, "pasted_document_" + Date.now() + "_" + randSuffix + ".pdf", "document");
-                return;
-              }
-            }
-          }
-        }
-        // Fallback to clipboard text
-        if (navigator.clipboard && navigator.clipboard.readText) {
-          const text = await navigator.clipboard.readText();
-          if (text && text.trim()) {
-            uploadTextDocument(text, "pasted_document_" + Date.now() + ".txt");
-            return;
-          }
-        }
-      } catch (err) {
-        showToast("Tip: Press ⌘V / Ctrl+V to paste screenshot or document");
-      }
-    }
-
-    const MAX_ATTACHMENT_SIZE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GiB (GitHub LFS maximum file limit)
-
-    function handleFileUpload(files, isPaste = false) {
-      if (!files || files.length === 0) return;
-      for (let i = 0; i < files.length; i++) {
-        const f = files[i];
-        if (f.size >= MAX_ATTACHMENT_SIZE_BYTES) {
-          showToast(`Error: ${f.name} exceeds maximum allowed size of 2 GB (GitHub LFS limit).`, 5000);
-          continue;
-        }
-        const reader = new FileReader();
-        reader.onload = () => {
-          const b64 = reader.result.split(",")[1];
-          const lowerName = f.name.toLowerCase();
-          const isImg = lowerName.match(/\.(png|jpg|jpeg|gif|svg|webp)$/i);
-          const isDoc = lowerName.match(/\.(pdf|txt|log|json|yaml|yml|md|csv)$/i);
-          const fileType = isImg ? "screenshot" : (isDoc ? "document" : "reference");
-          let targetName = f.name;
-          const isGeneric = targetName === "image.png" || targetName === "blob" || targetName === "screenshot.png";
-          if (isPaste || isGeneric) {
-            const randSuffix = Math.random().toString(36).slice(2, 7);
-            const ext = isImg ? (lowerName.match(/\.(png|jpg|jpeg|gif|svg|webp)$/i)[0]) : ".png";
-            targetName = `screenshot_paste_${Date.now()}_${randSuffix}${ext}`;
-          }
-          uploadPayload({
-            filename: targetName,
-            file_type: fileType,
-            content_base64: b64,
-            description: (isPaste ? "Pasted " : "Uploaded ") + fileType + " " + targetName
-          });
-        };
-        reader.readAsDataURL(f);
-      }
-    }
-
-    function uploadBlob(blob, filename, fileType) {
-      if (blob.size >= MAX_ATTACHMENT_SIZE_BYTES) {
-        showToast("Error: Attachment exceeds maximum allowed size of 2 GB (GitHub LFS limit).", 5000);
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => {
-        const b64 = reader.result.split(",")[1];
-        uploadPayload({
-          filename: filename,
-          file_type: fileType,
-          content_base64: b64,
-          description: "Pasted " + fileType
-        });
-      };
-      reader.readAsDataURL(blob);
-    }
-
-    function uploadTextDocument(text, filename) {
-      if (text.length >= MAX_ATTACHMENT_SIZE_BYTES) {
-        showToast("Error: Document exceeds maximum allowed size of 2 GB.", 5000);
-        return;
-      }
-      uploadPayload({
-        filename: filename,
-        file_type: "document",
-        content_text: text,
-        description: "Pasted text document"
-      });
-    }
-
-    async function uploadPayload(payload) {
-      if (activeBugId && !payload.bug_id) {
-        payload.bug_id = activeBugId;
-      }
-      return await runWithActionModal({
-        title: "UPLOADING ATTACHMENT",
-        description: `Uploading ${payload.filename || "file"} and saving to repository...`,
-        stepText: "Uploading file data...",
-        icon: "📎"
-      }, async () => {
-        showToast("Uploading " + payload.filename + "...");
-        const res = await fetch("/api/upload", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        if (res.status === 413) {
-          const errData = await res.json().catch(() => ({}));
-          showToast(errData.error || "Attachment exceeds maximum allowed size of 2 GB (GitHub LFS limit).", 5000);
-          return;
-        }
-        if (!res.ok) {
-          showToast("Failed to upload attachment: HTTP " + res.status);
-          return;
-        }
-        const att = await res.json();
-        const bug = db.bugs.find(b => b.id === activeBugId);
-        if (bug) {
-          if (!bug.attachments) bug.attachments = [];
-          bug.attachments.push(att);
-          renderAttachments(bug.attachments);
-          await saveActiveBug();
-          showToast("Attached " + att.filename);
-        }
-      });
-    }
-
-    async function syncFeedback() {
-      await runWithActionModal({
-        title: "MERGING AGENT FEEDBACK",
-        description: "Merging stored agent feedback from feedback/ directory into SQLite database...",
-        stepText: "Scanning feedback/ directory for BUG_*.md files...",
-        icon: "🔄"
-      }, async () => {
-        try {
-          const res = await fetch("/api/sync_feedback", { method: "POST" });
-          const data = await res.json();
-          if (data.status === "ok") {
-            const stats = data.stats || {};
-            showToast(`Feedback synced: ${stats.imported || 0} imported, ${stats.renamed || 0} renamed, ${stats.total || 0} total bugs.`);
-            const dbRes = await fetch("/api/database");
-            if (dbRes.ok) {
-              db = await dbRes.json();
-              updateMetrics();
-              renderBugList();
-              loadActiveBug();
-            }
-          } else {
-            showToast("Sync failed: " + (data.message || "Unknown error"));
-          }
-        } catch (err) {
-          showToast("Error syncing feedback: " + err.message);
-        }
-      });
-    }
-
-    function toggleExpandPanel(btn) {
-      const section = btn.closest(".form-section");
-      if (!section) return;
-      const isExp = section.classList.toggle("expanded-vertical");
-      btn.textContent = isExp ? "⤡ Compact" : "⤢ Expand";
-      btn.classList.toggle("quake-btn-gold", isExp);
-      btn.classList.toggle("quake-btn-default", !isExp);
-      if (!isExp) {
-        section.querySelectorAll("textarea").forEach(ta => autoResizeTextarea(ta));
-      }
-    }
-
-    function autoResizeTextarea(el, maxLimit = 500) {
-      if (!el) return;
-      if (el.closest && el.closest(".form-section.expanded-vertical")) return;
-      el.style.height = "auto";
-      const scrollH = el.scrollHeight;
-      const minH = el.dataset.minHeight ? parseInt(el.dataset.minHeight) : 80;
-      const targetHeight = Math.min(Math.max(scrollH, minH), maxLimit);
-      el.style.height = targetHeight + "px";
-      if (scrollH > maxLimit) {
-        el.style.overflowY = "auto";
-      } else {
-        el.style.overflowY = "hidden";
-      }
-    }
-
-    function autoResizeAllTextareas() {
-      const textareas = document.querySelectorAll(".content-area textarea");
-      textareas.forEach(ta => autoResizeTextarea(ta));
-    }
-
-    let lastKnownVersion = null;
-    let isUserTyping = false;
-
-    document.addEventListener("input", (e) => {
-      if (e.target && e.target.tagName === "TEXTAREA") {
-        autoResizeTextarea(e.target);
-      }
-    });
-
-    document.addEventListener("focusin", (e) => {
-      if (e.target && (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT")) {
-        isUserTyping = true;
-      }
-    });
-
-    document.addEventListener("focusout", (e) => {
-      if (e.target && (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT")) {
-        isUserTyping = false;
-      }
-    });
-
-
-    async function pollForExternalUpdates() {
-      try {
-        const res = await fetch("/api/version");
-        if (!res.ok) return;
-        const data = await res.json();
-        if (lastKnownVersion === null) {
-          lastKnownVersion = data.version;
-          return;
-        }
-        if (data.version !== lastKnownVersion) {
-          lastKnownVersion = data.version;
-          const dbRes = await fetch("/api/database");
-          if (!dbRes.ok) return;
-          db = await dbRes.json();
-          updateMetrics();
-          renderBugList();
-          updateComponentDatalist();
-          if (!isUserTyping && activeBugId) {
-            loadActiveBug();
-          } else if (activeBugId) {
-            const curBug = db.bugs.find(b => b.id === activeBugId);
-            if (curBug) {
-              const statusSel = document.getElementById("bug-status");
-              if (statusSel && statusSel.value !== curBug.status) {
-                statusSel.value = curBug.status;
-              }
-            }
-          }
-        }
-      } catch (e) {
-        // Ignore polling connection glitches
-      }
-    }
-
-    setInterval(pollForExternalUpdates, 2000);
-
-    window.onload = init;
   </script>
+  <script id="initial-tracker-db" type="application/json">{{ database_json | safe }}</script>
+  <script type="module" src="/js/tracker/tracker_app.js"></script>
   <div class="window-resize-gripper" title="Resize Window" aria-label="Resize Window"></div>
 </body>
 </html>

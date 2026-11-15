@@ -392,12 +392,17 @@ def test_static_assets_and_diff_syntax_highlighting_content(tmp_path: Path) -> N
     base_url = server.get_url()
 
     try:
-        # 1. Test GET /static/highlight.min.js
-        with urllib.request.urlopen(f"{base_url}static/highlight.min.js") as resp:
+        # 1. Test GET /static/vendor/highlight/highlight.js and modular ES entrypoints
+        with urllib.request.urlopen(f"{base_url}static/vendor/highlight/highlight.js") as resp:
             assert resp.status == 200
             content = resp.read()
             assert len(content) > 10000
             assert resp.headers.get("Content-Type") == "application/javascript; charset=utf-8"
+
+        for module_path in ("js/review/code_review_app.js", "js/diff/diff_engine.js"):
+            with urllib.request.urlopen(f"{base_url}{module_path}") as mod_resp:
+                assert mod_resp.status == 200
+                assert "application/javascript" in (mod_resp.headers.get("Content-Type") or "")
 
         # 2. Test GET /api/diff returns old_content and new_content
         with urllib.request.urlopen(f"{base_url}api/diff?commit=working&file=pyproject.toml") as resp:
@@ -406,10 +411,13 @@ def test_static_assets_and_diff_syntax_highlighting_content(tmp_path: Path) -> N
             assert "new_content" in data
             assert "full_content" in data
 
-        # 3. Test UI rendering includes syntax highlighting CSS and scripts
+        # 3. Test UI rendering includes syntax highlighting CSS and zero-globals module script
         with urllib.request.urlopen(base_url) as resp:
             html = resp.read().decode("utf-8")
-            assert "highlight.min.js" in html
+            assert "/static/vendor/highlight/highlight.js" in html
+            assert "/js/review/code_review_app.js" in html
+            assert "highlight.min.js" not in html
+            assert "/static/common.js" not in html
             assert "hljs-keyword" in html
             assert "activeFileLang" in html
             assert "btnVerdictApprove" in html
@@ -450,9 +458,12 @@ def test_parse_at_file_references_in_markdown_and_ui(tmp_path: Path) -> None:
         base_url = server.get_url()
         with urllib.request.urlopen(base_url) as resp:
             html = resp.read().decode("utf-8")
-            assert "parseFileReferences" in html
             assert "quake-file-ref" in html
             assert "cliSuggestions" in html
+            assert "/js/review/code_review_app.js" in html
+        with urllib.request.urlopen(f"{base_url}js/review/comment_threads.js") as mod_resp:
+            assert mod_resp.status == 200
+            assert "application/javascript" in (mod_resp.headers.get("Content-Type") or "")
     finally:
         server.shutdown()
         server.server_close()
@@ -485,7 +496,8 @@ def test_review_server_termination_and_auto_export_on_approve_and_reject(tmp_pat
             assert "PROVIDE FEEDBACK" not in html
             assert "EXPORT CR.md" not in html
             assert "terminationOverlay" in html
-            assert "handleSessionTermination" in html
+        with urllib.request.urlopen(f"{base_url1}js/review/verdict_controller.js") as mod_resp:
+            assert mod_resp.status == 200
 
         verdict_req = urllib.request.Request(
             f"{base_url1}api/verdict",
@@ -604,9 +616,11 @@ def test_launch_browser_and_webpage_title(tmp_path: Path) -> None:
 
 def test_commit_stream_collapsed_when_single_commit(tmp_path: Path) -> None:
     """Verify that the commit stream pane defaults to collapsed when only one commit is reviewed."""
+    from bs4 import BeautifulSoup
+
     repo_root, shas = create_isolated_git_repo(tmp_path)
 
-    # 1. Single commit: paneCommits should be collapsed
+    # 1. Single commit: paneCommits should be collapsed and boot config sets singleCommit=True
     server_single = ReviewServer(
         host="127.0.0.1",
         port=0,
@@ -622,13 +636,17 @@ def test_commit_stream_collapsed_when_single_commit(tmp_path: Path) -> None:
     try:
         with urllib.request.urlopen(server_single.get_url()) as resp:
             html = resp.read().decode("utf-8")
-            assert 'id="paneCommits" class="pane-commits collapsed"' in html
-            assert "commits: false, files: true, cli: true" in html
+            soup = BeautifulSoup(html, "html.parser")
+            pane_single = soup.find(id="paneCommits")
+            assert pane_single is not None
+            assert "collapsed" in (pane_single.get("class") or [])
+            boot_single = json.loads(soup.find(id="app-boot-config").string)
+            assert boot_single["singleCommit"] is True
     finally:
         server_single.shutdown()
         server_single.server_close()
 
-    # 2. Multiple commits: paneCommits should NOT be collapsed
+    # 2. Multiple commits: paneCommits should NOT be collapsed and boot config sets singleCommit=False
     server_multi = ReviewServer(
         host="127.0.0.1",
         port=0,
@@ -644,15 +662,21 @@ def test_commit_stream_collapsed_when_single_commit(tmp_path: Path) -> None:
     try:
         with urllib.request.urlopen(server_multi.get_url()) as resp:
             html = resp.read().decode("utf-8")
-            assert 'id="paneCommits" class="pane-commits"' in html
-            assert "commits: true, files: true, cli: true" in html
+            soup = BeautifulSoup(html, "html.parser")
+            pane_multi = soup.find(id="paneCommits")
+            assert pane_multi is not None
+            assert "collapsed" not in (pane_multi.get("class") or [])
+            boot_multi = json.loads(soup.find(id="app-boot-config").string)
+            assert boot_multi["singleCommit"] is False
     finally:
         server_multi.shutdown()
         server_multi.server_close()
 
 
 def test_diff_navigation_and_next_prev_change_cli(tmp_path: Path) -> None:
-    """Verify that the review UI and CLI support next/prev change navigation across diff hunks."""
+    """Verify that the review UI exposes zero-inline-handler navigation controls and serves navigation ES modules."""
+    from bs4 import BeautifulSoup
+
     repo_root = get_git_root()
 
     server = ReviewServer(
@@ -667,23 +691,21 @@ def test_diff_navigation_and_next_prev_change_cli(tmp_path: Path) -> None:
     time.sleep(0.1)
 
     try:
-        with urllib.request.urlopen(server.get_url()) as resp:
+        base_url = server.get_url()
+        with urllib.request.urlopen(base_url) as resp:
             html = resp.read().decode("utf-8")
-            # Verify toolbar buttons for change navigation exist
-            assert 'id="btnPrevChange"' in html
-            assert 'id="btnNextChange"' in html
-            assert "navigateChange(-1)" in html
-            assert "navigateChange(1)" in html
+            soup = BeautifulSoup(html, "html.parser")
+            prev_btn = soup.find(id="btnPrevChange")
+            next_btn = soup.find(id="btnNextChange")
+            assert prev_btn is not None
+            assert next_btn is not None
+            assert prev_btn.get("onclick") is None
+            assert next_btn.get("onclick") is None
 
-            # Verify CLI commands and helper functions are defined in frontend logic
-            assert "navigateChange" in html
-            assert "getFileChanges" in html
-            assert 'case "next_change":' in html
-            assert 'case "prev_change":' in html
-            assert 'case "nc":' in html
-            assert 'case "pc":' in html
-            assert "next change / nc" in html
-            assert "prev change / pc" in html
+        for mod_path in ("js/review/cli_drawer.js", "js/review/file_tree.js"):
+            with urllib.request.urlopen(f"{base_url}{mod_path}") as mod_resp:
+                assert mod_resp.status == 200
+                assert "application/javascript" in (mod_resp.headers.get("Content-Type") or "")
     finally:
         server.shutdown()
         server.server_close()

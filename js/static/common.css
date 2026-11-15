@@ -1,13 +1,18 @@
 /* =========================================================
    COMMON UI WORKSTATION BASE STYLESHEET
-   Unified scale, typography, reset, scrollbars, and widgets
+   Unified scale (--ui-scale), Retina typography, reset, scrollbars, and widgets
    ========================================================= */
 
+:root {
+  --ui-scale: 1;
+}
+
 html {
-  font-size: 80% !important;
+  font-size: calc(80% * var(--ui-scale, 1));
   height: 100%;
   width: 100%;
   -webkit-text-size-adjust: 100%;
+  text-rendering: geometricPrecision;
 }
 
 *, *::before, *::after {
@@ -25,6 +30,7 @@ body {
   letter-spacing: 0.02em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
 }
 
 /* UI Scale Toolbar Dropdown & Indicators */
@@ -32,14 +38,14 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 8.5px;
+  font-size: calc(8.5px * var(--ui-scale, 1));
   color: var(--quake-text-muted, var(--xerxes-text-muted, #9e8a78));
   font-family: var(--font-mono, ui-monospace, monospace);
   user-select: none;
 }
 
 .ui-scale-label {
-  font-size: 8px;
+  font-size: calc(8px * var(--ui-scale, 1));
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -51,7 +57,7 @@ body {
   color: var(--quake-gold, var(--xerxes-cyan, #ffb800));
   border: 1px solid var(--quake-border-mid, var(--xerxes-border-mid, #5a381e));
   border-radius: 2px;
-  font-size: 8.5px;
+  font-size: calc(8.5px * var(--ui-scale, 1));
   font-family: var(--font-mono, ui-monospace, monospace);
   padding: 2px 4px;
   cursor: pointer;
@@ -151,7 +157,7 @@ body {
   right: 24px;
   padding: 8px 16px;
   border-radius: 4px;
-  font-size: 10px;
+  font-size: calc(10px * var(--ui-scale, 1));
   font-weight: 700;
   z-index: 10000;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
@@ -187,4 +193,3 @@ body.in-iframe .window-resize-gripper,
 .in-iframe .window-resize-gripper {
   display: none !important;
 }
-

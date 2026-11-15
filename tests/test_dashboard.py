@@ -1743,7 +1743,7 @@ def test_regression_bug_234_pr_submit_no_git_sl_error(tmp_path: Path):
 
 def test_regression_bug_235_favicon_web_icon(tmp_path: Path):
     """Verify BUG-235: favicon.ico and /static/favicon.svg are served across DashboardServer."""
-    static_favicon = Path(__file__).parent.parent / "provider" / "code_review" / "static" / "favicon.svg"
+    static_favicon = Path(__file__).parent.parent / "js" / "static" / "favicon.svg"
     assert static_favicon.exists(), "static/favicon.svg must exist"
 
     repo_dir, _ = create_isolated_git_repo(tmp_path)

@@ -67,7 +67,7 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
 
-        if path.startswith("/static/"):
+        if path.startswith("/js/") or path.startswith("/static/"):
             self._handle_serve_static(path)
             return
 
@@ -664,33 +664,10 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
         return f"BUG-{max_idx + 1:03d}"
 
     def _handle_serve_static(self, path: str) -> None:
-        """Serve static assets such as favicon and vendor bundles."""
-        static_dir = Path(__file__).resolve().parent.parent / "code_review" / "static"
-        filename = path.removeprefix("/static/").strip("/")
-        file_target = (static_dir / filename).resolve()
-        if not str(file_target).startswith(str(static_dir)) or not file_target.is_file():
-            self.send_error(404, "Static asset not found")
-            return
-        if file_target.suffix == ".svg":
-            content_type = "image/svg+xml"
-        elif file_target.suffix == ".js":
-            content_type = "application/javascript"
-        elif file_target.suffix == ".css":
-            content_type = "text/css"
-        else:
-            content_type = "text/plain"
-        data = file_target.read_bytes()
-        try:
-            self.send_response(200)
-            self.send_header("Content-Type", f"{content_type}; charset=utf-8")
-            self.send_header("Content-Length", str(len(data)))
-            self.send_header("Connection", "close")
-            self.end_headers()
-            self.wfile.write(data)
-        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
-            self.close_connection = True
-        finally:
-            self.close_connection = True
+        """Serve ES modules from js/ and static assets from js/static/."""
+        from provider.http_static import get_hardware_js_root, serve_static_asset
+
+        serve_static_asset(self, path, js_root=get_hardware_js_root(), cache_control="no-cache")
 
     def _send_html(self, html: str) -> None:
         """Send UTF-8 encoded HTML HTTP response payload."""
@@ -954,15 +931,27 @@ class BugReportServer(ThreadingHTTPServer):
     def sync_with_feedback_dir(self) -> Dict[str, Any]:
         """Scan feedback/ directory, detect file renames, merge into SQLite, and update markdown."""
         with self._lock:
+            md_modified = False
             if self.markdown_output.exists():
-                md_db = self.exporter.parse_markdown(self.markdown_output)
-                if md_db and md_db.bugs:
-                    self.database = self.exporter.merge_databases(self.database, md_db)
+                try:
+                    curr_md_mtime = self.markdown_output.stat().st_mtime
+                except OSError:
+                    curr_md_mtime = 0.0
+                if curr_md_mtime > self.markdown_mtime + 0.001 or not self.database.bugs:
+                    md_db = self.exporter.parse_markdown(self.markdown_output)
+                    if md_db and md_db.bugs:
+                        self.database = self.exporter.merge_databases(self.database, md_db)
+                        md_modified = True
+                    self.markdown_mtime = curr_md_mtime
             stats = self.exporter.scan_and_sync_feedback_dir(self.feedback_dir, self.database, self.sqlite_store)
-            if stats.get("merged", 0) > 0 or stats.get("renamed", 0) > 0:
+            dirty_ids = stats.get("dirty_ids")
+            if md_modified:
                 self.save_and_sync()
+            elif stats.get("merged", 0) > 0 or stats.get("renamed", 0) > 0:
+                self.save_and_sync(dirty_bug_ids=dirty_ids)
             else:
                 self.feedback_mtime = self._get_feedback_dir_mtime()
+            stats["total_bugs"] = len(self.database.bugs)
             return stats
 
     def save_and_sync(self, dirty_bug_ids: Optional[Collection[str]] = None) -> Path:
@@ -1026,6 +1015,9 @@ class BugReportServer(ThreadingHTTPServer):
                         )
                     except Exception:
                         pass
+                if self.exporter._file_mtimes and hasattr(self.sqlite_store, "update_file_mtimes"):
+                    self.sqlite_store.update_file_mtimes(dict(self.exporter._file_mtimes))
+                    self.exporter._file_mtimes.clear()
                 # Update feedback_mtime after commit_database completes so it reflects post-commit disk state
                 self.feedback_mtime = self._get_feedback_dir_mtime()
                 return out

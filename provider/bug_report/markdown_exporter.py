@@ -907,6 +907,10 @@ class MarkdownBugExporter:
             except OSError:
                 pass
         target_file.write_text(content, encoding="utf-8")
+        try:
+            self._file_mtimes[target_file.name] = target_file.stat().st_mtime
+        except OSError:
+            pass
         return target_file
 
     def export_all_individual_bugs(self, database: BugDatabaseModel, feedback_dir: Path) -> List[Path]:
@@ -1212,6 +1216,7 @@ class MarkdownBugExporter:
                 existing_by_id[f"BUG-{norm}"] = b
 
         updated_mtimes: Dict[str, float] = {}
+        dirty_ids: List[str] = []
 
         bug_files = sorted(set(list(feedback_dir.glob("BUG_*.md")) + list(feedback_dir.glob("WORM_*.md"))))
         for bug_file in bug_files:
@@ -1264,7 +1269,11 @@ class MarkdownBugExporter:
                     if cand_by_id and cand_by_id.uuid != existing_by_uuid.uuid:
                         # Target ID is already claimed by another bug; treat as UUID collision
                         md_bug.uuid = str(uuid_pkg.uuid4())
-                        self.export_individual_bug(md_bug, feedback_dir)
+                        written = self.export_individual_bug(md_bug, feedback_dir)
+                        try:
+                            updated_mtimes[written.name] = written.stat().st_mtime
+                        except OSError:
+                            pass
                     elif not old_file_exists:
                         existing_by_uuid.id = expected_id_from_fn
                         md_bug.id = expected_id_from_fn
@@ -1274,7 +1283,11 @@ class MarkdownBugExporter:
                     else:
                         # Both files exist on disk simultaneously: UUID collision mitigation!
                         md_bug.uuid = str(uuid_pkg.uuid4())
-                        self.export_individual_bug(md_bug, feedback_dir)
+                        written = self.export_individual_bug(md_bug, feedback_dir)
+                        try:
+                            updated_mtimes[written.name] = written.stat().st_mtime
+                        except OSError:
+                            pass
                 if (
                     existing_by_uuid.status in (BugStatus.RESOLVED, BugStatus.CLOSED)
                     and md_bug.status == BugStatus.OPEN
@@ -1286,7 +1299,8 @@ class MarkdownBugExporter:
                     # Bug was already accepted/closed in database; do not regress to RESOLVED from stale markdown
                     pass
                 else:
-                    database.add_or_update(md_bug)
+                    assigned_id = database.add_or_update(md_bug)
+                    dirty_ids.append(assigned_id)
                 merged += 1
 
             else:
@@ -1300,13 +1314,19 @@ class MarkdownBugExporter:
                     md_bug.id = new_id
                     if not md_bug.uuid:
                         md_bug.uuid = str(uuid_pkg.uuid4())
-                    self.export_individual_bug(md_bug, feedback_dir)
+                    written = self.export_individual_bug(md_bug, feedback_dir)
+                    try:
+                        updated_mtimes[written.name] = written.stat().st_mtime
+                    except OSError:
+                        pass
                     if bug_file.exists():
                         try:
                             bug_file.unlink()
+                            updated_mtimes.pop(file_name, None)
                         except OSError:
                             pass
-                database.add_or_update(md_bug)
+                assigned_id = database.add_or_update(md_bug)
+                dirty_ids.append(assigned_id)
                 merged += 1
 
         if store and hasattr(store, "save_database") and (merged > 0 or renamed > 0):
@@ -1318,4 +1338,4 @@ class MarkdownBugExporter:
             if hasattr(self, "_file_mtimes"):
                 self._file_mtimes.update(updated_mtimes)
 
-        return {"merged": merged, "renamed": renamed, "scanned": scanned}
+        return {"merged": merged, "renamed": renamed, "scanned": scanned, "dirty_ids": dirty_ids}

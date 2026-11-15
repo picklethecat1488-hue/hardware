@@ -104,7 +104,7 @@ def init_eel_bridge(static_dir: Optional[Path] = None) -> None:
         return
 
     if static_dir is None:
-        static_dir = Path(__file__).resolve().parent.parent / "code_review" / "static"
+        static_dir = Path(__file__).resolve().parents[2] / "js" / "static"
 
     if static_dir.exists():
         eel.init(str(static_dir))

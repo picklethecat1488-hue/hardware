@@ -15,10 +15,7 @@ import pytest
 
 def get_static_dir() -> Path:
     """Return path to static assets directory."""
-    static_dir = Path(__file__).resolve().parent.parent / "provider" / "code_review" / "static"
-    if not static_dir.exists():
-        static_dir = Path(__file__).resolve().parent.parent / "src" / "provider" / "code_review" / "static"
-    return static_dir
+    return Path(__file__).resolve().parent.parent / "js" / "static"
 
 
 def test_icon_512_not_corrupted() -> None:

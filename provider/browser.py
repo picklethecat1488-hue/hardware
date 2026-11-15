@@ -19,8 +19,8 @@ def get_default_icon_path(repo_root: Optional[Path] = None) -> Optional[Path]:
     if repo_root is None:
         repo_root = Path(__file__).resolve().parent.parent
     for candidate in [
-        repo_root / "provider" / "code_review" / "static" / "scope-favicon.ico",
-        repo_root / "provider" / "code_review" / "static" / "scope-icon.png",
+        repo_root / "js" / "static" / "scope-favicon.ico",
+        repo_root / "js" / "static" / "scope-icon.png",
     ]:
         if candidate.is_file():
             return candidate
