@@ -48,6 +48,8 @@ const DEFAULT_EDGE_COLOR_DIAGRAM = 0x0f172a;
 const HIGHLIGHT_FACE_COLOR_HEX = 0xffb800;
 const BASE_EDGE_CSS_PX = 1.25;
 const DIAGRAM_EDGE_CSS_PX = 1.5;
+const DIAGRAM_WIRE_CSS_PX = 2.25;
+const DIAGRAM_YELLOW_CONTRAST_HEX = 0xca9a00;
 const EXPLODE_RADIAL_MULTIPLIER = 1.35;
 const MIN_INSTANCED_BATCH_COUNT = 6;
 const INDICES_PER_TRIANGLE = 3;
@@ -217,8 +219,38 @@ export class CadSceneManager {
       worldUnits: false,
       clippingPlanes: activeClipPlanes,
     });
+    sharedEdgeMat.userData = { cssWidth: edgeCssWidth };
     this._lineMaterials.push(sharedEdgeMat);
     this._disposableMaterials.push(sharedEdgeMat);
+
+    const wireMaterialsByColor = new Map();
+    const getWireLineMaterial = (hexColor) => {
+      const colorKey = String(hexColor || "#0f172a").toLowerCase();
+      if (wireMaterialsByColor.has(colorKey)) {
+        return wireMaterialsByColor.get(colorKey);
+      }
+      const parsedColor = new Color(colorKey);
+      if (
+        this.mode === "DIAGRAM"
+        && parsedColor.r > 0.9
+        && parsedColor.g > 0.9
+        && parsedColor.b < 0.15
+      ) {
+        parsedColor.setHex(DIAGRAM_YELLOW_CONTRAST_HEX);
+      }
+      const wireCssWidth = this.mode === "DIAGRAM" ? DIAGRAM_WIRE_CSS_PX : edgeCssWidth;
+      const wireMat = new LineMaterial({
+        color: parsedColor.getHex(),
+        linewidth: Math.max(1, Math.round(wireCssWidth * this.dpr)),
+        worldUnits: false,
+        clippingPlanes: activeClipPlanes,
+      });
+      wireMat.userData = { cssWidth: wireCssWidth };
+      this._lineMaterials.push(wireMat);
+      this._disposableMaterials.push(wireMat);
+      wireMaterialsByColor.set(colorKey, wireMat);
+      return wireMat;
+    };
 
     // Count static identical `{ref, color, alpha, renderback}` leaves in DIAGRAM mode for InstancedMesh batching
     const batchBuckets = new Map();
@@ -319,10 +351,11 @@ export class CadSceneManager {
         const suppressBrepOutline =
           isLabelGlyph || pcbSurfaceRole === "copper" || pcbSurfaceRole === "silkscreen";
         if (!suppressBrepOutline) {
-          edgeLines = new LineSegments2(edgeGeom, sharedEdgeMat);
+          const lineMat = meshGeom ? sharedEdgeMat : getWireLineMaterial(leaf.color);
+          edgeLines = new LineSegments2(edgeGeom, lineMat);
           edgeLines.name = `${leaf.name}_edges`;
           edgeLines.visible = leaf.edgesVisible;
-          edgeLines.renderOrder = 1;
+          edgeLines.renderOrder = meshGeom ? 1 : 2;
           group.add(edgeLines);
         }
       }
@@ -473,10 +506,10 @@ export class CadSceneManager {
    */
   setDevicePixelRatio(dpr) {
     this.dpr = Math.max(1, dpr);
-    const edgeCssWidth = this.mode === "DIAGRAM" ? DIAGRAM_EDGE_CSS_PX : BASE_EDGE_CSS_PX;
-    const physWidth = Math.max(1, Math.round(edgeCssWidth * this.dpr));
+    const defaultEdgeCssWidth = this.mode === "DIAGRAM" ? DIAGRAM_EDGE_CSS_PX : BASE_EDGE_CSS_PX;
     for (const lineMat of this._lineMaterials) {
-      lineMat.linewidth = physWidth;
+      const cssWidth = lineMat.userData?.cssWidth || defaultEdgeCssWidth;
+      lineMat.linewidth = Math.max(1, Math.round(cssWidth * this.dpr));
     }
   }
 

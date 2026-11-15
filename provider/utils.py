@@ -152,20 +152,24 @@ def get_rgba_color(
     if isinstance(color, (tuple, list)):
         return (*color, alpha)  # type: ignore
 
-    color_map = {
+    color_map: dict[str, tuple[float, float, float]] = {
         ColorType.RED: (1.0, 0.0, 0.0),
         ColorType.GREEN: (0.0, 1.0, 0.0),
         ColorType.BLUE: (0.0, 0.0, 1.0),
         ColorType.ORANGE: (1.0, 0.65, 0.0),
         ColorType.CYAN: (0.0, 1.0, 1.0),
+        ColorType.TEAL: (0.0, 0.52, 0.52),
         ColorType.YELLOW: (1.0, 1.0, 0.0),
         ColorType.MAGENTA: (1.0, 0.0, 1.0),
+        ColorType.BROWN: (0.55, 0.27, 0.07),
         ColorType.GREY: (0.5, 0.5, 0.5),
+        "gray": (0.5, 0.5, 0.5),
         ColorType.BLACK: (0.0, 0.0, 0.0),
+        ColorType.WHITE: (1.0, 1.0, 1.0),
         ColorType.PURPLE: (0.5, 0.0, 0.5),
     }
-    name = str(color)
-    rgb = color_map.get(cast(ColorType, name), default_rgb)
+    name = str(color).lower()
+    rgb = color_map.get(name, default_rgb)
     return (*rgb, alpha)
 
 

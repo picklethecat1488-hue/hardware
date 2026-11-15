@@ -210,4 +210,66 @@ describe("scope/decoder", () => {
     assert.ok(traceRec.mesh.material.metalness >= 0.35, "3D copper traces should render with metallic copper luster");
     assert.ok(silkRec.mesh.material.polygonOffsetFactor < traceRec.mesh.material.polygonOffsetFactor, "Silkscreen must bias in front of copper traces");
   });
+
+  it("renders 1D diagram wires with their explicit per-wire colors instead of black silhouette edges (BUG-PINCERED-TARANTULA-172)", () => {
+    const ctx = createMockRuntimeContext();
+    const wireEdges = new Float32Array([0, 0, 0, 15, 0, 0, 15, 0, 0, 15, 10, 0]);
+    const boxVerts = new Float32Array([0, 0, 0, 10, 0, 0, 10, 10, 0]);
+    const boxTris = new Uint32Array([0, 1, 2]);
+
+    const payload = {
+      instances: [
+        {
+          vertices: encodeB64Field(new Float32Array(0), "float32"),
+          triangles: encodeB64Field(new Uint32Array(0), "uint32"),
+          edges: encodeB64Field(wireEdges, "float32"),
+        },
+        {
+          vertices: encodeB64Field(boxVerts, "float32"),
+          triangles: encodeB64Field(boxTris, "uint32"),
+          edges: encodeB64Field(wireEdges, "float32"),
+        },
+      ],
+      shapes: {
+        parts: [
+          {
+            id: "/Group/wire_vcc_logic",
+            name: "wire_vcc_logic",
+            color: "#ff0000",
+            shape: { ref: 0 },
+            state: [1, 1],
+          },
+          {
+            id: "/Group/wire_scl",
+            name: "wire_scl",
+            color: "#0000ff",
+            shape: { ref: 0 },
+            state: [1, 1],
+          },
+          {
+            id: "/Group/fp_pico",
+            name: "fp_pico",
+            color: "#808080",
+            shape: { ref: 1 },
+            state: [1, 1],
+          },
+        ],
+      },
+    };
+
+    const decoded = decodeOcpPayload(ctx, payload);
+    const scene = new Scene();
+    const cadScene = new CadSceneManager({ scene, dpr: 2.0 });
+    cadScene.loadDecodedPayload(decoded, { mode: "DIAGRAM" });
+
+    const vccRec = cadScene.leafRecords.get("/Group/wire_vcc_logic");
+    const sclRec = cadScene.leafRecords.get("/Group/wire_scl");
+    const picoRec = cadScene.leafRecords.get("/Group/fp_pico");
+
+    assert.equal(vccRec.mesh, null);
+    assert.ok(vccRec.edgeLines, "1D wire leaf must emit LineSegments2");
+    assert.equal(`#${vccRec.edgeLines.material.color.getHexString()}`, "#ff0000");
+    assert.equal(`#${sclRec.edgeLines.material.color.getHexString()}`, "#0000ff");
+    assert.equal(`#${picoRec.edgeLines.material.color.getHexString()}`, "#0f172a");
+  });
 });

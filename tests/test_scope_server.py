@@ -574,6 +574,22 @@ def test_regression_bug_swarming_silverfish_292_diagram_view_payload(scope_serve
     assert len(labels_part.get("parts", [])) > 0
     assert labels_part["parts"][0].get("color") == "#000000"
 
+    # Verify BUG-PINCERED-TARANTULA-172: wiring diagram preserves explicit per-wire color coding (including brown & teal)
+    wire_colors_by_name = {
+        p["name"]: p.get("color", "").lower()
+        for p in data["shapes"]["parts"]
+        if str(p.get("name", "")).startswith("wire_") and not str(p.get("name", "")).startswith("wire_dot_")
+    }
+    assert len(wire_colors_by_name) >= 10, (
+        f"Expected named 1D wire parts in DIAGRAM payload, got {list(wire_colors_by_name)}"
+    )
+    assert wire_colors_by_name.get("wire_vcc_logic") == "#ff0000"
+    assert wire_colors_by_name.get("wire_scl") == "#0000ff"
+    assert wire_colors_by_name.get("wire_ctrl_uh") != wire_colors_by_name.get("wire_ctrl_vh"), (
+        "Brown (ctrl_uh) and Magenta (ctrl_vh) wires must have distinct colors"
+    )
+    assert len(set(wire_colors_by_name.values())) >= 8
+
     # Loading `cat_fountain/product` in DIAGRAM mode right after `wiring` must default to isometric (`iso`), not `top`!
     prod_url = (
         f"http://127.0.0.1:{scope_server.actual_port}"

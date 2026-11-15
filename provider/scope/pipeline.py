@@ -40,7 +40,7 @@ class ScopeGeometryPipeline:
 
     SIM_TELEMETRY_CACHE_VERSION = "v4"
     PCB_METADATA_RENDER_VERSION = 3
-    DIAGRAM_RENDER_VERSION = 2
+    DIAGRAM_RENDER_VERSION = 3
     DIAGRAM_ISO_CAMERA_DIR: Tuple[float, float, float] = (1.0, -1.15, 0.85)
     KICAD_EDGE_CUTS_HEX = "#e6d84c"
     KICAD_COPPER_LAYER_COLORS: Dict[str, str] = {
@@ -1015,9 +1015,11 @@ class ScopeGeometryPipeline:
                         if options and getattr(options, "view_from", None):
                             view_from = str(options.view_from).lower()
 
-                    display_items.append(
-                        (room.compound if isinstance(room, Room) else room, f"{p_name}_diagram", None, 1.0)
-                    )
+                        for item_name, (geom, rgba) in room.items():
+                            item_label = item_name if len(results) == 1 else f"{p_name}/{item_name}"
+                            display_items.append((geom, item_label, rgba[:3], rgba[3]))
+                    else:
+                        display_items.append((room, f"{p_name}_diagram", None, 1.0))
 
                     # Orient and append diagram text annotation labels for 2D planar or 3D isometric views
                     if hasattr(room, "_labels") and room._labels:
