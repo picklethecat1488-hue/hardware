@@ -34,6 +34,27 @@ import VIA_SDF_VERTEX_SHADER from "./shaders/via_sdf.vert.glsl";
 
 const KICAD_FCU_HEX = "#c83434";
 const KICAD_BCU_HEX = "#4d7fc4";
+const KICAD_EDGE_CUTS_HEX = "#e6d84c";
+const KICAD_COPPER_COLORS = Object.freeze({
+  "F.Cu": KICAD_FCU_HEX,
+  "In1.Cu": "#c2c200",
+  "In2.Cu": "#c200c2",
+  "In3.Cu": "#00c2c2",
+  "In4.Cu": "#28a448",
+  "In5.Cu": "#d97706",
+  "In6.Cu": "#8b5cf6",
+  "B.Cu": KICAD_BCU_HEX,
+});
+const DEFAULT_VISIBLE_LAYER_TYPES = Object.freeze([
+  "Edge.Cuts",
+  "Substrate",
+  "Pads",
+  "F.Cu",
+  "B.Cu",
+  "Vias",
+  "F.SilkS",
+  "B.SilkS",
+]);
 const KICAD_PAD_HEX = "#ce4785";
 const KICAD_TESTPOINT_HEX = "#e5b842";
 const KICAD_VIA_HEX = "#ececec";
@@ -59,6 +80,21 @@ const MAX_MM_PER_PX_SILK_TEXT = 0.45;
 const IDENTITY_MATRIX = new Matrix4();
 const SCRATCH_QUAT = new Quaternion();
 const SCRATCH_POS = new Vector3();
+
+/**
+ * Convert `#rrggbb` hex color into `rgba(r, g, b, alpha)` CSS string.
+ *
+ * @param {string} hex - `#rrggbb` string.
+ * @param {number} alpha - Opacity `[0..1]`.
+ * @returns {string}
+ */
+function hexToRgba(hex, alpha) {
+  const clean = String(hex || "#c2c200").replace("#", "");
+  const r = Number.parseInt(clean.slice(0, 2), 16) || 194;
+  const g = Number.parseInt(clean.slice(2, 4), 16) || 194;
+  const b = Number.parseInt(clean.slice(4, 6), 16) || 0;
+  return `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(3)})`;
+}
 
 /**
  * Encode pad shape string into shader `aPadParams.y` numeric variant.
@@ -103,15 +139,9 @@ export class PcbGpuRenderer {
     /** @type {object|null} */
     this.metadata = null;
     /** @type {Set<string>} */
-    this.visibleLayers = new Set([
-      "Substrate",
-      "Pads",
-      "F.Cu",
-      "B.Cu",
-      "Vias",
-      "F.SilkS",
-      "B.SilkS",
-    ]);
+    this.visibleLayers = new Set(DEFAULT_VISIBLE_LAYER_TYPES);
+    /** @type {Map<string, string>} */
+    this.layerColors = new Map(Object.entries(KICAD_COPPER_COLORS));
 
     /** @type {string} */
     this.highlightedNet = "";
@@ -165,32 +195,49 @@ export class PcbGpuRenderer {
     }
     this.metadata = pcbMetadata;
     this.spatialGrid.buildFromMetadata(pcbMetadata);
-    this.visibleLayers = new Set([
-      "Substrate",
-      "Pads",
-      "F.Cu",
-      "B.Cu",
-      "Vias",
-      "F.SilkS",
-      "B.SilkS",
-    ]);
+    this.layerColors = new Map(Object.entries(KICAD_COPPER_COLORS));
+    if (Array.isArray(pcbMetadata.layers) && pcbMetadata.layers.length > 0) {
+      this.visibleLayers = new Set();
+      for (const layer of pcbMetadata.layers) {
+        const lt = layer.type || layer.id;
+        if (layer.color) {
+          this.layerColors.set(lt, String(layer.color));
+        }
+        if (layer.default_visible !== false) {
+          this.visibleLayers.add(lt);
+        }
+      }
+    } else {
+      this.visibleLayers = new Set(DEFAULT_VISIBLE_LAYER_TYPES);
+    }
 
     const zTop = typeof pcbMetadata.z_top_mm === "number" ? pcbMetadata.z_top_mm : 0.8;
     const zBot = typeof pcbMetadata.z_bottom_mm === "number" ? pcbMetadata.z_bottom_mm : -0.8;
 
     this._quadGeometry = new PlaneGeometry(1, 1, 1, 1);
 
-    // 1. F.Cu & B.Cu SDF Rounded-Capsule Traces (`1` draw call per side)
-    const topTraces = this.spatialGrid.traces.filter((t) => t.layer === "F.Cu");
-    const botTraces = this.spatialGrid.traces.filter((t) => t.layer === "B.Cu");
-    if (topTraces.length > 0) {
-      this._buildTraceBatch(topTraces, "F.Cu", KICAD_FCU_HEX, zTop + Z_COPPER_OFFSET_MM, 3);
+    // 1. Copper SDF Rounded-Capsule Traces (`1` draw call per populated copper layer: F.Cu, In1..In4.Cu, B.Cu)
+    const tracesByLayer = new Map();
+    for (const trace of this.spatialGrid.traces) {
+      let arr = tracesByLayer.get(trace.layer);
+      if (!arr) {
+        arr = [];
+        tracesByLayer.set(trace.layer, arr);
+      }
+      arr.push(trace);
     }
-    if (botTraces.length > 0) {
-      this._buildTraceBatch(botTraces, "B.Cu", KICAD_BCU_HEX, zBot - Z_COPPER_OFFSET_MM, 3);
+    for (const [layerName, layerTraces] of tracesByLayer.entries()) {
+      if (layerTraces.length === 0) continue;
+      const hexColor = this.layerColors.get(layerName) || KICAD_COPPER_COLORS[layerName] || KICAD_FCU_HEX;
+      const isInner = layerName !== "F.Cu" && layerName !== "B.Cu";
+      const layerZ =
+        layerName === "B.Cu"
+          ? zBot - Z_COPPER_OFFSET_MM
+          : zTop + Z_COPPER_OFFSET_MM;
+      this._buildTraceBatch(layerTraces, layerName, hexColor, layerZ, isInner ? 3.5 : 3, !isInner);
     }
 
-    // 2. F.Cu & B.Cu SDF Pads + Test Points (`1` draw call per side; thru-hole pads appear on both sides!)
+    // 2. F.Cu & B.Cu SDF Pads + Test Points + Plated Mounting Holes (`1` draw call per side)
     const topPads = this.spatialGrid.pads.filter((p) => p.layer === "F.Cu" || p.padType === "thru_hole");
     const botPads = this.spatialGrid.pads.filter((p) => p.layer === "B.Cu" || p.padType === "thru_hole");
     if (topPads.length > 0) {
@@ -200,11 +247,13 @@ export class PcbGpuRenderer {
       this._buildPadBatch(botPads, "B.Cu", zBot - Z_PAD_PROUD_OFFSET_MM, 4);
     }
 
-    // 3. Plated Through-Hole Vias on top & bottom surfaces (`1` draw call per side)
+    // 3. Plated Through-Hole & Blind Vias on top & bottom surfaces (`1` draw call per side)
     if (this.spatialGrid.vias.length > 0) {
       this._buildViaBatch(this.spatialGrid.vias, "F.Cu", zTop + Z_VIA_PROUD_OFFSET_MM, 5);
       this._buildViaBatch(this.spatialGrid.vias, "B.Cu", zBot - Z_VIA_PROUD_OFFSET_MM, 5);
     }
+
+    this._syncBatchVisibility();
   }
 
   /**
@@ -220,12 +269,13 @@ export class PcbGpuRenderer {
    * Build a single `InstancedMesh` SDF Rounded-Capsule batch for all traces on `layerName`.
    *
    * @param {Array<object>} traces - Layer traces.
-   * @param {"F.Cu"|"B.Cu"} layerName - Copper layer identifier.
+   * @param {string} layerName - Copper layer identifier (`F.Cu`, `In1.Cu`..`In4.Cu`, `B.Cu`).
    * @param {string} hexColor - KiCad layer color.
    * @param {number} layerZ - World Z elevation in mm.
    * @param {number} renderOrder - Draw order.
+   * @param {boolean} [depthTest] - Whether substrate depth-testing applies (`false` for inner copper layers).
    */
-  _buildTraceBatch(traces, layerName, hexColor, layerZ, renderOrder) {
+  _buildTraceBatch(traces, layerName, hexColor, layerZ, renderOrder, depthTest = true) {
     const count = traces.length;
     const geom = this._quadGeometry.clone();
     const geomData = new Float32Array(count * 4);
@@ -251,7 +301,7 @@ export class PcbGpuRenderer {
       fragmentShader: TRACE_CAPSULE_FRAGMENT_SHADER,
       transparent: true,
       depthWrite: false,
-      depthTest: true,
+      depthTest,
       side: DoubleSide,
       uniforms: {
         uLayerZ: { value: layerZ },
@@ -412,11 +462,38 @@ export class PcbGpuRenderer {
   }
 
   /**
-   * Enable all 7 PCB layers simultaneously (`All On` button).
+   * Enable all PCB layers simultaneously (`All On` button).
    */
   enableAllLayers() {
-    for (const t of ["Substrate", "Pads", "F.Cu", "B.Cu", "Vias", "F.SilkS", "B.SilkS"]) {
-      this.visibleLayers.add(t);
+    const layers = Array.isArray(this.metadata?.layers) ? this.metadata.layers : null;
+    if (layers && layers.length > 0) {
+      for (const layer of layers) {
+        this.visibleLayers.add(layer.type || layer.id);
+      }
+    } else {
+      for (const t of DEFAULT_VISIBLE_LAYER_TYPES) {
+        this.visibleLayers.add(t);
+      }
+    }
+    this._syncBatchVisibility();
+  }
+
+  /**
+   * Restore default surface layer visibility (`Edge.Cuts`, `F.Cu`, `B.Cu`, `Pads`, `Vias`, `Silk`, `Substrate`).
+   */
+  resetDefaultLayers() {
+    const layers = Array.isArray(this.metadata?.layers) ? this.metadata.layers : null;
+    this.visibleLayers.clear();
+    if (layers && layers.length > 0) {
+      for (const layer of layers) {
+        if (layer.default_visible !== false) {
+          this.visibleLayers.add(layer.type || layer.id);
+        }
+      }
+    } else {
+      for (const t of DEFAULT_VISIBLE_LAYER_TYPES) {
+        this.visibleLayers.add(t);
+      }
     }
     this._syncBatchVisibility();
   }
@@ -509,7 +586,7 @@ export class PcbGpuRenderer {
     const activeSide = cameraController.activeBoardSide || "F.Cu";
     const mmPerPx = cameraController.getMillimetersPerCssPixel();
     const bounds2D = cameraController.getVisibleWorldBounds2D(0);
-    const { pads, traces, silkTexts, silkGraphics } = this.spatialGrid.queryFrustumOverlays(bounds2D, {
+    const { pads, traces, copperRegions, silkTexts, silkGraphics } = this.spatialGrid.queryFrustumOverlays(bounds2D, {
       activeSide,
       visibleLayers: this.visibleLayers,
     });
@@ -519,6 +596,32 @@ export class PcbGpuRenderer {
       activeSide === "B.Cu"
         ? (this.metadata.z_bottom_mm || -0.8) - Z_PAD_PROUD_OFFSET_MM
         : (this.metadata.z_top_mm || 0.8) + Z_PAD_PROUD_OFFSET_MM;
+
+    // 0A. Inner / Outer Copper Region Planes (`In1.Cu`..`In4.Cu` GND / Power pours with antipads & thermals)
+    if (copperRegions.length > 0) {
+      this._drawCopperRegions(ctx2d, cameraController, copperRegions, mmPerPx, zPlane);
+    }
+
+    // 0B. KiCad `Edge.Cuts` Board Perimeter & Internal Cutout Loops
+    if (this.visibleLayers.has("Edge.Cuts") && this.spatialGrid.edgeCuts.length > 0) {
+      ctx2d.save();
+      ctx2d.strokeStyle = this.layerColors.get("Edge.Cuts") || KICAD_EDGE_CUTS_HEX;
+      ctx2d.lineWidth = Math.min(4.5, Math.max(1.8, 0.16 / Math.max(1e-4, mmPerPx)));
+      ctx2d.lineJoin = "round";
+      ctx2d.lineCap = "round";
+      for (const loop of this.spatialGrid.edgeCuts) {
+        if (loop.length < 3) continue;
+        ctx2d.beginPath();
+        loop.forEach((pt, idx) => {
+          const sp = cameraController.worldToCss(pt[0], pt[1], zPlane);
+          if (idx === 0) ctx2d.moveTo(sp.x, sp.y);
+          else ctx2d.lineTo(sp.x, sp.y);
+        });
+        ctx2d.closePath();
+        ctx2d.stroke();
+      }
+      ctx2d.restore();
+    }
 
     // 1. Vector Silkscreen Outlines, Lines, & Polygons
     if (silkGraphics.length > 0) {
@@ -668,6 +771,127 @@ export class PcbGpuRenderer {
     if (focusEntity) {
       this._drawEntityHighlight(ctx2d, viewportMetrics, cameraController, focusEntity, zPlane);
     }
+  }
+
+  /**
+   * Render KiCad-style inner/outer copper zone pours (`CopperRegion`) with `evenodd` circular
+   * via/pad antipad cutouts, 4-spoke thermal relief crosses on matching-net vias, dashed zone
+   * outline, and layer/net corner legend badge.
+   *
+   * @param {CanvasRenderingContext2D} ctx2d - Retina 2D context.
+   * @param {import("./camera_controller.js").CadCameraController} cameraController - Camera controller.
+   * @param {Array<object>} copperRegions - Visible copper pour regions.
+   * @param {number} mmPerPx - Millimeters per CSS pixel.
+   * @param {number} zPlane - Active board projection Z in mm.
+   */
+  _drawCopperRegions(ctx2d, cameraController, copperRegions, mmPerPx, zPlane) {
+    const safeMmPerPx = Math.max(1e-4, mmPerPx);
+    const outerAlsoVisible = this.visibleLayers.has("F.Cu") || this.visibleLayers.has("B.Cu");
+    const baseFillAlpha = outerAlsoVisible ? 0.16 : 0.28;
+
+    copperRegions.forEach((region, regionIdx) => {
+      if (!region.polygon || region.polygon.length < 3) return;
+      const isHighlighted = Boolean(this.highlightedNet && region.net === this.highlightedNet);
+      const baseHex = isHighlighted
+        ? HIGHLIGHT_NET_HEX
+        : (this.layerColors.get(region.layer) || KICAD_COPPER_COLORS[region.layer] || "#c2c200");
+
+      ctx2d.save();
+
+      // 1. Even-odd filled copper plane with antipad clearance holes around spanning vias & thru-hole pads
+      ctx2d.beginPath();
+      region.polygon.forEach((pt, idx) => {
+        const sp = cameraController.worldToCss(pt[0], pt[1], zPlane);
+        if (idx === 0) ctx2d.moveTo(sp.x, sp.y);
+        else ctx2d.lineTo(sp.x, sp.y);
+      });
+      ctx2d.closePath();
+
+      const thermalVias = [];
+      for (const via of this.spatialGrid.vias) {
+        if (!this.spatialGrid.doesViaSpanLayer(via, region.layer)) continue;
+        if (via.x < region.minX || via.x > region.maxX || via.y < region.minY || via.y > region.maxY) continue;
+        const sp = cameraController.worldToCss(via.x, via.y, zPlane);
+        const sameNet = Boolean(region.net && via.net === region.net);
+        const rClearMm = via.padDia * 0.5 + (sameNet ? region.clearance * 0.7 : region.clearance);
+        const rPx = Math.max(1.2, rClearMm / safeMmPerPx);
+        ctx2d.moveTo(sp.x + rPx, sp.y);
+        ctx2d.arc(sp.x, sp.y, rPx, 0, Math.PI * 2);
+        if (sameNet) {
+          thermalVias.push({ sp, rInnerPx: (via.padDia * 0.5) / safeMmPerPx, rOuterPx: rPx });
+        }
+      }
+
+      for (const pad of this.spatialGrid.pads) {
+        if (pad.padType !== "thru_hole") continue;
+        if (pad.x < region.minX || pad.x > region.maxX || pad.y < region.minY || pad.y > region.maxY) continue;
+        const sp = cameraController.worldToCss(pad.x, pad.y, zPlane);
+        const sameNet = Boolean(region.net && pad.net === region.net);
+        const rClearMm = Math.max(pad.w, pad.h) * 0.5 + (sameNet ? region.clearance * 0.7 : region.clearance);
+        const rPx = Math.max(1.4, rClearMm / safeMmPerPx);
+        ctx2d.moveTo(sp.x + rPx, sp.y);
+        ctx2d.arc(sp.x, sp.y, rPx, 0, Math.PI * 2);
+        if (sameNet) {
+          thermalVias.push({ sp, rInnerPx: (Math.max(pad.w, pad.h) * 0.5) / safeMmPerPx, rOuterPx: rPx });
+        }
+      }
+
+      ctx2d.fillStyle = hexToRgba(baseHex, isHighlighted ? 0.36 : baseFillAlpha);
+      ctx2d.fill("evenodd");
+
+      // 2. 4-spoke KiCad thermal relief bridges connecting same-net vias/THT pads into the copper plane
+      if (thermalVias.length > 0 && safeMmPerPx <= 0.22) {
+        ctx2d.strokeStyle = hexToRgba(baseHex, 0.85);
+        ctx2d.lineWidth = Math.min(3.2, Math.max(1.2, 0.16 / safeMmPerPx));
+        ctx2d.beginPath();
+        for (const tv of thermalVias) {
+          if (tv.rOuterPx < 2.5) continue;
+          ctx2d.moveTo(tv.sp.x - tv.rOuterPx, tv.sp.y);
+          ctx2d.lineTo(tv.sp.x - tv.rInnerPx * 0.75, tv.sp.y);
+          ctx2d.moveTo(tv.sp.x + tv.rInnerPx * 0.75, tv.sp.y);
+          ctx2d.lineTo(tv.sp.x + tv.rOuterPx, tv.sp.y);
+          ctx2d.moveTo(tv.sp.x, tv.sp.y - tv.rOuterPx);
+          ctx2d.lineTo(tv.sp.x, tv.sp.y - tv.rInnerPx * 0.75);
+          ctx2d.moveTo(tv.sp.x, tv.sp.y + tv.rInnerPx * 0.75);
+          ctx2d.lineTo(tv.sp.x, tv.sp.y + tv.rOuterPx);
+        }
+        ctx2d.stroke();
+      }
+
+      // 3. KiCad dashed copper zone boundary + corner layer/net legend badge
+      ctx2d.strokeStyle = hexToRgba(baseHex, 0.92);
+      ctx2d.lineWidth = 1.6;
+      ctx2d.setLineDash([6, 4]);
+      ctx2d.beginPath();
+      region.polygon.forEach((pt, idx) => {
+        const sp = cameraController.worldToCss(pt[0], pt[1], zPlane);
+        if (idx === 0) ctx2d.moveTo(sp.x, sp.y);
+        else ctx2d.lineTo(sp.x, sp.y);
+      });
+      ctx2d.closePath();
+      ctx2d.stroke();
+      ctx2d.setLineDash([]);
+
+      const topLeft = cameraController.worldToCss(region.minX + 0.8, region.maxY - 0.8, zPlane);
+      const badgeLabel = `${region.layer} · ${region.net || "COPPER"} PLANE`;
+      ctx2d.font = '700 10px ui-monospace, "SF Mono", Menlo, monospace';
+      const tw = ctx2d.measureText(badgeLabel).width;
+      const bx = topLeft.x + 4;
+      const by = topLeft.y + 4 + regionIdx * 20;
+      ctx2d.fillStyle = "rgba(8, 12, 20, 0.86)";
+      ctx2d.strokeStyle = hexToRgba(baseHex, 0.9);
+      ctx2d.lineWidth = 1;
+      ctx2d.beginPath();
+      ctx2d.roundRect(bx, by, tw + 12, 17, 3);
+      ctx2d.fill();
+      ctx2d.stroke();
+      ctx2d.fillStyle = baseHex;
+      ctx2d.textAlign = "left";
+      ctx2d.textBaseline = "middle";
+      ctx2d.fillText(badgeLabel, bx + 6, by + 9);
+
+      ctx2d.restore();
+    });
   }
 
   /**

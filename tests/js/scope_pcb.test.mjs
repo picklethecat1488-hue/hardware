@@ -20,11 +20,33 @@ import { PcbSpatialGrid } from "../../js/scope/pcb_spatial_index.js";
 const { PcbGpuRenderer } = await import("../../js/scope/pcb_renderer.js");
 
 const SAMPLE_PCB_METADATA = {
-  render_version: 2,
+  render_version: 3,
   board_thickness_mm: 1.6,
   z_top_mm: 0.8,
   z_bottom_mm: -0.8,
-  nets: ["GND", "VCC_3V3", "SWDIO"],
+  copper_layers: ["F.Cu", "In1.Cu", "In2.Cu", "In3.Cu", "In4.Cu", "B.Cu"],
+  layers: [
+    { id: "edge_cuts", name: "Edge.Cuts (Outline)", color: "#e6d84c", type: "Edge.Cuts", default_visible: true },
+    { id: "f_cu", name: "F.Cu (L1 Top)", color: "#c83434", type: "F.Cu", default_visible: true },
+    { id: "in1_cu", name: "In1.Cu (L2 Ground)", color: "#c2c200", type: "In1.Cu", is_inner: true, default_visible: false },
+    { id: "in2_cu", name: "In2.Cu (L3 Signal)", color: "#c200c2", type: "In2.Cu", is_inner: true, default_visible: false },
+    { id: "in3_cu", name: "In3.Cu (L4 Power)", color: "#00c2c2", type: "In3.Cu", is_inner: true, default_visible: false },
+    { id: "in4_cu", name: "In4.Cu (L5 Signal)", color: "#28a448", type: "In4.Cu", is_inner: true, default_visible: false },
+    { id: "b_cu", name: "B.Cu (L6 Bottom)", color: "#4d7fc4", type: "B.Cu", default_visible: true },
+    { id: "pads", name: "Pads", color: "#ce4785", type: "Pads", default_visible: true },
+    { id: "vias", name: "Vias", color: "#ececec", type: "Vias", default_visible: true },
+    { id: "f_silk", name: "F.SilkS", color: "#f2eda1", type: "F.SilkS", default_visible: true },
+    { id: "b_silk", name: "B.SilkS", color: "#e8b2a7", type: "B.SilkS", default_visible: true },
+    { id: "substrate", name: "Substrate", color: "#041830", type: "Substrate", default_visible: true },
+  ],
+  edge_cuts: [
+    [[-30, -45], [30, -45], [30, 45], [-30, 45], [-30, -45]],
+  ],
+  copper_regions: [
+    { layer: "In1.Cu", net: "GND", polygon: [[-29, -44], [29, -44], [29, 44], [-29, 44]], clearance: 0.25, priority: 1 },
+    { layer: "In3.Cu", net: "VCC_3V3", polygon: [[-29, -44], [29, -44], [29, 44], [-29, 44]], clearance: 0.25, priority: 1 },
+  ],
+  nets: ["GND", "VCC_3V3", "SWDIO", "SPI_CLK"],
   components: [
     { ref_des: "U1", footprint: "QFN-32", layer: "F.Cu", x: 10, y: 10, value: "STM32" },
     { ref_des: "C4", footprint: "0402", layer: "B.Cu", x: -12, y: 6, value: "100nF" },
@@ -40,9 +62,11 @@ const SAMPLE_PCB_METADATA = {
   traces: [
     { net: "VCC_3V3", layer: "F.Cu", width: 0.35, start: [10, 12], end: [18, 12] },
     { net: "SWDIO", layer: "B.Cu", width: 0.25, start: [15, -4], end: [22, -4] },
+    { net: "SPI_CLK", layer: "In2.Cu", width: 0.2, start: [-8, 0], end: [8, 0] },
   ],
   vias: [
-    { net: "VCC_3V3", x: 18, y: 12, drill: 0.3, pad_dia: 0.6 },
+    { net: "VCC_3V3", x: 18, y: 12, drill: 0.3, pad_dia: 0.6, layer_start: "F.Cu", layer_end: "B.Cu" },
+    { net: "GND", x: -5, y: -5, drill: 0.2, pad_dia: 0.45, layer_start: "F.Cu", layer_end: "In1.Cu" },
   ],
   silkscreen_texts: [
     { text: "U1", layer: "F.SilkS", x: 10, y: 14, font_size: 1.0, rotation: 0 },
@@ -101,13 +125,13 @@ describe("scope/pcb_spatial_index & pcb_renderer", () => {
     assert.equal(backOverlays.silkGraphics.length, 0);
   });
 
-  it("builds <= 6 GPU SDF InstancedMesh batches and updates per-instance net highlight flags", () => {
+  it("builds <= 8 GPU SDF InstancedMesh batches and updates per-instance net highlight flags", () => {
     const scene = new Scene();
     const renderer = new PcbGpuRenderer({ scene });
     renderer.loadMetadata(SAMPLE_PCB_METADATA);
 
     const batchCount = renderer.getGpuBatchCount();
-    assert.ok(batchCount > 0 && batchCount <= 6, `Expected <= 6 GPU batches, got ${batchCount}`);
+    assert.ok(batchCount > 0 && batchCount <= 8, `Expected <= 8 GPU batches, got ${batchCount}`);
 
     renderer.setHighlightedNet("VCC_3V3");
     assert.equal(renderer.highlightedNet, "VCC_3V3");
@@ -127,5 +151,40 @@ describe("scope/pcb_spatial_index & pcb_renderer", () => {
     assert.equal(fcuTraceBatch.mesh.visible, false);
     renderer.enableAllLayers();
     assert.equal(fcuTraceBatch.mesh.visible, true);
+  });
+
+  it("preserves inner copper layers (In1.Cu..In4.Cu), Edge.Cuts outline, and copper_regions pours", () => {
+    const scene = new Scene();
+    const renderer = new PcbGpuRenderer({ scene });
+    renderer.loadMetadata(SAMPLE_PCB_METADATA);
+
+    // Edge.Cuts outline is enabled by default and indexed for magnetic snapping
+    assert.equal(renderer.visibleLayers.has("Edge.Cuts"), true);
+    assert.equal(renderer.spatialGrid.edgeCuts.length, 1);
+    const cornerSnap = renderer.spatialGrid.findMagneticSnap(-29.8, -44.9, 0.5, "F.Cu");
+    assert.ok(cornerSnap && Math.abs(cornerSnap.x - -30) < 1e-3 && Math.abs(cornerSnap.y - -45) < 1e-3);
+
+    // Inner trace SPI_CLK stays on In2.Cu (never coerced to F.Cu!)
+    const in2Trace = renderer.spatialGrid.traces.find((t) => t.net === "SPI_CLK");
+    assert.ok(in2Trace);
+    assert.equal(in2Trace.layer, "In2.Cu");
+    const in2Batch = renderer._traceBatches.find((b) => b.layerName === "In2.Cu");
+    assert.ok(in2Batch, "Expected dedicated GPU SDF trace batch for In2.Cu");
+
+    // In2.Cu defaults hidden (`default_visible: false`), then becomes visible & hit-testable when toggled ON
+    assert.equal(in2Batch.mesh.visible, false);
+    assert.equal(renderer.hitTest(0, 0, "F.Cu"), null);
+
+    renderer.setLayerVisibility("In2.Cu", true);
+    assert.equal(in2Batch.mesh.visible, true);
+    const innerHit = renderer.hitTest(0, 0, "F.Cu");
+    assert.equal(innerHit?.kind, "trace");
+    assert.equal(innerHit?.layer, "In2.Cu");
+    assert.equal(innerHit?.net, "SPI_CLK");
+
+    // Copper regions on In1.Cu & In3.Cu are indexed and check via span penetration
+    assert.equal(renderer.spatialGrid.copperRegions.length, 2);
+    assert.equal(renderer.spatialGrid.doesViaSpanLayer(renderer.spatialGrid.vias[1], "In1.Cu"), true);
+    assert.equal(renderer.spatialGrid.doesViaSpanLayer(renderer.spatialGrid.vias[1], "In3.Cu"), false);
   });
 });

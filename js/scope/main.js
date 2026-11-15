@@ -247,6 +247,9 @@ export class ScopeWorkstationApp {
       const btn = this._el(btnId);
       if (btn) {
         btn.addEventListener("click", () => {
+          if (this.currentMode === "PCB" && (preset === "top" || preset === "bottom" || preset === "flip") && this.inspector?._soloLayerType) {
+            this.inspector.toggleSoloPcbLayer(null);
+          }
           this.cameraController.setPreset(preset, { fit: preset === "fit" });
           this.viewport.setCamera(this.cameraController.activeCamera);
         });

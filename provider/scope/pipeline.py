@@ -39,7 +39,19 @@ class ScopeGeometryPipeline:
     """Manages project discovery, geometry resolution, and tessellation caching."""
 
     SIM_TELEMETRY_CACHE_VERSION = "v4"
-    PCB_METADATA_RENDER_VERSION = 2
+    PCB_METADATA_RENDER_VERSION = 3
+    KICAD_EDGE_CUTS_HEX = "#e6d84c"
+    KICAD_COPPER_LAYER_COLORS: Dict[str, str] = {
+        "F.Cu": "#c83434",
+        "In1.Cu": "#c2c200",
+        "In2.Cu": "#c200c2",
+        "In3.Cu": "#00c2c2",
+        "In4.Cu": "#28a448",
+        "In5.Cu": "#d97706",
+        "In6.Cu": "#8b5cf6",
+        "B.Cu": "#4d7fc4",
+    }
+    EDGE_CUT_CHORD_STEP_MM = 0.25
     MM_PER_METER = 1000.0
     DEFAULT_PARTICLE_RADIUS_MM = 2.0
     MIN_VOXEL_LATTICE_STEP_MM = 0.25
@@ -237,6 +249,94 @@ class ScopeGeometryPipeline:
 
         return result
 
+    @classmethod
+    def _discretize_wire_2d(cls, wire: Any) -> List[List[float]]:
+        """Discretize a 2D/3D planar `build123d` `Wire` into a continuous closed `(x, y)` polyline loop."""
+        raw_segments: List[List[Tuple[float, float]]] = []
+        for edge in wire.edges():
+            edge_len = float(getattr(edge, "length", 0.0) or 0.0)
+            if edge_len <= 1e-5:
+                continue
+            geom_name = str(getattr(getattr(edge, "geom_type", None), "name", "")).upper()
+            steps = 1 if geom_name == "LINE" else max(6, int(math.ceil(edge_len / cls.EDGE_CUT_CHORD_STEP_MM)))
+            pts: List[Tuple[float, float]] = []
+            for idx in range(steps + 1):
+                p = edge.position_at(idx / steps)
+                pts.append((float(p.X), float(p.Y)))
+            raw_segments.append(pts)
+
+        if not raw_segments:
+            return []
+
+        remaining = list(raw_segments[1:])
+        chain: List[Tuple[float, float]] = list(raw_segments[0])
+        while remaining:
+            cur_x, cur_y = chain[-1]
+            best_idx = 0
+            best_rev = False
+            best_dist = float("inf")
+            for r_idx, seg in enumerate(remaining):
+                sx, sy = seg[0]
+                ex, ey = seg[-1]
+                d_start = math.hypot(cur_x - sx, cur_y - sy)
+                d_end = math.hypot(cur_x - ex, cur_y - ey)
+                if d_start < best_dist:
+                    best_dist = d_start
+                    best_idx = r_idx
+                    best_rev = False
+                if d_end < best_dist:
+                    best_dist = d_end
+                    best_idx = r_idx
+                    best_rev = True
+            chosen = remaining.pop(best_idx)
+            if best_rev:
+                chosen = list(reversed(chosen))
+            for pt in chosen[1:]:
+                if math.hypot(pt[0] - chain[-1][0], pt[1] - chain[-1][1]) > 1e-4:
+                    chain.append(pt)
+
+        if len(chain) >= 3 and math.hypot(chain[0][0] - chain[-1][0], chain[0][1] - chain[-1][1]) > 1e-4:
+            chain.append(chain[0])
+        return [[round(x, 3), round(y, 3)] for x, y in chain]
+
+    @classmethod
+    def _extract_edge_cuts_loops(
+        cls,
+        substrate_geom: Any,
+        pcb_cfg: Any,
+        drill_centers: List[Tuple[float, float, float]],
+    ) -> List[List[List[float]]]:
+        """Extract exact `Edge.Cuts` board perimeter and mechanical cutout loops in millimeters."""
+        loops: List[List[List[float]]] = []
+        faces = list(substrate_geom.faces()) if substrate_geom is not None and hasattr(substrate_geom, "faces") else []
+        if faces:
+            top_face = max(faces, key=lambda f: (round(float(f.center().Z), 3), float(f.area)))
+            outer_pts = cls._discretize_wire_2d(top_face.outer_wire())
+            if len(outer_pts) >= 4:
+                loops.append(outer_pts)
+
+            for inner_w in top_face.inner_wires():
+                bb = inner_w.bounding_box()
+                span = max(float(bb.size.X), float(bb.size.Y))
+                cx = float((bb.min.X + bb.max.X) * 0.5)
+                cy = float((bb.min.Y + bb.max.Y) * 0.5)
+                is_drilled_hole = any(
+                    math.hypot(cx - hx, cy - hy) <= 0.25 and abs(span - h_dia) <= 0.35
+                    for hx, hy, h_dia in drill_centers
+                )
+                if is_drilled_hole:
+                    continue
+                inner_pts = cls._discretize_wire_2d(inner_w)
+                if len(inner_pts) >= 4:
+                    loops.append(inner_pts)
+
+        if not loops:
+            dims = getattr(pcb_cfg, "dimensions_mm", None) or (60.0, 90.0, 1.6)
+            hw = round(float(dims[0]) * 0.5, 3)
+            hl = round(float(dims[1]) * 0.5, 3)
+            loops.append([[-hw, -hl], [hw, -hl], [hw, hl], [-hw, hl], [-hw, -hl]])
+        return loops
+
     def _resolve_provider(self, project: str) -> Optional[Provider]:
         """Resolve a Provider instance for a project name."""
         for p in getattr(self.manager.router, "providers", []):
@@ -291,20 +391,25 @@ class ScopeGeometryPipeline:
                 gz_bytes = cache_file.read_bytes()
                 decomp = gzip.decompress(gz_bytes)
                 payload = orjson.loads(decomp)
-                with self._lock:
-                    self._cache[cache_key] = payload
-                    self._gz_cache[cache_key] = gz_bytes
-                    if wait_event is None and cache_key in self._in_progress:
-                        self._in_progress.pop(cache_key).set()
-                self.log.info(
-                    "Disk cache hit for %s/%s [%s] in %.3fs (%.2f MB compressed)",
-                    project,
-                    target,
-                    mode_upper,
-                    time.time() - t0_disk,
-                    len(gz_bytes) / (1024 * 1024),
+                pcb_ver_ok = (
+                    mode_upper != "PCB"
+                    or payload.get("pcb_metadata", {}).get("render_version") == self.PCB_METADATA_RENDER_VERSION
                 )
-                return payload
+                if pcb_ver_ok:
+                    with self._lock:
+                        self._cache[cache_key] = payload
+                        self._gz_cache[cache_key] = gz_bytes
+                        if wait_event is None and cache_key in self._in_progress:
+                            self._in_progress.pop(cache_key).set()
+                    self.log.info(
+                        "Disk cache hit for %s/%s [%s] in %.3fs (%.2f MB compressed)",
+                        project,
+                        target,
+                        mode_upper,
+                        time.time() - t0_disk,
+                        len(gz_bytes) / (1024 * 1024),
+                    )
+                    return payload
             except Exception as err:
                 self.log.warning("Failed reading disk cache %s: %s", cache_file, err)
 
@@ -341,9 +446,10 @@ class ScopeGeometryPipeline:
                 sub_pcb_config = None
                 item_name = f"{provider.name}_{sub_param or provider.name}_pcb"
 
-                if sub_param and hasattr(provider, "part") and sub_param in provider.part:
-                    part_func = provider.part[sub_param]
-                    part_res = part_func(sub_param, None, Mode.DEFAULT)
+                part_key = sub_param or target
+                if part_key and hasattr(provider, "part") and part_key in provider.part:
+                    part_func = provider.part[part_key]
+                    part_res = part_func(part_key, None, Mode.DEFAULT)
                     solid = getattr(part_res, "part", part_res)
                     if hasattr(part_res, "to_pcb_config"):
                         sub_pcb_config = part_res.to_pcb_config()
@@ -579,6 +685,81 @@ class ScopeGeometryPipeline:
                         }
                     )
 
+                drill_centers: List[Tuple[float, float, float]] = [
+                    (float(tp["x"]), float(tp["y"]), float(tp["drill"]))
+                    for tp in test_points_data
+                    if float(tp.get("drill", 0.0) or 0.0) > 0.0
+                ]
+                if not is_flex:
+                    for mh_idx, mh in enumerate(getattr(pcb_cfg, "mounting_holes", []), start=1):
+                        mx = round(float(mh.position_mm[0]), 3)
+                        my = round(float(mh.position_mm[1]), 3)
+                        m_drill = round(float(mh.drill_diameter_mm), 3)
+                        m_pad = round(
+                            float(
+                                mh.pad_diameter_mm
+                                or (mh.drill_diameter_mm + 1.2 if mh.plated else mh.drill_diameter_mm)
+                            ),
+                            3,
+                        )
+                        drill_centers.append((mx, my, m_drill))
+                        pads_data.append(
+                            {
+                                "x": mx,
+                                "y": my,
+                                "w": m_pad,
+                                "h": m_pad,
+                                "rot_deg": 0.0,
+                                "shape": "circle",
+                                "pad_type": "thru_hole",
+                                "comp": f"{getattr(mh, 'name', 'MH')}{mh_idx}"
+                                if str(getattr(mh, "name", "MH")) == "MH"
+                                else str(getattr(mh, "name", f"MH{mh_idx}")),
+                                "pin": "1",
+                                "number": "1",
+                                "net": str(getattr(mh, "net", "") or ""),
+                                "layer": "F.Cu",
+                                "is_mounting_hole": True,
+                                "dia": m_pad,
+                                "drill": m_drill,
+                            }
+                        )
+
+                edge_cuts_loops = self._extract_edge_cuts_loops(substrate_geom, pcb_cfg, drill_centers)
+
+                copper_regions_data = [
+                    {
+                        "layer": str(r.layer),
+                        "net": str(r.net),
+                        "polygon": [[round(float(pt[0]), 3), round(float(pt[1]), 3)] for pt in r.polygon_points_mm],
+                        "clearance": round(float(getattr(r, "clearance_mm", 0.25) or 0.25), 3),
+                        "priority": int(getattr(r, "priority", 1) or 1),
+                    }
+                    for r in getattr(pcb_cfg, "copper_regions", [])
+                ]
+
+                stackup_cu_objs = (
+                    [
+                        lyr
+                        for lyr in getattr(pcb_cfg.stackup, "layers", [])
+                        if str(getattr(lyr, "material", "")).lower() == "copper"
+                        or str(getattr(lyr, "name", "")).endswith(".Cu")
+                    ]
+                    if getattr(pcb_cfg, "stackup", None)
+                    else []
+                )
+                if stackup_cu_objs:
+                    copper_layer_names = [str(lyr.name) for lyr in stackup_cu_objs]
+                    copper_layer_roles = {
+                        str(lyr.name): str(
+                            getattr(getattr(lyr, "layer_type", "signal"), "value", getattr(lyr, "layer_type", "signal"))
+                        ).title()
+                        for lyr in stackup_cu_objs
+                    }
+                else:
+                    copper_layer_names = ["F.Cu", "B.Cu"]
+                    copper_layer_roles = {"F.Cu": "Signal", "B.Cu": "Signal"}
+
                 silkscreen_texts_data = []
                 existing_top_texts = set()
                 existing_bot_texts = set()
@@ -645,6 +826,9 @@ class ScopeGeometryPipeline:
                 for t in traces_data:
                     net_trace_counts[t["net"]] = net_trace_counts.get(t["net"], 0) + 1
                     net_layers.setdefault(t["net"], set()).add(t["layer"])
+                for r in copper_regions_data:
+                    if r["net"]:
+                        net_layers.setdefault(r["net"], set()).add(r["layer"])
 
                 net_via_counts = {}
                 for v in vias_data:
@@ -673,30 +857,97 @@ class ScopeGeometryPipeline:
                             }
                         )
 
+                num_cu = len(copper_layer_names)
+                cu_layer_entries: List[Dict[str, Any]] = []
+                for cu_idx, cu_name in enumerate(copper_layer_names, start=1):
+                    is_inner = cu_name not in ("F.Cu", "B.Cu")
+                    role = copper_layer_roles.get(cu_name, "Signal")
+                    if cu_name == "F.Cu":
+                        short_name = "F.Cu (Top)"
+                        label = "F.Cu (L1 Top)" if num_cu > 2 else short_name
+                        layer_id = f"{item_name}_traces_top"
+                    elif cu_name == "B.Cu":
+                        short_name = "B.Cu (Bottom)"
+                        label = f"B.Cu (L{num_cu} Bottom)" if num_cu > 2 else short_name
+                        layer_id = f"{item_name}_traces_bottom"
+                    else:
+                        short_name = f"{cu_name} (L{cu_idx} {role})"
+                        label = short_name
+                        layer_id = f"{item_name}_{cu_name.lower().replace('.', '_')}"
+                    cu_layer_entries.append(
+                        {
+                            "id": layer_id,
+                            "name": short_name,
+                            "label": label,
+                            "color": self.KICAD_COPPER_LAYER_COLORS.get(cu_name, "#c2a028"),
+                            "type": cu_name,
+                            "is_inner": is_inner,
+                            "role": role,
+                            "default_visible": not is_inner,
+                        }
+                    )
+
+                pcb_layers: List[Dict[str, Any]] = [
+                    {
+                        "id": f"{item_name}_edge_cuts",
+                        "name": "Edge.Cuts (Outline)",
+                        "label": "Edge.Cuts (Outline)",
+                        "color": self.KICAD_EDGE_CUTS_HEX,
+                        "type": "Edge.Cuts",
+                        "default_visible": True,
+                    },
+                    *cu_layer_entries,
+                    {
+                        "id": f"{item_name}_pads",
+                        "name": "Pads",
+                        "label": "Pads",
+                        "color": "#ce4785",
+                        "type": "Pads",
+                        "default_visible": True,
+                    },
+                    {
+                        "id": f"{item_name}_vias",
+                        "name": "Vias",
+                        "label": "Vias",
+                        "color": "#ececec",
+                        "type": "Vias",
+                        "default_visible": True,
+                    },
+                    {
+                        "id": f"{item_name}_silkscreen_top",
+                        "name": "F.SilkS",
+                        "label": "F.SilkS",
+                        "color": "#f2eda1",
+                        "type": "F.SilkS",
+                        "default_visible": True,
+                    },
+                    {
+                        "id": f"{item_name}_silkscreen_bottom",
+                        "name": "B.SilkS",
+                        "label": "B.SilkS",
+                        "color": "#e8b2a7",
+                        "type": "B.SilkS",
+                        "default_visible": True,
+                    },
+                    {
+                        "id": f"{item_name}_substrate",
+                        "name": "Substrate",
+                        "label": "Substrate",
+                        "color": "#041830",
+                        "type": "Substrate",
+                        "default_visible": True,
+                    },
+                ]
+
                 pcb_metadata = {
                     "render_version": self.PCB_METADATA_RENDER_VERSION,
                     "board_thickness_mm": round(float(assembler.total_thickness), 3),
                     "z_top_mm": round(float(assembler.z_top), 3),
                     "z_bottom_mm": round(float(assembler.z_bottom), 3),
-                    "layers": [
-                        {"id": f"{item_name}_substrate", "name": "Substrate", "color": "#041830", "type": "Substrate"},
-                        {"id": f"{item_name}_pads", "name": "Pads", "color": "#ce4785", "type": "Pads"},
-                        {"id": f"{item_name}_traces_top", "name": "F.Cu (Top)", "color": "#c83434", "type": "F.Cu"},
-                        {
-                            "id": f"{item_name}_traces_bottom",
-                            "name": "B.Cu (Bottom)",
-                            "color": "#4d7fc4",
-                            "type": "B.Cu",
-                        },
-                        {"id": f"{item_name}_vias", "name": "Vias", "color": "#ececec", "type": "Vias"},
-                        {"id": f"{item_name}_silkscreen_top", "name": "F.SilkS", "color": "#f2eda1", "type": "F.SilkS"},
-                        {
-                            "id": f"{item_name}_silkscreen_bottom",
-                            "name": "B.SilkS",
-                            "color": "#e8b2a7",
-                            "type": "B.SilkS",
-                        },
-                    ],
+                    "copper_layers": copper_layer_names,
+                    "layers": pcb_layers,
+                    "edge_cuts": edge_cuts_loops,
+                    "copper_regions": copper_regions_data,
                     "components": comps,
                     "nets": nets,
                     "traces": traces_data,

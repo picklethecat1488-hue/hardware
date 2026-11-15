@@ -23,13 +23,14 @@ const SPARKLINE_MIN_CSS_WIDTH_PX = 240;
 const MILS_PER_MM = 39.37007874;
 
 const DEFAULT_PCB_LAYERS = Object.freeze([
-  { id: "substrate", label: "Board Substrate", color: "#041830", type: "Substrate" },
-  { id: "pads", label: "Copper Pads", color: "#ce4785", type: "Pads" },
-  { id: "traces_fcu", label: "Top Copper (F.Cu)", color: "#c83434", type: "F.Cu" },
-  { id: "traces_bcu", label: "Bottom Copper (B.Cu)", color: "#4d7fc4", type: "B.Cu" },
-  { id: "vias", label: "Plated Vias", color: "#ececec", type: "Vias" },
-  { id: "silkscreen_f", label: "Top Silkscreen (F.SilkS)", color: "#f2eda1", type: "F.SilkS" },
-  { id: "silkscreen_b", label: "Bottom Silkscreen (B.SilkS)", color: "#e8b2a7", type: "B.SilkS" },
+  { id: "edge_cuts", label: "Edge.Cuts (Outline)", color: "#e6d84c", type: "Edge.Cuts", default_visible: true },
+  { id: "traces_fcu", label: "Top Copper (F.Cu)", color: "#c83434", type: "F.Cu", default_visible: true },
+  { id: "traces_bcu", label: "Bottom Copper (B.Cu)", color: "#4d7fc4", type: "B.Cu", default_visible: true },
+  { id: "pads", label: "Copper Pads", color: "#ce4785", type: "Pads", default_visible: true },
+  { id: "vias", label: "Plated Vias", color: "#ececec", type: "Vias", default_visible: true },
+  { id: "silkscreen_f", label: "Top Silkscreen (F.SilkS)", color: "#f2eda1", type: "F.SilkS", default_visible: true },
+  { id: "silkscreen_b", label: "Bottom Silkscreen (B.SilkS)", color: "#e8b2a7", type: "B.SilkS", default_visible: true },
+  { id: "substrate", label: "Board Substrate", color: "#041830", type: "Substrate", default_visible: true },
 ]);
 
 /**
@@ -357,6 +358,11 @@ export class ScopeInspectorController {
       simBar.classList.toggle("visible", upper === "SIMULATE");
     }
 
+    const innerLayerBtns = this._el("pcb-inner-layer-btns");
+    if (innerLayerBtns && upper !== "PCB") {
+      innerLayerBtns.style.display = "none";
+    }
+
     if (upper === "PCB") {
       this.activateTab("tab-layers");
     } else if (upper === "SIMULATE") {
@@ -513,7 +519,8 @@ export class ScopeInspectorController {
     if (pcbMetadata) {
       if (Array.isArray(pcbMetadata.nets)) {
         for (const n of pcbMetadata.nets) {
-          if (n) netCounts.set(String(n), 0);
+          const netName = typeof n === "string" ? n : n?.name;
+          if (netName) netCounts.set(String(netName), 0);
         }
       }
       if (Array.isArray(pcbMetadata.pads)) {
@@ -549,19 +556,56 @@ export class ScopeInspectorController {
   }
 
   /**
-   * Render `#layers-list` checkboxes and `Solo` buttons.
+   * Solo a specific PCB layer (`In1.Cu`..`In4.Cu`, `F.Cu`, `B.Cu`, etc.) or toggle back to default surface layers.
+   *
+   * @param {string|null} layerType - Layer type to solo (`null` restores default surface stackup).
+   * @param {object|null} [pcbMetadata] - Optional PCB metadata override.
+   */
+  toggleSoloPcbLayer(layerType, pcbMetadata = null) {
+    const meta = pcbMetadata || this.pcbRenderer.metadata;
+    const layers = meta && Array.isArray(meta.layers) && meta.layers.length > 0
+      ? meta.layers
+      : DEFAULT_PCB_LAYERS;
+
+    if (!layerType || this._soloLayerType === layerType) {
+      this._soloLayerType = null;
+      this.pcbRenderer.resetDefaultLayers();
+      this._syncSubstrateCadVisibility(true);
+    } else {
+      this._soloLayerType = layerType;
+      const isCopperLayer = layerType.endsWith(".Cu");
+      for (const l of layers) {
+        const lt = l.type || l.id;
+        const keepRef =
+          lt === layerType
+          || lt === "Substrate"
+          || (lt === "Edge.Cuts" && layerType !== "Substrate")
+          || (lt === "Vias" && isCopperLayer);
+        this.pcbRenderer.setLayerVisibility(lt, keepRef);
+        if (lt === "Substrate") {
+          this._syncSubstrateCadVisibility(keepRef);
+        }
+      }
+    }
+    this.renderPcbLayersList(meta);
+    this.viewport.requestRender();
+  }
+
+  /**
+   * Render `#layers-list` checkboxes, `Solo` buttons, and `#pcb-inner-layer-btns` toolbar pills.
    *
    * @param {object|null} [pcbMetadata] - Optional metadata override.
    */
   renderPcbLayersList(pcbMetadata = null) {
     const listEl = this._el("layers-list");
-    if (!listEl) return;
-    listEl.innerHTML = "";
-
     const meta = pcbMetadata || this.pcbRenderer.metadata;
     const layers = meta && Array.isArray(meta.layers) && meta.layers.length > 0
       ? meta.layers
       : DEFAULT_PCB_LAYERS;
+
+    this._renderInnerLayerToolbarBtns(layers, meta);
+    if (!listEl) return;
+    listEl.innerHTML = "";
 
     for (const layer of layers) {
       const layerType = layer.type || layer.id;
@@ -584,6 +628,7 @@ export class ScopeInspectorController {
         if (layerType === "Substrate") {
           this._syncSubstrateCadVisibility(cb.checked);
         }
+        this._renderInnerLayerToolbarBtns(layers, meta);
         this.viewport.requestRender();
       });
 
@@ -592,7 +637,7 @@ export class ScopeInspectorController {
       dot.style.background = layer.color || "#888";
 
       const text = this.ctx.createElement("span");
-      text.textContent = layer.label || layerType;
+      text.textContent = layer.label || layer.name || layerType;
 
       info.appendChild(cb);
       info.appendChild(dot);
@@ -602,28 +647,48 @@ export class ScopeInspectorController {
       soloBtn.className = `layer-btn-solo${this._soloLayerType === layerType ? " active" : ""}`;
       soloBtn.textContent = "SOLO";
       soloBtn.addEventListener("click", () => {
-        if (this._soloLayerType === layerType) {
-          this._soloLayerType = null;
-          this.pcbRenderer.enableAllLayers();
-          this._syncSubstrateCadVisibility(true);
-        } else {
-          this._soloLayerType = layerType;
-          for (const l of layers) {
-            const lt = l.type || l.id;
-            const on = lt === layerType || lt === "Substrate";
-            this.pcbRenderer.setLayerVisibility(lt, lt === layerType);
-            if (lt === "Substrate") {
-              this._syncSubstrateCadVisibility(on);
-            }
-          }
-        }
-        this.renderPcbLayersList(meta);
-        this.viewport.requestRender();
+        this.toggleSoloPcbLayer(layerType, meta);
       });
 
       item.appendChild(info);
       item.appendChild(soloBtn);
       listEl.appendChild(item);
+    }
+  }
+
+  /**
+   * Populate quick-select inner copper layer buttons (`In1`, `In2`, `In3`, `In4`) inside `#cam-toolbar`.
+   *
+   * @param {Array<object>} layers - PCB stackup layer descriptors.
+   * @param {object|null} meta - PCB metadata.
+   */
+  _renderInnerLayerToolbarBtns(layers, meta) {
+    const wrap = this._el("pcb-inner-layer-btns");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+
+    const innerLayers = layers.filter((l) => Boolean(l.is_inner) || /^In\d+\.Cu$/i.test(String(l.type || "")));
+    if (this.currentMode !== "PCB" || innerLayers.length === 0) {
+      wrap.style.display = "none";
+      return;
+    }
+
+    wrap.style.display = "inline-flex";
+    for (const layer of innerLayers) {
+      const layerType = String(layer.type || layer.id);
+      const shortLabel = layerType.replace(/\.Cu$/i, "");
+      const btn = this.ctx.createElement("button");
+      const isActive = this._soloLayerType === layerType || this.pcbRenderer.visibleLayers.has(layerType);
+      btn.className = `cam-btn${isActive ? " active" : ""}`;
+      btn.textContent = shortLabel;
+      btn.title = `Inspect ${layer.label || layer.name || layerType} (click again to return to surface view)`;
+      if (layer.color) {
+        btn.style.borderBottom = `2px solid ${layer.color}`;
+      }
+      btn.addEventListener("click", () => {
+        this.toggleSoloPcbLayer(layerType, meta);
+      });
+      wrap.appendChild(btn);
     }
   }
 

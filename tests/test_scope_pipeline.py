@@ -42,13 +42,23 @@ def test_scope_pipeline_load_geometry_pcb_layers():
     assert any("substrate" in n for n in part_names)
     assert not any("components" in n for n in part_names)
 
-    # Check enriched GPU SDF & Retina PCB metadata
+    # Check enriched GPU SDF & Retina PCB metadata (including Edge.Cuts & 6-layer stackup)
     pcb_meta = payload.get("pcb_metadata")
     assert pcb_meta is not None
-    assert pcb_meta.get("render_version") == 2
+    assert pcb_meta.get("render_version") == 3
     assert "layers" in pcb_meta
-    assert len(pcb_meta["layers"]) == 7
+    layer_types = [l["type"] for l in pcb_meta["layers"]]
+    assert "Edge.Cuts" in layer_types
+    for cu_layer in ("F.Cu", "In1.Cu", "In2.Cu", "In3.Cu", "In4.Cu", "B.Cu"):
+        assert cu_layer in layer_types, f"Missing stackup copper layer {cu_layer} in {layer_types}"
+    assert pcb_meta.get("copper_layers") == ["F.Cu", "In1.Cu", "In2.Cu", "In3.Cu", "In4.Cu", "B.Cu"]
+    edge_cuts = pcb_meta.get("edge_cuts", [])
+    assert len(edge_cuts) >= 1
+    assert len(edge_cuts[0]) >= 8  # Filleted 60x90mm board perimeter loop
+    copper_regions = pcb_meta.get("copper_regions", [])
+    assert {r["layer"] for r in copper_regions} >= {"In1.Cu", "In2.Cu", "In3.Cu", "In4.Cu"}
     assert len(pcb_meta.get("pads", [])) > 100
+    assert any(p.get("is_mounting_hole") for p in pcb_meta.get("pads", []))
     assert len(pcb_meta.get("traces", [])) > 100
     assert len(pcb_meta.get("vias", [])) > 0
     assert len(pcb_meta.get("silkscreen_texts", [])) > 10

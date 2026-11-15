@@ -122,7 +122,11 @@ def test_scope_server_api_load_pcb(scope_server):
     assert data["type"] == "data"
     assert "shapes" in data
     assert "pcb_metadata" in data
-    assert len(data["pcb_metadata"]["layers"]) == 7
+    layer_types = [l["type"] for l in data["pcb_metadata"]["layers"]]
+    assert len(layer_types) == 12
+    assert "Edge.Cuts" in layer_types
+    for cu_name in ("F.Cu", "In1.Cu", "In2.Cu", "In3.Cu", "In4.Cu", "B.Cu"):
+        assert cu_name in layer_types
 
 
 def test_scope_server_target_bug_submission(scope_server):
@@ -643,8 +647,13 @@ def test_regression_bug_dorsal_midge_176_pcb_layer_order_and_colors(scope_server
 
     expected_kicad_colors = {
         "Substrate": "#041830",
+        "Edge.Cuts (Outline)": "#e6d84c",
         "Pads": "#ce4785",
         "F.Cu (Top)": "#c83434",
+        "In1.Cu (L2 Ground)": "#c2c200",
+        "In2.Cu (L3 Signal)": "#c200c2",
+        "In3.Cu (L4 Power)": "#00c2c2",
+        "In4.Cu (L5 Signal)": "#28a448",
         "B.Cu (Bottom)": "#4d7fc4",
         "Vias": "#ececec",
         "F.SilkS": "#f2eda1",

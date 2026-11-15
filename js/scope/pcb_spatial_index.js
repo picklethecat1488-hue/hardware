@@ -101,6 +101,17 @@ export class PcbSpatialGrid {
     this.silkscreenTexts = [];
     /** @type {Array<object>} */
     this.silkscreenGraphics = [];
+    /** @type {Array<Array<Array<number>>>} */
+    this.edgeCuts = [];
+    /** @type {Array<object>} */
+    this.copperRegions = [];
+    /** @type {Array<string>} */
+    this.copperLayers = ["F.Cu", "B.Cu"];
+    /** @type {Map<string, number>} */
+    this.copperLayerOrder = new Map([
+      ["F.Cu", 0],
+      ["B.Cu", 1],
+    ]);
     /** @type {Map<string, object>} */
     this.netsByName = new Map();
     /** @type {number} */
@@ -124,10 +135,58 @@ export class PcbSpatialGrid {
     this.components = [];
     this.silkscreenTexts = [];
     this.silkscreenGraphics = [];
+    this.edgeCuts = [];
+    this.copperRegions = [];
     this.netsByName.clear();
 
+    const rawCuLayers = Array.isArray(meta.copper_layers) && meta.copper_layers.length >= 2
+      ? meta.copper_layers.map((l) => String(l))
+      : ["F.Cu", "B.Cu"];
+    this.copperLayers = rawCuLayers;
+    this.copperLayerOrder = new Map();
+    rawCuLayers.forEach((layerName, idx) => {
+      this.copperLayerOrder.set(layerName, idx);
+    });
+
+    for (const loop of meta.edge_cuts || []) {
+      if (Array.isArray(loop) && loop.length >= 3) {
+        this.edgeCuts.push(loop.map((pt) => [Number(pt[0]) || 0, Number(pt[1]) || 0]));
+      }
+    }
+
+    for (const rawRegion of meta.copper_regions || []) {
+      const poly = Array.isArray(rawRegion.polygon) ? rawRegion.polygon : [];
+      if (poly.length < 3) continue;
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      const pts = poly.map((pt) => {
+        const px = Number(pt[0]) || 0;
+        const py = Number(pt[1]) || 0;
+        if (px < minX) minX = px;
+        if (px > maxX) maxX = px;
+        if (py < minY) minY = py;
+        if (py > maxY) maxY = py;
+        return [px, py];
+      });
+      this.copperRegions.push({
+        layer: String(rawRegion.layer || "In1.Cu"),
+        net: String(rawRegion.net || ""),
+        clearance: Math.max(0.05, Number(rawRegion.clearance) || 0.25),
+        priority: Number(rawRegion.priority) || 1,
+        polygon: pts,
+        minX,
+        minY,
+        maxX,
+        maxY,
+      });
+    }
+
     for (const net of meta.nets || []) {
-      if (net && net.name) {
+      if (typeof net === "string" && net) {
+        this.netsByName.set(net, { name: net });
+      } else if (net && net.name) {
         this.netsByName.set(net.name, net);
       }
     }
@@ -267,7 +326,7 @@ export class PcbSpatialGrid {
         angleRad: Math.atan2(y2 - y1, x2 - x1),
         width,
         length,
-        layer: rawTrace.layer === "B.Cu" ? "B.Cu" : "F.Cu",
+        layer: String(rawTrace.layer || "F.Cu"),
         net: String(rawTrace.net || ""),
         minX: Math.min(x1, x2) - halfW,
         minY: Math.min(y1, y2) - halfW,
@@ -401,11 +460,30 @@ export class PcbSpatialGrid {
   }
 
   /**
+   * Return whether a plated or blind/buried `via` spans `layerName` in the board stackup.
+   *
+   * @param {object} via - Spatial via entry.
+   * @param {string} layerName - Copper layer identifier (e.g. `"In1.Cu"`, `"In3.Cu"`).
+   * @returns {boolean}
+   */
+  doesViaSpanLayer(via, layerName) {
+    const targetIdx = this.copperLayerOrder.get(layerName);
+    if (targetIdx === undefined) {
+      return true;
+    }
+    const i0 = this.copperLayerOrder.get(via.layerStart) ?? 0;
+    const i1 = this.copperLayerOrder.get(via.layerEnd) ?? (this.copperLayers.length - 1);
+    const minIdx = Math.min(i0, i1);
+    const maxIdx = Math.max(i0, i1);
+    return targetIdx >= minIdx && targetIdx <= maxIdx;
+  }
+
+  /**
    * Perform $O(1)$ spatial hit-test at `(boardX, boardY)` in millimeters.
    *
    * Substrate is NEVER indexed here, so hovering bare FR-4 soldermask returns `null`.
-   * Active-side (`F.Cu` or `B.Cu`) pads/vias/traces strictly win over back-side items;
-   * opposite-side copper is only hit when `substrateVisible === false` (X-ray mode)!
+   * Active-side (`F.Cu` or `B.Cu`) and explicitly enabled inner copper (`In*.Cu`) items win
+   * over opposite-side outer copper; opposite-side outer copper is only hit when `Substrate` is hidden!
    *
    * @param {number} boardX - Board X coordinate in mm.
    * @param {number} boardY - Board Y coordinate in mm.
@@ -472,7 +550,8 @@ export class PcbSpatialGrid {
             }
           } else if (item.kind === "trace") {
             if (!isLayerOn(item.layer)) continue;
-            const isActive = item.layer === activeSide;
+            const isInnerLayer = item.layer !== "F.Cu" && item.layer !== "B.Cu";
+            const isActive = item.layer === activeSide || isInnerLayer;
             if (!isActive && substrateOpaque) continue;
             const halfW = item.width * 0.5 + TRACE_HIT_MARGIN_MM;
             const dSq = pointToSegmentDistanceSq(boardX, boardY, item.x1, item.y1, item.x2, item.y2);
@@ -512,8 +591,8 @@ export class PcbSpatialGrid {
   }
 
   /**
-   * Locate the closest magnetic snap point (pad center, via center, trace endpoint, or component center)
-   * within `snapRadiusMm` for precision ruler measurement (`M`).
+   * Locate the closest magnetic snap point (pad center, via center, trace endpoint, Edge.Cuts vertex,
+   * or component center) within `snapRadiusMm` for precision ruler measurement (`M`).
    *
    * @param {number} boardX - Cursor X in mm.
    * @param {number} boardY - Cursor Y in mm.
@@ -554,7 +633,7 @@ export class PcbSpatialGrid {
             consider(item.x, item.y, item.net ? `Via (${item.net})` : "Via");
           } else if ((item.kind === "pad" || item.kind === "test_point") && (item.layer === activeSide || item.padType === "thru_hole")) {
             consider(item.x, item.y, `${item.comp}.${item.pin}`);
-          } else if (item.kind === "trace" && item.layer === activeSide) {
+          } else if (item.kind === "trace" && (item.layer === activeSide || (item.layer !== "F.Cu" && item.layer !== "B.Cu"))) {
             consider(item.x1, item.y1, item.net || "Trace");
             consider(item.x2, item.y2, item.net || "Trace");
           } else if (item.kind === "component" && item.side === activeSide) {
@@ -564,15 +643,22 @@ export class PcbSpatialGrid {
       }
     }
 
+    for (const loop of this.edgeCuts) {
+      for (const pt of loop) {
+        consider(pt[0], pt[1], "Edge.Cuts");
+      }
+    }
+
     return best;
   }
 
   /**
-   * Collect frustum-culled active-side pads, traces, and silkscreen items inside `bounds2D`
-   * for `2x` Retina Canvas2D typography rendering.
+   * Collect frustum-culled active-side pads, traces, copper regions, and silkscreen items inside `bounds2D`
+   * for `2x` Retina Canvas2D typography & zone rendering.
    *
-   * INVARIANT: Strictly filters copper net labels and pad pin labels to `activeSide` (`F.Cu` on Top,
-   * `B.Cu` on Bottom, plus `thru_hole` pads) so front-side net labels NEVER bleed through onto the back side!
+   * INVARIANT: Strictly filters outer copper net labels and pad pin labels to `activeSide` (`F.Cu` on Top,
+   * `B.Cu` on Bottom, plus `thru_hole` pads and explicitly enabled inner copper layers) so front-side net
+   * labels NEVER bleed through onto the back side!
    *
    * @param {{minX: number, minY: number, maxX: number, maxY: number}} bounds2D - Visible board rectangle.
    * @param {{
@@ -582,6 +668,7 @@ export class PcbSpatialGrid {
    * @returns {{
    *   pads: Array<object>,
    *   traces: Array<object>,
+   *   copperRegions: Array<object>,
    *   silkTexts: Array<object>,
    *   silkGraphics: Array<object>
    * }}
@@ -601,12 +688,23 @@ export class PcbSpatialGrid {
     }
 
     const traces = [];
-    if (isLayerOn(activeSide)) {
-      for (const trace of this.traces) {
-        if (trace.layer !== activeSide || !trace.net || trace.length < MIN_NET_LABEL_TRACE_LENGTH_MM) continue;
-        if (trace.maxX < minX || trace.minX > maxX || trace.maxY < minY || trace.minY > maxY) continue;
-        traces.push(trace);
-      }
+    for (const trace of this.traces) {
+      const isInner = trace.layer !== "F.Cu" && trace.layer !== "B.Cu";
+      const allowLayer = isInner ? Boolean(visibleLayers && visibleLayers.has(trace.layer)) : (trace.layer === activeSide && isLayerOn(activeSide));
+      if (!allowLayer || !trace.net || trace.length < MIN_NET_LABEL_TRACE_LENGTH_MM) continue;
+      if (trace.maxX < minX || trace.minX > maxX || trace.maxY < minY || trace.minY > maxY) continue;
+      traces.push(trace);
+    }
+
+    const copperRegions = [];
+    for (const region of this.copperRegions) {
+      const isInner = region.layer !== "F.Cu" && region.layer !== "B.Cu";
+      const allowRegion = isInner
+        ? Boolean(visibleLayers && visibleLayers.has(region.layer))
+        : (region.layer === activeSide && isLayerOn(activeSide));
+      if (!allowRegion) continue;
+      if (region.maxX < minX || region.minX > maxX || region.maxY < minY || region.minY > maxY) continue;
+      copperRegions.push(region);
     }
 
     const silkTexts = [];
@@ -624,6 +722,6 @@ export class PcbSpatialGrid {
       }
     }
 
-    return { pads, traces, silkTexts, silkGraphics };
+    return { pads, traces, copperRegions, silkTexts, silkGraphics };
   }
 }
