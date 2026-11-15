@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import gzip
 import logging
 import math
@@ -11,7 +12,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import orjson
-from pydantic import BaseModel, Field
 
 from model import AppConfig
 from shell import Logger
@@ -30,10 +30,7 @@ except ImportError:
 
 
 from model.scope import (
-    ScopeAnnotationModel,
-    ScopeMarkupModel,
     ScopeProjectModel,
-    ScopeTargetBugRequest,
     ScopeTargetModel,
 )
 
@@ -41,16 +38,15 @@ from model.scope import (
 class ScopeGeometryPipeline:
     """Manages project discovery, geometry resolution, and tessellation caching."""
 
-    SIM_TELEMETRY_CACHE_VERSION = "v3"
-    MAX_TELEMETRY_PARTICLES = 4000
+    SIM_TELEMETRY_CACHE_VERSION = "v4"
+    PCB_METADATA_RENDER_VERSION = 2
     MM_PER_METER = 1000.0
     DEFAULT_PARTICLE_RADIUS_MM = 2.0
-    SPATIAL_HASH_QUANT_MM = 0.5
-    HASH_PRIME_X = 73856093
-    HASH_PRIME_Y = 19349663
-    HASH_PRIME_Z = 83492791
-    HASH_MIX_MULT = 2654435761
-    UINT32_MAX = 0xFFFFFFFF
+    MIN_VOXEL_LATTICE_STEP_MM = 0.25
+    VOXEL_LATTICE_QUANT_MM = 0.01
+    VOXEL_LATTICE_TOLERANCE_RATIO = 0.03
+    VOXEL_LATTICE_INLIER_FRACTION = 0.96
+    VOXEL_RADIUS_RATIO_FALLBACK = 0.54
     DEFAULT_WATER_RGBA = [0.502, 0.800, 1.000, 0.750]
 
     def __init__(
@@ -384,21 +380,34 @@ class ScopeGeometryPipeline:
                     substrate_color=substrate_color,
                     pcb_name=item_name,
                 )
-                layer_items = assembler.get_display_items(
-                    prefix=item_name,
-                    include_components=False,
-                    kicad_2d_theme=True,
+                # Tessellate ONLY the substrate solid in Mode.PCB (~1,000 triangles vs ~1.33M B-rep copper triangles);
+                # copper traces, pads, vias, and silkscreen are rendered at 60-120 FPS via GPU SDF instancing & Retina Canvas2D.
+                substrate_geom = assembler.build_substrate() or solid
+                display_items.append(
+                    (substrate_geom, f"{item_name}_substrate", PCB3DAssembler.KICAD_SUBSTRATE_COLOR, 1.0)
                 )
-                if layer_items:
-                    display_items.extend(layer_items)
-                else:
-                    display_items.append((solid, item_name, PCB3DAssembler.KICAD_SUBSTRATE_COLOR, 1.0))
 
-                # Build PCB metadata for KiCad inspector & net highlight
+                # Build complete PCB metadata for GPU SDF instancing, Retina silkscreen, and $O(1)$ spatial grid hit-testing
+                from model.pcb import BoardType
                 from provider.footprints import FOOTPRINT_REGISTRY
 
+                target_ref = getattr(pcb_cfg, "shape_ref", None)
+                is_flex = getattr(pcb_cfg, "board_type", None) == BoardType.FLEX or "flex" in item_name.lower()
+
+                all_footprints = list(getattr(wiring, "footprints", []) or []) if wiring else []
+                if not all_footprints and getattr(pcb_cfg, "footprints", None):
+                    all_footprints = list(pcb_cfg.footprints)
+
+                footprints = []
+                for fp in all_footprints:
+                    fp_shape = getattr(fp, "shape_ref", None)
+                    if target_ref:
+                        if fp_shape == target_ref or (not fp_shape and not is_flex):
+                            footprints.append(fp)
+                    elif not is_flex or fp_shape:
+                        footprints.append(fp)
+
                 comps = []
-                footprints = getattr(wiring, "footprints", []) if wiring else []
                 for c in footprints:
                     fp_factory = FOOTPRINT_REGISTRY.get(c.package)
                     fp_inst = fp_factory() if fp_factory else None
@@ -451,19 +460,26 @@ class ScopeGeometryPipeline:
                     for v in getattr(pcb_cfg, "vias", [])
                 ]
 
-                test_points_data = [
-                    {
-                        "name": getattr(tp, "name", "TP"),
-                        "net": getattr(tp, "net", "GND"),
-                        "x": round(float(tp.position_mm[0]), 3),
-                        "y": round(float(tp.position_mm[1]), 3),
-                        "dia": round(float(tp.pad_diameter_mm), 3),
-                        "drill": round(float(getattr(tp, "drill_diameter_mm", 0.0) or 0.0), 3),
-                        "layer": getattr(tp, "layer", "F.Cu"),
-                        "label": getattr(tp, "label", None) or getattr(tp, "name", "TP"),
-                    }
-                    for tp in getattr(pcb_cfg, "test_points", [])
-                ]
+                test_points_data = []
+                for tp in getattr(pcb_cfg, "test_points", []):
+                    tp_shape = getattr(tp, "shape_ref", None)
+                    if target_ref:
+                        if tp_shape != target_ref and (tp_shape or is_flex):
+                            continue
+                    elif is_flex and not tp_shape:
+                        continue
+                    test_points_data.append(
+                        {
+                            "name": getattr(tp, "name", "TP"),
+                            "net": getattr(tp, "net", "GND"),
+                            "x": round(float(tp.position_mm[0]), 3),
+                            "y": round(float(tp.position_mm[1]), 3),
+                            "dia": round(float(tp.pad_diameter_mm), 3),
+                            "drill": round(float(getattr(tp, "drill_diameter_mm", 0.0) or 0.0), 3),
+                            "layer": getattr(tp, "layer", "F.Cu"),
+                            "label": getattr(tp, "label", None) or getattr(tp, "name", "TP"),
+                        }
+                    )
 
                 # Map pin to net
                 pin_net_map = {}
@@ -475,13 +491,11 @@ class ScopeGeometryPipeline:
                             elif hasattr(p, "component") and hasattr(p, "pin"):
                                 pin_net_map[f"{p.component}.{p.pin}"] = n.name
 
-                from provider.footprints import FOOTPRINT_REGISTRY
-
                 pads_data = []
                 for c in footprints:
                     cx, cy, cz = c.position
                     comp_layer = "B.Cu" if (getattr(c, "layer", "F.Cu") == "B.Cu" or cz < 0.0) else "F.Cu"
-                    yaw = c.rotation[2]
+                    yaw = float(c.rotation[2])
                     rad = math.radians(yaw)
                     cos_a = math.cos(rad)
                     sin_a = math.sin(rad)
@@ -494,18 +508,55 @@ class ScopeGeometryPipeline:
                             wy = cy + px * sin_a + py * cos_a
                             pw, ph = p.pad_size_mm
                             pin_id = f"{c.name}.{p.name}"
+                            raw_shape = getattr(p, "pad_shape", "roundrect")
+                            pad_shape = str(getattr(raw_shape, "value", raw_shape)).lower()
+                            raw_type = getattr(p, "pad_type", "smd")
+                            pad_type = str(getattr(raw_type, "value", raw_type)).lower()
+                            drill_mm = round(float(getattr(p, "drill_dia_mm", 0.0) or 0.0), 3)
                             pads_data.append(
                                 {
                                     "x": round(wx, 3),
                                     "y": round(wy, 3),
                                     "w": round(pw, 3),
                                     "h": round(ph, 3),
+                                    "rot_deg": round(yaw, 2),
+                                    "shape": pad_shape,
+                                    "pad_type": pad_type,
+                                    "drill": drill_mm,
                                     "comp": c.name,
                                     "pin": p.name,
+                                    "number": str(p.number) if getattr(p, "number", None) is not None else str(p.name),
                                     "net": pin_net_map.get(pin_id, ""),
                                     "layer": comp_layer,
                                 }
                             )
+
+                for cap in getattr(pcb_cfg, "capacitive_sensors", []):
+                    cap_shape = getattr(cap, "shape_ref", None)
+                    if target_ref:
+                        if cap_shape != target_ref and (cap_shape or is_flex):
+                            continue
+                    elif is_flex and not cap_shape:
+                        continue
+                    center = cap.center_mm or (0.0, 0.0)
+                    pads_data.append(
+                        {
+                            "x": round(float(center[0]), 3),
+                            "y": round(float(center[1]), 3),
+                            "w": round(float(cap.area_mm[0]), 3),
+                            "h": round(float(cap.area_mm[1]), 3),
+                            "rot_deg": 0.0,
+                            "shape": "rect",
+                            "pad_type": "smd",
+                            "drill": 0.0,
+                            "comp": getattr(cap, "name", "CAP"),
+                            "pin": "1",
+                            "number": "1",
+                            "net": getattr(cap, "net", ""),
+                            "layer": getattr(cap, "layer", "F.Cu"),
+                            "is_sensor": True,
+                        }
+                    )
 
                 for tp in test_points_data:
                     pads_data.append(
@@ -514,13 +565,78 @@ class ScopeGeometryPipeline:
                             "y": tp["y"],
                             "w": tp["dia"],
                             "h": tp["dia"],
+                            "rot_deg": 0.0,
+                            "shape": "circle",
+                            "pad_type": "thru_hole" if tp["drill"] > 0.0 else "smd",
                             "comp": tp["name"],
                             "pin": "1",
+                            "number": "1",
                             "net": tp["net"],
                             "layer": tp["layer"],
                             "is_test_point": True,
                             "dia": tp["dia"],
                             "drill": tp["drill"],
+                        }
+                    )
+
+                silkscreen_texts_data = []
+                existing_top_texts = set()
+                existing_bot_texts = set()
+                for st in getattr(pcb_cfg, "silkscreen_texts", []):
+                    st_layer = getattr(st, "layer", "F.SilkS")
+                    st_text = str(getattr(st, "text", ""))
+                    if st_layer == "B.SilkS":
+                        existing_bot_texts.add(st_text)
+                    else:
+                        existing_top_texts.add(st_text)
+                    silkscreen_texts_data.append(
+                        {
+                            "text": st_text,
+                            "layer": st_layer,
+                            "x": round(float(st.position[0]), 3),
+                            "y": round(float(st.position[1]), 3),
+                            "font_size": round(float(getattr(st, "font_size", 0.8) or 0.8), 3),
+                            "rotation": round(float(getattr(st, "rotation", 0.0) or 0.0), 2),
+                            "mirror": bool(getattr(st, "mirror", False)),
+                        }
+                    )
+
+                omitted_designators = set(getattr(pcb_cfg, "omitted_silkscreen_designators", []) or [])
+                for comp_entry in comps:
+                    ref_des = comp_entry["ref_des"]
+                    if not ref_des or ref_des in omitted_designators:
+                        continue
+                    is_bot = comp_entry["side"] == "B.Cu"
+                    silk_layer = "B.SilkS" if is_bot else "F.SilkS"
+                    known = existing_bot_texts if is_bot else existing_top_texts
+                    if ref_des in known:
+                        continue
+                    cx, cy = comp_entry["position"][0], comp_entry["position"][1]
+                    silkscreen_texts_data.append(
+                        {
+                            "text": ref_des,
+                            "layer": silk_layer,
+                            "x": round(float(cx), 3),
+                            "y": round(float(cy - 1.5), 3),
+                            "font_size": 0.8,
+                            "rotation": 0.0,
+                            "mirror": is_bot,
+                            "is_ref_des": True,
+                        }
+                    )
+
+                silkscreen_graphics_data = []
+                for sg in getattr(pcb_cfg, "silkscreen_graphics", []):
+                    pts = getattr(sg, "points", None)
+                    silkscreen_graphics_data.append(
+                        {
+                            "layer": getattr(sg, "layer", "F.SilkS"),
+                            "shape": getattr(sg, "shape", "rect"),
+                            "position": [round(float(sg.position[0]), 3), round(float(sg.position[1]), 3)],
+                            "dimensions": [round(float(sg.dimensions[0]), 3), round(float(sg.dimensions[1]), 3)],
+                            "thickness": round(float(getattr(sg, "thickness", 0.15) or 0.15), 3),
+                            "fill": bool(getattr(sg, "fill", False)),
+                            "points": [[round(float(pt[0]), 3), round(float(pt[1]), 3)] for pt in pts] if pts else [],
                         }
                     )
 
@@ -558,6 +674,10 @@ class ScopeGeometryPipeline:
                         )
 
                 pcb_metadata = {
+                    "render_version": self.PCB_METADATA_RENDER_VERSION,
+                    "board_thickness_mm": round(float(assembler.total_thickness), 3),
+                    "z_top_mm": round(float(assembler.z_top), 3),
+                    "z_bottom_mm": round(float(assembler.z_bottom), 3),
                     "layers": [
                         {"id": f"{item_name}_substrate", "name": "Substrate", "color": "#041830", "type": "Substrate"},
                         {"id": f"{item_name}_pads", "name": "Pads", "color": "#ce4785", "type": "Pads"},
@@ -583,6 +703,8 @@ class ScopeGeometryPipeline:
                     "vias": vias_data,
                     "pads": pads_data,
                     "test_points": test_points_data,
+                    "silkscreen_texts": silkscreen_texts_data,
+                    "silkscreen_graphics": silkscreen_graphics_data,
                 }
 
             elif mode_upper == "DIAGRAM":
@@ -708,8 +830,41 @@ class ScopeGeometryPipeline:
                     if cache_key in self._in_progress:
                         self._in_progress.pop(cache_key).set()
 
+    @classmethod
+    def _detect_voxel_lattice(cls, sample_positions_mm: np.ndarray, radius_mm: float) -> Tuple[bool, float]:
+        """Detect whether 3D fluid centers lie on a regular cubic voxel lattice and compute exact voxel_dx_mm."""
+        fallback_dx = round(float(radius_mm) / cls.VOXEL_RADIUS_RATIO_FALLBACK, 4)
+        if sample_positions_mm.ndim != 2 or len(sample_positions_mm) < 8:
+            return False, fallback_dx
+
+        step_candidates: List[float] = []
+        for axis in range(3):
+            uniq = np.unique(np.round(sample_positions_mm[:, axis], 2))
+            if len(uniq) < 2:
+                continue
+            diffs = np.diff(uniq)
+            valid = diffs[diffs >= cls.MIN_VOXEL_LATTICE_STEP_MM]
+            if len(valid) > 0:
+                step_candidates.append(float(np.min(valid)))
+
+        if not step_candidates:
+            return False, fallback_dx
+
+        candidate_dx = round(float(np.median(step_candidates)), 4)
+        if candidate_dx <= 0.0:
+            return False, fallback_dx
+
+        rel_coords = (sample_positions_mm - sample_positions_mm[0]) / candidate_dx
+        frac_err = np.abs(rel_coords - np.rint(rel_coords))
+        inliers = np.all(frac_err <= cls.VOXEL_LATTICE_TOLERANCE_RATIO, axis=1)
+        inlier_ratio = float(np.mean(inliers))
+        if inlier_ratio >= cls.VOXEL_LATTICE_INLIER_FRACTION:
+            return True, candidate_dx
+
+        return False, round(2.0 * float(radius_mm), 4)
+
     def load_simulation_telemetry(self, project: str, target: str) -> Dict[str, Any]:
-        """Extract authentic fluid particle positions and raw provider metrics dynamically from Rerun recordings."""
+        """Extract undecimated binary fluid positions, voxel lattice metadata, kinematic transforms, and metrics."""
         cache_key = f"{project}_{target}_sim_telemetry_{self.SIM_TELEMETRY_CACHE_VERSION}"
         cache_file = self.cache_dir / f"{cache_key}.json.gz"
 
@@ -763,22 +918,71 @@ class ScopeGeometryPipeline:
 
             particle_chunks = [c for c in chunks if c.entity_path.lstrip("/") == "world/particles"]
             metric_chunks = [c for c in chunks if c.entity_path.lstrip("/").startswith("metrics/")]
+            transform_chunks = [
+                c
+                for c in chunks
+                if c.entity_path.lstrip("/").startswith("world/") and c.entity_path.lstrip("/") != "world/particles"
+            ]
 
             metrics_by_step: Dict[int, Dict[str, float]] = {}
             for c in metric_chunks:
                 clean_path = c.entity_path.lstrip("/")
                 m_name = clean_path[len("metrics/") :]
                 rb = c.to_record_batch()
-                step = int(rb["step"].to_pylist()[0])
-                val = float(rb["Scalars:scalars"].to_pylist()[0][0])
-                if step not in metrics_by_step:
-                    metrics_by_step[step] = {}
-                metrics_by_step[step][m_name] = val
+                if "step" not in rb.schema.names or "Scalars:scalars" not in rb.schema.names:
+                    continue
+                steps_list = rb["step"].to_pylist()
+                vals_list = rb["Scalars:scalars"].to_pylist()
+                for row_idx, raw_step in enumerate(steps_list):
+                    if raw_step is None or not vals_list[row_idx]:
+                        continue
+                    step = int(raw_step)
+                    val = float(vals_list[row_idx][0])
+                    metrics_by_step.setdefault(step, {})[m_name] = val
 
             metrics_series: Dict[str, List[Dict[str, float]]] = {}
             for step, m_dict in sorted(metrics_by_step.items()):
                 for m_name, val in m_dict.items():
                     metrics_series.setdefault(m_name, []).append({"step": step, "value": val})
+
+            transforms_by_step: Dict[int, Dict[str, Dict[str, List[float]]]] = {}
+            for c in transform_chunks:
+                clean_path = c.entity_path.lstrip("/")
+                link_name = clean_path[len("world/") :]
+                if not link_name:
+                    continue
+                rb = c.to_record_batch()
+                if "step" not in rb.schema.names:
+                    continue
+                has_trans = "Transform3D:translation" in rb.schema.names
+                has_quat = "Transform3D:quaternion" in rb.schema.names
+                if not has_trans and not has_quat:
+                    continue
+                steps_list = rb["step"].to_pylist()
+                trans_list = rb["Transform3D:translation"].to_pylist() if has_trans else None
+                quat_list = rb["Transform3D:quaternion"].to_pylist() if has_quat else None
+                for row_idx, raw_step in enumerate(steps_list):
+                    if raw_step is None:
+                        continue
+                    step = int(raw_step)
+                    entry: Dict[str, List[float]] = {}
+                    if trans_list is not None and trans_list[row_idx]:
+                        t_vec = trans_list[row_idx][0]
+                        entry["translation"] = [
+                            round(float(t_vec[0]) * self.MM_PER_METER, 4),
+                            round(float(t_vec[1]) * self.MM_PER_METER, 4),
+                            round(float(t_vec[2]) * self.MM_PER_METER, 4),
+                        ]
+                    if quat_list is not None and quat_list[row_idx]:
+                        q_vec = quat_list[row_idx][0]
+                        entry["quaternion"] = [
+                            round(float(q_vec[0]), 6),
+                            round(float(q_vec[1]), 6),
+                            round(float(q_vec[2]), 6),
+                            round(float(q_vec[3]), 6),
+                        ]
+                    if entry:
+                        transforms_by_step.setdefault(step, {})[link_name] = entry
 
             raw_frames: List[Tuple[int, np.ndarray, Optional[np.ndarray]]] = []
             radius_mm = self.DEFAULT_PARTICLE_RADIUS_MM
@@ -814,8 +1018,10 @@ class ScopeGeometryPipeline:
 
             raw_frames.sort(key=lambda item: item[0])
             counts = [len(pos_mm) for _, pos_mm, _ in raw_frames if len(pos_mm) > 0]
-            max_count = max(counts) if counts else 0
             is_lagrangian = len(counts) > 0 and len(set(counts)) == 1
+
+            first_non_empty = next((pos_mm for _, pos_mm, _ in raw_frames if len(pos_mm) > 0), np.empty((0, 3)))
+            is_voxel_grid, voxel_dx_mm = self._detect_voxel_lattice(first_non_empty, radius_mm)
 
             default_color = list(self.DEFAULT_WATER_RGBA)
             if not has_varying_colors and len(uniform_u32_colors) == 1:
@@ -826,57 +1032,27 @@ class ScopeGeometryPipeline:
                 a_ch = (u32 & 0xFF) / 255.0
                 default_color = [round(r_ch, 4), round(g_ch, 4), round(b_ch, 4), round(a_ch, 4)]
 
-            fixed_lagrangian_idx: Optional[np.ndarray] = None
-            hash_threshold = self.UINT32_MAX
-            if max_count > self.MAX_TELEMETRY_PARTICLES:
-                if is_lagrangian:
-                    fixed_lagrangian_idx = np.linspace(0, max_count - 1, self.MAX_TELEMETRY_PARTICLES, dtype=np.int64)
-                else:
-                    hash_threshold = int(self.UINT32_MAX * (self.MAX_TELEMETRY_PARTICLES / float(max_count)))
-
             frames = []
             for step, pos_mm, col_u32 in raw_frames:
-                n_pts = len(pos_mm)
-                if n_pts == 0:
-                    sampled_pos = []
-                    sampled_cols = None
-                elif max_count <= self.MAX_TELEMETRY_PARTICLES:
-                    sampled_pos = np.round(pos_mm, 2).tolist()
-                    sampled_cols = col_u32
-                elif is_lagrangian and fixed_lagrangian_idx is not None:
-                    sampled_pos = np.round(pos_mm[fixed_lagrangian_idx], 2).tolist()
-                    sampled_cols = col_u32[fixed_lagrangian_idx] if col_u32 is not None else None
-                else:
-                    # Deterministic 3D spatial hash on quantized coordinates so Eulerian LBM
-                    # lattice cells remain 100% temporally stable instead of jumping on count changes.
-                    q = np.rint(pos_mm / self.SPATIAL_HASH_QUANT_MM).astype(np.int64) & self.UINT32_MAX
-                    h = (
-                        np.bitwise_xor(
-                            np.bitwise_xor(q[:, 0] * self.HASH_PRIME_X, q[:, 1] * self.HASH_PRIME_Y),
-                            q[:, 2] * self.HASH_PRIME_Z,
-                        )
-                        & self.UINT32_MAX
-                    )
-                    h = (np.bitwise_xor(h, h >> 16) * self.HASH_MIX_MULT) & self.UINT32_MAX
-                    h = np.bitwise_xor(h, h >> 16) & self.UINT32_MAX
-                    mask = h <= hash_threshold
-                    sampled_pos = np.round(pos_mm[mask], 2).tolist()
-                    sampled_cols = col_u32[mask] if col_u32 is not None else None
+                pos_f32 = np.ascontiguousarray(pos_mm, dtype="<f4")
+                positions_b64 = base64.b64encode(pos_f32.tobytes()).decode("ascii") if len(pos_f32) > 0 else ""
 
                 frame_dict: Dict[str, Any] = {
                     "step": step,
-                    "positions": sampled_pos,
+                    "count": int(len(pos_f32)),
+                    "positions_b64": positions_b64,
                     "metrics": dict(metrics_by_step.get(step, {})),
+                    "transforms": dict(transforms_by_step.get(step, {})),
                 }
-                if has_varying_colors and sampled_cols is not None:
-                    rgb_arr = np.column_stack(
+                if has_varying_colors and col_u32 is not None and len(col_u32) == len(pos_f32):
+                    rgb_u8 = np.column_stack(
                         [
-                            ((sampled_cols >> 24) & 0xFF) / 255.0,
-                            ((sampled_cols >> 16) & 0xFF) / 255.0,
-                            ((sampled_cols >> 8) & 0xFF) / 255.0,
+                            (col_u32 >> 24) & 0xFF,
+                            (col_u32 >> 16) & 0xFF,
+                            (col_u32 >> 8) & 0xFF,
                         ]
-                    )
-                    frame_dict["colors"] = np.round(rgb_arr, 3).tolist()
+                    ).astype(np.uint8)
+                    frame_dict["colors_b64"] = base64.b64encode(np.ascontiguousarray(rgb_u8).tobytes()).decode("ascii")
                 frames.append(frame_dict)
 
             payload = {
@@ -884,7 +1060,10 @@ class ScopeGeometryPipeline:
                 "recording": str(
                     rrd_file.relative_to(self.repo_root) if rrd_file.is_relative_to(self.repo_root) else rrd_file
                 ),
+                "encoding": "float32_b64",
                 "is_lagrangian": is_lagrangian,
+                "is_voxel_grid": is_voxel_grid,
+                "voxel_dx_mm": voxel_dx_mm,
                 "radius_mm": radius_mm,
                 "default_color": default_color,
                 "frames_count": len(frames),

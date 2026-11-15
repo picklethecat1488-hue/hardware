@@ -93,49 +93,19 @@ class ScopeRequestHandler(BaseHTTPRequestHandler):
             self.close_connection = True
 
     def _handle_serve_static(self, path: str) -> None:
-        """Serve static vendor assets from provider/code_review/static/."""
-        rel_path = path.lstrip("/")
-        if rel_path.startswith("static/"):
-            rel_path = rel_path[len("static/") :]
+        """Serve ES modules from js/ and static vendor/UI assets from js/static/."""
+        from provider.http_static import serve_static_asset
 
-        file_path = self.server.static_dir / rel_path
-        if not file_path.is_file():
-            self.send_error(404, f"Static asset '{rel_path}' not found")
-            return
-
-        content_type, _ = mimetypes.guess_type(str(file_path))
-        if file_path.suffix in (".js", ".mjs"):
-            content_type = "application/javascript"
-        elif file_path.suffix == ".css":
-            content_type = "text/css"
-        elif file_path.suffix == ".wasm":
-            content_type = "application/wasm"
-
-        try:
-            with open(file_path, "rb") as f:
-                content = f.read()
-
-            accept_encoding = self.headers.get("Accept-Encoding", "")
-            use_gzip = "gzip" in accept_encoding and len(content) > 1024
-
-            if use_gzip:
-                cache_key = (rel_path, file_path.stat().st_mtime)
-                if not hasattr(self.server, "_static_gzip_cache"):
-                    self.server._static_gzip_cache = {}
-                if cache_key not in self.server._static_gzip_cache:
-                    self.server._static_gzip_cache[cache_key] = gzip.compress(content, compresslevel=6)
-                content = self.server._static_gzip_cache[cache_key]
-
-            self.send_response(200)
-            self.send_header("Content-Type", content_type or "application/octet-stream")
-            if use_gzip:
-                self.send_header("Content-Encoding", "gzip")
-            self.send_header("Content-Length", str(len(content)))
-            self.send_header("Cache-Control", "no-cache")
-            self.end_headers()
-            self.wfile.write(content)
-        except (BrokenPipeError, ConnectionResetError):
-            self.close_connection = True
+        js_root = getattr(self.server, "js_dir", self.server.repo_root / "js")
+        static_dir = getattr(self.server, "static_dir", js_root / "static")
+        serve_static_asset(
+            self,
+            path,
+            js_root=js_root,
+            static_dirs=[static_dir],
+            cache_control="no-cache",
+            enable_gzip=True,
+        )
 
     def _handle_serve_attachment(self, path: str) -> None:
         """Serve attachment files from attachments/ directory."""
@@ -205,7 +175,7 @@ class ScopeRequestHandler(BaseHTTPRequestHandler):
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
 
-        if path.startswith("/static/"):
+        if path.startswith("/js/") or path.startswith("/static/"):
             self._handle_serve_static(path)
             return
 
@@ -627,9 +597,14 @@ class ScopeServer(ThreadingHTTPServer):
         self.host = host
         self.port = port
         self.logger = logger or logging.getLogger("scope.server")
+        from provider.http_static import get_hardware_js_root
+
         self.repo_root = (repo_root or Path(__file__).resolve().parent.parent.parent).resolve()
-        self.static_dir = self.repo_root / "provider" / "code_review" / "static"
+        self.js_dir = get_hardware_js_root(self.repo_root)
+        self.static_dir = self.js_dir / "static"
         self.template_dir = self.repo_root / "provider" / "templates"
+        if not self.template_dir.is_dir():
+            self.template_dir = Path(__file__).resolve().parent.parent / "templates"
         self.feedback_dir = feedback_dir or (self.repo_root / "feedback")
         self.attachments_dir = attachments_dir or (self.repo_root / "attachments")
         self.sqlite_file = sqlite_file or (self.repo_root / "build" / "bugs.sqlite")

@@ -26,7 +26,7 @@ def test_scope_pipeline_get_projects():
 
 
 def test_scope_pipeline_load_geometry_pcb_layers():
-    """Verify load_geometry in PCB mode extracts all 7 distinct 2D PCB layers without 3D Components."""
+    """Verify load_geometry in PCB mode tessellates only the substrate solid and emits complete GPU SDF metadata."""
     pipeline = ScopeGeometryPipeline()
     payload = pipeline.load_geometry("carrier_board", "carrier_board", mode="PCB")
 
@@ -36,27 +36,25 @@ def test_scope_pipeline_load_geometry_pcb_layers():
     assert "parts" in shapes
 
     parts = shapes["parts"]
-    assert len(parts) == 7
+    assert len(parts) == 1
 
     part_names = [p.get("name", "") for p in parts]
     assert any("substrate" in n for n in part_names)
     assert not any("components" in n for n in part_names)
-    assert any("pads" in n for n in part_names)
-    assert any("traces_top" in n for n in part_names)
-    assert any("traces_bottom" in n for n in part_names)
-    assert any("vias" in n for n in part_names)
-    assert any("silkscreen_top" in n for n in part_names)
-    assert any("silkscreen_bottom" in n for n in part_names)
 
-    # Check PCB metadata
+    # Check enriched GPU SDF & Retina PCB metadata
     pcb_meta = payload.get("pcb_metadata")
     assert pcb_meta is not None
+    assert pcb_meta.get("render_version") == 2
     assert "layers" in pcb_meta
     assert len(pcb_meta["layers"]) == 7
-    assert "components" in pcb_meta
-    assert len(pcb_meta["components"]) > 0
-    assert "nets" in pcb_meta
-    assert len(pcb_meta["nets"]) > 0
+    assert len(pcb_meta.get("pads", [])) > 100
+    assert len(pcb_meta.get("traces", [])) > 100
+    assert len(pcb_meta.get("vias", [])) > 0
+    assert len(pcb_meta.get("silkscreen_texts", [])) > 10
+    assert len(pcb_meta.get("silkscreen_graphics", [])) > 0
+    assert len(pcb_meta.get("components", [])) > 0
+    assert len(pcb_meta.get("nets", [])) > 0
 
 
 def test_scope_pipeline_load_geometry_cad_mode():

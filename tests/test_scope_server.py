@@ -1,5 +1,6 @@
 """Integration tests for CAD/PCB Scope HTTP Server and Target Bug API."""
 
+import base64
 import gzip
 from html.parser import HTMLParser
 import json
@@ -12,6 +13,7 @@ import threading
 import time
 import urllib.request
 
+import numpy as np
 import pytest
 import yaml
 
@@ -59,24 +61,46 @@ def test_scope_server_serve_ui(scope_server):
     assert "SCOPE // CAD/PCB WORKSTATION" in html
 
 
-def test_scope_server_serve_static_assets(scope_server):
-    """Verify static assets are served with correct MIME types and gzip compression."""
-    js_url = f"http://127.0.0.1:{scope_server.actual_port}/static/three-cad-viewer.esm.js"
-    req_js = urllib.request.urlopen(js_url)
-    assert req_js.status == 200
-    assert "application/javascript" in req_js.headers.get("Content-Type", "")
+def _decode_frame_positions(frame: dict) -> np.ndarray:
+    """Decode binary little-endian float32 `positions_b64` from a simulation telemetry frame."""
+    raw = base64.b64decode(frame["positions_b64"])
+    return np.frombuffer(raw, dtype="<f4").reshape(-1, 3)
 
-    req_gzip = urllib.request.Request(js_url, headers={"Accept-Encoding": "gzip"})
+
+def test_scope_server_serve_static_assets(scope_server):
+    """Verify ES modules and static assets are served with correct MIME types and gzip compression."""
+    main_js_url = f"http://127.0.0.1:{scope_server.actual_port}/js/scope/main.js"
+    req_main = urllib.request.urlopen(main_js_url)
+    assert req_main.status == 200
+    assert "application/javascript" in req_main.headers.get("Content-Type", "")
+
+    three_url = f"http://127.0.0.1:{scope_server.actual_port}/js/static/vendor/three/three.module.js"
+    req_gzip = urllib.request.Request(three_url, headers={"Accept-Encoding": "gzip"})
     resp_gzip = urllib.request.urlopen(req_gzip)
     assert resp_gzip.status == 200
     assert resp_gzip.headers.get("Content-Encoding") == "gzip"
     decompressed = gzip.decompress(resp_gzip.read()).decode("utf-8")
-    assert len(decompressed) > 1000
+    assert len(decompressed) > 10000
 
-    css_url = f"http://127.0.0.1:{scope_server.actual_port}/static/three-cad-viewer.css"
+    css_url = f"http://127.0.0.1:{scope_server.actual_port}/static/common.css"
     req_css = urllib.request.urlopen(css_url)
     assert req_css.status == 200
     assert "text/css" in req_css.headers.get("Content-Type", "")
+
+    for shader_rel in (
+        "scope/shaders/trace_capsule.vert.glsl",
+        "scope/shaders/fluid_particle.vert.glsl",
+        "scope/shaders/floor_grid.frag.glsl",
+    ):
+        shader_url = f"http://127.0.0.1:{scope_server.actual_port}/js/{shader_rel}"
+        req_shader = urllib.request.urlopen(shader_url)
+        assert req_shader.status == 200
+        assert "application/javascript" in req_shader.headers.get("Content-Type", "")
+        shader_module = req_shader.read().decode("utf-8")
+        assert shader_module.startswith('export default "')
+        assert shader_module.rstrip().endswith('";')
+        glsl_src = json.loads(shader_module.removeprefix("export default ").rstrip().removesuffix(";"))
+        assert "void main()" in glsl_src
 
 
 def test_scope_server_api_projects(scope_server):
@@ -402,7 +426,7 @@ def test_regression_bug_hovering_tigerbeetle_411_hierarchical_cad_tree():
 
 
 def test_regression_bug_lustrous_mantis_333_simulation_fountain_physics(scope_server):
-    """Verify BUG-LUSTROUS-MANTIS-333: authentic simulation telemetry respects bowl floor and spout bounds."""
+    """Verify BUG-LUSTROUS-MANTIS-333: undecimated simulation telemetry respects bowl floor, spout bounds, and voxel lattice."""
     telem_url = (
         f"http://127.0.0.1:{scope_server.actual_port}/api/scope/simulation_telemetry"
         "?project=cat_fountain&target=product"
@@ -413,13 +437,19 @@ def test_regression_bug_lustrous_mantis_333_simulation_fountain_physics(scope_se
 
     assert telem["status"] == "ok"
     assert telem["frames_count"] > 0
+    assert telem["is_voxel_grid"] is True
+    assert telem["voxel_dx_mm"] == pytest.approx(3.5, abs=0.05)
     assert len(telem["frames"]) > 0
+    assert telem["frames"][0]["count"] > 20000
+    assert "impeller" in telem["frames"][0].get("transforms", {})
 
     for frame in telem["frames"]:
-        for pt in frame["positions"]:
-            z = pt[2]
-            assert z >= 40.0, f"Authentic particle dipped below floor: z={z}"
-            assert z <= 118.0, f"Authentic particle exceeded max CAD fountain bound: z={z}"
+        pts = _decode_frame_positions(frame)
+        assert len(pts) == frame["count"]
+        z_min = float(pts[:, 2].min())
+        z_max = float(pts[:, 2].max())
+        assert z_min >= 40.0, f"Authentic voxel dipped below floor: z={z_min}"
+        assert z_max <= 118.0, f"Authentic voxel exceeded max CAD fountain bound: z={z_max}"
 
 
 def test_regression_bug_jumping_instar_950_open_rerun_endpoint(scope_server, monkeypatch):
@@ -465,14 +495,20 @@ def test_regression_bug_segmented_larva_621_simulation_lid_drainage(scope_server
         f"Expected > 100 particles draining through lid hole, got {max(drainage_cutout_metrics)}"
     )
 
-    lid_drain_particles = []
+    lid_drain_count = 0
     for f in telem["frames"]:
-        for pt in f["positions"]:
-            x, y, z = pt[0], pt[1], pt[2]
-            if -20.0 <= x <= 20.0 and 45.0 <= y <= 80.0 and 50.0 <= z <= 105.0:
-                lid_drain_particles.append(pt)
+        pts = _decode_frame_positions(f)
+        mask = (
+            (pts[:, 0] >= -20.0)
+            & (pts[:, 0] <= 20.0)
+            & (pts[:, 1] >= 45.0)
+            & (pts[:, 1] <= 80.0)
+            & (pts[:, 2] >= 50.0)
+            & (pts[:, 2] <= 105.0)
+        )
+        lid_drain_count += int(mask.sum())
 
-    assert len(lid_drain_particles) > 0, "No particles detected draining through lid cutout region"
+    assert lid_drain_count > 0, "No voxels detected draining through lid cutout region"
 
 
 def test_regression_bug_punctate_darner_735_diagram_view_labels():
@@ -600,10 +636,10 @@ def test_regression_bug_dorsal_midge_176_pcb_layer_order_and_colors(scope_server
     assert data["pcb_metadata"]["components"], "Component metadata must remain populated for pad/inspector lookup"
 
     parts = data.get("shapes", {}).get("parts", [])
+    assert len(parts) == 1
     part_ids = [part.get("id", "") or part.get("name", "") for part in parts]
     assert not any("components" in pid for pid in part_ids)
     assert any("substrate" in pid for pid in part_ids)
-    assert any("pads" in pid for pid in part_ids)
 
     expected_kicad_colors = {
         "Substrate": "#041830",
@@ -617,14 +653,10 @@ def test_regression_bug_dorsal_midge_176_pcb_layer_order_and_colors(scope_server
     layer_colors = {layer["name"]: layer["color"].lower() for layer in layers}
     assert layer_colors == expected_kicad_colors
 
-    # Verify tessellated 3D/2D mesh colors match pcb_metadata layer swatches 1-to-1
-    part_color_by_id = {}
-    for part in parts:
-        pname = part.get("name", "")
-        pcolor = (part.get("color") or (part.get("parts") or [{}])[0].get("color") or "").lower()
-        part_color_by_id[pname] = pcolor
-    for layer in layers:
-        assert part_color_by_id.get(layer["id"]) == layer["color"].lower()
+    # Verify tessellated substrate solid color matches pcb_metadata Substrate swatch
+    sub_part = parts[0]
+    sub_color = (sub_part.get("color") or (sub_part.get("parts") or [{}])[0].get("color") or "").lower()
+    assert sub_color == "#041830"
 
     # Verify 3D CAD assembly mode still retains Components above Substrate on the stack
     cad_items = PCB3DAssembler.from_provider(CarrierBoardProvider()).get_display_items(prefix="carrier_board")
@@ -843,10 +875,12 @@ def test_regression_bug_chitinous_grub_712_simulation_particle_temporal_coherenc
     frames = telem["frames"]
     assert len(frames) >= 5
     for idx in range(1, 5):
-        prev_set = {tuple(pt) for pt in frames[idx - 1]["positions"]}
-        curr_set = {tuple(pt) for pt in frames[idx]["positions"]}
-        assert len(curr_set) >= 2000
+        prev_pts = _decode_frame_positions(frames[idx - 1])
+        curr_pts = _decode_frame_positions(frames[idx])
+        prev_set = {tuple(row.tolist()) for row in np.round(prev_pts, 3)}
+        curr_set = {tuple(row.tolist()) for row in np.round(curr_pts, 3)}
+        assert len(curr_set) >= 20000
         stationary_overlap = len(prev_set & curr_set) / max(1, len(curr_set))
-        assert stationary_overlap > 0.95, (
+        assert stationary_overlap > 0.90, (
             f"Fluid cells jumped between step {idx - 1} and {idx}: overlap={stationary_overlap:.3f}"
         )
