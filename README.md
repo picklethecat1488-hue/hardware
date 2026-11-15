@@ -73,45 +73,35 @@ python tools/list.py outputs 'exhaust_manifolds/*'
 ```
 
 ### Geometry Visualization
-Use the viewer to inspect geometry in VS Code using the `ocp_vscode` extension. For PCB targets, `view.py` also opens the native board file in VS Code using the interactive [KiCode](https://marketplace.visualstudio.com/items?itemName=SajadGhorbani.KiCode) extension.
+Use the interactive CAD/PCB Scope Workstation (`tools/scope.py`) to inspect 3D geometry and multi-layer PCBs with Blender-style navigation (`MMB` orbit, `Shift+MMB` pan, scroll zoom, Numpad presets), face highlighting, 2D/3D diagram markups, and one-click **Target Bug** reporting into Forge.
 
 ```bash
-# List all available targets and their supported visual actions:
-python tools/view.py --list
+# Launch interactive CAD/PCB Scope workstation with Target Chooser modal:
+python tools/scope.py
 
-# View the driver manifold part
-python tools/view.py exhaust_manifolds/driver
+# Inspect specific target in native Scope workstation:
+python tools/scope.py exhaust_manifolds/driver
 
-# View the global wire path for all manifold assemblies
-python tools/view.py exhaust_manifolds/wire
+# View the global wire path for all manifold assemblies:
+python tools/scope.py exhaust_manifolds/wire
 
-# View all printable parts for all manifolds 
-python tools/view.py 'exhaust_manifolds/*:part/print'
+# View all printable parts for all manifolds:
+python tools/scope.py 'exhaust_manifolds/*:part/print'
 
-# View PCB target (opens interactive KiCode tab in VS Code and shows 3D substrate in ocp_vscode):
-python tools/view.py carrier_board:pcb
-python tools/view.py carrier_board/carrier_pcb
+# View PCB target with interactive multi-layer toggling and net highlighting:
+python tools/scope.py carrier_board/carrier_board:pcb
 
-# View any compiled KiCad PCB or schematic file directly in VS Code:
-python tools/view.py build/board/carrier_board/carrier_board.kicad_pcb
+# Run and inspect simulation targets:
+python tools/scope.py cat_fountain/product:simulate
 ```
 
-### Simulating Rooms and Visualizing in Rerun
+### Simulating Rooms and Visualizing in Scope
 
-For targets that support simulation (e.g., the cat water fountain room), you can run a PyBullet physics simulation and visualize it in real-time using Rerun. Rerun runs headless under DIRECT physics client mode and spawns the visualization automatically.
+For targets that support simulation (e.g., the cat water fountain room), you can run a simulation and visualize it in real-time in Scope Workstation:
 
 ```bash
-# Run the simulation and spawn the Rerun visualizer:
-python tools/view.py cat_fountain/product:view/simulate
-
-# Run the simulation for a specific number of steps:
-python tools/view.py cat_fountain/product:view/simulate -s 500
-
-# Skip compiling parts and URDFs prior to starting the simulation:
-python tools/view.py cat_fountain/product:view/simulate --no-build
-
-# Save the simulation recording to a (.rrd) file to upload to rerun.io:
-python tools/view.py cat_fountain/product:view/simulate --save-rrd output.rrd
+# Run the simulation and open in Scope:
+python tools/scope.py cat_fountain/product:simulate
 ```
 
 ### Wiring Diagrams & PCB Manufacturing Pipeline
@@ -123,7 +113,7 @@ This project includes a declarative wiring and PCB engine driven by native KiCad
 *   **KiCad Dependency (`kicad-cli`)**:
     The build toolchain uses `kicad-cli` (v7+ or v8+) to generate industry-standard CAM manufacturing files (RS-274X Gerbers, Excellon drills, IPC-2581/gbrjob). It automatically detects local KiCad installations (`brew install --cask kicad` on macOS, `apt-get install kicad` on Linux, or Windows installation) or custom paths via `KICAD_CLI_BIN`. Remote execution can be dispatched via `tools/anvil run`.
 *   **Viewing PCB & Schematic Files**:
-    *   **In VS Code**: Install the recommended [KiCode](https://marketplace.visualstudio.com/items?itemName=SajadGhorbani.KiCode) (`sajadghorbani.kicode`) extension (powered by KiCanvas) to inspect `.kicad_pcb` and `.kicad_sch` with interactive zoom, pan, layer toggling, net highlighting, and component inspection directly in VS Code editor tabs. Alternatively, use the **KiCad PCB Viewer** (`kicad-pcb-viewer`) or **Gerber Viewer** extension for `.gbr` layers.
+    *   **In CAD/PCB Scope Workstation**: Run `python tools/scope.py carrier_board/carrier_board:pcb` to inspect multi-layer copper ribbons, pads, vias, silkscreen, and substrate with interactive net highlighting, component inspection, and Blender navigation controls.
     *   **In Browser**: Inspect layer stacks instantly by dragging the `build/board/<project>/` folder into [tracespace.io/view](https://tracespace.io/view/) or online fab viewers (JLCPCB / PCBWay).
     *   **SVG Schematics**: Vector schematics (`build/schematics/<project>/<project>_schematic.svg`) can be opened directly in any browser or SVG viewer.
 
@@ -137,21 +127,36 @@ python tools/build.py cat_fountain/wiring
 ```
 ---
 
-## Running Tests
+## Pre-Commit Verification & Running Tests
 
-This project uses `pytest` for testing.
+Run `./tools/verify.sh` to execute the full pre-commit verification pipeline (Python syntax compilation, Ruff formatting & linting, JavaScript zero-globals & Jinja2 template linting, parallel `node --test` ES module suites, and parallel `pytest`):
 
-To run the default test suite (skips slow tests for a fast local feedback loop):
 ```bash
+# Full pre-commit verification (auto-resolves the cq conda environment):
+./tools/verify.sh
+
+# Auto-format & auto-fix Ruff lint issues before running verification:
+./tools/verify.sh --fix
+
+# Fast static + JS lint + parallel JS unit tests only (skips pytest):
+./tools/verify.sh --quick
+
+# Offload full pre-commit verification to the remote anvil cloud server:
+tools/anvil verify
+```
+
+You can also invoke individual test runners directly:
+
+```bash
+# Run parallel JavaScript ES module unit tests:
+node --test --test-concurrency=4 tests/js/*.test.mjs
+
+# Run the default Python test suite (skips slow tests for a fast local feedback loop):
 pytest
-```
 
-To run only the slow geometry validation tests (which perform expensive 3D CAD boolean checks):
-```bash
+# Run only the slow geometry & physics validation tests (3D CAD booleans, PyBullet, JAX SPH):
 pytest -m "slow"
-```
 
-To run all tests (both fast and slow):
-```bash
-pytest -m "slow or not slow"
+# Run all Python tests (both fast and slow):
+./tools/verify.sh --slow
 ```

@@ -23,5 +23,5 @@ After running `build.py`, you should see these files in your build output:
 
 To view the limiter plate in the CAD viewer:
 ```bash
-python tools/view.py valve_actuator_limiter/limiter_plate
+python tools/scope.py valve_actuator_limiter/limiter_plate
 ```

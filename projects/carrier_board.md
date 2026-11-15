@@ -26,22 +26,22 @@ After running `build.py`, you should see these files in your build output organi
 
 To view the complete carrier board mechanical assembly in the 3D CAD viewer:
 ```bash
-python tools/view.py carrier_board/product
+python tools/scope.py carrier_board/product
 ```
 
 To visualize the routed carrier PCB with copper zones, silkscreen, and components:
 ```bash
-python tools/view.py carrier_board/carrier_board:pcb
+python tools/scope.py carrier_board/carrier_board:pcb
 ```
 
 To visualize the routed flexible tail with capacitive sensor pads:
 ```bash
-python tools/view.py carrier_board/flex_tail:pcb
+python tools/scope.py carrier_board/flex_tail:pcb
 ```
 
 To view the top-down 2D wiring layout:
 ```bash
-python tools/view.py carrier_board/carrier_board:diagram
+python tools/scope.py carrier_board/carrier_board:diagram
 ```
 
 ## System Block Diagram

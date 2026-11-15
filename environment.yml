@@ -9,6 +9,7 @@ dependencies:
   - pyyaml
   - ffmpeg
   - jinja2
+  - nodejs>=20
   - pip
   - pip:
     - ocp-vscode==2.7.1
@@ -35,3 +36,4 @@ dependencies:
     - cbor2
     - eel
     - pywebview
+    - oxlint

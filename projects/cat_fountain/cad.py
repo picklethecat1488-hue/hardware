@@ -5,6 +5,7 @@ import math
 from pathlib import Path
 from build123d import *  # type: ignore
 from model import (
+    DiagramOptions,
     TextArgs,
     ShapeType,
     BoundaryType,
@@ -1530,6 +1531,7 @@ class CatFountainCAD:
 
     def build_diagram(self, room: Room, targets: Sequence[str], mode: ProviderMode) -> None:
         """Build an exploded assembly diagram for the cat fountain."""
+        room.diagram_options = DiagramOptions(view_from="iso")
         bowl_part = self.build_bowl("bowl").part
         impeller_part = self.build_impeller("impeller").part
         bottom_cover_part = self.build_bottom_cover("bottom_cover").part

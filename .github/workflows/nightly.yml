@@ -24,6 +24,18 @@ jobs:
           use-mamba: true
           activate-environment: cq
 
+      - name: Install Linting Tools
+        shell: bash -el {0}
+        run: pip install ruff oxlint
+
+      - name: Check JavaScript Syntax & Lint Rules
+        shell: bash -el {0}
+        run: python tools/validate_js.py
+
+      - name: Run JavaScript Unit Tests
+        shell: bash -el {0}
+        run: node --test --test-concurrency=2 tests/js/*.test.mjs
+
       - name: Run Fast Tests
         shell: bash -el {0}
         env:

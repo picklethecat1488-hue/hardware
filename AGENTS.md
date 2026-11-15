@@ -1,6 +1,20 @@
 # Workspace Rules: Pre-Commit Validation
 
-Before finalizing any task, committing changes, or proposing modifications to the codebase, you MUST run formatting, linting, compile check, and the tests to ensure the codebase remains healthy:
+Before finalizing any task, committing changes, or proposing modifications to the codebase, you MUST run formatting, linting, compile check, and the tests via `./tools/verify.sh` (or `tools/anvil verify` remotely) to ensure the codebase remains healthy:
+
+```bash
+# Run the full automated pre-commit verification suite (auto-resolves cq conda env):
+./tools/verify.sh
+
+# Useful options:
+./tools/verify.sh --fix       # Auto-format & auto-fix Ruff lint issues before running checks
+./tools/verify.sh --quick     # Fast static + JS compilation/lint + parallel JS tests (skips pytest)
+./tools/verify.sh --slow      # Include @pytest.mark.slow 3D CAD & physics simulation suites
+./tools/verify.sh --smoke     # Also run integration smoke tests (python tools/smoke.py)
+tools/anvil verify            # Offload full ./tools/verify.sh suite to the remote anvil server
+```
+
+Under the hood, `./tools/verify.sh` executes the following mandatory stages in order:
 
 ```bash
 # 1. Activate the conda environment
@@ -15,16 +29,22 @@ ruff format --check .
 # 4. Check linting rules
 ruff check .
 
-# 5. Run the fast test suite (excludes slow tests)
+# 5. Check JavaScript compilation & zero-globals lint rules
+python tools/validate_js.py
+
+# 6. Run parallel JavaScript ES module unit tests
+node --test --test-concurrency=4 tests/js/*.test.mjs
+
+# 7. Run the fast Python test suite (excludes slow tests)
 pytest
 ```
 
 ## Validation Guidelines
-1. **Execution**: Prefer offloading test suites (`pytest`, `pytest -m "slow"`, `python tools/smoke.py`) and pre-commit validation to the `anvil` cloud server (e.g., via `tools/anvil run "PYTHONPATH=.:tools /home/ubuntu/miniforge3/envs/cq/bin/pytest"` or `ssh anvil`) to free up local CPU/GPU compute for rapid iteration, CAD generation, and interactive experiments. When running locally, activate the `cq` conda environment.
-2. **Outcome Verification**: Confirm that all checks (format, lint, compile, and pytest) pass with exit code `0`.
-3. **Resolution**: If any component fails (such as syntax error, ruff failure, or failing test), you must address the failure and re-run the check before concluding your work.
-4. **Integration Smoke Tests**: The integration smoke tests (`python tools/smoke.py`) are highly resource-intensive and should always be run on `anvil`.
-5. **Process Management & Rerun Hygiene**: When restarting or re-running test suites (`pytest`, `pytest -m "slow"`, `tools/anvil pytest`, `python tools/smoke.py`, etc.), you MUST explicitly terminate/kill any preceding running instances of that test or task before launching a new execution. Never allow multiple overlapping runs of the same test command.
+1. **Execution**: Run `./tools/verify.sh` locally or offload pre-commit validation and test suites (`tools/anvil verify`, `tools/anvil pytest`, `pytest -m "slow"`, `python tools/smoke.py`) to the `anvil` cloud server to free up local CPU/GPU compute for rapid iteration, CAD generation, and interactive experiments. `./tools/verify.sh` automatically resolves the `cq` conda environment; when invoking individual tools manually, activate `cq` first.
+2. **Outcome Verification**: Confirm that `./tools/verify.sh` (compileall, ruff format, ruff check, JS lint, JS unit tests, and pytest) exits with code `0`.
+3. **Resolution**: If any component fails (such as syntax error, ruff failure, JS lint error, or failing test), you must address the failure and re-run `./tools/verify.sh` before concluding your work.
+4. **Integration Smoke Tests**: The integration smoke tests (`python tools/smoke.py` / `./tools/verify.sh --smoke`) are resource-intensive and should preferably be run on `anvil` (`tools/anvil smoke`).
+5. **Process Management & Rerun Hygiene**: When restarting or re-running test suites (`./tools/verify.sh`, `pytest`, `pytest -m "slow"`, `tools/anvil verify`, `tools/anvil pytest`, `python tools/smoke.py`, etc.), you MUST explicitly terminate/kill any preceding running instances of that test or task before launching a new execution. Never allow multiple overlapping runs of the same test command.
 6. **GitHub CI Monitoring & Local Stack Remediation**: When commits have been pushed to a remote feature branch or when instructed to inspect CI, you may inspect GitHub Actions CI workflow results (e.g. via `gh run list --limit 5`, `gh pr checks`, or `gh run view <run-id> --log-failed`) and resolve any reported failures. However, the agent MUST NOT autonomously create pull requests (`gh pr create`) or merge pull requests (`gh pr merge`).
 
 ---
@@ -54,13 +74,13 @@ Host anvil
 ## Core Architecture & Code Invariants
 
 ### 1. Test Isolation & Regression Unit Testing
-* Unit tests MUST be completely isolated from implementation code. Core framework tests go in [tests/](tests/) and project-specific tests go in [projects/tests/](projects/tests/).
+* Unit tests MUST be completely isolated from implementation code. Core Python framework tests go in [tests/](tests/), project-specific Python tests go in [projects/tests/](projects/tests/), and JavaScript ES module unit tests go in [tests/js/](tests/js/) (`*.test.mjs`, executed in parallel via `node --test --test-concurrency=<WORKERS>`).
 * **Slow Tests**: 3D CAD boolean checks, PyBullet physics simulations, and JAX SPH fluid dynamics tests are highly resource-intensive and must be decorated with `@pytest.mark.slow` (or have `slow` in their test markers) so they do not block fast pre-commit checks:
   ```bash
   pytest -m "slow"
   ```
 * **Regression Unit Testing Mandate**: Whenever a regression is identified, investigated, or bisected to a prior change, you MUST introduce dedicated regression unit tests (or add active regression assertions to existing test suites) that explicitly guard against the identified regression before concluding the task.
-* **Functional Behavioral Testing Mandate**: All test code (Python unit/integration tests, CAD validation, and physics simulation suites) MUST test the actual functionality and runtime behavioral invariants of the code being run (e.g. verifying state transitions, execution outcomes, geometric properties, and physical boundary interactions). Tests must NOT verify behavior by simply inspecting source files for the existence of specific statements, strings, or AST tokens.
+* **Functional Behavioral Testing Mandate**: All test code (Python unit/integration tests, JavaScript `node --test` suites, CAD validation, and physics simulation suites) MUST test the actual functionality and runtime behavioral invariants of the code being run (e.g. verifying state transitions, execution outcomes, DOM/renderer interactions via `createMockRuntimeContext()`, geometric properties, and physical boundary interactions). Tests must NOT verify behavior by simply inspecting source files for the existence of specific statements, strings, or AST tokens.
 * **Prohibition on Redundant Wrapper Tests**: Regression tests must assert new behavioral invariants directly against the code under test. Do NOT create shallow wrapper tests (such as test functions that merely invoke other test suites or test commands via subprocess) without exercising new functionality.
 * **Update Existing Tests Directly Over Duplicate Tests**: If an existing test case intended to guard an invariant does not properly check for a bug, update the original test case directly to assert the missing invariant rather than creating redundant wrapper or duplicate test listings.
 * **Omit Tests When Invariant Cannot Be Unit Tested**: If it is not possible to unit test a regression fix and existing test suites already verify logical invariants, omit adding an artificial regression test rather than introducing a meaningless test that merely wraps other tests.
@@ -81,9 +101,9 @@ Host anvil
 * **No Fallback Constants**: Do NOT place fallback constants directly in the codebase when parsing configs or settings (e.g., ternary fallbacks or `getattr` defaults like `0.004` or `0.90`). All configuration fields must be strongly typed and resolved dynamically. Fallbacks of `0`, `0.0`, or `None` are acceptable to represent unconfigured properties.
 * **Context Manager Variable Referencing for Declarative PCB & Wiring**: When declaring electrical connections, schematic sheets, routing traces, or assembly test steps in declarative PCB code, ALWAYS reference components, pins, and nets directly via the variables and object handles returned by their context managers (`ComponentInstance`, `PinRef`, `NetModel` / `Net`) rather than using raw string literals or string tuples (e.g. use `mcu.pin("VSS")`, `mcu["VSS"]`, `mcu.named_pin.VSS`, `mcu.name`, and `net.name` instead of raw `("U1", "J8")`, `"U1"`, or `"VBUS"`). This guarantees compile-time pin validation, prevents reference designator desynchronization, and enforces single-source netlist topology.
 * **Chaining Identical Component Placements with Locations**: In declarative PCB component layout blocks (`BuildComponents`), ALWAYS chain identical component placements (such as bypass capacitor arrays, current-limiting resistors, LED indicators, or filter banks) using `with Locations([...]):` context managers rather than repeating duplicate `Component(...)` instantiations with manual `position` arguments. This leverages build123d's ambient `LocationList` context and continuous auto-numbering, eliminates boilerplate repetition, and keeps layout definitions declarative and DRY.
-* **Declarative Component Footprints**: Standard SMD, Through-Hole, and IC component footprints must be implemented declaratively using build123d primitives under `provider/footprints/` (`smd.py`, `thru_hole.py`, `ic.py`) using `BuildFootprint`, `Pad`, `PadShape`, `PadType`, and the `@footprint` decorator. Footprints integrate 3D physical package bodies with 2D copper pads and are registered in `provider/footprints/manifest.yaml`. Every footprint is discoverable via `FootprintProvider` and inspectable with 3D CAD dimensions and copper pads via `python tools/view.py footprints/<package_name>`. Legacy footprint YAML files (`projects/footprints/*.yaml`) and test step YAML files (`pcb_test_steps.yaml`) are prohibited.
+* **Declarative Component Footprints**: Standard SMD, Through-Hole, and IC component footprints must be implemented declaratively using build123d primitives under `provider/footprints/` (`smd.py`, `thru_hole.py`, `ic.py`) using `BuildFootprint`, `Pad`, `PadShape`, `PadType`, and the `@footprint` decorator. Footprints integrate 3D physical package bodies with 2D copper pads and are registered in `provider/footprints/manifest.yaml`. Every footprint is discoverable via `FootprintProvider` and inspectable with 3D CAD dimensions and copper pads via `python tools/scope.py footprints/<package_name>`. Legacy footprint YAML files (`projects/footprints/*.yaml`) and test step YAML files (`pcb_test_steps.yaml`) are prohibited.
 * **Single-Source PCB Subsystem Accessors & Sub-Context Managers**: PCB metadata, schematic sheets, test steps, net classes, and design rules must be defined as single `@cached_property` or `@property` methods on the provider or listing class (`self.sheets`, `self.tests`, `self.design_rules`, `self.net_classes`) and registered into root `BuildPcb` / `BuildFlexPCB` contexts via sub-context managers (`with BuildSchematic() as bs: bs.add(self.sheets)`). Symbol tables are synthesized transparently inside `Wiring.from_models` from component metadata; never manually manipulate symbol tables in user project code. Trace routing uses declarative `with BuildTraces() ... with BuildLine(): Polyline(...) / Line(...) / make_trace(...)` and `BuildVias() ... Via(...)` serialized into strongly typed Python modules (`carrier_board_routing.py`) generated from Jinja2 templates (`pcb_routing.py.j2`).
-* **Native 3D PCB CAD Assembly & Multi-Layer Viewing**: Complete 3D PCB assemblies must be generated via `PCB3DAssembler` (or `pcb.populate_room(room, prefix)` / `pcb.to_cad_assembly()`) with vectorized batch compounding for substrate, components, copper pads, front/back trace ribbons, and vias (< 0.5s). In interactive CAD inspection (`ocp_vscode`), individual layers must be exposed as distinct named items in `Room` to allow toggling visibility. In simulation/URDF contexts (`mode == Mode.SIMULATE` or `room.is_simulate == True`), the rigid body link must remain a single unified shape attached to the link to preserve URDF single-root integrity.
+* **Native 3D PCB CAD Assembly & Multi-Layer Viewing**: Complete 3D PCB assemblies must be generated via `PCB3DAssembler` (or `pcb.populate_room(room, prefix)` / `pcb.to_cad_assembly()`) with vectorized batch compounding for substrate, components, copper pads, front/back trace ribbons, and vias (< 0.5s). In interactive CAD inspection (native CAD/PCB workstation via `tools/scope.py`), individual layers must be exposed as distinct named items in `Room` to allow toggling visibility. In simulation/URDF contexts (`mode == Mode.SIMULATE` or `room.is_simulate == True`), the rigid body link must remain a single unified shape attached to the link to preserve URDF single-root integrity.
 
 ### 4. Strict Code Cleanliness & Hygiene
 * **No Dead Code**: Unused code (dangling clauses, functions, or parameters that do nothing) and settings that do not affect anything must be removed from the repository.
@@ -91,10 +111,11 @@ Host anvil
 * **Parameter & Signature Hygiene**: When modifying, refactoring, or simplifying functions, subroutines, or methods, any parameters that become unused MUST be immediately pruned from both the function signature and all caller invocations with each change.
 * **Error Handling Guardrails**: Use explicit bounds checking and validation rather than generic `try/except` blocks. Do NOT use `try/except` structures in core computation or logic paths except to guard I/O operations (filesystem, network, database). Never silently ignore errors with `try/except/pass` blocks; exceptions must be logged, raised descriptively, or allowed to propagate.
 
-### 5. Documentation & Lint Style
-* Code documentation MUST be PEP-257 compliant and comprehensive. Write docstrings for all custom classes, methods, functions, and properties.
-* **String Enums for Keys**: Prefer defining structured string enums (subclassing `str` and `Enum`) over passing raw string literals directly for dictionary keys, joint/link labels, or configuration modes.
-* **Named Constant Formatting**: Constant values in production code must be assigned to module-level or class-level `ALL_CAPS` named constant variables rather than being embedded as inline magic literals.
+### 5. Documentation, JavaScript Zero-Globals & Lint Style
+* Code documentation MUST be comprehensive: PEP-257 docstrings in Python and JSDoc (`/** ... */`) docstrings in JavaScript for all custom classes, methods, exported functions, and properties.
+* **JavaScript Canonical Root & Strict Zero-Globals Rule**: All browser ES modules and static assets reside under [js/](js/) (including unminified Three.js and style-compliant addons under `js/static/vendor/three/`). Jinja2 workstation templates (`.html.j2`) must contain zero inline executable `<script>` blocks and zero inline `on*="..."` HTML attributes, passing server state solely via `<script id="app-boot-config" type="application/json">`. Only `js/core/runtime_context.js` may touch `globalThis` (`getRuntimeContext()` / `createMockRuntimeContext()`); feature and modifiable vendor modules must never access `window`, `document`, `localStorage`, `fetch`, or `requestAnimationFrame` directly, nor attach globals onto `window.*`. Never use CSS `zoom` on `html`/`body` (use `--ui-scale` and physical `devicePixelRatio` canvas backing stores).
+* **String Enums for Keys**: Prefer defining structured string enums (subclassing `str` and `Enum` in Python, or `Object.freeze({ ... })` in JavaScript) over passing raw string literals directly for dictionary keys, joint/link labels, or configuration modes.
+* **Named Constant Formatting**: Constant values in production Python and JavaScript code must be assigned to module-level or class-level `ALL_CAPS` named constant variables rather than being embedded as inline magic literals.
 * **Idiomatic Iteration & Pattern Matching**: Prefer looping over sequences directly or using `enumerate(...)` rather than indexing by integer range bounds. Prefer Python `match / case` pattern matching syntax when comparing against multiple variants or enum branches.
 * **Import Placement**: Imports should be placed at the top of the file, unless doing so would cause circular dependencies.
 * **Markdown Preview Asset Location**: All markdown preview galleries, rendered frame previews, inspection figures, and simulation snapshots intended for visual evaluation MUST be placed inside the workspace under `recordings/previews/` using relative image paths.
@@ -124,7 +145,7 @@ Host anvil
   3. **Targeted Fix**: Implement the minimal necessary change strictly scoped to the defect.
   4. **Dedicated Regression Test**: Codify the reproduction into an active unit test asserting the correct invariant.
   5. **Verification**: Run pre-commit checks (`compileall`, `ruff`, and `pytest`) to verify 100% pass rate.
-  6. **Review Tasks & Functional Checklist**: When changing status to `RESOLVED`, populate the bug's review tasks and functional checklist (`review_tasks`) with concise, actionable verification steps and executable demonstration commands that verify the change from a user-experience perspective (such as a host CLI command e.g. `python tools/host.py cli ...`, interactive 3D visualizer e.g. `python tools/view.py ...`, or UI inspection). Do NOT use `pytest` commands as review verification tasks, as automated test suites are already run during pre-commit checks and CI; verification commands should demonstrate the actual behavioral outcome or visual fix in the user experience.
+  6. **Review Tasks & Functional Checklist**: When changing status to `RESOLVED`, populate the bug's review tasks and functional checklist (`review_tasks`) with concise, actionable verification steps and executable demonstration commands that verify the change from a user-experience perspective (such as a host CLI command e.g. `python tools/host.py cli ...`, interactive 3D visualizer e.g. `python tools/scope.py ...`, or UI inspection). Do NOT use `pytest` commands as review verification tasks, as automated test suites are already run during pre-commit checks and CI; verification commands should demonstrate the actual behavioral outcome or visual fix in the user experience.
   7. **Resolution, Linkage & Commit**: Mark the bug resolved (`python tools/forge.py resolve-bug --id <ID> --notes "<Summary>"`), attach the fix commit hash (`python tools/forge.py attach-commit --id <ID> --commit <hash>`), and commit atomically before picking up the next task.
 
 ### 5. User-Managed Code Review & Autonomous PR Prohibition
@@ -137,7 +158,8 @@ Host anvil
 * **Automatic Cross-Repository Synchronization**: Any bug fix, feature enhancement, styling update, or refactoring applied to developer scripts, tooling, or dashboard components in one repository (`firmware` or `hardware`) that is applicable to the other repository MUST be automatically cross-patched and mirrored into that repository, and vice versa.
 * **Synchronized Subsystems**: This includes, but is not limited to:
   - Remote cloud runner and lifecycle orchestration (`tools/anvil`, `tools/vast_manager.py`, `~/.anvil.env`, `~/.anvil.lock`).
-  - VCS web workstation and dashboard backends (`tools/forge.py`, `provider/vcs/git_engine.py`, `provider/worm_report/`, `provider/bug_report/`).
+  - VCS web workstation and dashboard backends (`tools/forge.py`, `provider/http_static.py`, `provider/vcs/git_engine.py`, `provider/worm_report/`, `provider/bug_report/`).
+  - Shared JavaScript ES modules and parallel unit tests (`js/{core,diff,vcs,review,tracker}/` <-> `tools/js/{core,diff,vcs,review,tracker}/` and `tests/js/shared_*.test.mjs` <-> `tools/tests/js/shared_*.test.mjs`).
   - Shared workstation templates (`diff_view.html.j2`, `diff_component.html.j2`, `code_review.html.j2`, `worm_report.html.j2`, `bug_report.html.j2`).
   - Smartlog DAG tree rendering, commit selection, node highlighting, and author identity sanitization.
 * **Zero Disparity**: Never allow dashboard bug fixes or tooling improvements (such as node highlighting, reverse-proxying, detached branch persistence, or SSH port handling) to remain isolated in one repository when the other repository shares the same architecture or template.
@@ -175,4 +197,10 @@ To minimize global context overhead and prevent unnecessary token burn, domain- 
    - Dynamic `/workspace` persistent storage detection and fallback paths.
    - Remote dependency bootstrapping (`build-essential`, Rust, Miniforge, CUDA).
    - Activity lock tracking (`~/.anvil.lock`), port forwarding, and COB auto-release protocols.
+
+6. [JavaScript Style, Zero-Globals & CAD Viewport Architecture](docs/javascript_style_architecture.md)
+   - Single canonical `js/` root, zero inline template JS/`on*` attributes, and typed `#app-boot-config` JSON payloads.
+   - Strict zero-globals isolation via `js/core/runtime_context.js` (`oxlint --deny-warnings`) and modifiable vendor addon parity.
+   - Native Retina `devicePixelRatio` rendering, `--ui-scale` HUD sizing, coalesced single-RAF viewport, GPU SDF PCB instancing, and exact world-space simulation voxels.
+   - Full Diff View visibility (zero `.js` exclusions in `GitEngine`) and parallel `node --test` functional unit suites.
 

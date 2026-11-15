@@ -19,18 +19,29 @@ class PCB3DAssembler:
     mechanical CAD assemblies.
     """
 
-    DEFAULT_SOLDERMASK_COLOR = (0.08, 0.45, 0.18)  # Standard dark green soldermask
-    DEFAULT_COMPONENT_COLOR = (0.20, 0.20, 0.22)  # Molded epoxy IC / passive dark charcoal
-    DEFAULT_PAD_COLOR = (0.90, 0.72, 0.22)  # ENIG gold surface finish
-    DEFAULT_TOP_TRACE_COLOR = (0.85, 0.55, 0.18)  # F.Cu warm copper foil ribbon
-    DEFAULT_BOTTOM_TRACE_COLOR = (0.28, 0.55, 0.85)  # B.Cu contrasting blue/copper ribbon
-    DEFAULT_VIA_COLOR = (0.75, 0.75, 0.80)  # Tinned through-hole via barrels
-    DEFAULT_SILKSCREEN_COLOR = (0.95, 0.95, 0.95)  # High-contrast crisp white silkscreen legend
+    DEFAULT_SOLDERMASK_COLOR = (0.04, 0.14, 0.06)  # KiCad rich dark green soldermask (#0a2410)
+    DEFAULT_COMPONENT_COLOR = (0.165, 0.180, 0.208)  # Molded epoxy IC / passive dark charcoal (#2a2e35)
+    DEFAULT_PAD_COLOR = (0.784, 0.627, 0.204)  # Brilliant ENIG gold surface finish (#c8a034)
+    DEFAULT_TOP_TRACE_COLOR = (0.831, 0.494, 0.235)  # Physical 3D warm copper wire (#d47e3c)
+    DEFAULT_BOTTOM_TRACE_COLOR = (0.831, 0.494, 0.235)  # Physical 3D warm copper wire (#d47e3c)
+    DEFAULT_VIA_COLOR = (0.706, 0.627, 0.235)  # Copper/gold through-hole via barrels (#b4a03c)
+    DEFAULT_SILKSCREEN_COLOR = (0.96, 0.96, 0.96)  # High-contrast crisp white silkscreen legend (#f5f5f5)
+
+    # KiCad 10 _builtin_default 2D PCB Editor layer colors
+    KICAD_SUBSTRATE_COLOR = (0.015725, 0.094157, 0.188275)  # Board interior dark navy (#041830)
+    KICAD_PAD_COLOR = (0.807882, 0.278471, 0.521608)  # F.Cu + 40% F.Mask (#d864ff) SMD pad (#ce4785)
+    KICAD_TOP_TRACE_COLOR = (0.784353, 0.203961, 0.203961)  # F.Cu (#c83434)
+    KICAD_BOTTOM_TRACE_COLOR = (0.302000, 0.498078, 0.768667)  # B.Cu (#4d7fc4)
+    KICAD_VIA_COLOR = (0.925529, 0.925529, 0.925529)  # Plated via_through (#ececec)
+    KICAD_TOP_SILKSCREEN_COLOR = (0.949059, 0.929451, 0.631412)  # F.SilkS (#f2eda1)
+    KICAD_BOTTOM_SILKSCREEN_COLOR = (0.909843, 0.698078, 0.654941)  # B.SilkS (#e8b2a7)
+    Z_PAD_OFFSET = 0.015  # Solder pads sit proud of trace ribbons to prevent Z-fighting (BUG-TRANSLUCENT-LACEWING-144)
+    Z_SILK_OFFSET = 0.045  # Silkscreen legends sit cleanly proud above copper traces and pads (BUG-SPOTTED-SPIDER-413)
 
     SOLDERMASK_COLORS: Dict[str, Tuple[float, float, float]] = {
-        "matte_black": (0.12, 0.12, 0.14),
-        "black": (0.12, 0.12, 0.14),
-        "green": (0.08, 0.45, 0.18),
+        "matte_black": (0.06, 0.08, 0.07),
+        "black": (0.06, 0.08, 0.07),
+        "green": (0.04, 0.18, 0.08),
         "blue": (0.10, 0.35, 0.65),
         "red": (0.65, 0.12, 0.12),
         "white": (0.92, 0.92, 0.92),
@@ -205,7 +216,7 @@ class PCB3DAssembler:
         else:
             z_pos = self.z_mid
 
-        boxes = []
+        solids: List[Shape] = []
         for t in matching_traces:
             x1, y1 = t.start_mm
             x2, y2 = t.end_mm
@@ -221,12 +232,21 @@ class PCB3DAssembler:
 
             b = Box(length, t.width_mm, self.cu_thickness)
             b.locate(Location((mx, my, z_pos), (0.0, 0.0, angle_deg)))
-            boxes.append(b)
+            b.label = f"trace_{t.net}"
+            solids.append(b)
 
-        if not boxes:
+            # Add round end caps to trace vertices for continuous, seamless KiCad-style trace routing
+            r = t.width_mm / 2.0
+            c1 = Cylinder(radius=r, height=self.cu_thickness)
+            c1.locate(Location((x1, y1, z_pos)))
+            c2 = Cylinder(radius=r, height=self.cu_thickness)
+            c2.locate(Location((x2, y2, z_pos)))
+            solids.extend([c1, c2])
+
+        if not solids:
             return None
 
-        return Compound(children=boxes)
+        return Compound(children=solids)
 
     def build_vias(self) -> Optional[Compound]:
         """Construct a Compound of plated through-hole via barrel cylinders."""
@@ -240,6 +260,7 @@ class PCB3DAssembler:
             dia = v.pad_diameter_mm
             c = Cylinder(radius=dia / 2.0, height=via_height)
             c.locate(Location((vx, vy, self.z_mid)))
+            c.label = f"via_{v.net}"
             cylinders.append(c)
 
         if not cylinders:
@@ -247,7 +268,9 @@ class PCB3DAssembler:
 
         return Compound(children=cylinders)
 
-    def build_components_and_pads(self) -> Tuple[Optional[Compound], Optional[Compound]]:
+    def build_components_and_pads(
+        self, include_components: bool = True
+    ) -> Tuple[Optional[Compound], Optional[Compound]]:
         """Construct Compounds of 3D component package bodies and copper pads."""
         target_ref = getattr(self.pcb_config, "shape_ref", None)
         is_flex = getattr(self.pcb_config, "board_type", None) == BoardType.FLEX or "flex" in self.pcb_name.lower()
@@ -283,16 +306,22 @@ class PCB3DAssembler:
             is_bottom = (getattr(c, "layer", "F.Cu") == "B.Cu") or (cz < 0.0)
 
             pad_z = (
-                (self.z_top + self.cu_thickness / 2.0) if not is_bottom else (self.z_bottom - self.cu_thickness / 2.0)
+                (self.z_top + self.cu_thickness / 2.0 + self.Z_PAD_OFFSET)
+                if not is_bottom
+                else (self.z_bottom - self.cu_thickness / 2.0 - self.Z_PAD_OFFSET)
             )
 
             fp_factory = FOOTPRINT_REGISTRY.get(c.package)
             if fp_factory is not None:
                 fp_inst = fp_factory()
-                if fp_inst.part is not None:
+                if include_components and fp_inst.part is not None:
                     body = fp_inst.part
                     body_bb = body.bounding_box()
-                    z_mount = self.z_top + self.cu_thickness if not is_bottom else self.z_bottom - self.cu_thickness
+                    z_mount = (
+                        (self.z_top + self.cu_thickness + self.Z_PAD_OFFSET)
+                        if not is_bottom
+                        else (self.z_bottom - self.cu_thickness - self.Z_PAD_OFFSET)
+                    )
                     if is_bottom:
                         comp_z = z_mount + body_bb.min.Z
                         loc = Location((cx, cy, comp_z), (180.0, 0.0, -yaw))
@@ -300,6 +329,7 @@ class PCB3DAssembler:
                         comp_z = z_mount - body_bb.min.Z
                         loc = Location((cx, cy, comp_z), (0.0, 0.0, yaw))
                     body.locate(loc)
+                    body.label = f"comp_{c.name}"
                     comp_solids.append(body)
 
                 for p in fp_inst.pins:
@@ -315,14 +345,20 @@ class PCB3DAssembler:
                     else:
                         pad = Box(pw, ph, self.cu_thickness)
                         pad.locate(Location((wx, wy, pad_z), (0.0, 0.0, yaw)))
+                    pad.label = f"pad_{c.name}_{p.name}"
                     pad_solids.append(pad)
-            else:
+            elif include_components:
                 dims = getattr(c, "dimensions", None) or (5.0, 5.0, 1.0)
                 dx, dy, dz = dims[0], dims[1], dims[2]
-                z_mount = self.z_top + self.cu_thickness if not is_bottom else self.z_bottom - self.cu_thickness
+                z_mount = (
+                    (self.z_top + self.cu_thickness + self.Z_PAD_OFFSET)
+                    if not is_bottom
+                    else (self.z_bottom - self.cu_thickness - self.Z_PAD_OFFSET)
+                )
                 box_z = (z_mount + dz / 2.0) if not is_bottom else (z_mount - dz / 2.0)
                 body = Box(dx, dy, dz)
                 body.locate(Location((cx, cy, box_z), (0.0, 0.0, yaw)))
+                body.label = f"comp_{c.name}"
                 comp_solids.append(body)
 
         # Include capacitive sensor electrodes in copper pads (scoped to target subassembly)
@@ -338,7 +374,7 @@ class PCB3DAssembler:
             ex, ey = center[0], center[1]
             ew, eh = cap.area_mm[0], cap.area_mm[1]
             pad = Box(ew, eh, self.cu_thickness)
-            pad.locate(Location((ex, ey, self.z_top + self.cu_thickness / 2.0)))
+            pad.locate(Location((ex, ey, self.z_top + self.cu_thickness / 2.0 + self.Z_PAD_OFFSET)))
             pad_solids.append(pad)
 
         # Include test points in copper pads (scoped to target subassembly)
@@ -354,9 +390,9 @@ class PCB3DAssembler:
             dia = tp.pad_diameter_mm
             tp_is_bottom = getattr(tp, "layer", "F.Cu") == "B.Cu"
             tp_z = (
-                (self.z_top + self.cu_thickness / 2.0)
+                (self.z_top + self.cu_thickness / 2.0 + self.Z_PAD_OFFSET)
                 if not tp_is_bottom
-                else (self.z_bottom - self.cu_thickness / 2.0)
+                else (self.z_bottom - self.cu_thickness / 2.0 - self.Z_PAD_OFFSET)
             )
             pad = Cylinder(radius=dia / 2.0, height=self.cu_thickness)
             pad.locate(Location((tpx, tpy, tp_z)))
@@ -378,12 +414,12 @@ class PCB3DAssembler:
         """
         is_bottom = layer == "B.SilkS"
         t_silk = 0.02
-        # Position silkscreen slightly proud of copper foil to prevent visual z-fighting
+        # Position silkscreen slightly proud of copper pads to prevent visual z-fighting
         if not is_bottom:
-            z_base = self.z_top + self.cu_thickness + 0.005
+            z_base = self.z_top + self.cu_thickness + self.Z_SILK_OFFSET
             z_center = z_base + t_silk / 2.0
         else:
-            z_base = self.z_bottom - self.cu_thickness - 0.005
+            z_base = self.z_bottom - self.cu_thickness - self.Z_SILK_OFFSET
             z_center = z_base - t_silk / 2.0
 
         solids: List[Shape] = []
@@ -394,11 +430,15 @@ class PCB3DAssembler:
                 continue
             txt = Text(st.text, font_size=st.font_size)
             s = extrude(txt, t_silk)
-            yaw = st.rotation
+            yaw = st.rotation or 0.0
             if not is_bottom:
-                s.locate(Location((st.position[0], st.position[1], z_base), (0.0, 0.0, yaw)))
+                if st.mirror:
+                    s.locate(Location((st.position[0], st.position[1], z_base + t_silk), (0.0, 180.0, -yaw)))
+                else:
+                    s.locate(Location((st.position[0], st.position[1], z_base), (0.0, 0.0, yaw)))
             else:
-                s.locate(Location((st.position[0], st.position[1], z_base), (180.0, 0.0, -yaw)))
+                # Rotate 180 deg around Y so bottom view (-Z camera, +Y up => X_right = -X_world) reads left-to-right
+                s.locate(Location((st.position[0], st.position[1], z_base), (0.0, 180.0, -yaw)))
             solids.append(s)
 
         # 2. Silkscreen vector graphics (rectangles/frames, lines, polygons)
@@ -443,7 +483,7 @@ class PCB3DAssembler:
                 case "polygon":
                     if sg.points and len(sg.points) >= 3:
                         pts = [(pt[0], pt[1]) for pt in sg.points]
-                        poly = Polygon(*pts)
+                        poly = Polygon(*pts, align=None)
                         s = extrude(poly, t_silk)
                         if not is_bottom:
                             s.locate(Location((0.0, 0.0, z_base)))
@@ -485,9 +525,9 @@ class PCB3DAssembler:
             txt = Text(fp_name, font_size=0.8)
             s = extrude(txt, t_silk)
             if not is_bottom:
-                s.locate(Location((cx, cy + 1.5, z_base)))
+                s.locate(Location((cx, cy - 1.5, z_base), (0.0, 0.0, 0.0)))
             else:
-                s.locate(Location((cx, cy + 1.5, z_base), (180.0, 0.0, 0.0)))
+                s.locate(Location((cx, cy - 1.5, z_base), (0.0, 180.0, 0.0)))
             solids.append(s)
 
         if not solids:
@@ -496,50 +536,61 @@ class PCB3DAssembler:
         return Compound(children=solids)
 
     def get_display_items(
-        self, prefix: Optional[str] = None
+        self,
+        prefix: Optional[str] = None,
+        include_components: bool = True,
+        kicad_2d_theme: bool = False,
     ) -> List[Tuple[Any, str, Tuple[float, float, float], float]]:
-        """Return list of (geometry, layer_name, rgb_color, alpha) for all active PCB layers."""
+        """Return list of (geometry, layer_name, rgb_color, alpha) for active PCB layers."""
         pfx = prefix or self.pcb_name
         items: List[Tuple[Any, str, Tuple[float, float, float], float]] = []
 
-        # 1. Substrate
+        substrate_col = self.KICAD_SUBSTRATE_COLOR if kicad_2d_theme else self.substrate_color
+        pad_col = self.KICAD_PAD_COLOR if kicad_2d_theme else self.DEFAULT_PAD_COLOR
+        top_trace_col = self.KICAD_TOP_TRACE_COLOR if kicad_2d_theme else self.DEFAULT_TOP_TRACE_COLOR
+        bottom_trace_col = self.KICAD_BOTTOM_TRACE_COLOR if kicad_2d_theme else self.DEFAULT_BOTTOM_TRACE_COLOR
+        via_col = self.KICAD_VIA_COLOR if kicad_2d_theme else self.DEFAULT_VIA_COLOR
+        top_silk_col = self.KICAD_TOP_SILKSCREEN_COLOR if kicad_2d_theme else self.silkscreen_color
+        bottom_silk_col = self.KICAD_BOTTOM_SILKSCREEN_COLOR if kicad_2d_theme else self.silkscreen_color
+
+        # 1. Components (included for 3D CAD assemblies; omitted in 2D PCB view)
+        comps, pads = self.build_components_and_pads(include_components=include_components)
+        if include_components and comps is not None:
+            items.append((comps, f"{pfx}_components", self.DEFAULT_COMPONENT_COLOR, 1.0))
+
+        # 2. Substrate
         substrate = self.build_substrate()
         if substrate is not None:
-            items.append((substrate, f"{pfx}_substrate", self.substrate_color, 1.0))
-
-        # 2. Components
-        comps, pads = self.build_components_and_pads()
-        if comps is not None:
-            items.append((comps, f"{pfx}_components", self.DEFAULT_COMPONENT_COLOR, 1.0))
+            items.append((substrate, f"{pfx}_substrate", substrate_col, 1.0))
 
         # 3. Copper Pads
         if pads is not None:
-            items.append((pads, f"{pfx}_pads", self.DEFAULT_PAD_COLOR, 1.0))
+            items.append((pads, f"{pfx}_pads", pad_col, 1.0))
 
         # 4. Front Copper Traces (F.Cu)
         traces_top = self.build_traces("F.Cu")
         if traces_top is not None:
-            items.append((traces_top, f"{pfx}_traces_top", self.DEFAULT_TOP_TRACE_COLOR, 1.0))
+            items.append((traces_top, f"{pfx}_traces_top", top_trace_col, 1.0))
 
         # 5. Back Copper Traces (B.Cu)
         traces_bottom = self.build_traces("B.Cu")
         if traces_bottom is not None:
-            items.append((traces_bottom, f"{pfx}_traces_bottom", self.DEFAULT_BOTTOM_TRACE_COLOR, 1.0))
+            items.append((traces_bottom, f"{pfx}_traces_bottom", bottom_trace_col, 1.0))
 
         # 6. Vias
         vias = self.build_vias()
         if vias is not None:
-            items.append((vias, f"{pfx}_vias", self.DEFAULT_VIA_COLOR, 1.0))
+            items.append((vias, f"{pfx}_vias", via_col, 1.0))
 
         # 7. Front Silkscreen (F.SilkS)
         silk_top = self.build_silkscreen("F.SilkS")
         if silk_top is not None:
-            items.append((silk_top, f"{pfx}_silkscreen_top", self.silkscreen_color, 1.0))
+            items.append((silk_top, f"{pfx}_silkscreen_top", top_silk_col, 1.0))
 
         # 8. Back Silkscreen (B.SilkS)
         silk_bottom = self.build_silkscreen("B.SilkS")
         if silk_bottom is not None:
-            items.append((silk_bottom, f"{pfx}_silkscreen_bottom", self.silkscreen_color, 1.0))
+            items.append((silk_bottom, f"{pfx}_silkscreen_bottom", bottom_silk_col, 1.0))
 
         return items
 

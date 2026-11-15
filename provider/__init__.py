@@ -36,6 +36,20 @@ from .utils import (
 # Initialize JAX environment configuration deterministically
 initialize_jax_environment()
 
+# Silence pybullet C-extension build time banner on import
+try:
+    _null_fd = os.open(os.devnull, os.O_WRONLY)
+    _orig_stderr = os.dup(2)
+    os.dup2(_null_fd, 2)
+    os.close(_null_fd)
+    try:
+        import pybullet as _pybullet  # noqa: F401
+    finally:
+        os.dup2(_orig_stderr, 2)
+        os.close(_orig_stderr)
+except Exception:
+    pass
+
 import OCP.TopoDS  # type: ignore
 
 # Monkey-patch TopoDS_Shape to resolve Pydantic validation errors.
@@ -73,7 +87,7 @@ from .types import (
     COLOR,
     DAEMON_LOGGERS,
 )
-from .target_list import TargetList
+from .target_list import TargetList, parse_target_string
 from .room import Room
 from .bullet import Bullet, LinkType
 from .boundary import (

@@ -171,7 +171,7 @@ def test_daemon_client_connection_failure_exits(monkeypatch):
 
 
 def test_daemon_spawn_tools():
-    """Verify that the daemon can spawn build, config, and view tools via the client."""
+    """Verify that the daemon can spawn build, config, and scope tools via the client."""
     temp_sock = Path(tempfile.gettempdir()) / "test_daemon_tools.sock"
     if temp_sock.exists():
         try:
@@ -198,7 +198,7 @@ def test_daemon_spawn_tools():
     client = DaemonClient(socket_path=temp_sock)
 
     # Test running each tool with help argument
-    for tool in ["build", "config", "view"]:
+    for tool in ["build", "config", "scope"]:
         try:
             client.run(tool, ["--help"])
         except SystemExit as e:

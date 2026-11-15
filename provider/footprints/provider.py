@@ -1,4 +1,4 @@
-"""Discoverable provider exposing 3D component footprints for inspection in tools/view.py."""
+"""Discoverable provider exposing 3D component footprints for inspection in tools/scope.py."""
 
 from functools import cached_property
 from typing import Any, Callable, Dict, Optional

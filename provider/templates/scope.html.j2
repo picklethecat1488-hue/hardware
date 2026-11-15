@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>◈ SCOPE // CAD/PCB WORKSTATION ◈</title>
+  <meta name="theme-color" content="#291a10">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/svg+xml" href="/static/scope-icon.svg">
+  <link rel="alternate icon" type="image/x-icon" href="/static/scope-favicon.ico">
+  <link rel="apple-touch-icon" href="/static/scope-icon.png">
+  <link rel="stylesheet" href="/static/common.css">
+  <script type="importmap">
+{
+  "imports": {
+    "three": "/js/static/vendor/three/three.module.js",
+    "three/addons/": "/js/static/vendor/three/addons/"
+  }
+}
+  </script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --quake-bg: #120c08;
+      --quake-panel: #1b120a;
+      --quake-panel-hover: #261a0f;
+      --quake-panel-alt: #1f150d;
+      --quake-header-bg: #291a10;
+      --quake-border: #5a381e;
+      --quake-border-light: #8d5d33;
+      --quake-border-mid: #5a381e;
+      --quake-border-dark: #120a05;
+      --quake-border-bright: #8d5d33;
+
+      --quake-gold: #ffb800;
+      --quake-gold-dim: #c98c00;
+      --quake-amber: #e59400;
+      --quake-copper: #c87a32;
+      --quake-red: #ef4444;
+      --quake-green: #22c55e;
+      --quake-cyan: #38bdf8;
+      --quake-purple: #c084fc;
+      --quake-text: #dedede;
+      --quake-text-light: #dedede;
+      --quake-text-muted: #9e8a78;
+      --quake-text-dim: #716053;
+
+      --font-mono: ui-monospace, "SF Mono", "Courier New", "Lucida Console", monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    html {
+      font-size: calc(80% * var(--ui-scale, 1));
+    }
+
+    body {
+      background-color: var(--quake-bg);
+      background-image:
+        repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.45) 0px, rgba(0, 0, 0, 0.45) 2px, transparent 2px, transparent 4px),
+        radial-gradient(ellipse at 50% 0%, #2e1d13 0%, #0d0704 100%);
+      color: var(--quake-text);
+      font-family: var(--font-mono);
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      border: 2px solid var(--quake-border-mid);
+      box-shadow: inset 0 0 0 1px rgba(255, 184, 0, 0.2), 0 0 10px rgba(200, 122, 50, 0.1);
+      box-sizing: border-box;
+    }
+
+    /* TOP HUD HEADER */
+    #top-hud {
+      height: 44px;
+      min-height: 44px;
+      max-height: 44px;
+      background: linear-gradient(180deg, var(--quake-header-bg) 0%, var(--quake-panel) 100%);
+      border-bottom: 2px solid var(--quake-border-mid);
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      white-space: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 0 14px;
+      gap: 12px;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+    }
+
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #1e130b;
+      border: 1px solid #3d2311;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #965a25;
+      border-radius: 4px;
+      border: 1px solid #c87a32;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--quake-gold);
+      border-color: #ffd700;
+    }
+    ::-webkit-scrollbar-corner {
+      background: #120c08;
+    }
+
+    .hud-title {
+      font-size: 1.02rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      color: var(--quake-gold);
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+
+    .hud-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+
+    .hud-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--quake-text-muted);
+      text-transform: uppercase;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .hud-select, .ui-scale-select {
+      background: var(--quake-bg);
+      color: var(--quake-gold);
+      border: 1px solid var(--quake-border-mid);
+      border-radius: 3px;
+      padding: 3px 7px;
+      font-size: 0.88rem;
+      font-family: var(--font-mono);
+      outline: none;
+      cursor: pointer;
+    }
+    .hud-select:focus, .hud-select:hover,
+    .ui-scale-select:focus, .ui-scale-select:hover {
+      border-color: var(--quake-cyan);
+      box-shadow: 0 0 6px rgba(0, 229, 255, 0.3);
+    }
+
+    .ui-scale-container {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .ui-scale-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--quake-text-muted);
+      text-transform: uppercase;
+      font-family: var(--font-mono);
+    }
+
+    .mode-pills {
+      display: flex;
+      border: 1px solid var(--quake-border);
+      border-radius: 4px;
+      overflow: hidden;
+      background: #090b0e;
+      flex-shrink: 0;
+    }
+    .mode-pill {
+      background: transparent;
+      border: none;
+      color: var(--quake-text-muted);
+      padding: 4px 10px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      transition: all 0.15s ease;
+    }
+    .mode-pill:hover {
+      color: var(--quake-text);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .mode-pill.active {
+      background: var(--quake-gold);
+      color: #000;
+      font-weight: 800;
+    }
+    .mode-pill:disabled, .mode-pill.disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .hud-btn {
+      background: #1b120a;
+      border: 1px solid var(--quake-border-mid);
+      color: var(--quake-text);
+      padding: 4px 10px;
+      border-radius: 3px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .hud-btn:hover, .hud-btn.active {
+      background: #261a0f;
+      border-color: var(--quake-gold);
+      color: var(--quake-gold);
+      box-shadow: 0 0 8px rgba(255, 184, 0, 0.3);
+    }
+
+    .btn-target-bug {
+      background: linear-gradient(180deg, #dc2626 0%, #991b1b 100%) !important;
+      color: #fff !important;
+      border: 1px solid #ef4444 !important;
+      font-weight: 800 !important;
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+    }
+    .btn-target-bug:hover {
+      box-shadow: 0 0 16px rgba(239, 68, 68, 0.8) !important;
+    }
+
+    /* MAIN WORKSPACE */
+    #main-workspace {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* SIDEBAR */
+    #sidebar {
+      width: 320px;
+      min-width: 180px;
+      max-width: 780px;
+      background: var(--quake-panel);
+      display: flex;
+      flex-direction: column;
+      z-index: 50;
+      flex-shrink: 0;
+    }
+
+    .panel-resizer {
+      width: 6px;
+      cursor: col-resize;
+      background: var(--quake-border);
+      position: relative;
+      z-index: 60;
+      user-select: none;
+      flex-shrink: 0;
+    }
+    .panel-resizer:hover, .panel-resizer.resizing {
+      background: var(--quake-gold);
+    }
+
+    .sidebar-tabs {
+      display: flex;
+      background: #0d1017;
+      border-bottom: 1px solid var(--quake-border);
+    }
+    .sidebar-tab {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--quake-text-muted);
+      padding: 8px 4px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      text-align: center;
+    }
+    .sidebar-tab:hover {
+      color: var(--quake-text);
+    }
+    .sidebar-tab.active {
+      color: var(--quake-gold);
+      border-bottom-color: var(--quake-gold);
+      background: rgba(255, 170, 0, 0.05);
+    }
+
+    .sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+    .tab-pane {
+      display: none;
+    }
+    .tab-pane.active {
+      display: block;
+    }
+
+    /* PCB LAYERS & NETLIST */
+    .layer-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 8px;
+      margin-bottom: 4px;
+      background: #0d1017;
+      border: 1px solid var(--quake-border);
+      border-radius: 4px;
+      font-size: 0.88rem;
+    }
+    .layer-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .layer-color-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+    .layer-btn-solo {
+      background: transparent;
+      border: 1px solid var(--quake-border);
+      color: var(--quake-text-muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 2px;
+      cursor: pointer;
+    }
+    .layer-btn-solo:hover, .layer-btn-solo.active {
+      background: var(--quake-gold);
+      color: #000;
+      border-color: var(--quake-gold);
+    }
+
+    .net-item {
+      padding: 5px 8px;
+      font-size: 0.88rem;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .net-item:hover {
+      background: rgba(255, 184, 0, 0.1);
+    }
+    .net-item.active {
+      background: rgba(51, 255, 51, 0.2);
+      border: 1px solid #33ff33;
+      color: #33ff33;
+      font-weight: 700;
+    }
+    .net-pin-count {
+      font-size: 0.78rem;
+      padding: 1px 6px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--quake-text-muted);
+    }
+
+    /* 3D + 2D RETINA VIEWPORT */
+    #viewport-container {
+      flex: 1;
+      position: relative;
+      background: #10141b;
+      overflow: hidden;
+    }
+    #cad-view {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+    #markup-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 20;
+    }
+    #markup-canvas.active {
+      pointer-events: auto;
+      cursor: crosshair;
+    }
+
+    /* FLOATING CAMERA TOOLBAR */
+    #cam-toolbar {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: rgba(20, 13, 8, 0.96);
+      border: 1.5px solid var(--quake-gold-dim);
+      border-radius: 6px;
+      backdrop-filter: blur(8px);
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      padding: 6px;
+      z-index: 50;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.82);
+    }
+    .cam-btn {
+      background: #140d08;
+      border: 1px solid var(--quake-border-bright);
+      color: #f8fafc;
+      width: 34px;
+      height: 32px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.88rem;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      cursor: pointer;
+    }
+    .cam-btn:hover {
+      background: #261a0f;
+      border-color: var(--quake-gold);
+      color: var(--quake-gold);
+    }
+    .cam-btn.active {
+      background: var(--quake-gold);
+      color: #000;
+      border-color: var(--quake-gold);
+    }
+
+    /* 2D MODE ORBIT/ROTATE CONTROL LOCKS & MODE-SCOPED HUD ROWS (BUG-EMERALD-TICK-950) */
+    body.mode-cad #cam-flip,
+    body.mode-simulate #cam-flip,
+    body.mode-pcb #cam-iso,
+    body.mode-pcb #cam-front,
+    body.mode-pcb #cam-right,
+    body.mode-pcb #cam-ortho,
+    body.mode-pcb #cam-wire,
+    body.mode-diagram #cam-iso,
+    body.mode-diagram #cam-top,
+    body.mode-diagram #cam-bottom,
+    body.mode-diagram #cam-flip,
+    body.mode-diagram #cam-front,
+    body.mode-diagram #cam-right,
+    body.mode-diagram #cam-ortho,
+    body.mode-diagram #cam-wire,
+    body.mode-pcb #btn-view-iso,
+    body.mode-pcb #btn-view-front,
+    body.mode-pcb #btn-view-right,
+    body.mode-pcb #btn-view-left,
+    body.mode-pcb #btn-view-ortho,
+    body.mode-pcb #btn-view-wire,
+    body.mode-pcb #explode-section,
+    body.mode-diagram #btn-view-iso,
+    body.mode-diagram #btn-view-top,
+    body.mode-diagram #btn-view-bottom,
+    body.mode-diagram #btn-view-front,
+    body.mode-diagram #btn-view-right,
+    body.mode-diagram #btn-view-left,
+    body.mode-diagram #btn-view-ortho,
+    body.mode-diagram #btn-view-wire,
+    body.mode-diagram #explode-section,
+    body.mode-pcb #hud-row-orbit,
+    body.mode-pcb #hud-row-pivot,
+    body.mode-pcb #hud-row-front,
+    body.mode-pcb #hud-row-right,
+    body.mode-pcb #hud-row-ortho,
+    body.mode-pcb #hud-row-iso,
+    body.mode-pcb #hud-row-wire,
+    body.mode-pcb #hud-row-sim,
+    body.mode-diagram #hud-row-orbit,
+    body.mode-diagram #hud-row-pivot,
+    body.mode-diagram #hud-row-front,
+    body.mode-diagram #hud-row-right,
+    body.mode-diagram #hud-row-top,
+    body.mode-diagram #hud-row-ortho,
+    body.mode-diagram #hud-row-iso,
+    body.mode-diagram #hud-row-wire,
+    body.mode-diagram #hud-row-sim,
+    body.mode-diagram #hud-row-flip,
+    body.mode-diagram #hud-row-inspect-pcb,
+    body.mode-cad #hud-row-flip,
+    body.mode-cad #hud-row-inspect-pcb,
+    body.mode-cad #hud-row-sim,
+    body.mode-simulate #hud-row-flip,
+    body.mode-simulate #hud-row-inspect-pcb {
+      display: none !important;
+    }
+
+    /* FLOATING MARKUP TOOLBAR */
+    #markup-toolbar {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(20, 13, 8, 0.97);
+      border: 1.5px solid var(--quake-gold);
+      border-radius: 8px;
+      backdrop-filter: blur(12px);
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      z-index: 40;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.88);
+    }
+    #markup-toolbar.visible {
+      display: flex;
+    }
+    .tool-btn {
+      background: #0d1017;
+      border: 1px solid var(--quake-border);
+      color: var(--quake-text);
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      cursor: pointer;
+    }
+    .tool-btn:hover, .tool-btn.active {
+      border-color: var(--quake-gold);
+      color: var(--quake-gold);
+      background: rgba(255, 170, 0, 0.1);
+    }
+    .color-swatch {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+    }
+    .color-swatch.active {
+      border-color: #fff;
+      box-shadow: 0 0 8px #fff;
+    }
+
+    /* SIMULATION SCRUBBER BAR */
+    #sim-bar {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      right: 16px;
+      background: rgba(19, 23, 32, 0.95);
+      border: 1px solid var(--quake-border);
+      border-radius: 6px;
+      backdrop-filter: blur(8px);
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      padding: 8px 16px;
+      z-index: 35;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7);
+      white-space: nowrap;
+    }
+    #sim-bar.visible {
+      display: flex;
+    }
+    .sim-slider {
+      flex: 1;
+      min-width: 120px;
+      accent-color: var(--quake-gold);
+      cursor: pointer;
+    }
+
+    /* MODALS & SHORTCUTS HUD */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+    .modal-overlay.visible {
+      display: flex;
+    }
+    .modal-box {
+      background: var(--quake-panel);
+      border: 2px solid var(--quake-border-bright);
+      border-radius: 8px;
+      width: 640px;
+      max-width: 90vw;
+      max-height: 85vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.9);
+    }
+    .modal-header {
+      padding: 12px 16px;
+      background: #181d28;
+      border-bottom: 1px solid var(--quake-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-header h3 {
+      margin: 0;
+      font-size: 1rem;
+      color: var(--quake-gold);
+    }
+    .modal-body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .modal-footer {
+      padding: 12px 16px;
+      background: #0d1017;
+      border-top: 1px solid var(--quake-border);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .form-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--quake-text-muted);
+      text-transform: uppercase;
+    }
+    .form-input, .form-textarea, .form-select {
+      background: #090b0e;
+      border: 1px solid var(--quake-border);
+      color: var(--quake-text);
+      border-radius: 4px;
+      padding: 6px 10px;
+      font-size: 0.88rem;
+      font-family: var(--font-mono);
+      outline: none;
+      box-sizing: border-box;
+    }
+    .form-input:focus, .form-textarea:focus, .form-select:focus {
+      border-color: var(--quake-cyan);
+    }
+
+    #cad-shortcuts-hud {
+      position: absolute;
+      top: 16px;
+      right: 68px;
+      width: 500px;
+      max-width: calc(100% - 84px);
+      max-height: calc(100% - 32px);
+      background: rgba(20, 13, 8, 0.98);
+      border: 2px solid var(--quake-gold);
+      border-radius: 8px;
+      backdrop-filter: blur(14px);
+      z-index: 45;
+      display: none;
+      flex-direction: column;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.92);
+    }
+    #cad-shortcuts-hud.visible {
+      display: flex;
+    }
+    .hud-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 9px 12px;
+      background: linear-gradient(180deg, #2e1d12 0%, #1d120a 100%);
+      border-bottom: 1px solid var(--quake-border-bright);
+      border-radius: 6px 6px 0 0;
+    }
+    .hud-panel-body {
+      padding: 8px 12px 10px 12px;
+      overflow-y: auto;
+    }
+    .shortcuts-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      color: #f8fafc;
+    }
+    .shortcuts-table th {
+      text-align: left;
+      color: var(--quake-gold);
+      padding: 6px 8px;
+      border-bottom: 1.5px solid var(--quake-border-bright);
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    .shortcuts-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid rgba(255, 184, 0, 0.14);
+      color: #f3f4f6;
+    }
+    .kbd-badge {
+      background: #0b111c;
+      border: 1px solid #38bdf8;
+      color: #7dd3fc;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 0.8rem;
+      font-weight: 800;
+    }
+  </style>
+</head>
+{% set active_mode = (init_mode or 'CAD') | upper %}
+<body class="mode-{{ active_mode | lower }}">
+
+  <!-- TOP HUD HEADER -->
+  <header id="top-hud">
+    <div class="hud-group">
+      <img src="/static/scope-icon.svg" width="22" height="22" alt="Scope Icon" style="filter: drop-shadow(0 0 6px rgba(255, 170, 0, 0.5)); border-radius: 4px;">
+      <div class="hud-title">◈ SCOPE // CAD/PCB WORKSTATION ◈</div>
+      <button id="btn-sync" class="hud-btn" title="Sync manifests and invalidate caches">⟳ Sync</button>
+      <button id="btn-open-chooser" class="hud-btn" title="Open Project &amp; Target Selection Screen">
+        <span>📁 Target:</span>
+        <span id="hud-active-target" style="color: var(--quake-gold); font-weight: 700;">(Select Target)</span>
+      </button>
+    </div>
+
+    <div class="hud-group">
+      <div class="hud-label">Mode:</div>
+      <div class="mode-pills">
+        <button class="mode-pill{% if active_mode == 'CAD' %} active{% endif %}" data-mode="CAD">CAD</button>
+        <button class="mode-pill{% if active_mode == 'PCB' %} active{% endif %}" data-mode="PCB">PCB</button>
+        <button class="mode-pill{% if active_mode == 'SIMULATE' %} active{% endif %}" data-mode="SIMULATE">SIM</button>
+        <button class="mode-pill{% if active_mode == 'DIAGRAM' %} active{% endif %}" data-mode="DIAGRAM">DIAG</button>
+      </div>
+    </div>
+
+    <div class="hud-group">
+      <div class="ui-scale-container" title="UI Scale (Shortcuts: Cmd/Ctrl +/- or 0 to reset)">
+        <span class="ui-scale-label">SCALE:</span>
+        <select id="uiScaleSelect" class="ui-scale-select">
+          <option value="75%">75%</option>
+          <option value="80%">80%</option>
+          <option value="90%">90%</option>
+          <option value="100%" selected>100%</option>
+          <option value="110%">110%</option>
+          <option value="125%">125%</option>
+          <option value="150%">150%</option>
+        </select>
+      </div>
+
+      <button id="btn-shortcuts" class="hud-btn" title="Toggle Shortcuts in CAD Viewport (? or H)">⌨️ Shortcuts</button>
+      <button id="btn-toggle-markup" class="hud-btn">✏️ Markup</button>
+      <button id="btn-target-bug" class="hud-btn btn-target-bug">🎯 Target Bug</button>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE -->
+  <div id="main-workspace">
+    <!-- COLLAPSIBLE SIDEBAR -->
+    <aside id="sidebar">
+      <div class="sidebar-tabs">
+        <button id="tab-btn-layers" class="sidebar-tab" data-pane="tab-layers" style="display: none;">PCB Layers</button>
+        <button id="tab-btn-tree" class="sidebar-tab active" data-pane="tab-tree">Tree</button>
+        <button id="tab-btn-display" class="sidebar-tab" data-pane="tab-display">View</button>
+        <button id="tab-btn-metrics" class="sidebar-tab" data-pane="tab-metrics" style="display: none;">Metrics</button>
+        <button id="tab-btn-inspect" class="sidebar-tab" data-pane="tab-inspect">Inspect</button>
+        <button id="tab-btn-pins" class="sidebar-tab" data-pane="tab-pins">Pins</button>
+      </div>
+
+      <div class="sidebar-content">
+        <!-- PCB LAYERS PANE -->
+        <div id="tab-layers" class="tab-pane">
+          <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+            <button id="btn-all-layers" class="hud-btn" style="flex: 1; justify-content: center; padding: 4px;">All On</button>
+            <button id="btn-flip-pcb" class="hud-btn" style="flex: 1; justify-content: center; padding: 4px;">Flip 2D</button>
+          </div>
+          <div id="layers-list"></div>
+
+          <div style="margin-top: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <div class="hud-label">Nets Highlighting:</div>
+              <button id="btn-clear-net-highlight" class="hud-btn" style="padding: 1px 6px; font-size: 0.75rem;">Clear</button>
+            </div>
+            <input id="net-search" class="form-input" style="width: 100%; margin-bottom: 6px;" placeholder="Search net...">
+            <div id="nets-list" style="max-height: 240px; overflow-y: auto;"></div>
+          </div>
+        </div>
+
+        <!-- OCP SCENE TREE PANE -->
+        <div id="tab-tree" class="tab-pane active">
+          <div id="tree-container">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 6px;">
+              <div class="hud-label">CAD Objects:</div>
+              <div style="display: inline-flex; gap: 4px;">
+                <button id="btn-cad-tree-expand-all" class="hud-btn" style="padding: 1px 6px; font-size: 0.72rem;" title="Expand all CAD rooms and groups">Expand All</button>
+                <button id="btn-cad-tree-collapse-all" class="hud-btn" style="padding: 1px 6px; font-size: 0.72rem;" title="Collapse all CAD rooms">Collapse All</button>
+              </div>
+            </div>
+            <div style="display: flex; gap: 4px; margin-bottom: 8px; align-items: center;">
+              <input id="cad-tree-search" class="form-input" style="flex: 1;" placeholder="Search CAD rooms &amp; parts...">
+              <button id="btn-cad-tree-clear-search" class="hud-btn" style="padding: 3px 7px; font-size: 0.75rem; display: none;" title="Clear CAD tree search">✕</button>
+            </div>
+            <div id="cad-tree-list" style="max-height: calc(100vh - 210px); overflow-y: auto;"></div>
+          </div>
+        </div>
+
+        <!-- CAD DISPLAY CONTROLS PANE -->
+        <div id="tab-display" class="tab-pane">
+          <div class="hud-label" style="margin-bottom: 8px;">Camera Presets:</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 14px;">
+            <button id="btn-view-iso" class="hud-btn" style="padding: 4px;">Isometric</button>
+            <button id="btn-view-top" class="hud-btn" style="padding: 4px;">Top View</button>
+            <button id="btn-view-front" class="hud-btn" style="padding: 4px;">Front View</button>
+            <button id="btn-view-right" class="hud-btn" style="padding: 4px;">Right View</button>
+            <button id="btn-view-bottom" class="hud-btn" style="padding: 4px;">Bottom View</button>
+            <button id="btn-view-left" class="hud-btn" style="padding: 4px;">Left View</button>
+          </div>
+
+          <div class="hud-label" style="margin-bottom: 8px;">Projection &amp; Shading:</div>
+          <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px;">
+            <button id="btn-view-ortho" class="hud-btn" style="text-align: left; padding: 6px;">📐 Toggle Ortho / Persp</button>
+            <button id="btn-view-wire" class="hud-btn" style="text-align: left; padding: 6px;">🕸️ Toggle Wireframe</button>
+            <button id="btn-view-axes" class="hud-btn" style="text-align: left; padding: 6px;">🧭 Toggle Coordinate Axes</button>
+            <button id="btn-view-grid" class="hud-btn" style="text-align: left; padding: 6px;">▦ Toggle Floor Grid</button>
+          </div>
+
+          <div id="explode-section">
+            <div class="hud-label" style="margin-bottom: 8px;">Exploded Assembly:</div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input id="view-explode-slider" type="range" class="sim-slider" min="0" max="100" value="0">
+              <span id="view-explode-val" style="font-size: 0.88rem; width: 40px; text-align: right;">0%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- RERUN METRICS PANE -->
+        <div id="tab-metrics" class="tab-pane">
+          <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+            <input type="text" id="metrics-search" class="form-input" placeholder="Query simulation metrics (spout, waterfall, vel)..." style="flex: 1;">
+            <button id="btn-save-rrd" class="hud-btn" style="padding: 4px 8px;" title="Download authentic Rerun .rrd recording">💾 Save .rrd</button>
+          </div>
+          <div id="metrics-summary" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.8rem; color: var(--quake-text-muted);">
+            <span id="metrics-count">0 metrics</span>
+            <button id="btn-metrics-clear-filter" class="hud-btn" style="padding: 1px 6px; font-size: 0.72rem; display: none;">Clear</button>
+          </div>
+          <div id="metrics-list" style="display: flex; flex-direction: column; gap: 6px; max-height: calc(100vh - 220px); overflow-y: auto;"></div>
+        </div>
+
+        <!-- INSPECTOR PANE -->
+        <div id="tab-inspect" class="tab-pane">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div class="hud-label">Selected Object / Face:</div>
+            <button id="btn-open-kicad" class="hud-btn" style="padding: 3px 8px; font-size: 0.8rem; background: rgba(56, 189, 248, 0.15); border: 1px solid var(--quake-cyan); color: var(--quake-cyan); font-weight: bold; display: none;" title="Open KiCad PCB Project in local KiCad EDA application">
+              📂 Open in KiCad
+            </button>
+          </div>
+          <div id="inspect-content" style="font-size: 0.88rem; line-height: 1.6; color: var(--quake-text-muted);">
+            Hover or click on geometry or PCB components to inspect details.
+          </div>
+        </div>
+
+        <!-- PINS PANE -->
+        <div id="tab-pins" class="tab-pane">
+          <div class="hud-label" style="margin-bottom: 8px;">Spatial 3D Pins:</div>
+          <div id="pins-list" style="display: flex; flex-direction: column; gap: 6px;"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- VERTICAL GRIPPER / RESIZER -->
+    <div id="sidebar-resizer" class="panel-resizer" title="Drag to resize panel (Double-click to reset)"></div>
+
+    <!-- 3D + 2D RETINA VIEWPORT -->
+    <div id="viewport-container">
+      <div id="cad-view"></div>
+      <canvas id="markup-canvas"></canvas>
+
+      <!-- CAD VIEWPORT SHORTCUTS HUD OVERLAY -->
+      <div id="cad-shortcuts-hud">
+        <div class="hud-panel-header">
+          <div id="shortcuts-hud-title" class="hud-title">{% if active_mode == 'PCB' %}◈ PCB 2D CONTROLS &amp; SHORTCUTS ◈{% elif active_mode == 'DIAGRAM' %}◈ DIAGRAM 2D CONTROLS &amp; SHORTCUTS ◈{% elif active_mode == 'SIMULATE' %}◈ SIMULATION CONTROLS &amp; SHORTCUTS ◈{% else %}◈ KEYBOARD &amp; MOUSE CONTROLS ◈{% endif %}</div>
+          <button id="btn-close-shortcuts-hud" class="hud-btn" style="padding: 1px 6px; font-size: 0.8rem;" title="Hide shortcuts overlay (Esc)">✕</button>
+        </div>
+        <div class="hud-panel-body">
+          <table class="shortcuts-table">
+            <thead>
+              <tr><th>Action</th><th id="shortcuts-col-header">{% if active_mode == 'PCB' %}Shortcut (2D PCB){% elif active_mode == 'DIAGRAM' %}Shortcut (2D Diagram){% else %}Shortcut (3D Viewport){% endif %}</th></tr>
+            </thead>
+            <tbody>
+              <tr id="hud-row-inspect-pcb"><td>Inspect Pad / Trace / Net</td><td><span class="kbd-badge">LMB Click</span> (<span class="kbd-badge">Esc</span> clears net)</td></tr>
+              <tr id="hud-row-orbit"><td>Orbit View</td><td><span class="kbd-badge">LMB Drag</span> or <span class="kbd-badge">MMB Drag</span></td></tr>
+              <tr id="hud-row-pan"><td>Pan View</td><td id="hud-cell-pan">{% if active_mode in ['PCB', 'DIAGRAM'] %}<span class="kbd-badge">LMB Drag</span> or <span class="kbd-badge">RMB Drag</span>{% else %}<span class="kbd-badge">RMB Drag</span> or <span class="kbd-badge">Shift + MMB</span>{% endif %}</td></tr>
+              <tr id="hud-row-zoom"><td>Zoom In / Out</td><td id="hud-cell-zoom">{% if active_mode in ['PCB', 'DIAGRAM'] %}<span class="kbd-badge">Scroll Wheel</span>, <span class="kbd-badge">MMB Drag</span>, or <span class="kbd-badge">+</span> / <span class="kbd-badge">-</span>{% else %}<span class="kbd-badge">Scroll Wheel</span> or <span class="kbd-badge">+</span> / <span class="kbd-badge">-</span>{% endif %}</td></tr>
+              <tr id="hud-row-flip"><td>Flip Board (Top / Bottom)</td><td><span class="kbd-badge">F</span></td></tr>
+              <tr id="hud-row-pivot"><td>Center View Pivot</td><td><span class="kbd-badge">Double Click</span> on surface</td></tr>
+              <tr id="hud-row-front"><td>Front / Rear View</td><td><span class="kbd-badge">1</span> / <span class="kbd-badge">Ctrl + 1</span></td></tr>
+              <tr id="hud-row-right"><td>Right / Left View</td><td><span class="kbd-badge">3</span> / <span class="kbd-badge">Ctrl + 3</span></td></tr>
+              <tr id="hud-row-top"><td id="hud-label-top">{% if active_mode == 'PCB' %}Top (F.Cu) / Bottom (B.Cu){% else %}Top / Bottom View{% endif %}</td><td id="hud-cell-top">{% if active_mode == 'PCB' %}<span class="kbd-badge">7</span> (Top) / <span class="kbd-badge">1</span> (Bottom){% else %}<span class="kbd-badge">7</span> / <span class="kbd-badge">Ctrl + 7</span>{% endif %}</td></tr>
+              <tr id="hud-row-ortho"><td>Toggle Ortho / Persp</td><td><span class="kbd-badge">5</span></td></tr>
+              <tr id="hud-row-focus"><td>Frame / Reset View</td><td id="hud-cell-focus">{% if active_mode == 'PCB' %}<span class="kbd-badge">.</span> or <span class="kbd-badge">Home</span>{% else %}<span class="kbd-badge">F</span>, <span class="kbd-badge">.</span>, or <span class="kbd-badge">Home</span>{% endif %}</td></tr>
+              <tr id="hud-row-iso"><td>Reset Isometric</td><td><span class="kbd-badge">0</span></td></tr>
+              <tr id="hud-row-planar-pan"><td>Keyboard Pan</td><td><span class="kbd-badge">W</span> <span class="kbd-badge">A</span> <span class="kbd-badge">S</span> <span class="kbd-badge">D</span> or <span class="kbd-badge">Arrow Keys</span></td></tr>
+              <tr id="hud-row-ruler"><td>Measure Distance (mm)</td><td><span class="kbd-badge">M</span> (<span class="kbd-badge">Shift</span> no-snap · <span class="kbd-badge">Esc</span> clear)</td></tr>
+              <tr id="hud-row-wire"><td>Toggle Wireframe</td><td><span class="kbd-badge">Z</span></td></tr>
+              <tr><td>Undo / Clear Markup</td><td><span class="kbd-badge">Cmd/Ctrl + Z</span> · <span class="kbd-badge">X</span> / <span class="kbd-badge">Del</span></td></tr>
+              <tr><td>UI Scale</td><td><span class="kbd-badge">Cmd/Ctrl +</span> / <span class="kbd-badge">-</span> / <span class="kbd-badge">0</span></td></tr>
+              <tr><td>Report Target Bug</td><td><span class="kbd-badge">B</span></td></tr>
+              <tr><td>Toggle Shortcuts Help</td><td><span class="kbd-badge">?</span> or <span class="kbd-badge">H</span> (<span class="kbd-badge">Esc</span> closes)</td></tr>
+              <tr id="hud-row-sim"><td>Simulation Play / Pause</td><td><span class="kbd-badge">Space</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- FLOATING CAMERA TOOLBAR -->
+      <div id="cam-toolbar">
+        <button class="cam-btn" id="cam-iso" title="Isometric View [0]">Iso</button>
+        <button class="cam-btn" id="cam-top" title="Top View (F.Cu) [7]">Top</button>
+        <span id="pcb-inner-layer-btns" style="display: none; align-items: center; gap: 3px;"></span>
+        <button class="cam-btn" id="cam-bottom" title="Bottom View (B.Cu) [1 in PCB / Ctrl+7 in CAD]">Bot</button>
+        <button class="cam-btn" id="cam-flip" title="Flip Board Top/Bottom [F]">Flip</button>
+        <button class="cam-btn" id="cam-front" title="Front View [1]">Frn</button>
+        <button class="cam-btn" id="cam-right" title="Right View [3]">Rgt</button>
+        <button class="cam-btn" id="cam-ortho" title="Toggle Ortho/Persp [5]">Or</button>
+        <button class="cam-btn" id="cam-focus" title="Frame / Reset View [. or Home]">🎯</button>
+        <button class="cam-btn" id="cam-wire" title="Toggle Wireframe [Z]">Z</button>
+        <button class="cam-btn" id="cam-ruler" title="Measure Distance in mm [M]">📏</button>
+      </div>
+
+      <!-- FLOATING MARKUP TOOLBAR -->
+      <div id="markup-toolbar">
+        <div class="hud-label">Tools:</div>
+        <button class="tool-btn active" data-tool="pen">✏️ Pen</button>
+        <button class="tool-btn" data-tool="line">📏 Line</button>
+        <button class="tool-btn" data-tool="arrow">➔ Arrow</button>
+        <button class="tool-btn" data-tool="rect">▭ Rect</button>
+        <button class="tool-btn" data-tool="circle">◯ Circle</button>
+        <button class="tool-btn" data-tool="text">T Text</button>
+        <button class="tool-btn" data-tool="pin">📍 Pin</button>
+
+        <div style="width: 1px; height: 18px; background: var(--quake-border); margin: 0 4px;"></div>
+
+        <input id="markup-text-input" type="text" placeholder="Note / Pin text..." class="form-input" style="width: 140px; padding: 2px 6px; height: 24px;" title="Non-modal text note for Pin and Text tools">
+
+        <div style="width: 1px; height: 18px; background: var(--quake-border); margin: 0 4px;"></div>
+
+        <div class="hud-label">Color:</div>
+        <div class="color-swatch active" data-color="#ff3333" style="background: #ff3333;"></div>
+        <div class="color-swatch" data-color="#33ff33" style="background: #33ff33;"></div>
+        <div class="color-swatch" data-color="#00ffff" style="background: #00ffff;"></div>
+        <div class="color-swatch" data-color="#ff00ff" style="background: #ff00ff;"></div>
+        <div class="color-swatch" data-color="#3388ff" style="background: #3388ff;"></div>
+        <div class="color-swatch" data-color="#ffff00" style="background: #ffff00;"></div>
+
+        <div style="width: 1px; height: 18px; background: var(--quake-border); margin: 0 4px;"></div>
+
+        <button id="btn-undo-markup" class="tool-btn" title="Undo (Ctrl+Z)">↩️ Undo</button>
+        <button id="btn-clear-markup" class="tool-btn" title="Clear All (X / Delete)">🗑️ Clear</button>
+      </div>
+
+      <!-- SIMULATION SCRUBBER BAR -->
+      <div id="sim-bar">
+        <div style="display: flex; align-items: center; gap: 10px; width: 100%;">
+          <button id="btn-sim-play" class="hud-btn" style="padding: 4px 10px;">▶ Play</button>
+          <button id="btn-sim-prev" class="hud-btn" style="padding: 4px 8px;" title="Step Back (10 frames)">⏮</button>
+          <button id="btn-sim-next" class="hud-btn" style="padding: 4px 8px;" title="Step Forward (10 frames)">⏭</button>
+          <input id="sim-step-slider" type="range" class="sim-slider" min="0" max="1000" value="0">
+          <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--quake-border); border-radius: 4px; padding: 2px 8px;">
+            <div id="sim-step-val" style="font-size: 0.88rem; min-width: 140px; text-align: center; color: var(--quake-gold); font-weight: bold; font-variant-numeric: tabular-nums;">Step: 0</div>
+            <div style="width: 1px; height: 16px; background: var(--quake-border);"></div>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <label class="hud-label" for="sim-timescale">SPEED:</label>
+              <select id="sim-timescale" class="hud-select" style="padding: 2px 6px;">
+                <option value="0.25">0.25x</option>
+                <option value="0.5">0.5x</option>
+                <option value="1.0" selected>1.0x</option>
+                <option value="2.0">2.0x</option>
+                <option value="5.0">5.0x</option>
+              </select>
+            </div>
+          </div>
+          <div class="mode-pills" title="Toggle exact 3D Voxel Grid Cubes vs Smooth Spheres">
+            <button id="btn-sim-style-voxels" class="mode-pill active" type="button">🧊 Voxels</button>
+            <button id="btn-sim-style-spheres" class="mode-pill" type="button">⚪ Spheres</button>
+          </div>
+          <button id="btn-open-rerun" class="hud-btn" style="padding: 3px 10px; background: rgba(255, 136, 0, 0.2); border: 1px solid #ff8800; color: #ffaa33;" title="Launch official Rerun Viewer for deep telemetry inspection">
+            🚀 Open in Rerun Viewer
+          </button>
+        </div>
+        <div id="sim-timeline-logs" style="display: flex; align-items: center; justify-content: flex-end; width: 100%; margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 0.8rem; gap: 8px;">
+          <div id="sim-flow-metrics" style="color: var(--quake-cyan); font-weight: 500;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROJECT & TARGET CHOOSER MODAL -->
+  <div id="modal-project-chooser" class="modal-overlay">
+    <div class="modal-box" style="width: 520px;">
+      <div class="modal-header">
+        <h3>◈ SELECT PROJECT &amp; TARGET ◈</h3>
+        <button id="btn-close-chooser" class="hud-btn" style="padding: 2px 8px;">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size: 0.88rem; color: var(--quake-text-muted);">
+          Select a project and geometry target to inspect in the 3D CAD/PCB Scope Workstation:
+        </div>
+
+        <div class="form-group">
+          <label class="hud-label" for="chooser-project">Project</label>
+          <select id="chooser-project" class="form-input"></select>
+        </div>
+
+        <div class="form-group">
+          <label class="hud-label" for="chooser-target">Target</label>
+          <select id="chooser-target" class="form-input"></select>
+        </div>
+
+        <div class="form-group">
+          <label class="hud-label" for="chooser-sub">Subassembly</label>
+          <select id="chooser-sub" class="form-input">
+            <option value="">(None / Entire Target)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="hud-label">Mode</label>
+          <div id="chooser-mode-pills" class="mode-pills" style="width: fit-content;">
+            <button class="mode-pill active" data-mode="CAD">CAD</button>
+            <button class="mode-pill" data-mode="PCB">PCB</button>
+            <button class="mode-pill" data-mode="SIMULATE">SIM</button>
+            <button class="mode-pill" data-mode="DIAGRAM">DIAG</button>
+          </div>
+        </div>
+
+        <div id="chooser-sim-steps-container" class="form-group" style="display: none;">
+          <label class="hud-label" for="chooser-max-steps">Max Simulation Steps</label>
+          <select id="chooser-max-steps" class="form-input">
+            <option value="500">500 steps (fast verification)</option>
+            <option value="1000" selected>1000 steps (nominal cycle)</option>
+            <option value="2000">2000 steps (extended dynamics)</option>
+            <option value="5000">5000 steps (deep equilibrium)</option>
+          </select>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px;">
+          <button id="btn-chooser-cancel" class="hud-btn">Cancel</button>
+          <button id="btn-chooser-submit" class="hud-btn btn-target-bug" style="padding: 6px 16px;">Inspect Target ➜</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TARGET BUG MODAL -->
+  <div id="modal-bug" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>◈ TARGET BUG REPORT ◈</h3>
+        <button id="btn-close-bug" class="hud-btn" style="padding: 2px 8px;">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="display: flex; gap: 12px;">
+          <div style="flex: 1;" class="form-group">
+            <label class="form-label" for="bug-title">Title:</label>
+            <input id="bug-title" class="form-input" value="[scope] Defect Summary">
+          </div>
+          <div style="width: 140px;" class="form-group">
+            <label class="form-label" for="bug-severity">Severity:</label>
+            <select id="bug-severity" class="form-select">
+              <option value="CRITICAL">CRITICAL</option>
+              <option value="HIGH">HIGH</option>
+              <option value="MEDIUM" selected>MEDIUM</option>
+              <option value="LOW">LOW</option>
+              <option value="NIT">NIT</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 12px;">
+          <div style="flex: 1;" class="form-group">
+            <label class="form-label" for="bug-comp">Component / Project:</label>
+            <input id="bug-comp" class="form-input" readonly>
+          </div>
+          <div style="flex: 1;" class="form-group">
+            <label class="form-label" for="bug-cat">Category:</label>
+            <select id="bug-cat" class="form-select">
+              <option value="CAD">CAD</option>
+              <option value="PCB">PCB</option>
+              <option value="SIMULATION">SIMULATION</option>
+              <option value="FABRICATION">FABRICATION</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="bug-desc">Description:</label>
+          <textarea id="bug-desc" class="form-textarea" rows="4"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="bug-steps">Reproduction Steps:</label>
+          <input id="bug-steps" class="form-input" readonly>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Composited Viewport Snapshot:</label>
+          <div style="border: 1px solid var(--quake-border); border-radius: 4px; overflow: hidden; max-height: 180px; background: #000; text-align: center;">
+            <img id="bug-snapshot-preview" alt="Viewport Snapshot" style="max-width: 100%; max-height: 180px; object-fit: contain;">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-cancel-bug" class="hud-btn">Cancel</button>
+        <button id="btn-submit-bug" class="hud-btn btn-target-bug">Submit Bug Report</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SYNC / LOADING MODAL PROGRESS DIALOG -->
+  <div id="modal-sync-progress" class="modal-overlay">
+    <div class="modal-box" style="width: 440px; text-align: center; border: 1px solid var(--quake-gold); box-shadow: 0 0 24px rgba(255,170,0,0.25);">
+      <div class="modal-header" style="justify-content: center; border-bottom: 1px solid rgba(255,170,0,0.3);">
+        <h3 id="sync-modal-title">◈ SYNCHRONIZING WORKSTATION... ◈</h3>
+      </div>
+      <div class="modal-body" style="padding: 20px 16px;">
+        <div id="sync-stage-text" style="font-size: 0.92rem; font-weight: 600; color: #fff; margin-bottom: 10px;">
+          Initializing synchronization...
+        </div>
+        <div id="sync-stage-detail" style="font-size: 0.8rem; color: var(--quake-text-muted); margin-bottom: 16px;">
+          Connecting to provider pipeline
+        </div>
+        <div style="background: rgba(0,0,0,0.5); border: 1px solid var(--quake-border); border-radius: 4px; height: 16px; overflow: hidden; position: relative;">
+          <div id="sync-progress-bar" style="background: linear-gradient(90deg, #ffaa00, #00e5ff); height: 100%; width: 0%; transition: width 0.25s ease-out; border-radius: 3px;"></div>
+        </div>
+        <div id="sync-percent-text" style="font-size: 0.8rem; font-family: monospace; color: var(--quake-cyan); margin-top: 8px;">
+          0%
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STRUCTURED WORKSTATION BOOT CONFIGURATION -->
+  <script id="app-boot-config" type="application/json">
+{{ {
+  "initProject": init_project | default("", true),
+  "initTarget": init_target | default("", true),
+  "initSubassembly": init_subassembly | default("", true),
+  "initMode": (init_mode | default("CAD", true)) | upper,
+  "initMaxSteps": init_max_steps | default(1000, true),
+  "port": port | default(0, true)
+} | tojson }}
+  </script>
+  <script type="module" src="/js/scope/main.js"></script>
+</body>
+</html>

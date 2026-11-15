@@ -365,23 +365,7 @@ def test_regression_bug_076_feedback_tools_sqlite_only():
 
 
 def test_regression_bug_079_no_duplicate_bug_ids_and_generator():
-    """Verify BUG-079: bug report workstation does not generate duplicate bug IDs using bugs.length."""
-    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
-    template_file = templates_dir / "bug_report.html.j2"
-    assert template_file.exists()
-    content = template_file.read_text(encoding="utf-8")
-
-    # 1. Frontend template must NOT generate bug ID using db.bugs.length + 1
-    assert "db.bugs.length + 1" not in content, (
-        "Frontend bug_report.html.j2 must not generate bug IDs from db.bugs.length + 1 as missing IDs cause collisions"
-    )
-
-    # 2. Frontend must define generateNextBugId using max ID index
-    assert "generateNextBugId" in content, (
-        "Frontend bug_report.html.j2 must define generateNextBugId calculating max bug index"
-    )
-
-    # 3. Backend BugDatabaseModel must correctly skip to max + 1 when IDs are non-contiguous
+    """Verify BUG-079: BugDatabaseModel generates unique Docker-pattern IDs when existing IDs are non-contiguous."""
     db = BugDatabaseModel(title="Non-contiguous test")
     db.bugs = [
         BugReportModel(
@@ -485,12 +469,6 @@ def test_regression_bug_169_git_lfs_tracking_and_policy() -> None:
     assert "GitHub LFS" in agents_text or "Git LFS" in agents_text
     assert "non-confidential" in agents_text
 
-    # Check bug_report template
-    template_file = repo_root / "provider" / "templates" / "bug_report.html.j2"
-    tpl_text = template_file.read_text(encoding="utf-8")
-    assert "attachment-lfs-notice" in tpl_text
-    assert "GitHub LFS" in tpl_text
-
 
 def test_regression_bug_170_feedback_dir_watch_and_resolution_preservation(tmp_path: Path) -> None:
     """Verify BUG-170: Feedback directory watch detects external bug resolution and preserves resolution on Save."""
@@ -574,25 +552,6 @@ def test_regression_bug_170_feedback_dir_watch_and_resolution_preservation(tmp_p
     assert final_b166.status == BugStatus.RESOLVED
     assert "- **Status**: `RESOLVED`" in bug166_md.read_text(encoding="utf-8")
     assert server.sqlite_store.load_database().get_bug("BUG-166").status == BugStatus.RESOLVED
-
-
-def test_regression_bug_172_vertical_text_panel_and_cli_expansion() -> None:
-    """Verify BUG-172: Allow text panels in bug report tool and CLI console in code review tool to extend vertically."""
-    repo_root = Path(__file__).resolve().parent.parent
-
-    # 1. Verify code_review.html.j2 has vertical CLI console resizing
-    cr_template = (repo_root / "provider" / "templates" / "code_review.html.j2").read_text(encoding="utf-8")
-    assert "cli-resizer" in cr_template
-    assert "cliResizer" in cr_template
-    assert "setupCliResizer" in cr_template
-    assert "cursor: ns-resize" in cr_template
-
-    # 2. Verify bug_report.html.j2 has vertical text panel expansion
-    br_template = (repo_root / "provider" / "templates" / "bug_report.html.j2").read_text(encoding="utf-8")
-    assert "panel-expand-btn" in br_template
-    assert "expanded-vertical" in br_template
-    assert "toggleExpandPanel" in br_template
-    assert "resize: both" in br_template or "resize: vertical" in br_template
 
 
 def test_regression_bug_181_no_file_descriptor_leak_in_sqlite_and_server(tmp_path: Path) -> None:
@@ -926,32 +885,12 @@ def test_regression_bug_270_bug_report_server_handles_broken_pipe_gracefully(
 
 
 def test_regression_bug_279_component_autocomplete_datalist() -> None:
-    """Verify BUG-279: populate component textbox with autocomplete datalist from prior bug history."""
+    """Verify BUG-279: Jinja2 bug_report template renders unique component datalist options from bug history."""
     import jinja2
     from model.bug_report import BugCategory, BugDatabaseModel, BugReportModel, BugSeverity, BugStatus
 
     templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
-    tpl_path = templates_dir / "bug_report.html.j2"
-    assert tpl_path.is_file(), "bug_report.html.j2 must exist"
-    content = tpl_path.read_text(encoding="utf-8")
 
-    # 1. Component textbox must bind to datalist via list attribute
-    assert 'id="bug-component"' in content
-    assert 'list="bug-component-list"' in content or 'list="component-list"' in content, (
-        "bug-component input must have a list attribute referencing a datalist"
-    )
-
-    # 2. Datalist element must exist
-    assert '<datalist id="bug-component-list">' in content or '<datalist id="component-list">' in content, (
-        "bug_report.html.j2 must contain datalist for component autocomplete"
-    )
-
-    # 3. Dynamic JS updater must be present
-    assert "updateComponentDatalist" in content, (
-        "bug_report.html.j2 must define updateComponentDatalist to keep autocomplete in sync"
-    )
-
-    # 4. Jinja2 render with prior bug history renders unique option elements
     db = BugDatabaseModel(title="Autocomplete Test")
     db.bugs = [
         BugReportModel(
@@ -1191,19 +1130,6 @@ def test_bug_report_server_streams_attachment_chunks(tmp_path: Path) -> None:
         server.server_close()
 
 
-def test_bug_report_template_client_side_limit() -> None:
-    """Verify bug_report.html.j2 enforces MAX_ATTACHMENT_SIZE_BYTES client-side before FileReader."""
-    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "bug_report.html.j2"
-    assert template_path.exists()
-    content = template_path.read_text(encoding="utf-8")
-    assert "MAX_ATTACHMENT_SIZE_BYTES = 2 * 1024 * 1024 * 1024" in content
-    assert "MAX_ATTACHMENT_SIZE_BYTES" in content
-    assert "FileReader" in content
-    idx_limit = content.find("if (f.size >= MAX_ATTACHMENT_SIZE_BYTES)")
-    idx_reader = content.find("reader.readAsDataURL(f)", idx_limit)
-    assert idx_limit != -1 and idx_reader != -1, "Expected client-side size check before readAsDataURL"
-
-
 def test_regression_worm_creeping_larva_820_worm_prefixed_bug_files(tmp_path: Path) -> None:
     """Verify MarkdownBugExporter and BugReportServer support WORM_*.md files alongside BUG_*.md."""
     feedback_dir = tmp_path / "feedback"
@@ -1327,27 +1253,7 @@ def test_regression_bug_shining_silverfish_89_attachments_in_detached_branch_and
 
 
 def test_regression_bug_bristly_centipede_327_action_progress_modals_and_incremental_indexing(tmp_path: Path) -> None:
-    """Verify BUG-BRISTLY-CENTIPEDE-327: Action progress modals in diff and bug views & incremental attachment indexing."""
-    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
-
-    # 1. Verify diff_view.html.j2 modal UI and helper
-    diff_view = (templates_dir / "diff_view.html.j2").read_text(encoding="utf-8")
-    assert 'id="actionProgressModalOverlay"' in diff_view
-    assert "runWithActionModal" in diff_view
-    assert 'title: "SYNCHRONIZING REPOSITORY"' in diff_view
-    assert "await runWithActionModal" in diff_view
-
-    # 2. Verify bug_report.html.j2 modal UI and helper
-    bug_report = (templates_dir / "bug_report.html.j2").read_text(encoding="utf-8")
-    assert 'id="actionProgressModalOverlay"' in bug_report
-    assert "runWithActionModal" in bug_report
-    assert 'title: "SAVING BUG REPORT"' in bug_report
-    assert 'title: "ACCEPTING BUG REPORT"' in bug_report
-    assert 'title: "REJECTING BUG REPORT"' in bug_report
-    assert 'title: "DELETING BUG REPORT"' in bug_report
-    assert 'title: "MERGING AGENT FEEDBACK"' in bug_report
-
-    # 3. Verify incremental attachment scanning in DetachedBranchBugStore
+    """Verify BUG-BRISTLY-CENTIPEDE-327: incremental attachment scanning in DetachedBranchBugStore."""
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     subprocess.run(["git", "init", "-b", "main"], cwd=str(repo_root), check=True, capture_output=True)

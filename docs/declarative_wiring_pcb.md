@@ -6,7 +6,7 @@ Guidelines for schematic capture, routing engines, DRC checks, headless KiCad to
 * **Pipeline Architecture**: The PCB engine follows a strict declarative pipeline:
   `pcb_materials.yaml imports -> manifest.yaml -> .kicad_pcb / .kicad_sch targets -> kicad_cli -> board and schematic files`.
 * **Headless CAM Generation**: Manufacturing board files (RS-274X Gerbers, Excellon NC drills, Gerber job files) must be generated strictly via headless `kicad-cli` (`KiCadCLI`), not custom DIY string formatting.
-* **Pre-Computed Route Persistence**: PCB viewing workflows (`view.py`) and standard artifact generation MUST consume pre-computed, persisted routing artifacts (`carrier_board_routing.py`, `flex_tail.py`) rather than invoking the A* auto-router on the fly. Auto-routing is an explicit orchestration action performed via `python tools/config.py '<target>'` which emits strongly-typed Python modules generated from Jinja2 templates (`pcb_routing.py.j2`) using `BuildTraces`, `BuildLine`, `Polyline`, `Line`, `make_trace`, `BuildVias`, and `Via`.
+* **Pre-Computed Route Persistence**: PCB viewing workflows (`tools/scope.py`) and standard artifact generation MUST consume pre-computed, persisted routing artifacts (`carrier_board_routing.py`, `flex_tail.py`) rather than invoking the A* auto-router on the fly. Auto-routing is an explicit orchestration action performed via `python tools/config.py '<target>'` which emits strongly-typed Python modules generated from Jinja2 templates (`pcb_routing.py.j2`) using `BuildTraces`, `BuildLine`, `Polyline`, `Line`, `make_trace`, `BuildVias`, and `Via`.
 
 ## 2. Component Scoping & Canonical Reference Designators
 * **Subassembly Footprint Scoping**: Multi-board and rigid-flex assemblies must scope footprints, passives, and connectors explicitly to target subassemblies (via `shape_ref: carrier_board` or `shape_ref: flex_tail`). Never duplicate components across subassemblies or rely on hardcoded component names for footprint queries.
@@ -72,11 +72,11 @@ Guidelines for schematic capture, routing engines, DRC checks, headless KiCad to
 * **Integrated 3D Body & 2D Copper Pads**: `BuildFootprint` subclasses `BuildPart`, allowing 3D package geometries (`Box`, `Cylinder`) to be ambiently constructed inside the footprint definition alongside 2D copper pads (`Pad`) evaluated across ambient `Locations([...])` blocks.
 * **Provider Discoverability & 3D Inspection**: Footprints are exposed via `FootprintProvider` in `provider/footprints/provider.py` (decorated with `@discover_provider`), registering all standard footprints into `provider/footprints/manifest.yaml`. Every footprint can be inspected with bounding dimensions, 3D body solids, and copper pads via the CLI viewer:
   ```bash
-  python tools/view.py footprints/<package_name>
+  python tools/scope.py footprints/<package_name>
   # Examples:
-  python tools/view.py footprints/0402
-  python tools/view.py footprints/SOIC-8
-  python tools/view.py footprints/USB-C-16P
+  python tools/scope.py footprints/0402
+  python tools/scope.py footprints/SOIC-8
+  python tools/scope.py footprints/USB-C-16P
   ```
 
 ## 6. Native 3D PCB CAD Viewing & Multi-Layer Inspection
@@ -86,7 +86,7 @@ Guidelines for schematic capture, routing engines, DRC checks, headless KiCad to
   - Copper pads (`{name}_pads`): SMD, through-hole, and capacitive sensor copper pads elevated on surface planes with copper finish styling.
   - Copper trace ribbons (`{name}_traces_top`, `{name}_traces_bottom`): Front (`F.Cu`) and back (`B.Cu`) traces synthesized as rotated rectangular planar ribbons using vectorized batch compounding (< 0.3s for > 1,500 traces).
   - Through-hole vias (`{name}_vias`): Annular copper cylinders and drill holes penetrating the substrate stackup.
-* **Toggable Layers in OCP CAD Viewer**: `BuildPcb.populate_room(room, prefix)` populates distinct layer items into `Room`. In `ocp_vscode` (the interactive CAD viewer), each layer renders with an independent tree node and checkbox, enabling engineers to toggle layers on and off independently (e.g. hiding components to inspect inner traces, or isolating top vs bottom routing).
+* **Toggable Layers in Native CAD/PCB Scope Workstation**: `BuildPcb.populate_room(room, prefix)` populates distinct layer items into `Room`. In the interactive CAD/PCB workstation (`tools/scope.py`), each layer renders with an independent tree node and checkbox, enabling engineers to toggle layers on and off independently (e.g. hiding components to inspect inner traces, or isolating top vs bottom routing).
 * **Project Integration API**: Projects access the 3D assembler directly via `pcb.populate_room(room, prefix)` and `pcb.to_cad_assembly()`:
   ```python
   def view_carrier_board(self, room: Room, mode: Mode) -> None:

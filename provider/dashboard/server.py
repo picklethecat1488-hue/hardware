@@ -18,6 +18,7 @@ import socket
 import sqlite3
 import subprocess
 import sys
+import threading
 import time
 from typing import Any, Dict, List, Optional
 import urllib.parse
@@ -124,7 +125,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
 
-        if path.startswith("/static/"):
+        if path.startswith("/js/") or path.startswith("/static/"):
             self._handle_serve_static(path)
             return
 
@@ -246,8 +247,9 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             case "/api/search":
                 q = query.get("q", [""])[0]
                 commit = query.get("commit", ["working"])[0]
-                results = self.server.git_engine.search_code(q, commit=commit)
-                self._send_json({"query": q, "commit": commit, "results": results})
+                current_file = query.get("file", [""])[0]
+                results = self.server.git_engine.search_code(q, commit=commit, current_file=current_file)
+                self._send_json({"query": q, "commit": commit, "current_file": current_file, "results": results})
             case "/api/raw":
                 commit = query.get("commit", ["working"])[0]
                 file_path = query.get("file", [""])[0]
@@ -678,45 +680,12 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             self.close_connection = True
 
     def _handle_serve_static(self, path: str) -> None:
-        """Serve static files such as JavaScript vendor bundles and CSS."""
-        static_dir = Path(__file__).resolve().parent.parent / "code_review" / "static"
-        filename = path.removeprefix("/static/").strip("/")
-        file_target = (static_dir / filename).resolve()
-        if not str(file_target).startswith(str(static_dir)) or not file_target.is_file():
-            self.send_error(404, "Static asset not found")
-            return
-        mime_type, _ = mimetypes.guess_type(str(file_target))
-        if filename.endswith(".svg"):
-            mime_type = "image/svg+xml"
-        elif filename.endswith(".png"):
-            mime_type = "image/png"
-        elif filename.endswith(".ico"):
-            mime_type = "image/x-icon"
-        elif filename.endswith("manifest.json"):
-            mime_type = "application/manifest+json"
-        elif filename.endswith(".json"):
-            mime_type = "application/json"
-        elif filename.endswith(".js"):
-            mime_type = "application/javascript"
-        elif filename.endswith(".css"):
-            mime_type = "text/css"
-        elif not mime_type:
-            mime_type = "application/octet-stream"
+        """Serve ES modules from js/ and static assets from js/static/."""
+        from provider.http_static import get_hardware_js_root, serve_static_asset
 
-        content = file_target.read_bytes()
-        try:
-            self.send_response(200)
-            if mime_type.startswith("text/") or mime_type.startswith("application/"):
-                self.send_header("Content-Type", f"{mime_type}; charset=utf-8")
-            else:
-                self.send_header("Content-Type", mime_type)
-            self.send_header("Content-Length", str(len(content)))
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Connection", "close")
-            self.end_headers()
-            self.wfile.write(content)
-        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
-            self.close_connection = True
+        repo_root = getattr(self.server, "repo_root", None)
+        js_root = get_hardware_js_root(repo_root)
+        serve_static_asset(self, path, js_root=js_root, cache_control="no-cache")
 
     def _handle_serve_attachment(self, path: str) -> None:
         """Serve uploaded attachments."""
@@ -1160,10 +1129,21 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             self._send_json({"error": "Empty command"}, status=400)
             return
 
+        env = os.environ.copy()
+        py_bin_dir = str(Path(sys.executable).resolve().parent)
+        env["PATH"] = f"{py_bin_dir}{os.pathsep}{env.get('PATH', '')}"
+        repo_str = str(self.server.repo_root)
+        tools_str = str(self.server.repo_root / "tools")
+        existing_pypath = env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = f"{repo_str}{os.pathsep}{tools_str}" + (
+            f"{os.pathsep}{existing_pypath}" if existing_pypath else ""
+        )
+
         proc = subprocess.run(
             cmd,
             shell=True,
-            cwd=str(self.server.repo_root),
+            cwd=repo_str,
+            env=env,
             capture_output=True,
             text=True,
         )
@@ -1344,6 +1324,7 @@ class DashboardServer(ThreadingHTTPServer):
         self.active_branch = initial_branch or self.git_engine.get_current_branch()
         self.active_commit = initial_commit or "working"
         self.initial_sync_done: bool = False
+        self._sync_lock = threading.Lock()
 
         md_review = markdown_review_path
         md_bugs = markdown_bugs_path
@@ -1678,10 +1659,11 @@ class DashboardServer(ThreadingHTTPServer):
 
     def sync_feedback(self) -> Dict[str, Any]:
         """Synchronize review and bug report feedback from workspace feedback/ directory."""
-        review_res = self.review_server.sync_feedback()
-        bug_res = self.bug_server.sync_with_feedback_dir()
-        self.initial_sync_done = True
-        return {"status": "ok", "initial_sync_done": True, "review": review_res, "bugs": bug_res}
+        with self._sync_lock:
+            review_res = self.review_server.sync_feedback()
+            bug_res = self.bug_server.sync_with_feedback_dir()
+            self.initial_sync_done = True
+            return {"status": "ok", "initial_sync_done": True, "review": review_res, "bugs": bug_res}
 
     def server_close(self) -> None:
         """Close server sockets and cleanup sub-servers."""

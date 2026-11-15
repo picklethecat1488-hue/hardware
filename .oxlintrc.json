@@ -1,0 +1,26 @@
+{
+  "env": {
+    "es2024": true
+  },
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "no-undef": "error",
+    "no-unreachable": "error",
+    "no-dupe-keys": "error",
+    "no-redeclare": "error",
+    "no-const-assign": "error",
+    "no-func-assign": "error",
+    "no-import-assign": "error",
+    "no-self-assign": "error",
+    "valid-typeof": "error",
+    "no-constant-condition": ["error", { "checkLoops": false }],
+    "no-control-regex": "off",
+    "no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }]
+  },
+  "ignorePatterns": [
+    "**/static/vendor/highlight/highlight.js",
+    "**/static/vendor/three/three.module.js"
+  ]
+}
