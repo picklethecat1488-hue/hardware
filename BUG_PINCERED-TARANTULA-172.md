@@ -527,3 +527,7 @@ face 46 ignored
 | :--- | :--- | :--- |
 | `image/png` | [snapshot.png](attachments/BUG-PINCERED-TARANTULA-172/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
 | `text/plain` | [scope.log](attachments/BUG-PINCERED-TARANTULA-172/scope.log) | Scope workstation execution logs |
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:46839842 --> Verify cat_fountain/wiring diagram renders all routed nets and key swatches in vivid per-wire colors (red, black, blue, green, purple, orange, brown, teal, yellow, magenta) | `python tools/scope.py cat_fountain/wiring --mode diagram`
