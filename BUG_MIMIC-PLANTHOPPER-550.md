@@ -1,12 +1,13 @@
-# 🔴 `[BUG-MIMIC-PLANTHOPPER-550]` [carrier_board/carrier_board] Defect Summary
+# 🟢 `[BUG-MIMIC-PLANTHOPPER-550]` [carrier_board/carrier_board] Defect Summary
 
 - **UUID**: `a3b4f0e7-9143-4b0a-aafd-6433d4b732cf`
 - **ID**: `BUG-MIMIC-PLANTHOPPER-550`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-14 21:18:44 UTC`
+- **Resolved**: `2026-11-15 01:42:12 UTC`
 
 #### Description
 
@@ -524,3 +525,7 @@ face 46 ignored
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:773272b2 --> Inspect the crisp yellow Edge.Cuts rounded board perimeter & mounting holes and toggle In1.Cu–In4.Cu inner copper layers via the PCB Layers panel or quickbar pills | `python tools/scope.py carrier_board/carrier_board --mode pcb`
+
+#### Resolution Notes
+
+Extracted exact 2D Edge.Cuts outer/cutout loops from the filleted BuildPcb substrate, exported all 6 copper stackup layers (F.Cu, In1.Cu..In4.Cu, B.Cu) and inner copper plane pours (copper_regions) with KiCad palette colors, added GPU SDF inner-layer trace batches + evenodd antipad/thermal-relief Canvas2D plane rendering, and added In1..In4 quick-select pills and solo controls.
