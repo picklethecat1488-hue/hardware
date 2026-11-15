@@ -35,6 +35,10 @@ import { LineSegments2 } from "../static/vendor/three/addons/lines/LineSegments2
 import { LineSegmentsGeometry } from "../static/vendor/three/addons/lines/LineSegmentsGeometry.js";
 import { lookupBrepFace, measureBrepFace } from "./decoder.js";
 
+export const DEFAULT_CAD_ROUGHNESS = 0.78;
+export const DEFAULT_CAD_METALNESS = 0.04;
+const DEFAULT_PCB_SUBSTRATE_ROUGHNESS = 0.82;
+const DEFAULT_PCB_SUBSTRATE_METALNESS = 0.03;
 const DEFAULT_EDGE_COLOR_CAD = 0x182230;
 const DEFAULT_EDGE_COLOR_DIAGRAM = 0x0f172a;
 const HIGHLIGHT_FACE_COLOR_HEX = 0xffb800;
@@ -369,8 +373,8 @@ export class CadSceneManager {
     } else {
       mat = new MeshStandardMaterial({
         color: new Color(hexColor || "#8a99ad"),
-        roughness: this.mode === "PCB" ? 0.62 : 0.42,
-        metalness: this.mode === "PCB" ? 0.08 : 0.16,
+        roughness: this.mode === "PCB" ? DEFAULT_PCB_SUBSTRATE_ROUGHNESS : DEFAULT_CAD_ROUGHNESS,
+        metalness: this.mode === "PCB" ? DEFAULT_PCB_SUBSTRATE_METALNESS : DEFAULT_CAD_METALNESS,
         opacity: alpha,
         transparent: isTransparent,
         depthWrite: !isTransparent || alpha >= 0.85,

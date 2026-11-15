@@ -21,6 +21,8 @@ import { computeRulerMeasurement, PrecisionRulerTool } from "../../js/scope/rule
 import { ScopeViewport } from "../../js/scope/viewport.js";
 
 const { CadCameraController } = await import("../../js/scope/camera_controller.js");
+const { CadSceneManager } = await import("../../js/scope/cad_scene.js");
+const { ScopeInspectorController } = await import("../../js/scope/inspector.js");
 const { PcbGpuRenderer } = await import("../../js/scope/pcb_renderer.js");
 
 describe("scope/viewport, ruler_tool, & markup_tool", () => {
@@ -180,5 +182,106 @@ describe("scope/viewport, ruler_tool, & markup_tool", () => {
 
     mc.clearAll();
     assert.equal(mc.markups.length, 0);
+  });
+
+  it("provides bright studio CAD lighting, matte non-glossy CAD materials, and collapsible fuzzy-searchable CAD rooms (BUG-STRIDULATING-SCARAB-621)", () => {
+    const ctx = createMockRuntimeContext({ dpr: 2.0, viewport: { width: 800, height: 600 } });
+    const mockGlRenderer = {
+      domElement: { style: {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }) },
+      setPixelRatio() {},
+      setSize() {},
+      render() {},
+      dispose() {},
+    };
+    const vp = new ScopeViewport({
+      ctx,
+      container: { clientWidth: 800, clientHeight: 600 },
+      renderer: mockGlRenderer,
+    });
+
+    assert.ok(vp.ambientLight && vp.ambientLight.intensity >= 1.4, "Ambient light must be bright in physical Three.js units");
+    assert.ok(vp.hemiLight && vp.hemiLight.intensity >= 1.0, "Hemisphere fill light must illuminate underside & crevices");
+    assert.ok(vp.keyLight && vp.keyLight.intensity >= 2.0, "Key light must compensate for 1/PI physically-correct diffuse BRDF");
+    assert.ok(vp.fillLight && vp.fillLight.intensity >= 1.2, "Fill light must eliminate dark shadows");
+
+    const cadScene = new CadSceneManager({ scene: vp.scene, dpr: 2.0 });
+    const mat = cadScene._createSurfaceMaterial("#2a2e35", 1.0, false, []);
+    assert.ok(mat.roughness >= 0.72, `Expected matte CAD roughness >= 0.72, got ${mat.roughness}`);
+    assert.ok(mat.metalness <= 0.08, `Expected low non-glossy metalness <= 0.08, got ${mat.metalness}`);
+
+    // Build mock DOM elements for CAD Tree collapsible rooms + fuzzy search
+    const doc = ctx.getDocument();
+    const treeList = ctx.createElement("div");
+    treeList.id = "cad-tree-list";
+    const searchInput = ctx.createElement("input");
+    searchInput.id = "cad-tree-search";
+    const clearBtn = ctx.createElement("button");
+    clearBtn.id = "btn-cad-tree-clear-search";
+    const expandAllBtn = ctx.createElement("button");
+    expandAllBtn.id = "btn-cad-tree-expand-all";
+    const collapseAllBtn = ctx.createElement("button");
+    collapseAllBtn.id = "btn-cad-tree-collapse-all";
+    doc.body.appendChild(treeList);
+    doc.body.appendChild(searchInput);
+    doc.body.appendChild(clearBtn);
+    doc.body.appendChild(expandAllBtn);
+    doc.body.appendChild(collapseAllBtn);
+
+    const inspector = new ScopeInspectorController({
+      ctx,
+      viewport: vp,
+      cameraController: new CadCameraController({ width: 800, height: 600 }),
+      cadScene,
+      pcbRenderer: new PcbGpuRenderer({ scene: vp.scene }),
+      simRenderer: /** @type {any} */ ({}),
+      markupController: new MarkupAndPinController(),
+      onSelectTarget: async () => {},
+    });
+    inspector.currentProject = "carrier_board";
+    inspector.currentTarget = "carrier_board";
+
+    const sampleTree = [
+      {
+        id: "carrier_board_components",
+        name: "carrier_board_components",
+        visible: true,
+        color: "#2a2e35",
+        leafIds: ["comp_U1", "comp_J1"],
+        children: [
+          { id: "comp_U1", name: "comp_U1", visible: true, color: "#2a2e35", leafIds: ["comp_U1"], children: [] },
+          { id: "comp_J1", name: "comp_J1", visible: true, color: "#2a2e35", leafIds: ["comp_J1"], children: [] },
+        ],
+      },
+      {
+        id: "carrier_board_substrate",
+        name: "carrier_board_substrate",
+        visible: true,
+        color: "#0a2410",
+        leafIds: ["sub_0"],
+        children: [],
+      },
+    ];
+
+    inspector.renderCadTree(sampleTree);
+
+    // Initially, root CAD room ("carrier_board") + its children are rendered
+    assert.ok(treeList.children.length >= 3, "CAD room root and children should render initially");
+
+    // Collapsing all CAD rooms leaves only the collapsed top-level CAD room row visible
+    inspector.collapseAllCadTree();
+    assert.equal(treeList.children.length, 1, "Collapsing CAD room should hide nested child rows");
+
+    // Expanding all restores full nested hierarchy
+    inspector.expandAllCadTree();
+    assert.ok(treeList.children.length >= 4, "Expanding all should reveal room, groups, and leaf parts");
+
+    // Fuzzy search ("cmpu1" subsequence -> matches "comp_U1" via shared fuzzyFilterAndRank!)
+    searchInput.value = "cmpu1";
+    searchInput.dispatchEvent({ type: "input" });
+    assert.ok(treeList.children.length >= 1, "Fuzzy search should match subsequence cmpu1 -> comp_U1");
+    const renderedNames = treeList.children.map((row) => row.textContent || "").join(" ");
+    assert.ok(renderedNames.includes("comp_U1"), `Expected comp_U1 in fuzzy results, got: ${renderedNames}`);
+
+    vp.dispose();
   });
 });

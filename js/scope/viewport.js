@@ -23,6 +23,12 @@ import {
 } from "../static/vendor/three/three.module.js";
 
 export const MAX_DEVICE_PIXEL_RATIO = 3.0;
+export const AMBIENT_LIGHT_INTENSITY = 1.65;
+export const HEMI_LIGHT_INTENSITY = 1.25;
+export const KEY_LIGHT_INTENSITY = 2.45;
+export const FILL_LIGHT_INTENSITY = 1.45;
+export const RIM_LIGHT_INTENSITY = 1.15;
+const TONE_MAPPING_EXPOSURE = 1.15;
 const MIN_CANVAS_CSS_PX = 1;
 const DEFAULT_CAD_BG_HEX = 0x10141b;
 const DEFAULT_PCB_BG_HEX = 0x050d17;
@@ -124,31 +130,32 @@ export class ScopeViewport {
     });
     glRenderer.outputColorSpace = SRGBColorSpace;
     glRenderer.toneMapping = ACESFilmicToneMapping;
-    glRenderer.toneMappingExposure = 1.05;
+    glRenderer.toneMappingExposure = TONE_MAPPING_EXPOSURE;
     glRenderer.localClippingEnabled = true;
     glRenderer.setPixelRatio(this.dpr);
     return glRenderer;
   }
 
   /**
-   * Configure balanced 3-point CAD studio lighting + hemisphere fill so machined B-rep fillets,
-   * chamfers, and water voxels read clearly from every camera azimuth.
+   * Configure balanced 3-point CAD studio lighting + hemisphere fill calibrated for Three.js r184
+   * physically-correct `1/PI` diffuse BRDF units so machined B-rep fillets, dark FR4 soldermasks,
+   * IC packages, and water voxels read brightly and evenly from every camera azimuth.
    */
   _setupLightingRig() {
-    const ambient = new AmbientLight(0xffffff, 0.55);
-    const hemi = new HemisphereLight(0xdbeafe, 0x1e293b, 0.48);
-    hemi.position.set(0, 0, 250);
+    this.ambientLight = new AmbientLight(0xffffff, AMBIENT_LIGHT_INTENSITY);
+    this.hemiLight = new HemisphereLight(0xf8fafc, 0x64748b, HEMI_LIGHT_INTENSITY);
+    this.hemiLight.position.set(0, 0, 250);
 
-    this.keyLight = new DirectionalLight(0xffffff, 0.95);
+    this.keyLight = new DirectionalLight(0xffffff, KEY_LIGHT_INTENSITY);
     this.keyLight.position.set(180, -160, 260);
 
-    this.fillLight = new DirectionalLight(0xcbd5e1, 0.45);
-    this.fillLight.position.set(-200, 180, 140);
+    this.fillLight = new DirectionalLight(0xe2e8f0, FILL_LIGHT_INTENSITY);
+    this.fillLight.position.set(-200, 180, 160);
 
-    this.rimLight = new DirectionalLight(0x93c5fd, 0.32);
-    this.rimLight.position.set(40, 220, -180);
+    this.rimLight = new DirectionalLight(0xdbeafe, RIM_LIGHT_INTENSITY);
+    this.rimLight.position.set(40, 220, -220);
 
-    this.scene.add(ambient, hemi, this.keyLight, this.fillLight, this.rimLight);
+    this.scene.add(this.ambientLight, this.hemiLight, this.keyLight, this.fillLight, this.rimLight);
   }
 
   /**

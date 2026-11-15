@@ -811,8 +811,18 @@
         <!-- OCP SCENE TREE PANE -->
         <div id="tab-tree" class="tab-pane active">
           <div id="tree-container">
-            <div class="hud-label" style="margin-bottom: 8px;">CAD Objects:</div>
-            <div id="cad-tree-list"></div>
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 6px;">
+              <div class="hud-label">CAD Objects:</div>
+              <div style="display: inline-flex; gap: 4px;">
+                <button id="btn-cad-tree-expand-all" class="hud-btn" style="padding: 1px 6px; font-size: 0.72rem;" title="Expand all CAD rooms and groups">Expand All</button>
+                <button id="btn-cad-tree-collapse-all" class="hud-btn" style="padding: 1px 6px; font-size: 0.72rem;" title="Collapse all CAD rooms">Collapse All</button>
+              </div>
+            </div>
+            <div style="display: flex; gap: 4px; margin-bottom: 8px; align-items: center;">
+              <input id="cad-tree-search" class="form-input" style="flex: 1;" placeholder="Search CAD rooms &amp; parts...">
+              <button id="btn-cad-tree-clear-search" class="hud-btn" style="padding: 3px 7px; font-size: 0.75rem; display: none;" title="Clear CAD tree search">✕</button>
+            </div>
+            <div id="cad-tree-list" style="max-height: calc(100vh - 210px); overflow-y: auto;"></div>
           </div>
         </div>
 

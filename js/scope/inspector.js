@@ -21,6 +21,7 @@ import { copyToClipboard, showToast } from "../core/toast.js";
 const SPARKLINE_CSS_HEIGHT_PX = 42;
 const SPARKLINE_MIN_CSS_WIDTH_PX = 240;
 const MILS_PER_MM = 39.37007874;
+const AUTO_COLLAPSE_CHILD_THRESHOLD = 16;
 
 const DEFAULT_PCB_LAYERS = Object.freeze([
   { id: "edge_cuts", label: "Edge.Cuts (Outline)", color: "#e6d84c", type: "Edge.Cuts", default_visible: true },
@@ -106,6 +107,14 @@ export class ScopeInspectorController {
     this._allNets = [];
     /** @type {string|null} */
     this._soloLayerType = null;
+    /** @type {Array<object>} */
+    this._cadTreeRooms = [];
+    /** @type {Set<string>} */
+    this._collapsedTreeNodeIds = new Set();
+    /** @type {Map<string, boolean>} */
+    this._treeVisibilityById = new Map();
+    /** @type {string} */
+    this._cadTreeQuery = "";
     /** @type {Array<{key: string, values: Array<number>, min: number, max: number, last: number}>} */
     this._metricSeries = [];
     /** @type {Map<string, HTMLCanvasElement>} */
@@ -145,6 +154,35 @@ export class ScopeInspectorController {
           this.activateTab(paneId);
         }
       });
+    }
+
+    // CAD Tree search & expand/collapse room controls
+    const cadTreeSearch = this._el("cad-tree-search");
+    const btnCadTreeClear = this._el("btn-cad-tree-clear-search");
+    if (cadTreeSearch) {
+      cadTreeSearch.addEventListener("input", () => {
+        this._cadTreeQuery = cadTreeSearch.value || "";
+        if (btnCadTreeClear) {
+          btnCadTreeClear.style.display = this._cadTreeQuery.trim() ? "inline-flex" : "none";
+        }
+        this._refreshCadTreeDom();
+      });
+    }
+    if (btnCadTreeClear && cadTreeSearch) {
+      btnCadTreeClear.addEventListener("click", () => {
+        cadTreeSearch.value = "";
+        this._cadTreeQuery = "";
+        btnCadTreeClear.style.display = "none";
+        this._refreshCadTreeDom();
+      });
+    }
+    const btnCadExpandAll = this._el("btn-cad-tree-expand-all");
+    if (btnCadExpandAll) {
+      btnCadExpandAll.addEventListener("click", () => this.expandAllCadTree());
+    }
+    const btnCadCollapseAll = this._el("btn-cad-tree-collapse-all");
+    if (btnCadCollapseAll) {
+      btnCadCollapseAll.addEventListener("click", () => this.collapseAllCadTree());
     }
 
     // PCB layer buttons & net search
@@ -440,30 +478,215 @@ export class ScopeInspectorController {
   }
 
   /**
-   * Render the hierarchical CAD object tree (`#cad-tree-list`) from `decoded.treeNodes`.
+   * Organize decoded `treeNodes` into collapsible CAD Room root nodes (`room/part` or active target room).
+   *
+   * @param {Array<object>} treeNodes - Decoded `treeEntry` array.
+   * @returns {Array<object>}
+   */
+  _buildCadTreeRooms(treeNodes) {
+    if (!Array.isArray(treeNodes) || treeNodes.length === 0) {
+      return [];
+    }
+
+    // Group slash-delimited multi-room entries (`room_a/part_1`) into explicit CAD room nodes
+    const hasSlashRooms = treeNodes.some((n) => typeof n.name === "string" && n.name.includes("/"));
+    if (hasSlashRooms) {
+      const roomMap = new Map();
+      for (const node of treeNodes) {
+        const rawName = String(node.name || "Part");
+        const slashIdx = rawName.indexOf("/");
+        const roomName = slashIdx > 0 ? rawName.slice(0, slashIdx) : (this.currentTarget || "Room");
+        const subName = slashIdx > 0 ? rawName.slice(slashIdx + 1) : rawName;
+        let roomEntry = roomMap.get(roomName);
+        if (!roomEntry) {
+          roomEntry = {
+            id: `room:${roomName}`,
+            name: roomName,
+            isRoom: true,
+            visible: true,
+            color: null,
+            leafIds: [],
+            children: [],
+          };
+          roomMap.set(roomName, roomEntry);
+        }
+        const childClone = { ...node, name: subName };
+        roomEntry.children.push(childClone);
+        if (Array.isArray(node.leafIds)) {
+          roomEntry.leafIds.push(...node.leafIds);
+        }
+        if (node.visible === false) {
+          roomEntry.visible = roomEntry.children.some((c) => c.visible !== false);
+        }
+      }
+      return Array.from(roomMap.values());
+    }
+
+    // Single room with a single root group that already has children -> mark as collapsible room directly
+    if (treeNodes.length === 1 && Array.isArray(treeNodes[0].children) && treeNodes[0].children.length > 0) {
+      return [{ ...treeNodes[0], isRoom: true }];
+    }
+
+    // Wrap multi-part target assembly into a collapsible CAD Room root node
+    const defaultRoomLabel = this.currentSub || this.currentTarget || this.currentProject || "CAD Room";
+    const allLeafIds = [];
+    for (const node of treeNodes) {
+      if (Array.isArray(node.leafIds)) {
+        allLeafIds.push(...node.leafIds);
+      }
+    }
+    return [
+      {
+        id: `room:${defaultRoomLabel}`,
+        name: defaultRoomLabel,
+        isRoom: true,
+        visible: treeNodes.some((n) => n.visible !== false),
+        color: null,
+        leafIds: allLeafIds,
+        children: treeNodes,
+      },
+    ];
+  }
+
+  /**
+   * Collapse all CAD Room root nodes (and nested compound groups) in `#cad-tree-list`.
+   */
+  collapseAllCadTree() {
+    const markCollapsed = (nodes) => {
+      for (const node of nodes) {
+        if (Array.isArray(node.children) && node.children.length > 0) {
+          this._collapsedTreeNodeIds.add(String(node.id || node.name));
+          markCollapsed(node.children);
+        }
+      }
+    };
+    markCollapsed(this._cadTreeRooms);
+    this._refreshCadTreeDom();
+  }
+
+  /**
+   * Expand all CAD Room root nodes and nested groups in `#cad-tree-list`.
+   */
+  expandAllCadTree() {
+    this._collapsedTreeNodeIds.clear();
+    this._refreshCadTreeDom();
+  }
+
+  /**
+   * Render the hierarchical CAD object tree (`#cad-tree-list`) with collapsible CAD rooms
+   * and shared fuzzy search (`fuzzyFilterAndRank`).
    *
    * @param {Array<object>} treeNodes - Array of `treeEntry` nodes from `decodeOcpPayload`.
    */
   renderCadTree(treeNodes) {
+    this._cadTreeRooms = this._buildCadTreeRooms(treeNodes);
+    this._collapsedTreeNodeIds.clear();
+    this._treeVisibilityById.clear();
+    this._cadTreeQuery = "";
+
+    const searchInput = /** @type {HTMLInputElement|null} */ (this._el("cad-tree-search"));
+    const clearBtn = this._el("btn-cad-tree-clear-search");
+    if (searchInput) {
+      searchInput.value = "";
+    }
+    if (clearBtn) {
+      clearBtn.style.display = "none";
+    }
+
+    // Seed visibility map & auto-collapse dense sub-compounds (>16 primitives) while keeping CAD Rooms open
+    const initTreeState = (nodes, depth) => {
+      for (const node of nodes) {
+        const key = String(node.id || node.name);
+        this._treeVisibilityById.set(key, node.visible !== false);
+        if (Array.isArray(node.children) && node.children.length > 0) {
+          if (depth >= 1 && node.children.length > AUTO_COLLAPSE_CHILD_THRESHOLD) {
+            this._collapsedTreeNodeIds.add(key);
+          }
+          initTreeState(node.children, depth + 1);
+        }
+      }
+    };
+    initTreeState(this._cadTreeRooms, 0);
+
+    this._refreshCadTreeDom();
+  }
+
+  /**
+   * Propagate checkbox visibility recursively across a CAD tree node and its descendants.
+   *
+   * @param {object} node - Target CAD tree node.
+   * @param {boolean} visible - Desired visibility flag.
+   */
+  _setSubtreeCheckedState(node, visible) {
+    const key = String(node.id || node.name);
+    this._treeVisibilityById.set(key, visible);
+    if (Array.isArray(node.children)) {
+      for (const child of node.children) {
+        this._setSubtreeCheckedState(child, visible);
+      }
+    }
+  }
+
+  /**
+   * Re-render `#cad-tree-list` according to `_collapsedTreeNodeIds` and `_cadTreeQuery`.
+   */
+  _refreshCadTreeDom() {
     const listEl = this._el("cad-tree-list");
     if (!listEl) return;
     listEl.innerHTML = "";
-    if (!Array.isArray(treeNodes) || treeNodes.length === 0) return;
+    if (!Array.isArray(this._cadTreeRooms) || this._cadTreeRooms.length === 0) return;
 
-    const renderNode = (node, depth) => {
+    const query = (this._cadTreeQuery || "").trim();
+
+    const buildTreeRow = (node, depth, breadcrumb = "") => {
+      const nodeKey = String(node.id || node.name);
+      const children = Array.isArray(node.children) ? node.children : [];
+      const hasChildren = children.length > 0;
+      const isCollapsed = hasChildren && this._collapsedTreeNodeIds.has(nodeKey);
+      const leafIds = Array.isArray(node.leafIds) ? node.leafIds : [];
+
       const row = this.ctx.createElement("div");
-      row.className = "cad-tree-row";
+      row.className = `cad-tree-row${node.isRoom ? " cad-tree-room" : ""}`;
       row.style.cssText =
         `display:flex;align-items:center;gap:6px;padding:4px 6px 4px ${6 + depth * 12}px;` +
-        "border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px;";
+        "border-bottom:1px solid rgba(255,255,255,0.05);font-size:11px;" +
+        (node.isRoom ? "background:rgba(255,184,0,0.06);font-weight:700;" : "");
 
-      const leafIds = Array.isArray(node.leafIds) ? node.leafIds : [];
+      if (hasChildren && !query) {
+        const toggleBtn = this.ctx.createElement("button");
+        toggleBtn.type = "button";
+        toggleBtn.className = "cad-tree-chevron";
+        toggleBtn.textContent = isCollapsed ? "▸" : "▾";
+        toggleBtn.title = isCollapsed ? `Expand ${node.name}` : `Collapse ${node.name}`;
+        toggleBtn.style.cssText =
+          "background:transparent;border:none;color:var(--quake-gold);cursor:pointer;" +
+          "padding:0 2px;font-size:11px;line-height:1;width:14px;flex-shrink:0;";
+        toggleBtn.addEventListener("click", (ev) => {
+          if (ev && typeof ev.stopPropagation === "function") ev.stopPropagation();
+          if (this._collapsedTreeNodeIds.has(nodeKey)) {
+            this._collapsedTreeNodeIds.delete(nodeKey);
+          } else {
+            this._collapsedTreeNodeIds.add(nodeKey);
+          }
+          this._refreshCadTreeDom();
+        });
+        row.appendChild(toggleBtn);
+      } else if (!query) {
+        const spacer = this.ctx.createElement("span");
+        spacer.style.cssText = "display:inline-block;width:14px;flex-shrink:0;";
+        row.appendChild(spacer);
+      }
+
       const cb = this.ctx.createElement("input");
       cb.type = "checkbox";
-      cb.checked = node.visible !== false;
+      cb.checked = this._treeVisibilityById.has(nodeKey)
+        ? Boolean(this._treeVisibilityById.get(nodeKey))
+        : node.visible !== false;
       cb.style.accentColor = "#ffb800";
       cb.addEventListener("change", () => {
+        this._setSubtreeCheckedState(node, cb.checked);
         this.cadScene.setLeavesVisibility(leafIds, cb.checked);
+        this._refreshCadTreeDom();
         this.viewport.requestRender();
       });
       row.appendChild(cb);
@@ -480,9 +703,18 @@ export class ScopeInspectorController {
       label.textContent = node.name || "Assembly";
       label.style.cssText =
         "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;flex:1;";
-      label.title = node.id || node.name;
+      label.title = breadcrumb ? `${breadcrumb} / ${node.name}` : (node.id || node.name);
       label.addEventListener("click", () => {
-        if (leafIds.length === 1) {
+        if (hasChildren && !query) {
+          if (this._collapsedTreeNodeIds.has(nodeKey)) {
+            this._collapsedTreeNodeIds.delete(nodeKey);
+          } else {
+            this._collapsedTreeNodeIds.add(nodeKey);
+          }
+          this._refreshCadTreeDom();
+          return;
+        }
+        if (leafIds.length >= 1) {
           const rec = this.cadScene.leafRecords.get(leafIds[0]);
           if (rec && rec.leaf.worldBounds) {
             this.renderCadPartSummary(rec);
@@ -491,17 +723,68 @@ export class ScopeInspectorController {
         }
       });
       row.appendChild(label);
-      listEl.appendChild(row);
 
-      if (Array.isArray(node.children)) {
-        for (const ch of node.children) {
-          renderNode(ch, depth + 1);
+      if (breadcrumb) {
+        const pathBadge = this.ctx.createElement("span");
+        pathBadge.textContent = breadcrumb;
+        pathBadge.style.cssText =
+          "font-size:9px;color:var(--quake-text-muted);max-width:92px;overflow:hidden;" +
+          "text-overflow:ellipsis;white-space:nowrap;flex-shrink:0;";
+        row.appendChild(pathBadge);
+      } else if (hasChildren) {
+        const countBadge = this.ctx.createElement("span");
+        countBadge.textContent = `${children.length}`;
+        countBadge.style.cssText =
+          "font-size:9px;padding:0 5px;border-radius:8px;background:rgba(255,255,255,0.08);" +
+          "color:var(--quake-text-muted);flex-shrink:0;";
+        row.appendChild(countBadge);
+      }
+
+      return row;
+    };
+
+    if (query) {
+      const flatCandidates = [];
+      const collectCandidates = (nodes, ancestors) => {
+        for (const node of nodes) {
+          const name = String(node.name || "");
+          const breadcrumb = ancestors.join(" / ");
+          const searchKey = breadcrumb ? `${name} ${breadcrumb}` : name;
+          flatCandidates.push({ node, breadcrumb, searchKey });
+          if (Array.isArray(node.children) && node.children.length > 0) {
+            collectCandidates(node.children, [...ancestors, name]);
+          }
+        }
+      };
+      collectCandidates(this._cadTreeRooms, []);
+
+      const ranked = fuzzyFilterAndRank(query, flatCandidates, (entry) => entry.searchKey);
+      if (ranked.length === 0) {
+        const empty = this.ctx.createElement("div");
+        empty.style.cssText = "font-size:10px;color:var(--quake-text-muted);padding:6px 4px;";
+        empty.textContent = "No matching CAD rooms or parts.";
+        listEl.appendChild(empty);
+        return;
+      }
+
+      for (const { item } of ranked) {
+        listEl.appendChild(buildTreeRow(item.node, 0, item.breadcrumb));
+      }
+      return;
+    }
+
+    const appendRecursive = (node, depth) => {
+      const nodeKey = String(node.id || node.name);
+      listEl.appendChild(buildTreeRow(node, depth));
+      if (Array.isArray(node.children) && node.children.length > 0 && !this._collapsedTreeNodeIds.has(nodeKey)) {
+        for (const child of node.children) {
+          appendRecursive(child, depth + 1);
         }
       }
     };
 
-    for (const rootNode of treeNodes) {
-      renderNode(rootNode, 0);
+    for (const roomNode of this._cadTreeRooms) {
+      appendRecursive(roomNode, 0);
     }
   }
 
