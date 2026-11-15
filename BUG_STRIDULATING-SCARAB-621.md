@@ -520,3 +520,7 @@ face 46 ignored
 2026-11-14 13:19:49 [INFO] scope: Successfully loaded geometry for carrier_board/carrier_board [CAD] in 32.52s
 2026-11-14 13:19:50 [INFO] scope: 127.0.0.1 - - [14/Nov/2026 13:19:50] "GET /api/scope/load?project=carrier_board&target=carrier_board&mode=CAD HTTP/1.1" 200 -
 ```
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:5a93691d --> Verify bright matte studio CAD shading, collapse/expand CAD rooms in the Tree tab, and fuzzy-search CAD objects (e.g. cmpu1 or substrate) | `python tools/scope.py carrier_board/carrier_board`
