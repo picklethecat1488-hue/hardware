@@ -92,6 +92,8 @@ export class CadCameraController {
     /** @type {"F.Cu"|"B.Cu"} */
     this.activeBoardSide = "F.Cu";
     /** @type {string} */
+    this.defaultPreset = "iso";
+    /** @type {string} */
     this.mode = "CAD";
     /** @type {boolean} */
     this.axesVisible = true;
@@ -213,7 +215,9 @@ export class CadCameraController {
       };
       this.floorGridMesh.visible = false;
       this.controls.object = this.orthoCamera;
-      this.setPreset("top", { fit: true });
+      const diagramPreset = upper === "PCB" ? "top" : String(viewFrom || "iso").toLowerCase();
+      this.defaultPreset = diagramPreset;
+      this.setPreset(diagramPreset, { fit: true });
     } else {
       this.isOrtho = false;
       this.controls.enableRotate = true;
@@ -225,6 +229,7 @@ export class CadCameraController {
       this.floorGridMesh.visible = this.gridVisible && upper !== "DIAGRAM";
       this.controls.object = this.perspCamera;
       const initialPreset = viewFrom ? String(viewFrom).toLowerCase() : "iso";
+      this.defaultPreset = initialPreset;
       this.setPreset(initialPreset, { fit: true });
     }
   }
@@ -334,7 +339,7 @@ export class CadCameraController {
     const halfFovTan = Math.tan((this.perspCamera.fov * DEG_TO_RAD) * 0.5);
 
     if (key === "fit") {
-      if (this.is2DMode) {
+      if (this.is2DMode && (this.defaultPreset === "top" || this.defaultPreset === "bottom")) {
         this._fit2DView(this.activeBoardSide === "B.Cu" ? "bottom" : "top");
       } else {
         this._fit3DCurrentDirection();

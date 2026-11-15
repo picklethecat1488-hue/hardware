@@ -558,7 +558,7 @@ def test_regression_bug_shining_dragonfly_640_silkscreen_cad_assembly():
 
 
 def test_regression_bug_swarming_silverfish_292_diagram_view_payload(scope_server):
-    """Verify BUG-SWARMING-SILVERFISH-292: diagram API serves top camera preset and black text annotations."""
+    """Verify BUG-SWARMING-SILVERFISH-292 & BUG-ARMORED-COCOON-182: 2D wiring diagram uses 'top' while 3D product diagram uses 'iso' with 3D-positioned labels."""
     load_url = (
         f"http://127.0.0.1:{scope_server.actual_port}/api/scope/load?project=cat_fountain&target=wiring&mode=DIAGRAM"
     )
@@ -573,6 +573,29 @@ def test_regression_bug_swarming_silverfish_292_diagram_view_payload(scope_serve
     assert labels_part is not None
     assert len(labels_part.get("parts", [])) > 0
     assert labels_part["parts"][0].get("color") == "#000000"
+
+    # Loading `cat_fountain/product` in DIAGRAM mode right after `wiring` must default to isometric (`iso`), not `top`!
+    prod_url = (
+        f"http://127.0.0.1:{scope_server.actual_port}"
+        "/api/scope/load?project=cat_fountain&target=product&mode=DIAGRAM&nocache=1"
+    )
+    req_prod = urllib.request.urlopen(prod_url)
+    assert req_prod.status == 200
+    prod_data = json.loads(req_prod.read().decode("utf-8"))
+    assert prod_data["mode"] == "DIAGRAM"
+    assert prod_data["view_from"] == "iso"
+
+    prod_labels = next((p for p in prod_data["shapes"]["parts"] if "label" in p["name"].lower()), None)
+    assert prod_labels is not None
+    label_z_coords = [
+        float(child["loc"][0][2])
+        for child in prod_labels.get("parts", [])
+        if isinstance(child.get("loc"), list) and len(child["loc"]) >= 1
+    ]
+    assert label_z_coords, "Expected 3D exploded part labels with world locations"
+    assert max(label_z_coords) - min(label_z_coords) > 150.0, (
+        f"3D isometric diagram labels must sit at their exploded part elevations, got Z={label_z_coords}"
+    )
 
 
 def test_regression_bug_shining_hoverfly_298_download_rrd(scope_server):

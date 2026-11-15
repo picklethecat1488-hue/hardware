@@ -19,7 +19,7 @@ from provider import ProviderManager, Section, Mode, Room, Provider
 from target_parser import TargetParser
 from provider.pcb.cad_assembler import PCB3DAssembler
 from model.pcb import resolve_subassembly_pcb_config
-from build123d import Plane, Compound
+from build123d import BuildSketch, Compound, Location, Plane, Text, Vector
 
 try:
     from ocp_vscode.config import config as ocp_config
@@ -40,6 +40,8 @@ class ScopeGeometryPipeline:
 
     SIM_TELEMETRY_CACHE_VERSION = "v4"
     PCB_METADATA_RENDER_VERSION = 3
+    DIAGRAM_RENDER_VERSION = 2
+    DIAGRAM_ISO_CAMERA_DIR: Tuple[float, float, float] = (1.0, -1.15, 0.85)
     KICAD_EDGE_CUTS_HEX = "#e6d84c"
     KICAD_COPPER_LAYER_COLORS: Dict[str, str] = {
         "F.Cu": "#c83434",
@@ -250,6 +252,45 @@ class ScopeGeometryPipeline:
         return result
 
     @classmethod
+    def _build_diagram_labels(cls, room: Room, view_from: Optional[str]) -> List[Any]:
+        """Construct oriented 2D/3D text label sketches positioned at their world anchors facing `view_from`."""
+        preset = str(view_from or "iso").strip().lower()
+        if preset in ("top", "bottom") and hasattr(room, "_project_labels"):
+            return list(room._project_labels(Plane.XY))
+
+        match preset:
+            case "front":
+                cam_dir = Vector(0.0, -1.0, 0.0)
+            case "rear" | "back":
+                cam_dir = Vector(0.0, 1.0, 0.0)
+            case "right":
+                cam_dir = Vector(1.0, 0.0, 0.0)
+            case "left":
+                cam_dir = Vector(-1.0, 0.0, 0.0)
+            case _:
+                ix, iy, iz = cls.DIAGRAM_ISO_CAMERA_DIR
+                cam_dir = Vector(ix, iy, iz)
+
+        z_dir = cam_dir.normalized()
+        world_up = Vector(0.0, 0.0, 1.0)
+        x_dir = world_up.cross(z_dir)
+        x_dir = Vector(1.0, 0.0, 0.0) if x_dir.length < 1e-6 else x_dir.normalized()
+
+        sketches: List[Any] = []
+        for _, text, loc, opts in room._labels:
+            with BuildSketch() as label_sketch:
+                Text(
+                    text,
+                    font_size=opts.font_size,
+                    font=opts.font,
+                    font_style=opts.font_style,
+                    align=opts.align,
+                )
+            billboard_plane = Plane(origin=Vector(loc), x_dir=x_dir, z_dir=z_dir)
+            sketches.append(label_sketch.sketch.moved(Location(billboard_plane)))
+        return sketches
+
+    @classmethod
     def _discretize_wire_2d(cls, wire: Any) -> List[List[float]]:
         """Discretize a 2D/3D planar `build123d` `Wire` into a continuous closed `(x, y)` polyline loop."""
         raw_segments: List[List[Tuple[float, float]]] = []
@@ -395,7 +436,10 @@ class ScopeGeometryPipeline:
                     mode_upper != "PCB"
                     or payload.get("pcb_metadata", {}).get("render_version") == self.PCB_METADATA_RENDER_VERSION
                 )
-                if pcb_ver_ok:
+                diagram_ver_ok = (
+                    mode_upper != "DIAGRAM" or payload.get("diagram_render_version") == self.DIAGRAM_RENDER_VERSION
+                )
+                if pcb_ver_ok and diagram_ver_ok:
                     with self._lock:
                         self._cache[cache_key] = payload
                         self._gz_cache[cache_key] = gz_bytes
@@ -427,7 +471,7 @@ class ScopeGeometryPipeline:
 
             display_items: List[Tuple[Any, str, Optional[Tuple[float, float, float]], float]] = []
             pcb_metadata: Optional[Dict[str, Any]] = None
-            view_from: Optional[str] = "top" if mode_upper == "DIAGRAM" else None
+            view_from: Optional[str] = "iso" if mode_upper == "DIAGRAM" else None
 
             provider = self._resolve_provider(project)
             full_target = f"{project}/{target}"
@@ -975,9 +1019,9 @@ class ScopeGeometryPipeline:
                         (room.compound if isinstance(room, Room) else room, f"{p_name}_diagram", None, 1.0)
                     )
 
-                    # Project and append diagram text annotation labels so they render in 3D viewport
-                    if hasattr(room, "_project_labels") and hasattr(room, "_labels") and room._labels:
-                        labels = room._project_labels(Plane.XY)
+                    # Orient and append diagram text annotation labels for 2D planar or 3D isometric views
+                    if hasattr(room, "_labels") and room._labels:
+                        labels = self._build_diagram_labels(room, view_from)
                         if labels:
                             display_items.append((Compound(children=labels), f"{p_name}_labels", (0.0, 0.0, 0.0), 1.0))
 
@@ -1031,6 +1075,7 @@ class ScopeGeometryPipeline:
                 "config": config_data,
                 "instances": instances,
                 "pcb_metadata": pcb_metadata,
+                "diagram_render_version": self.DIAGRAM_RENDER_VERSION if mode_upper == "DIAGRAM" else None,
                 "target": full_target,
                 "project": project,
                 "mode": mode_upper,

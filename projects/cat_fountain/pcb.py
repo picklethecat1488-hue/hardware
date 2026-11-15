@@ -20,7 +20,7 @@ from build123d import (
     Vector,
     fillet,
 )
-from model import Wiring, TextArgs, DiagramStyle
+from model import DiagramOptions, DiagramStyle, TextArgs, Wiring
 from provider import Room, WiringDiagram, Mode as ProviderMode
 from model.wiring import FootprintModel, NetModel, LabelModel, PinModel, PinListModel, PinSide, PinList, Pin
 from provider.pcb import BuildComponents, Component, BuildWiring, Net, BuildPcb
@@ -510,8 +510,7 @@ def build_tmc6300_key(provider: Any, room: Room, wiring: Wiring) -> None:
 
 def build_cat_fountain_wiring_diagram(provider: Any, room: Room, targets: Sequence[str], mode: ProviderMode) -> None:
     """Render the 2D colored wiring diagram for the cat water fountain."""
-    provider.settings.diagram_options.style = DiagramStyle.COLOR
-    provider.settings.diagram_options.view_from = "top"
+    room.diagram_options = DiagramOptions(style=DiagramStyle.COLOR, view_from="top")
 
     r = provider.settings.bowl_radius
     t = provider.settings.bowl_thickness

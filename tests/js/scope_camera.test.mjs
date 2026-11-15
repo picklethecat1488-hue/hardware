@@ -148,4 +148,38 @@ describe("scope/camera_controller", () => {
       `Expected >= 5% zoom on -5px trackpad ctrlKey pinch tick, got ${(pinchReductionFraction * 100).toFixed(2)}%`,
     );
   });
+
+  it("defaults 3D assembly diagrams (viewFrom='iso') to Isometric while keeping 2D wiring diagrams at TOP (BUG-ARMORED-COCOON-182)", () => {
+    const camCtrl = new CadCameraController({ width: 1280, height: 800 });
+    const explodedBounds = {
+      min: [-110, -110, -54],
+      max: [110, 110, 198],
+      center: [0, 0, 72],
+      size: [220, 220, 252],
+    };
+
+    camCtrl.configureForMode("DIAGRAM", { bounds: explodedBounds, viewFrom: "iso" });
+    assert.equal(camCtrl.isOrtho, true);
+    assert.equal(camCtrl.controls.enableRotate, false);
+
+    const dxIso = camCtrl.activeCamera.position.x - camCtrl.controls.target.x;
+    const dyIso = camCtrl.activeCamera.position.y - camCtrl.controls.target.y;
+    const dzIso = camCtrl.activeCamera.position.z - camCtrl.controls.target.z;
+    assert.ok(dxIso > 50, `Expected +X isometric camera offset, got dx=${dxIso}`);
+    assert.ok(dyIso < -50, `Expected -Y isometric camera offset, got dy=${dyIso}`);
+    assert.ok(dzIso > 50, `Expected +Z isometric camera offset, got dz=${dzIso}`);
+
+    // Re-fitting (`F`) in isometric DIAGRAM mode must preserve the isometric viewing ray!
+    camCtrl.panBySteps(2, -1);
+    camCtrl.setPreset("fit");
+    const dxFit = camCtrl.activeCamera.position.x - camCtrl.controls.target.x;
+    const dyFit = camCtrl.activeCamera.position.y - camCtrl.controls.target.y;
+    assert.ok(dxFit > 50 && dyFit < -50, "Fit preset must keep isometric camera direction");
+
+    // 2D wiring diagrams (`viewFrom='top'`) must remain top-down along +Z
+    camCtrl.configureForMode("DIAGRAM", { bounds: SAMPLE_PCB_BOUNDS, viewFrom: "top" });
+    assert.ok(Math.abs(camCtrl.activeCamera.position.x - camCtrl.controls.target.x) < 1e-5);
+    assert.ok(Math.abs(camCtrl.activeCamera.position.y - camCtrl.controls.target.y) < 1e-5);
+    assert.ok(camCtrl.activeCamera.position.z > camCtrl.controls.target.z);
+  });
 });
