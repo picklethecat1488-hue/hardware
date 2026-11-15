@@ -1911,8 +1911,6 @@ class GitEngine:
                 grep_pattern,
                 "--",
                 ".",
-                ":(exclude)*.min.js",
-                ":(exclude)*three-cad-viewer.esm.js",
             ]
             try:
                 out = run_git_command(grep_cmd, cwd=self.repo_root)
@@ -1943,8 +1941,6 @@ class GitEngine:
                 commit,
                 "--",
                 ".",
-                ":(exclude)*.min.js",
-                ":(exclude)*three-cad-viewer.esm.js",
             ]
             try:
                 out = run_git_command(grep_cmd, cwd=self.repo_root)
@@ -1977,8 +1973,6 @@ class GitEngine:
             for f_line in ls_out.splitlines():
                 f_path = f_line.strip()
                 if not f_path or f_path in files_with_hits or self.is_file_ignored(f_path):
-                    continue
-                if f_path.endswith((".min.js", "three-cad-viewer.esm.js")):
                     continue
                 scored_path = self._score_fuzzy_match(q_lower, q_tokens, "", f_path)
                 if scored_path is not None and (f_path, 1) not in seen_locs:

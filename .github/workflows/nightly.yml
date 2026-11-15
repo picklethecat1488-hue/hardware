@@ -32,6 +32,10 @@ jobs:
         shell: bash -el {0}
         run: python tools/validate_js.py
 
+      - name: Run JavaScript Unit Tests
+        shell: bash -el {0}
+        run: node --test --test-concurrency=2 tests/js/*.test.mjs
+
       - name: Run Fast Tests
         shell: bash -el {0}
         env:

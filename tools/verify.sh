@@ -22,19 +22,18 @@ export OMP_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 export XLA_FLAGS="--xla_cpu_multi_thread_eigen=false"
 
-echo "🔍 [1/5] Checking Python compilation syntax..."
+echo "🔍 [1/6] Checking Python compilation syntax..."
 python -m compileall -q .
 
-echo "🎨 [2/5] Checking code formatting..."
+echo "🎨 [2/6] Checking code formatting..."
 ruff format --check .
 
-echo "🧹 [3/5] Checking linting rules..."
+echo "🧹 [3/6] Checking linting rules..."
 ruff check .
 
-echo "⚡ [4/5] Checking JavaScript compilation & lint rules..."
+echo "⚡ [4/6] Checking JavaScript compilation & lint rules..."
 python tools/validate_js.py
 
-echo "🧪 [5/5] Running fast test suite (excluding slow CAD/physics)..."
 NUM_CPUS=$(OMP_NUM_THREADS= nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 if [ "${NUM_CPUS}" -gt 4 ]; then
     PYTEST_WORKERS=4
@@ -42,6 +41,10 @@ else
     PYTEST_WORKERS="${NUM_CPUS}"
 fi
 
+echo "🧩 [5/6] Running parallel JavaScript unit tests..."
+node --test --test-concurrency="${PYTEST_WORKERS}" tests/js/*.test.mjs
+
+echo "🧪 [6/6] Running fast Python test suite (excluding slow CAD/physics)..."
 if [[ "$*" == *"-n "* ]] || [[ "$*" == *"-n="* ]]; then
     pytest "$@"
 else
