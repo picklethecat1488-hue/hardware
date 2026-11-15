@@ -2,12 +2,13 @@
 
 - **UUID**: `12e7f183-6646-4931-80f4-e6611dc800d2`
 - **ID**: `BUG-MOTTLED-BUMBLEBEE-555`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-14 21:22:58 UTC`
 - **Resolved**: `2026-11-15 03:10:31 UTC`
+- **Accepted**: `2026-11-15 03:10:45 UTC`
 
 #### Description
 
