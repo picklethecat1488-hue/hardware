@@ -1,12 +1,13 @@
-# 🔴 `[BUG-MOTTLED-BUMBLEBEE-555]` [carrier_board/carrier_board] Defect Summary
+# 🟢 `[BUG-MOTTLED-BUMBLEBEE-555]` [carrier_board/carrier_board] Defect Summary
 
 - **UUID**: `12e7f183-6646-4931-80f4-e6611dc800d2`
 - **ID**: `BUG-MOTTLED-BUMBLEBEE-555`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-14 21:22:58 UTC`
+- **Resolved**: `2026-11-15 02:20:00 UTC`
 
 #### Description
 
@@ -524,3 +525,7 @@ face 46 ignored
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:2d32dd79 --> Inspect carrier_board in 3D CAD view (both Top and Bottom sides) and verify all silkscreen board labels (OVERRIDES, STATUS, RESET) and reference designators (U1, R1, C1) read left-to-right without horizontal mirroring | `python tools/scope.py carrier_board/carrier_board`
+
+#### Resolution Notes
+
+Removed the legacy 180-deg X reflection from F.SilkS text & reference designator extrusions and rotated B.SilkS extrusions by 180 deg around Y in PCB3DAssembler.build_silkscreen so both top and bottom silkscreens read unmirrored left-to-right in Scope right-handed 3D CAD coordinates.
