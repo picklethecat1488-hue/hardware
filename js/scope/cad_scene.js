@@ -404,7 +404,7 @@ export class CadSceneManager {
    */
   _createSurfaceMaterial(hexColor, alpha, renderback, clippingPlanes, pcbSurfaceRole = null) {
     const isTransparent = alpha < 0.995;
-    const side = renderback || isTransparent || this.mode === "DIAGRAM" ? DoubleSide : FrontSide;
+    const side = renderback || this.mode === "DIAGRAM" ? DoubleSide : FrontSide;
 
     let mat;
     if (this.mode === "DIAGRAM") {

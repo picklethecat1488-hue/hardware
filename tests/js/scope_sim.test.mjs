@@ -14,7 +14,7 @@ import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import { describe, it } from "node:test";
 import "./glsl_loader.mjs";
-import { Scene } from "../../js/static/vendor/three/three.module.js";
+import { DoubleSide, FrontSide, Scene } from "../../js/static/vendor/three/three.module.js";
 import { createMockRuntimeContext } from "../../js/core/runtime_context.js";
 import { CadSceneManager } from "../../js/scope/cad_scene.js";
 import { decodeOcpPayload } from "../../js/scope/decoder.js";
@@ -122,5 +122,67 @@ describe("scope/sim_renderer", () => {
     assert.equal(sim.renderStyle, "spheres");
     assert.equal(sim._geometry.parameters.radius, 1.89);
     assert.equal(sim._instancedMesh.count, 12000);
+  });
+
+  it("prevents translucent container inner-wall voxel clipping via FrontSide culling and fluid polygonOffset (BUG-LUSTROUS-TICK-848)", () => {
+    const ctx = createMockRuntimeContext();
+    const scene = new Scene();
+    const cadScene = new CadSceneManager({ scene, dpr: 2.0 });
+
+    const decoded = decodeOcpPayload(ctx, {
+      instances: [
+        {
+          vertices: [0, 0, 0, 10, 0, 0, 0, 10, 0],
+          normals: [0, 0, 1, 0, 0, 1, 0, 0, 1],
+          triangles: [0, 1, 2],
+        },
+      ],
+      shapes: {
+        parts: [
+          {
+            id: "/world/bowl",
+            name: "bowl",
+            color: "#1d4ed8",
+            alpha: 0.45,
+            renderback: false,
+            loc: [[0, 0, 0], [0, 0, 0, 1]],
+            shape: { ref: 0 },
+          },
+          {
+            id: "/world/baffle_sheet",
+            name: "baffle_sheet",
+            color: "#38bdf8",
+            alpha: 0.5,
+            renderback: true,
+            loc: [[0, 0, 10], [0, 0, 0, 1]],
+            shape: { ref: 0 },
+          },
+        ],
+      },
+    });
+    cadScene.loadDecodedPayload(decoded, { mode: "SIMULATE" });
+
+    const bowlRec = cadScene.leafRecords.get("/world/bowl");
+    const sheetRec = cadScene.leafRecords.get("/world/baffle_sheet");
+    assert.equal(
+      bowlRec.mesh.material.side,
+      FrontSide,
+      "Closed translucent 3D solids (renderback=false) must cull internal back-facing cavity walls to prevent voxel corner clipping stripes",
+    );
+    assert.equal(
+      sheetRec.mesh.material.side,
+      DoubleSide,
+      "Open surfaces with renderback=true must remain DoubleSide",
+    );
+
+    const sim = new SimulationVoxelRenderer({ ctx, scene, cadScene });
+    sim.loadTelemetry({
+      status: "ok",
+      is_voxel_grid: true,
+      voxel_dx_mm: 3.5,
+      frames: [{ step: 0, count: 1, positions: [[94.5, 0, 50.0]] }],
+    });
+    assert.equal(sim._material.polygonOffset, true);
+    assert.ok(sim._material.polygonOffsetFactor > 0);
   });
 });

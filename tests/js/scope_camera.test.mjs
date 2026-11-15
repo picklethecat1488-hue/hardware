@@ -104,4 +104,48 @@ describe("scope/camera_controller", () => {
     const mmPerPxZoomedPersp = camCtrl.getMillimetersPerCssPixel();
     assert.ok(Math.abs(mmPerPxZoomedPersp - mmPerPxZoomedOrtho) < 1e-5);
   });
+
+  it("zooms responsively on two-finger trackpad scroll and ctrlKey pinch gestures (BUG-LUSTROUS-TICK-848)", () => {
+    const camCtrl = new CadCameraController({ width: 1200, height: 800 });
+    camCtrl.configureForMode("SIMULATE", {
+      bounds: {
+        min: [-100, -100, 0],
+        max: [100, 100, 115],
+        center: [0, 0, 57.5],
+        size: [200, 200, 115],
+      },
+    });
+
+    const distBeforeScroll = camCtrl.perspCamera.position.distanceTo(camCtrl.controls.target);
+    camCtrl.controls._handleMouseWheel({
+      deltaY: -20,
+      deltaMode: 0,
+      ctrlKey: false,
+      clientX: 600,
+      clientY: 400,
+      preventDefault() {},
+    });
+    const distAfterScroll = camCtrl.perspCamera.position.distanceTo(camCtrl.controls.target);
+    const scrollReductionFraction = (distBeforeScroll - distAfterScroll) / distBeforeScroll;
+    assert.ok(
+      scrollReductionFraction >= 0.05,
+      `Expected >= 5% zoom on -20px trackpad scroll tick, got ${(scrollReductionFraction * 100).toFixed(2)}%`,
+    );
+
+    const distBeforePinch = camCtrl.perspCamera.position.distanceTo(camCtrl.controls.target);
+    camCtrl.controls._handleMouseWheel({
+      deltaY: -5,
+      deltaMode: 0,
+      ctrlKey: true,
+      clientX: 600,
+      clientY: 400,
+      preventDefault() {},
+    });
+    const distAfterPinch = camCtrl.perspCamera.position.distanceTo(camCtrl.controls.target);
+    const pinchReductionFraction = (distBeforePinch - distAfterPinch) / distBeforePinch;
+    assert.ok(
+      pinchReductionFraction >= 0.05,
+      `Expected >= 5% zoom on -5px trackpad ctrlKey pinch tick, got ${(pinchReductionFraction * 100).toFixed(2)}%`,
+    );
+  });
 });

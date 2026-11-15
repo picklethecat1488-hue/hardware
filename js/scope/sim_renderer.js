@@ -33,6 +33,8 @@ const DEFAULT_VOXEL_DX_MM = 3.5;
 const DEFAULT_SPHERE_RADIUS_MM = 1.89;
 const BASE_PLAYBACK_FPS = 30;
 const MIN_CAPACITY = 64;
+const FLUID_POLYGON_OFFSET_FACTOR = 2.0;
+const FLUID_POLYGON_OFFSET_UNITS = 2.0;
 
 const IDENTITY_MAT4 = new Matrix4();
 
@@ -298,6 +300,9 @@ export class SimulationVoxelRenderer {
       transparent: false,
       depthWrite: true,
       depthTest: true,
+      polygonOffset: true,
+      polygonOffsetFactor: FLUID_POLYGON_OFFSET_FACTOR,
+      polygonOffsetUnits: FLUID_POLYGON_OFFSET_UNITS,
       side: FrontSide,
       uniforms: {
         uOpacity: { value: 1.0 },

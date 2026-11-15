@@ -29,8 +29,10 @@ const DEFAULT_POLAR_MAX_RAD = Math.PI - 1e-4;
 const DEFAULT_ZOOM_SPEED = 1.0;
 const DEFAULT_ROTATE_SPEED = 1.0;
 const DEFAULT_PAN_SPEED = 1.0;
-const WHEEL_DOLLY_BASE = 0.95;
-const WHEEL_DELTA_NORMALIZER = 100;
+const WHEEL_DOLLY_BASE = 0.86;
+const WHEEL_DELTA_NORMALIZER = 45;
+const TRACKPAD_PINCH_MULTIPLIER = 3.5;
+const MAX_WHEEL_DOLLY_STEPS = 6;
 const WHEEL_LINE_HEIGHT_PX = 16;
 const WHEEL_MODE_LINE = 1;
 const MIN_ORTHO_ZOOM = 1e-4;
@@ -606,7 +608,13 @@ export class OrbitControls extends EventDispatcher {
     if (event.deltaMode === WHEEL_MODE_LINE) {
       rawDeltaY *= WHEEL_LINE_HEIGHT_PX;
     }
-    const clampedSteps = Math.max(-4, Math.min(4, rawDeltaY / WHEEL_DELTA_NORMALIZER));
+    if (event.ctrlKey) {
+      rawDeltaY *= TRACKPAD_PINCH_MULTIPLIER;
+    }
+    const clampedSteps = Math.max(
+      -MAX_WHEEL_DOLLY_STEPS,
+      Math.min(MAX_WHEEL_DOLLY_STEPS, rawDeltaY / WHEEL_DELTA_NORMALIZER),
+    );
     const dollyScale = Math.pow(1 / WHEEL_DOLLY_BASE, clampedSteps * this.zoomSpeed);
 
     this.dispatchEvent(START_EVENT);
