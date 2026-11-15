@@ -522,6 +522,10 @@ face 46 ignored
 2026-11-14 13:24:36 [INFO] scope: 127.0.0.1 - - [14/Nov/2026 13:24:36] "GET /api/scope/load?project=cat_fountain&target=product&mode=DIAGRAM HTTP/1.1" 200 -
 ```
 
+#### Attached Commits
+
+- `e953e49b`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:3c18003b --> Verify cat_fountain/product diagram opens in Isometric perspective by default with 3D-positioned part labels | `python tools/scope.py cat_fountain/product --mode diagram`
