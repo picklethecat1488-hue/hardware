@@ -522,6 +522,10 @@ face 46 ignored
 2026-11-14 13:22:22 [INFO] scope: 127.0.0.1 - - [14/Nov/2026 13:22:22] "POST /api/scope/target_bug HTTP/1.1" 200 -
 ```
 
+#### Attached Commits
+
+- `abef5295`
+
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:2d32dd79 --> Inspect carrier_board in 3D CAD view (both Top and Bottom sides) and verify all silkscreen board labels (OVERRIDES, STATUS, RESET) and reference designators (U1, R1, C1) read left-to-right without horizontal mirroring | `python tools/scope.py carrier_board/carrier_board`
