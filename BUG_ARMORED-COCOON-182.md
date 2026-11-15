@@ -520,10 +520,3 @@ face 46 ignored
 2026-11-14 13:24:36 [INFO] scope: Successfully loaded geometry for cat_fountain/product [DIAGRAM] in 2.38s
 2026-11-14 13:24:36 [INFO] scope: 127.0.0.1 - - [14/Nov/2026 13:24:36] "GET /api/scope/load?project=cat_fountain&target=product&mode=DIAGRAM HTTP/1.1" 200 -
 ```
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-ARMORED-COCOON-182/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
-| `text/plain` | [scope.log](attachments/BUG-ARMORED-COCOON-182/scope.log) | Scope workstation execution logs |

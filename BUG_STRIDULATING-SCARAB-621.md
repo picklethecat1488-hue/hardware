@@ -520,10 +520,3 @@ face 46 ignored
 2026-11-14 13:19:49 [INFO] scope: Successfully loaded geometry for carrier_board/carrier_board [CAD] in 32.52s
 2026-11-14 13:19:50 [INFO] scope: 127.0.0.1 - - [14/Nov/2026 13:19:50] "GET /api/scope/load?project=carrier_board&target=carrier_board&mode=CAD HTTP/1.1" 200 -
 ```
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-STRIDULATING-SCARAB-621/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
-| `text/plain` | [scope.log](attachments/BUG-STRIDULATING-SCARAB-621/scope.log) | Scope workstation execution logs |

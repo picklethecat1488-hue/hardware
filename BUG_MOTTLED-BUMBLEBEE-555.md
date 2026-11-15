@@ -520,10 +520,3 @@ face 46 ignored
 2026-11-14 13:21:32 [INFO] scope: 127.0.0.1 - - [14/Nov/2026 13:21:32] "POST /api/scope/target_bug HTTP/1.1" 200 -
 2026-11-14 13:22:22 [INFO] scope: 127.0.0.1 - - [14/Nov/2026 13:22:22] "POST /api/scope/target_bug HTTP/1.1" 200 -
 ```
-
-#### Attachments & References
-
-| Type | Filename | Description |
-| :--- | :--- | :--- |
-| `image/png` | [snapshot.png](attachments/BUG-MOTTLED-BUMBLEBEE-555/snapshot.png) | 3D CAD/PCB annotated WebGL viewport snapshot |
-| `text/plain` | [scope.log](attachments/BUG-MOTTLED-BUMBLEBEE-555/scope.log) | Scope workstation execution logs |
