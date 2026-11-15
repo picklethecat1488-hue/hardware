@@ -7,6 +7,8 @@ import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import { describe, it } from "node:test";
 import { createMockRuntimeContext } from "../../js/core/runtime_context.js";
+import { Scene } from "../../js/static/vendor/three/three.module.js";
+import { CadSceneManager } from "../../js/scope/cad_scene.js";
 import {
   decodeOcpPayload,
   decodeTypedBuffer,
@@ -156,5 +158,56 @@ describe("scope/decoder", () => {
     const e0 = lookupBrepEdge(leaf.instance, 1);
     assert.equal(e0.edgeIndex, 0);
     assert.equal(e0.curveType, "Line");
+  });
+
+  it("renders 3D PCB copper traces without dark B-rep edge washout and overlays crisp silkscreen on top (BUG-SPOTTED-SPIDER-413)", () => {
+    const ctx = createMockRuntimeContext();
+    const vertices = new Float32Array([0, 0, 0, 2, 0, 0, 2, 0.2, 0, 0, 0.2, 0]);
+    const triangles = new Uint32Array([0, 1, 2, 0, 2, 3]);
+    const edges = new Float32Array([0, 0, 0, 2, 0, 0, 2, 0, 0, 2, 0.2, 0]);
+
+    const payload = {
+      instances: [
+        {
+          vertices: encodeB64Field(vertices, "float32"),
+          triangles: encodeB64Field(triangles, "uint32"),
+          edges: encodeB64Field(edges, "float32"),
+        },
+      ],
+      shapes: {
+        parts: [
+          {
+            id: "/Group/carrier_board_traces_top",
+            name: "carrier_board_traces_top",
+            color: "#d47e3c",
+            parts: [
+              { id: "/Group/carrier_board_traces_top/Solid_0", name: "Solid_0", shape: { ref: 0 }, state: [1, 1] },
+            ],
+          },
+          {
+            id: "/Group/carrier_board_silkscreen_top",
+            name: "carrier_board_silkscreen_top",
+            color: "#f5f5f5",
+            parts: [
+              { id: "/Group/carrier_board_silkscreen_top/Solid_0", name: "Solid_0", shape: { ref: 0 }, state: [1, 1] },
+            ],
+          },
+        ],
+      },
+    };
+
+    const decoded = decodeOcpPayload(ctx, payload);
+    const scene = new Scene();
+    const cadScene = new CadSceneManager({ scene, dpr: 2.0 });
+    cadScene.loadDecodedPayload(decoded, { mode: "CAD" });
+
+    const traceRec = cadScene.leafRecords.get("/Group/carrier_board_traces_top/Solid_0");
+    const silkRec = cadScene.leafRecords.get("/Group/carrier_board_silkscreen_top/Solid_0");
+
+    assert.ok(traceRec && silkRec);
+    assert.equal(traceRec.edgeLines, null, "Copper trace segments & endcaps must not have dark B-rep edge outlines");
+    assert.equal(silkRec.edgeLines, null, "Silkscreen glyphs must not have dark B-rep edge outlines swallowing strokes");
+    assert.ok(traceRec.mesh.material.metalness >= 0.35, "3D copper traces should render with metallic copper luster");
+    assert.ok(silkRec.mesh.material.polygonOffsetFactor < traceRec.mesh.material.polygonOffsetFactor, "Silkscreen must bias in front of copper traces");
   });
 });

@@ -257,3 +257,55 @@ def test_carrier_board_pcb_3d_assembler_performance():
 
     # Fast CAD synthesis invariant
     assert elapsed < 5.0, f"PCB 3D synthesis took {elapsed:.2f}s, expected < 5.0s"
+
+
+def test_regression_bug_spotted_spider_413_copper_traces_and_silkscreen_overlay():
+    """Verify BUG-SPOTTED-SPIDER-413: 3D CAD traces render as physical copper wires cleanly overlaid by silkscreen."""
+    from model.pcb import SilkscreenTextModel
+
+    cfg = PCBConfig(
+        name="copper_overlay_board",
+        dimensions_mm=(30.0, 30.0, 1.6),
+        traces=[
+            TraceSegmentModel(start_mm=(-8.0, 0.0), end_mm=(8.0, 0.0), width_mm=0.2, layer="F.Cu", net="VDD"),
+            TraceSegmentModel(start_mm=(-8.0, 2.0), end_mm=(8.0, 2.0), width_mm=0.2, layer="B.Cu", net="GND"),
+        ],
+        silkscreen_texts=[
+            SilkscreenTextModel(text="U1", layer="F.SilkS", position=(0.0, 0.0), font_size=1.2),
+            SilkscreenTextModel(text="J1", layer="B.SilkS", position=(0.0, 2.0), font_size=1.2),
+        ],
+    )
+    footprints = [
+        FootprintModel(
+            name="R1",
+            package="0402",
+            position=(0.0, 0.0, 0.8),
+            rotation=(0.0, 0.0, 0.0),
+            dimensions=(1.0, 0.5, 0.35),
+            layer="F.Cu",
+        )
+    ]
+    assembler = PCB3DAssembler(cfg, wiring=Wiring.from_models(footprints=footprints, nets=[]))
+
+    # 1. In 3D CAD mode (kicad_2d_theme=False), both F.Cu and B.Cu traces must be warm physical copper (R > G > B)
+    cad_items = {name: (geom, color) for geom, name, color, _ in assembler.get_display_items(prefix="brd")}
+    top_geom, top_col = cad_items["brd_traces_top"]
+    bot_geom, bot_col = cad_items["brd_traces_bottom"]
+    for trace_col in (top_col, bot_col):
+        r, g, b = trace_col
+        assert r > 0.75 and 0.40 <= g <= 0.62 and 0.15 <= b <= 0.35 and r > g > b, (
+            f"Expected physical warm copper RGB for 3D CAD traces, got {trace_col}"
+        )
+
+    # 2. KiCad 2D theme must still preserve red/blue layer distinction when requested
+    kicad_items = {name: color for _, name, color, _ in assembler.get_display_items(prefix="brd", kicad_2d_theme=True)}
+    assert kicad_items["brd_traces_top"] == assembler.KICAD_TOP_TRACE_COLOR
+    assert kicad_items["brd_traces_bottom"] == assembler.KICAD_BOTTOM_TRACE_COLOR
+
+    # 3. Top silkscreen Z-min must sit strictly proud above both top copper traces and top pads
+    pads_geom, _ = cad_items["brd_pads"]
+    silk_top_geom, _ = cad_items["brd_silkscreen_top"]
+    silk_bot_geom, _ = cad_items["brd_silkscreen_bottom"]
+    assert silk_top_geom.bounding_box().min.Z > top_geom.bounding_box().max.Z + 0.015
+    assert silk_top_geom.bounding_box().min.Z > pads_geom.bounding_box().max.Z + 0.005
+    assert silk_bot_geom.bounding_box().max.Z < bot_geom.bounding_box().min.Z - 0.015

@@ -22,10 +22,10 @@ class PCB3DAssembler:
     DEFAULT_SOLDERMASK_COLOR = (0.04, 0.14, 0.06)  # KiCad rich dark green soldermask (#0a2410)
     DEFAULT_COMPONENT_COLOR = (0.165, 0.180, 0.208)  # Molded epoxy IC / passive dark charcoal (#2a2e35)
     DEFAULT_PAD_COLOR = (0.784, 0.627, 0.204)  # Brilliant ENIG gold surface finish (#c8a034)
-    DEFAULT_TOP_TRACE_COLOR = (0.784, 0.204, 0.204)  # F.Cu KiCad vivid red copper ribbon (#c83434)
-    DEFAULT_BOTTOM_TRACE_COLOR = (0.204, 0.353, 0.784)  # B.Cu KiCad contrasting vivid blue ribbon (#345ac8)
+    DEFAULT_TOP_TRACE_COLOR = (0.831, 0.494, 0.235)  # Physical 3D warm copper wire (#d47e3c)
+    DEFAULT_BOTTOM_TRACE_COLOR = (0.831, 0.494, 0.235)  # Physical 3D warm copper wire (#d47e3c)
     DEFAULT_VIA_COLOR = (0.706, 0.627, 0.235)  # Copper/gold through-hole via barrels (#b4a03c)
-    DEFAULT_SILKSCREEN_COLOR = (0.90, 0.90, 0.90)  # High-contrast crisp white silkscreen legend (#e6e6e6)
+    DEFAULT_SILKSCREEN_COLOR = (0.96, 0.96, 0.96)  # High-contrast crisp white silkscreen legend (#f5f5f5)
 
     # KiCad 10 _builtin_default 2D PCB Editor layer colors
     KICAD_SUBSTRATE_COLOR = (0.015725, 0.094157, 0.188275)  # Board interior dark navy (#041830)
@@ -36,7 +36,7 @@ class PCB3DAssembler:
     KICAD_TOP_SILKSCREEN_COLOR = (0.949059, 0.929451, 0.631412)  # F.SilkS (#f2eda1)
     KICAD_BOTTOM_SILKSCREEN_COLOR = (0.909843, 0.698078, 0.654941)  # B.SilkS (#e8b2a7)
     Z_PAD_OFFSET = 0.015  # Solder pads sit proud of trace ribbons to prevent Z-fighting (BUG-TRANSLUCENT-LACEWING-144)
-    Z_SILK_OFFSET = 0.030  # Silkscreen legends sit proud of copper pads to guarantee clean visibility
+    Z_SILK_OFFSET = 0.045  # Silkscreen legends sit cleanly proud above copper traces and pads (BUG-SPOTTED-SPIDER-413)
 
     SOLDERMASK_COLORS: Dict[str, Tuple[float, float, float]] = {
         "matte_black": (0.06, 0.08, 0.07),

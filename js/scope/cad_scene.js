@@ -39,6 +39,10 @@ export const DEFAULT_CAD_ROUGHNESS = 0.78;
 export const DEFAULT_CAD_METALNESS = 0.04;
 const DEFAULT_PCB_SUBSTRATE_ROUGHNESS = 0.82;
 const DEFAULT_PCB_SUBSTRATE_METALNESS = 0.03;
+const PCB_COPPER_ROUGHNESS = 0.42;
+const PCB_COPPER_METALNESS = 0.45;
+const PCB_SILK_ROUGHNESS = 0.86;
+const PCB_SILK_EMISSIVE_INTENSITY = 0.14;
 const DEFAULT_EDGE_COLOR_CAD = 0x182230;
 const DEFAULT_EDGE_COLOR_DIAGRAM = 0x0f172a;
 const HIGHLIGHT_FACE_COLOR_HEX = 0xffb800;
@@ -282,14 +286,26 @@ export class CadSceneManager {
         leaf.location.quaternion[3],
       );
 
+      const pcbSurfaceRole = this._classifyPcbSurfaceRole(leaf);
+
       let mesh = null;
       const meshGeom = getMeshGeometry(leaf.instance);
       if (meshGeom) {
-        const mat = this._createSurfaceMaterial(leaf.color, leaf.alpha, leaf.renderback, activeClipPlanes);
+        const mat = this._createSurfaceMaterial(
+          leaf.color,
+          leaf.alpha,
+          leaf.renderback,
+          activeClipPlanes,
+          pcbSurfaceRole,
+        );
         mesh = new Mesh(meshGeom, mat);
         mesh.name = `${leaf.name}_mesh`;
         if (leaf.alpha < 0.999) {
+          mesh.renderOrder = 3;
+        } else if (pcbSurfaceRole === "silkscreen") {
           mesh.renderOrder = 2;
+        } else if (pcbSurfaceRole === "copper") {
+          mesh.renderOrder = 1;
         }
         group.add(mesh);
       }
@@ -297,9 +313,12 @@ export class CadSceneManager {
       let edgeLines = null;
       const edgeGeom = getEdgeGeometry(leaf.instance);
       if (edgeGeom) {
-        // Diagram black text glyph interiors don't need thick dark outlines on top of tiny strokes
+        // Fine PCB copper traces/endcaps/pads/vias and silkscreen/diagram text glyphs must not be
+        // covered by dark 2.5px B-rep silhouette outlines (`BUG-SPOTTED-SPIDER-413`)
         const isLabelGlyph = leaf.name.toLowerCase().includes("label");
-        if (!isLabelGlyph) {
+        const suppressBrepOutline =
+          isLabelGlyph || pcbSurfaceRole === "copper" || pcbSurfaceRole === "silkscreen";
+        if (!suppressBrepOutline) {
           edgeLines = new LineSegments2(edgeGeom, sharedEdgeMat);
           edgeLines.name = `${leaf.name}_edges`;
           edgeLines.visible = leaf.edgesVisible;
@@ -346,15 +365,44 @@ export class CadSceneManager {
   }
 
   /**
+   * Classify whether a decoded CAD leaf belongs to a 3D PCB copper (`traces`, `pads`, `vias`),
+   * `silkscreen`, or `substrate` layer so copper wires and silkscreen legends render cleanly.
+   *
+   * @param {object} leaf - Decoded leaf node.
+   * @returns {"copper"|"silkscreen"|"substrate"|null}
+   */
+  _classifyPcbSurfaceRole(leaf) {
+    const pathKey = `${leaf?.id || ""}/${leaf?.name || ""}`.toLowerCase();
+    if (pathKey.includes("silkscreen")) {
+      return "silkscreen";
+    }
+    if (
+      pathKey.includes("_traces_")
+      || pathKey.includes("/trace_")
+      || pathKey.includes("_pads")
+      || pathKey.includes("/pad_")
+      || pathKey.includes("_vias")
+      || pathKey.includes("/via_")
+    ) {
+      return "copper";
+    }
+    if (pathKey.includes("_substrate")) {
+      return "substrate";
+    }
+    return null;
+  }
+
+  /**
    * Create a CAD surface material (`MeshBasicMaterial` for flat 2D diagrams, `MeshStandardMaterial` for 3D).
    *
    * @param {string} hexColor - CSS hex color.
    * @param {number} alpha - Opacity `[0..1]`.
    * @param {boolean} renderback - Whether backfaces should be shaded.
    * @param {Array<Plane>} clippingPlanes - Active Three.js clip planes.
+   * @param {"copper"|"silkscreen"|"substrate"|null} [pcbSurfaceRole] - Optional 3D PCB surface layer role.
    * @returns {MeshStandardMaterial|MeshBasicMaterial}
    */
-  _createSurfaceMaterial(hexColor, alpha, renderback, clippingPlanes) {
+  _createSurfaceMaterial(hexColor, alpha, renderback, clippingPlanes, pcbSurfaceRole = null) {
     const isTransparent = alpha < 0.995;
     const side = renderback || isTransparent || this.mode === "DIAGRAM" ? DoubleSide : FrontSide;
 
@@ -371,17 +419,45 @@ export class CadSceneManager {
         wireframe: this.wireframe,
       });
     } else {
+      let roughness = this.mode === "PCB" ? DEFAULT_PCB_SUBSTRATE_ROUGHNESS : DEFAULT_CAD_ROUGHNESS;
+      let metalness = this.mode === "PCB" ? DEFAULT_PCB_SUBSTRATE_METALNESS : DEFAULT_CAD_METALNESS;
+      let polyFactor = 1.0;
+      let polyUnits = 1.0;
+      let emissiveHex = 0x000000;
+      let emissiveIntensity = 0.0;
+
+      if (pcbSurfaceRole === "copper") {
+        roughness = PCB_COPPER_ROUGHNESS;
+        metalness = PCB_COPPER_METALNESS;
+        polyFactor = 0.25;
+        polyUnits = 0.5;
+      } else if (pcbSurfaceRole === "silkscreen") {
+        roughness = PCB_SILK_ROUGHNESS;
+        metalness = 0.0;
+        polyFactor = -1.5;
+        polyUnits = -2.0;
+        emissiveHex = 0xffffff;
+        emissiveIntensity = PCB_SILK_EMISSIVE_INTENSITY;
+      } else if (pcbSurfaceRole === "substrate") {
+        roughness = DEFAULT_PCB_SUBSTRATE_ROUGHNESS;
+        metalness = DEFAULT_PCB_SUBSTRATE_METALNESS;
+        polyFactor = 2.0;
+        polyUnits = 2.0;
+      }
+
       mat = new MeshStandardMaterial({
         color: new Color(hexColor || "#8a99ad"),
-        roughness: this.mode === "PCB" ? DEFAULT_PCB_SUBSTRATE_ROUGHNESS : DEFAULT_CAD_ROUGHNESS,
-        metalness: this.mode === "PCB" ? DEFAULT_PCB_SUBSTRATE_METALNESS : DEFAULT_CAD_METALNESS,
+        roughness,
+        metalness,
+        emissive: new Color(emissiveHex),
+        emissiveIntensity,
         opacity: alpha,
         transparent: isTransparent,
         depthWrite: !isTransparent || alpha >= 0.85,
         side,
         polygonOffset: true,
-        polygonOffsetFactor: 1.0,
-        polygonOffsetUnits: 1.0,
+        polygonOffsetFactor: polyFactor,
+        polygonOffsetUnits: polyUnits,
         wireframe: this.wireframe,
         clippingPlanes,
       });
