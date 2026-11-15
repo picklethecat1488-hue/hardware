@@ -520,3 +520,7 @@ face 46 ignored
 2026-11-14 13:23:43 [INFO] scope: 127.0.0.1 - - [14/Nov/2026 13:23:43] "GET /api/scope/load?project=cat_fountain&target=product&mode=SIMULATE HTTP/1.1" 200 -
 2026-11-14 13:23:45 [INFO] scope: 127.0.0.1 - - [14/Nov/2026 13:23:45] "GET /api/scope/simulation_telemetry?project=cat_fountain&target=product HTTP/1.1" 200 -
 ```
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:08d3c1ef --> Verify translucent bowl renders cleanly over water voxels without vertical clipping stripes and two-finger trackpad scroll/pinch zooms smoothly | `python tools/scope.py cat_fountain/product --mode simulate`
