@@ -12,10 +12,13 @@ dependencies:
   - nodejs>=20
   - pip
   - pip:
-    - ocp-vscode==2.7.1
+    - ocp-vscode==4.1.0
+    - ocp-viewer-core==1.0.13
+    - orjson
+    - openpyxl
+    - xlrd
     - pyvista==0.47.3
     - opencv-python==4.13.0.92
-    - ocp_vscode
     - pytest==9.0.3
     - halo
     - pytest-xdist

@@ -143,13 +143,37 @@ def test_daemon_server_sigterm_handling() -> None:
 
 
 def test_regression_bug_flying_grasshopper_413_ci_dependencies() -> None:
-    """Verify BUG-FLYING-GRASSHOPPER-413: pluggy is pinned <1.7.0 for scancode-toolkit and CI gate formats cleanly."""
+    """Verify CI environment.yml pins pluggy<1.7.0 and non-conflicting ocp-vscode>=4.1.0 + ocp-viewer-core."""
+    from packaging.requirements import Requirement
+    from packaging.version import Version
+    from provider.scope.pipeline import CoreViewer
+
     lc_workflow = WORKSPACE_ROOT / ".github" / "workflows" / "license-compliance.yml"
     assert lc_workflow.exists(), "license-compliance.yml must exist"
-    lc_text = lc_workflow.read_text(encoding="utf-8")
-    assert "pluggy<1.7.0" in lc_text, "license-compliance.yml must constrain pluggy<1.7.0"
+    lc_data = yaml.safe_load(lc_workflow.read_text(encoding="utf-8"))
+    lc_steps = lc_data.get("jobs", {}).get("scancode", {}).get("steps", [])
+    assert any("pluggy<1.7.0" in s.get("run", "") for s in lc_steps), (
+        "license-compliance.yml must constrain pluggy<1.7.0"
+    )
 
     env_path = WORKSPACE_ROOT / "environment.yml"
     assert env_path.exists(), "environment.yml must exist"
-    env_text = env_path.read_text(encoding="utf-8")
-    assert "pluggy<1.7.0" in env_text, "environment.yml must constrain pluggy<1.7.0"
+    env_data = yaml.safe_load(env_path.read_text(encoding="utf-8"))
+    pip_specs = next((d["pip"] for d in env_data.get("dependencies", []) if isinstance(d, dict) and "pip" in d), [])
+    reqs = [Requirement(spec) for spec in pip_specs]
+    by_name: dict[str, list[Requirement]] = {}
+    for req in reqs:
+        canonical = req.name.lower().replace("_", "-")
+        by_name.setdefault(canonical, []).append(req)
+
+    assert "pluggy" in by_name and not by_name["pluggy"][0].specifier.contains(Version("1.7.0"))
+    assert len(by_name.get("ocp-vscode", [])) == 1, "ocp-vscode must not have duplicate conflicting pins"
+    assert by_name["ocp-vscode"][0].specifier.contains(Version("4.1.0")), (
+        "ocp-vscode spec in environment.yml must allow >=4.1.0 so ocp-viewer-core is installed"
+    )
+    assert not by_name["ocp-vscode"][0].specifier.contains(Version("2.7.1")), (
+        "ocp-vscode==2.7.1 omits ocp-viewer-core and breaks ScopeGeometryPipeline in CI"
+    )
+    assert "ocp-viewer-core" in by_name, "environment.yml must explicitly include ocp-viewer-core"
+    assert "orjson" in by_name, "environment.yml must include orjson for Scope pipeline/server"
+    assert CoreViewer is not None, "ocp_viewer_core.show.Viewer must be importable in active test environment"
