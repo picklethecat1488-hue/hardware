@@ -2,12 +2,13 @@
 
 - **UUID**: `cd9a5e76-d677-43c5-a9b5-1f419f719775`
 - **ID**: `BUG-STRIDULATING-SCARAB-621`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-14 21:21:32 UTC`
 - **Resolved**: `2026-11-15 03:11:23 UTC`
+- **Accepted**: `2026-11-15 03:11:37 UTC`
 
 #### Description
 
