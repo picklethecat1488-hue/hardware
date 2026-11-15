@@ -2,12 +2,13 @@
 
 - **UUID**: `a3b4f0e7-9143-4b0a-aafd-6433d4b732cf`
 - **ID**: `BUG-MIMIC-PLANTHOPPER-550`
-- **Status**: `RESOLVED`
+- **Status**: `CLOSED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-11-14 21:18:44 UTC`
 - **Resolved**: `2026-11-15 03:13:41 UTC`
+- **Accepted**: `2026-11-15 03:13:55 UTC`
 
 #### Description
 
