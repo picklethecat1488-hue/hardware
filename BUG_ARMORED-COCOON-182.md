@@ -1,12 +1,13 @@
-# 🔴 `[BUG-ARMORED-COCOON-182]` [cat_fountain/product] Defect Summary
+# 🟢 `[BUG-ARMORED-COCOON-182]` [cat_fountain/product] Defect Summary
 
 - **UUID**: `c7052c76-8539-4350-a7de-32f3827581fb`
 - **ID**: `BUG-ARMORED-COCOON-182`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-11-14 21:25:01 UTC`
+- **Resolved**: `2026-11-15 02:41:11 UTC`
 
 #### Description
 
@@ -524,3 +525,7 @@ face 46 ignored
 #### Review Tasks & Functional Checklist
 
 - [ ] <!-- task:3c18003b --> Verify cat_fountain/product diagram opens in Isometric perspective by default with 3D-positioned part labels | `python tools/scope.py cat_fountain/product --mode diagram`
+
+#### Resolution Notes
+
+Configured CadCameraController.configureForMode('DIAGRAM') to honor viewFrom ('iso' default for 3D exploded diagrams, 'top' for 2D schematics), scoped room.diagram_options per Room in cat_fountain, and oriented 3D diagram labels at their exploded part elevations facing the isometric camera.
