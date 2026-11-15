@@ -433,12 +433,12 @@ class PCB3DAssembler:
             yaw = st.rotation or 0.0
             if not is_bottom:
                 if st.mirror:
-                    s.locate(Location((st.position[0], st.position[1], z_base), (0.0, 0.0, 180.0 - yaw)))
+                    s.locate(Location((st.position[0], st.position[1], z_base + t_silk), (0.0, 180.0, -yaw)))
                 else:
-                    # Rotate 180 deg around X so glyph RIGHT stays +X_kicad and glyph UP maps to -Y_kicad
-                    s.locate(Location((st.position[0], st.position[1], z_base + t_silk), (180.0, 0.0, yaw)))
+                    s.locate(Location((st.position[0], st.position[1], z_base), (0.0, 0.0, yaw)))
             else:
-                s.locate(Location((st.position[0], st.position[1], z_base - t_silk), (0.0, 0.0, 180.0 - yaw)))
+                # Rotate 180 deg around Y so bottom view (-Z camera, +Y up => X_right = -X_world) reads left-to-right
+                s.locate(Location((st.position[0], st.position[1], z_base), (0.0, 180.0, -yaw)))
             solids.append(s)
 
         # 2. Silkscreen vector graphics (rectangles/frames, lines, polygons)
@@ -525,9 +525,9 @@ class PCB3DAssembler:
             txt = Text(fp_name, font_size=0.8)
             s = extrude(txt, t_silk)
             if not is_bottom:
-                s.locate(Location((cx, cy - 1.5, z_base + t_silk), (180.0, 0.0, 0.0)))
+                s.locate(Location((cx, cy - 1.5, z_base), (0.0, 0.0, 0.0)))
             else:
-                s.locate(Location((cx, cy - 1.5, z_base - t_silk), (0.0, 0.0, 180.0)))
+                s.locate(Location((cx, cy - 1.5, z_base), (0.0, 180.0, 0.0)))
             solids.append(s)
 
         if not solids:

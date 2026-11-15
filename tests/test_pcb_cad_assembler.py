@@ -187,7 +187,7 @@ def test_pcb_cad_assembler_silkscreen_and_colors():
 
 
 def test_regression_bug_jumping_aphid_570_silkscreen_text_unmirrored_orientation():
-    """Verify BUG-JUMPING-APHID-570: silkscreen text is unmirrored left-to-right on F.SilkS and flipped B.SilkS."""
+    """Verify BUG-JUMPING-APHID-570 & BUG-MOTTLED-BUMBLEBEE-555: 3D silkscreen labels and designators are unmirrored."""
     from model.pcb import LayerType, SilkscreenTextModel, StackupLayerModel
 
     cfg = PCBConfig(
@@ -208,28 +208,60 @@ def test_regression_bug_jumping_aphid_570_silkscreen_text_unmirrored_orientation
             SilkscreenTextModel(text="L", layer="B.SilkS", position=(0.0, 0.0), font_size=10.0),
         ],
     )
-    assembler = PCB3DAssembler(cfg)
+    footprints = [
+        FootprintModel(
+            name="P",
+            package="0402",
+            position=(10.0, 10.0, 0.8),
+            rotation=(0.0, 0.0, 0.0),
+            dimensions=(1.0, 0.5, 0.35),
+            layer="F.Cu",
+        ),
+        FootprintModel(
+            name="P",
+            package="0402",
+            position=(-10.0, -10.0, -0.8),
+            rotation=(0.0, 0.0, 0.0),
+            dimensions=(1.0, 0.5, 0.35),
+            layer="B.Cu",
+        ),
+    ]
+    assembler = PCB3DAssembler(cfg, wiring=Wiring.from_models(footprints=footprints, nets=[]))
 
     # Glyph "L" has its vertical stem on the left and horizontal foot at the bottom.
-    # In Scope PCB view (X_screen = +X_kicad, Y_screen = -Y_kicad):
-    # - F.SilkS top view requires center.X < 0 (stem left) and center.Y > 0 (foot bottom => -Y_screen < 0).
+    # In right-handed Scope 3D CAD Top view (+Z camera, X_screen = +X_world, Y_screen = +Y_world):
+    # - F.SilkS requires center.X < 0 (stem left) and center.Y < 0 (foot bottom, det = +1 unmirrored!).
     silk_top = assembler.build_silkscreen("F.SilkS")
     assert silk_top is not None
+    assert len(silk_top.children) == 2  # explicit "L" label + auto-generated "P" reference designator
     top_center = silk_top.children[0].center()
     top_bb = silk_top.bounding_box()
     assert top_center.X < -0.5, f"F.SilkS glyph 'L' mirrored horizontally: center.X={top_center.X}"
-    assert top_center.Y > 0.5, f"F.SilkS glyph 'L' flipped vertically: center.Y={top_center.Y}"
+    assert top_center.Y < -0.5, f"F.SilkS glyph 'L' reflected/upside-down: center.Y={top_center.Y}"
     assert top_bb.min.Z >= 0.800
 
-    # - B.SilkS bottom view (X_screen_bottom = -X_kicad, Y_screen_bottom = -Y_kicad)
-    #   requires center.X > 0 (so -X_kicad < 0 = stem left) and center.Y > 0 (foot bottom).
+    # Auto-generated top designator "P" (vertical stem on left, bowl at top => center.X < 10.0, center.Y > 8.5)
+    top_des_center = silk_top.children[1].center()
+    assert top_des_center.X < 10.0 and top_des_center.Y > 8.5, (
+        f"F.SilkS auto-designator 'P' mirrored: center=({top_des_center.X}, {top_des_center.Y})"
+    )
+
+    # In right-handed Scope 3D CAD Bottom view (-Z camera, up = +Y_world => X_screen_bottom = -X_world, Y_screen_bottom = +Y_world):
+    # - B.SilkS requires center.X > 0 (so -X_world < 0 = stem left) and center.Y < 0 (foot bottom).
     silk_bot = assembler.build_silkscreen("B.SilkS")
     assert silk_bot is not None
+    assert len(silk_bot.children) == 2
     bot_center = silk_bot.children[0].center()
     bot_bb = silk_bot.bounding_box()
     assert bot_center.X > 0.5, f"B.SilkS glyph 'L' mirrored horizontally in bottom view: center.X={bot_center.X}"
-    assert bot_center.Y > 0.5, f"B.SilkS glyph 'L' flipped vertically in bottom view: center.Y={bot_center.Y}"
+    assert bot_center.Y < -0.5, f"B.SilkS glyph 'L' reflected/upside-down in bottom view: center.Y={bot_center.Y}"
     assert bot_bb.max.Z <= -0.800
+
+    # Auto-generated bottom designator "P" at (-10.0, -11.5): stem on bottom-screen left (-X_world < 10 => X_world > -10.0), bowl at top (Y > -11.5)
+    bot_des_center = silk_bot.children[1].center()
+    assert bot_des_center.X > -10.0 and bot_des_center.Y > -11.5, (
+        f"B.SilkS auto-designator 'P' mirrored in bottom view: center=({bot_des_center.X}, {bot_des_center.Y})"
+    )
 
 
 @pytest.mark.slow
