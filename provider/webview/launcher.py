@@ -95,7 +95,7 @@ def get_app_icon_path(static_dir: Optional[Path] = None) -> Optional[Path]:
         Path to the preferred icon file, or None if no icon is found.
     """
     if static_dir is None:
-        static_dir = Path(__file__).resolve().parent.parent / "code_review" / "static"
+        static_dir = Path(__file__).resolve().parents[2] / "js" / "static"
 
     if not static_dir.exists():
         return None

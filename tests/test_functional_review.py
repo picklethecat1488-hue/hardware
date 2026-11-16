@@ -46,19 +46,19 @@ def test_review_task_model() -> None:
     task = ReviewTaskModel(
         id="task-123",
         title="Verify motor RPM under load",
-        command="python tools/view.py",
+        command="python tools/scope.py",
         status=ReviewTaskStatus.PENDING,
         notes="Inspect graph",
     )
     assert task.id == "task-123"
     assert task.title == "Verify motor RPM under load"
-    assert task.command == "python tools/view.py"
+    assert task.command == "python tools/scope.py"
     assert task.status == ReviewTaskStatus.PENDING
     assert task.notes == "Inspect graph"
 
     dumped = task.model_dump(mode="json")
     assert dumped["status"] == "PENDING"
-    assert dumped["command"] == "python tools/view.py"
+    assert dumped["command"] == "python tools/scope.py"
 
     loaded = ReviewTaskModel.model_validate(dumped)
     assert loaded.id == task.id

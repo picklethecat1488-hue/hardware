@@ -1028,13 +1028,13 @@ if [ "$TARGET" = "all" ] || [ "$TARGET" = "firmware" ]; then
         conda create -y -n firmware-env python=3.11
         conda run -n firmware-env pip install --no-cache-dir \
             pytest pytest-mock pytest-xdist pydantic jinja2 requests \
-            ruff tree-sitter tree-sitter-rust halo colorama pyyaml \
+            ruff oxlint tree-sitter tree-sitter-rust halo colorama pyyaml \
             eel pillow beautifulsoup4 pyserial numpy psutil pywebview
     else
         echo "firmware-env already exists, ensuring required packages..."
         conda run -n firmware-env pip install --no-cache-dir \
             pytest pytest-mock pytest-xdist pydantic jinja2 requests \
-            ruff tree-sitter tree-sitter-rust halo colorama pyyaml \
+            ruff oxlint tree-sitter tree-sitter-rust halo colorama pyyaml \
             eel pillow beautifulsoup4 pyserial numpy psutil pywebview || true
     fi
 fi
@@ -1045,7 +1045,7 @@ if [ "$TARGET" = "all" ] || [ "$TARGET" = "hardware" ] || [ "$TARGET" = "cq" ]; 
         echo "Creating cq environment..."
         conda create -y -n cq python=3.11 cadquery build123d -c conda-forge
         conda run -n cq pip install --no-cache-dir \
-            ruff pytest pytest-xdist pytest-mock pytest-timeout \
+            ruff oxlint pytest pytest-xdist pytest-mock pytest-timeout \
             pydantic pydantic-settings pydantic-changedetect cbor2 rerun-sdk \
             opencv-python pybullet trimesh jinja2 jax jaxlib jax-md pyvista halo \
             openpyxl xlrd eel pywebview matplotlib pyyaml requests ocp-vscode "pluggy<1.7.0" \
@@ -1053,7 +1053,7 @@ if [ "$TARGET" = "all" ] || [ "$TARGET" = "hardware" ] || [ "$TARGET" = "cq" ]; 
     else
         echo "cq environment already exists, ensuring required packages..."
         conda run -n cq pip install --no-cache-dir \
-            ruff pytest pytest-xdist pytest-mock pytest-timeout \
+            ruff oxlint pytest pytest-xdist pytest-mock pytest-timeout \
             pydantic pydantic-settings pydantic-changedetect cbor2 rerun-sdk \
             opencv-python pybullet trimesh jinja2 jax jaxlib jax-md pyvista halo \
             openpyxl xlrd eel pywebview matplotlib pyyaml requests ocp-vscode "pluggy<1.7.0" \

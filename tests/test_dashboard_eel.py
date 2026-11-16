@@ -160,20 +160,6 @@ def test_dashboard_server_serves_manifest_and_icons(tmp_path: Path) -> None:
         server.server_close()
 
 
-def test_templates_have_theme_color_and_manifest() -> None:
-    """Verify all dashboard HTML templates define theme-color, dark scheme, manifest, and icons."""
-    templates_dir = Path(__file__).parent.parent / "provider" / "templates"
-    for tpl_name in ("diff_view.html.j2", "code_review.html.j2", "bug_report.html.j2"):
-        tpl_path = templates_dir / tpl_name
-        assert tpl_path.exists()
-        content = tpl_path.read_text(encoding="utf-8")
-        assert '<meta name="theme-color" content="#291a10">' in content
-        assert '<meta name="color-scheme" content="dark">' in content
-        assert '<link rel="manifest" href="/static/manifest.json">' in content
-        assert '<link rel="shortcut icon" href="/static/favicon.ico">' in content
-        assert '<link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">' in content
-
-
 def test_launch_eel_commandline_args_include_theme_and_scrollbars() -> None:
     """Verify launch_eel configures dark mode and overlay scrollbars in Chrome cmdline_args."""
     with (

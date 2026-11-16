@@ -3107,7 +3107,7 @@ def test_regression_bug_204_fast_pytest_suite_timing_and_slow_markers() -> None:
     import inspect
     import pytest
     from tests import test_bullet_fluid, test_room, test_pcb_export, test_pcb_drc, test_pcb_advanced
-    from projects.tests import test_cat_fountain, test_carrier_board
+    from projects.tests import test_cat_fountain, test_carrier_board, test_carrier_board_schematic
 
     slow_targets = [
         (test_bullet_fluid.TestBulletFluid, True),
@@ -3117,9 +3117,9 @@ def test_regression_bug_204_fast_pytest_suite_timing_and_slow_markers() -> None:
         (test_pcb_advanced.test_carrier_board_manufacturing_artifacts_and_pos_alignment, False),
         (test_pcb_advanced.test_regression_bug_082_carrier_board_routing_and_kicad_drc, False),
         (test_cat_fountain.TestCatFountainProvider.test_collar_standoff_geometry, False),
-        (test_carrier_board.test_regression_bug_179_right_side_ports_clear_mounting_holes, False),
+        (test_carrier_board_schematic.test_regression_bug_179_right_side_ports_clear_mounting_holes, False),
         (test_carrier_board.test_regression_bug_134_carrier_board_components_match_schematic, False),
-        (test_carrier_board.test_regression_bug_207_sheet_17_components_on_carrier_board, False),
+        (test_carrier_board_schematic.test_regression_bug_207_sheet_17_components_on_carrier_board, False),
     ]
 
     for target, is_class in slow_targets:

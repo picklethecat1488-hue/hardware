@@ -22,12 +22,12 @@ After running `build.py`, you should see these files in your build output organi
 
 To view the cat fountain assembly in the CAD viewer:
 ```bash
-python tools/view.py cat_fountain/product
+python tools/scope.py cat_fountain/product
 ```
 
-To run the physics simulation of the cat fountain in PyBullet:
+To run the physics simulation of the cat fountain:
 ```bash
-python tools/view.py cat_fountain/product:view/simulate -s 1000
+python tools/scope.py cat_fountain/product:simulate
 ```
 
 ## System Block Diagram

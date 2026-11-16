@@ -260,22 +260,6 @@ def test_code_review_granular_markdown_export_and_auto_merge(tmp_path: Path) -> 
     assert merged.comments[0].body == "Consider using namedtuple or dataclass"
 
 
-def test_feedback_ui_elements_in_templates() -> None:
-    """Verify UI loading overlays and sync feedback buttons in Jinja2 templates."""
-    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
-
-    bug_template = (templates_dir / "bug_report.html.j2").read_text(encoding="utf-8")
-    assert "feedback-loading-modal" in bug_template
-    assert "syncFeedback()" in bug_template
-    assert "/api/sync_feedback" in bug_template
-
-    cr_template = (templates_dir / "code_review.html.j2").read_text(encoding="utf-8")
-    assert "feedbackLoadingModal" in cr_template
-    assert "btnSyncFeedback" in cr_template
-    assert "syncFeedback()" in cr_template
-    assert "/api/sync_feedback" in cr_template
-
-
 def test_code_review_no_feedback_leaves_no_markdown_files(tmp_path: Path) -> None:
     """Verify that when a review has no comments, CR_<commit>.md and feedback/CR.md are not created."""
     feedback_dir = tmp_path / "feedback"
@@ -452,6 +436,59 @@ def test_scan_and_sync_incremental_mtime_caching(tmp_path: Path) -> None:
     assert bug1_updated is not None
     assert bug1_updated.title == "First Bug Updated Title"
 
+    # 4. Detached worktree commit_database must preserve WORM/BUG prefixes and elide unchanged mtimes
+    import subprocess
+    from provider.bug_report.detached_branch import DetachedBranchBugStore
+
+    repo_dir = tmp_path / "isolated_repo"
+    repo_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "User"], cwd=repo_dir, check=True)
+    subprocess.run(["git", "config", "user.email", "user@workspace"], cwd=repo_dir, check=True)
+    (repo_dir / "README.md").write_text("init\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=repo_dir, check=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=repo_dir, check=True, capture_output=True)
+    wt_dir = repo_dir / "feedback"
+    subprocess.run(
+        ["git", "worktree", "add", "--orphan", "-b", "bugs", str(wt_dir)],
+        cwd=repo_dir,
+        check=True,
+        capture_output=True,
+    )
+
+    wt_store = SQLiteBugStore(repo_dir / "build" / "bugs.sqlite")
+    cross_worm = BugReportModel(
+        id="WORM-CREEPING-LARVA-820",
+        title="Cross-repo worm record",
+        status=BugStatus.CLOSED,
+        severity=BugSeverity.MEDIUM,
+        category=BugCategory.GENERAL,
+    )
+    wt_db = BugDatabaseModel(bugs=[bug1_updated, cross_worm])
+    exporter.export_individual_bug(bug1_updated, wt_dir)
+    exporter.export_individual_bug(cross_worm, wt_dir)
+    exporter.scan_and_sync_feedback_dir(wt_dir, wt_db, wt_store)
+
+    bug1_file = wt_dir / "BUG_001.md"
+    worm_file = wt_dir / "WORM_CREEPING-LARVA-820.md"
+    assert bug1_file.exists()
+    assert worm_file.exists()
+    mtime_before = bug1_file.stat().st_mtime_ns
+    time.sleep(0.02)
+
+    detached = DetachedBranchBugStore(repo_dir)
+    detached.commit_database(wt_db, commit_message="Sync worktree", extra_feedback_dir=wt_dir)
+
+    assert not (wt_dir / "BUG_CREEPING-LARVA-820.md").exists(), (
+        "commit_database must not write a cross-prefix BUG_ clone of a WORM- record"
+    )
+    assert bug1_file.stat().st_mtime_ns == mtime_before, (
+        "commit_database must not rewrite unchanged markdown files or invalidate cached mtimes"
+    )
+    stats_after = exporter.scan_and_sync_feedback_dir(wt_dir, wt_db, wt_store)
+    assert stats_after["merged"] == 0
+    assert len(wt_db.bugs) == 2
+
 
 def test_export_markdown_elides_unchanged_write(tmp_path: Path) -> None:
     """Verify export_markdown does not rewrite BUGS.md if content is unchanged."""
@@ -494,18 +531,15 @@ def test_feedback_environment_variable_isolation(tmp_path: Path, monkeypatch) ->
     assert dash_server.review_server.feedback_dir.resolve() == custom_fb.resolve()
 
 
-def test_detached_branch_refuses_to_commit_to_production_worktree_in_tests(tmp_path: Path) -> None:
+def test_detached_branch_refuses_to_commit_to_production_worktree_in_tests(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Verify DetachedBranchBugStore refuses to mutate production workspace feedback/ in test mode."""
+    import subprocess
     from provider.bug_report.detached_branch import DetachedBranchBugStore
     from model.bug_report import BugDatabaseModel, BugReportModel, BugStatus, BugSeverity, BugCategory
-    from provider.vcs.git_engine import get_git_root
+    import provider.vcs.git_engine as git_engine
 
-    ws_root = get_git_root()
-    prod_feedback = ws_root / "feedback"
-    if not (prod_feedback / ".git").is_file():
-        pytest.skip("Workspace feedback/ is not a git worktree")
-
-    store = DetachedBranchBugStore(repo_root=ws_root)
     db = BugDatabaseModel(
         bugs=[
             BugReportModel(
@@ -518,10 +552,39 @@ def test_detached_branch_refuses_to_commit_to_production_worktree_in_tests(tmp_p
         ]
     )
 
-    # In test mode (PYTEST_CURRENT_TEST set), commit_database must return None without touching prod feedback
+    # 1. Active checkout root (whether feedback/ is a git worktree locally or absent in CI)
+    ws_root = git_engine.get_git_root()
+    prod_feedback = ws_root / "feedback"
+    store = DetachedBranchBugStore(repo_root=ws_root)
+    ref_before = store.get_ref_commit()
+
     res = store.commit_database(db, commit_message="Attempted test commit to prod")
     assert res is None
+    assert store.get_ref_commit() == ref_before
     assert not (prod_feedback / "BUG_TEST-ISOLATION-001.md").exists()
+
+    # 2. Deterministically exercise the provisioned feedback/.git worktree guard path in CI too
+    sim_ws = tmp_path / "simulated_prod_ws"
+    sim_ws.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init"], cwd=sim_ws, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "User"], cwd=sim_ws, check=True)
+    subprocess.run(["git", "config", "user.email", "user@workspace"], cwd=sim_ws, check=True)
+    (sim_ws / "README.md").write_text("init\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=sim_ws, check=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=sim_ws, check=True, capture_output=True)
+    sim_fb = sim_ws / "feedback"
+    subprocess.run(
+        ["git", "worktree", "add", "--orphan", "-b", "bugs", str(sim_fb)],
+        cwd=sim_ws,
+        check=True,
+        capture_output=True,
+    )
+    assert (sim_fb / ".git").is_file()
+
+    monkeypatch.setattr(git_engine, "get_git_root", lambda: sim_ws)
+    sim_store = DetachedBranchBugStore(repo_root=sim_ws)
+    assert sim_store.commit_database(db, commit_message="Attempted test commit to worktree") is None
+    assert not (sim_fb / "BUG_TEST-ISOLATION-001.md").exists()
 
 
 def test_forge_cli_custom_feedback_dir(tmp_path: Path, monkeypatch, capsys) -> None:

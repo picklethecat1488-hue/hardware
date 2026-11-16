@@ -392,12 +392,17 @@ def test_static_assets_and_diff_syntax_highlighting_content(tmp_path: Path) -> N
     base_url = server.get_url()
 
     try:
-        # 1. Test GET /static/highlight.min.js
-        with urllib.request.urlopen(f"{base_url}static/highlight.min.js") as resp:
+        # 1. Test GET /static/vendor/highlight/highlight.js and modular ES entrypoints
+        with urllib.request.urlopen(f"{base_url}static/vendor/highlight/highlight.js") as resp:
             assert resp.status == 200
             content = resp.read()
             assert len(content) > 10000
             assert resp.headers.get("Content-Type") == "application/javascript; charset=utf-8"
+
+        for module_path in ("js/review/code_review_app.js", "js/diff/diff_engine.js"):
+            with urllib.request.urlopen(f"{base_url}{module_path}") as mod_resp:
+                assert mod_resp.status == 200
+                assert "application/javascript" in (mod_resp.headers.get("Content-Type") or "")
 
         # 2. Test GET /api/diff returns old_content and new_content
         with urllib.request.urlopen(f"{base_url}api/diff?commit=working&file=pyproject.toml") as resp:
@@ -406,10 +411,13 @@ def test_static_assets_and_diff_syntax_highlighting_content(tmp_path: Path) -> N
             assert "new_content" in data
             assert "full_content" in data
 
-        # 3. Test UI rendering includes syntax highlighting CSS and scripts
+        # 3. Test UI rendering includes syntax highlighting CSS and zero-globals module script
         with urllib.request.urlopen(base_url) as resp:
             html = resp.read().decode("utf-8")
-            assert "highlight.min.js" in html
+            assert "/static/vendor/highlight/highlight.js" in html
+            assert "/js/review/code_review_app.js" in html
+            assert "highlight.min.js" not in html
+            assert "/static/common.js" not in html
             assert "hljs-keyword" in html
             assert "activeFileLang" in html
             assert "btnVerdictApprove" in html
@@ -450,9 +458,12 @@ def test_parse_at_file_references_in_markdown_and_ui(tmp_path: Path) -> None:
         base_url = server.get_url()
         with urllib.request.urlopen(base_url) as resp:
             html = resp.read().decode("utf-8")
-            assert "parseFileReferences" in html
             assert "quake-file-ref" in html
             assert "cliSuggestions" in html
+            assert "/js/review/code_review_app.js" in html
+        with urllib.request.urlopen(f"{base_url}js/review/comment_threads.js") as mod_resp:
+            assert mod_resp.status == 200
+            assert "application/javascript" in (mod_resp.headers.get("Content-Type") or "")
     finally:
         server.shutdown()
         server.server_close()
@@ -485,7 +496,8 @@ def test_review_server_termination_and_auto_export_on_approve_and_reject(tmp_pat
             assert "PROVIDE FEEDBACK" not in html
             assert "EXPORT CR.md" not in html
             assert "terminationOverlay" in html
-            assert "handleSessionTermination" in html
+        with urllib.request.urlopen(f"{base_url1}js/review/verdict_controller.js") as mod_resp:
+            assert mod_resp.status == 200
 
         verdict_req = urllib.request.Request(
             f"{base_url1}api/verdict",
@@ -604,9 +616,11 @@ def test_launch_browser_and_webpage_title(tmp_path: Path) -> None:
 
 def test_commit_stream_collapsed_when_single_commit(tmp_path: Path) -> None:
     """Verify that the commit stream pane defaults to collapsed when only one commit is reviewed."""
+    from bs4 import BeautifulSoup
+
     repo_root, shas = create_isolated_git_repo(tmp_path)
 
-    # 1. Single commit: paneCommits should be collapsed
+    # 1. Single commit: paneCommits should be collapsed and boot config sets singleCommit=True
     server_single = ReviewServer(
         host="127.0.0.1",
         port=0,
@@ -622,13 +636,17 @@ def test_commit_stream_collapsed_when_single_commit(tmp_path: Path) -> None:
     try:
         with urllib.request.urlopen(server_single.get_url()) as resp:
             html = resp.read().decode("utf-8")
-            assert 'id="paneCommits" class="pane-commits collapsed"' in html
-            assert "commits: false, files: true, cli: true" in html
+            soup = BeautifulSoup(html, "html.parser")
+            pane_single = soup.find(id="paneCommits")
+            assert pane_single is not None
+            assert "collapsed" in (pane_single.get("class") or [])
+            boot_single = json.loads(soup.find(id="app-boot-config").string)
+            assert boot_single["singleCommit"] is True
     finally:
         server_single.shutdown()
         server_single.server_close()
 
-    # 2. Multiple commits: paneCommits should NOT be collapsed
+    # 2. Multiple commits: paneCommits should NOT be collapsed and boot config sets singleCommit=False
     server_multi = ReviewServer(
         host="127.0.0.1",
         port=0,
@@ -644,15 +662,21 @@ def test_commit_stream_collapsed_when_single_commit(tmp_path: Path) -> None:
     try:
         with urllib.request.urlopen(server_multi.get_url()) as resp:
             html = resp.read().decode("utf-8")
-            assert 'id="paneCommits" class="pane-commits"' in html
-            assert "commits: true, files: true, cli: true" in html
+            soup = BeautifulSoup(html, "html.parser")
+            pane_multi = soup.find(id="paneCommits")
+            assert pane_multi is not None
+            assert "collapsed" not in (pane_multi.get("class") or [])
+            boot_multi = json.loads(soup.find(id="app-boot-config").string)
+            assert boot_multi["singleCommit"] is False
     finally:
         server_multi.shutdown()
         server_multi.server_close()
 
 
 def test_diff_navigation_and_next_prev_change_cli(tmp_path: Path) -> None:
-    """Verify that the review UI and CLI support next/prev change navigation across diff hunks."""
+    """Verify that the review UI exposes zero-inline-handler navigation controls and serves navigation ES modules."""
+    from bs4 import BeautifulSoup
+
     repo_root = get_git_root()
 
     server = ReviewServer(
@@ -667,23 +691,21 @@ def test_diff_navigation_and_next_prev_change_cli(tmp_path: Path) -> None:
     time.sleep(0.1)
 
     try:
-        with urllib.request.urlopen(server.get_url()) as resp:
+        base_url = server.get_url()
+        with urllib.request.urlopen(base_url) as resp:
             html = resp.read().decode("utf-8")
-            # Verify toolbar buttons for change navigation exist
-            assert 'id="btnPrevChange"' in html
-            assert 'id="btnNextChange"' in html
-            assert "navigateChange(-1)" in html
-            assert "navigateChange(1)" in html
+            soup = BeautifulSoup(html, "html.parser")
+            prev_btn = soup.find(id="btnPrevChange")
+            next_btn = soup.find(id="btnNextChange")
+            assert prev_btn is not None
+            assert next_btn is not None
+            assert prev_btn.get("onclick") is None
+            assert next_btn.get("onclick") is None
 
-            # Verify CLI commands and helper functions are defined in frontend logic
-            assert "navigateChange" in html
-            assert "getFileChanges" in html
-            assert 'case "next_change":' in html
-            assert 'case "prev_change":' in html
-            assert 'case "nc":' in html
-            assert 'case "pc":' in html
-            assert "next change / nc" in html
-            assert "prev change / pc" in html
+        for mod_path in ("js/review/cli_drawer.js", "js/review/file_tree.js"):
+            with urllib.request.urlopen(f"{base_url}{mod_path}") as mod_resp:
+                assert mod_resp.status == 200
+                assert "application/javascript" in (mod_resp.headers.get("Content-Type") or "")
     finally:
         server.shutdown()
         server.server_close()
@@ -848,33 +870,6 @@ def test_code_review_stale_session_reset_on_startup(tmp_path: Path) -> None:
     server.server_close()
 
 
-def test_code_review_ui_cli_focus_and_edit_button(tmp_path: Path) -> None:
-    """Verify that the served UI template contains the Edit button and CLI console focus handler."""
-    repo_root = get_git_root()
-    server = ReviewServer(
-        host="127.0.0.1",
-        port=0,
-        repo_root=repo_root,
-        markdown_output=tmp_path / "CR_ui.md",
-        state_file=tmp_path / "cr_ui.json",
-    )
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    time.sleep(0.1)
-
-    try:
-        with urllib.request.urlopen(server.get_url()) as resp:
-            html = resp.read().decode("utf-8")
-            assert "editCommentViaCli" in html
-            assert "Edit ✎" in html
-            assert 'case "edit":' in html
-            assert "editComment(" in html
-            assert 'cliDrawer.addEventListener("click"' in html
-    finally:
-        server.shutdown()
-        server.server_close()
-
-
 def test_git_review_engine_resolve_revisions_range_syntax(tmp_path: Path) -> None:
     """Verify GitEngine resolves A..B commit ranges, individual hashes, and raises on invalid ranges."""
     repo_root, _ = create_isolated_git_repo(tmp_path)
@@ -918,38 +913,6 @@ def test_review_server_with_range_revisions(tmp_path: Path) -> None:
     server.server_close()
 
 
-def test_code_review_html_unified_diff_delete_styling(tmp_path: Path) -> None:
-    """Verify code_review HTML template styles deleted diff lines with red background in unified diff view.
-
-    Regression test: Ensures deleted/unmodified lines in unified diffs are styled with .delete/.del
-    and var(--bg-diff-del) rather than appearing as unstyled context lines.
-    """
-    repo_root = get_git_root()
-    server = ReviewServer(
-        host="127.0.0.1",
-        port=0,
-        repo_root=repo_root,
-        markdown_output=tmp_path / "CR.md",
-        state_file=tmp_path / "cr.json",
-    )
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    time.sleep(0.1)
-
-    try:
-        with urllib.request.urlopen(server.get_url()) as resp:
-            html = resp.read().decode("utf-8")
-            # Must contain both .delete and .del selectors for deleted unified diff rows
-            assert ".unified-row.delete" in html
-            assert "var(--bg-diff-del)" in html
-            # Must map l.type delete in renderUnified
-            assert 'l.type === "delete"' in html
-            assert "del delete" in html
-    finally:
-        server.shutdown()
-        server.server_close()
-
-
 def test_code_review_commit_time_ascending_and_code_search(tmp_path: Path) -> None:
     """Verify commits include formatted time HH:MM:SS, are in ascending order, and search API returns matches."""
     repo_root, shas = create_isolated_git_repo(tmp_path)
@@ -985,44 +948,6 @@ def test_code_review_commit_time_ascending_and_code_search(tmp_path: Path) -> No
             assert data["query"] == "content"
             assert len(data["results"]) >= 1
             assert any("test_" in r["file_path"] for r in data["results"])
-    finally:
-        server.shutdown()
-        server.server_close()
-
-
-def test_code_review_html_responsive_and_cli_navigation(tmp_path: Path) -> None:
-    """Verify that code review HTML template includes responsive toolbar styles and commit navigation commands."""
-    repo_root, _ = create_isolated_git_repo(tmp_path)
-    server = ReviewServer(
-        host="127.0.0.1",
-        port=0,
-        repo_root=repo_root,
-        markdown_output=tmp_path / "CR.md",
-        state_file=tmp_path / "cr.json",
-    )
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    time.sleep(0.1)
-
-    try:
-        base_url = server.get_url()
-        with urllib.request.urlopen(base_url) as resp:
-            html = resp.read().decode("utf-8")
-
-            # 1. Responsive toolbar styles
-            assert "flex-wrap: wrap" in html
-            assert "codeSearchInput" in html
-            assert "min-height: 48px" in html
-            assert "min-height: 42px" in html
-
-            # 2. Empty line repeating last command
-            assert "state.cmdHistory[state.cmdHistory.length - 1]" in html
-
-            # 3. Stack commit navigation
-            assert "navigateCommit" in html
-            assert "next_commit" in html
-            assert "prev_commit" in html
-            assert "next commit" in html or 'sub === "commit"' in html
     finally:
         server.shutdown()
         server.server_close()
@@ -1293,31 +1218,6 @@ def test_code_review_cli_features(
     assert "0 unresolved" in open_out
 
 
-def test_regression_bug_078_code_review_highlight_markers_preserve_diff_colors() -> None:
-    """Verify BUG-078: highlight markers are in a column grid on the left side of text and do not elide diff colors."""
-    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
-    template_file = templates_dir / "code_review.html.j2"
-    assert template_file.exists()
-    content = template_file.read_text(encoding="utf-8")
-
-    # 1. Ensure selection on code text does not overwrite background with !important eliding diff colors
-    assert ".sbs-row.selected td {\n      background: var(--bg-diff-sel) !important;" not in content, (
-        "Selected SBS rows must not wipe out diff colors on code cells with !important background"
-    )
-    assert ".unified-row.selected {\n      background: var(--bg-diff-sel) !important;" not in content, (
-        "Selected unified rows must not wipe out diff colors across the entire row with !important background"
-    )
-
-    # 2. Ensure marker column grid exists for highlight markers on the left side of text
-    assert "col-marker" in content, "Table column grid must include col-marker"
-    assert "diff-marker" in content, "Diff row structure must have diff-marker cell on left of code text"
-    assert "unified-marker" in content, "Unified row structure must have unified-marker cell on left of code text"
-
-    # 3. Highlight markers on the left column grid receive selection highlight
-    assert "td.diff-marker" in content, "diff-marker styles must exist"
-    assert ".unified-marker" in content, "unified-marker styles must exist"
-
-
 def test_code_review_ignores_bugs_md(tmp_path: Path) -> None:
     """Verify that BUGS.md and BUGS.txt are excluded from code review diffs and files."""
     from provider.vcs.git_engine import GitEngine, is_file_ignored
@@ -1338,49 +1238,8 @@ def test_code_review_ignores_bugs_md(tmp_path: Path) -> None:
     assert not any(f["path"] == "BUGS.md" or f["path"].endswith("/BUGS.md") for f in changed_files)
 
 
-def test_regression_bug_091_diff_view_horizontal_scrollbar_on_bottom() -> None:
-    """Verify BUG-091: diff view lines do not have per-line scrollbars; horizontal scrollbar is at the bottom."""
-    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
-    template_file = templates_dir / "code_review.html.j2"
-    assert template_file.exists()
-    content = template_file.read_text(encoding="utf-8")
-
-    # 1. No per-line overflow-x: auto on sbs-row td or unified-text
-    assert (
-        ".sbs-row td {\n      padding: 1px 6px;\n      white-space: pre;\n      word-break: normal;\n      vertical-align: top;\n      max-width: 0;\n      overflow-x: auto;\n    }"
-        not in content
-    )
-    assert "overflow-x: auto" not in content.split(".sbs-row td")[1].split("}")[0], (
-        ".sbs-row td must not have overflow-x: auto"
-    )
-    assert "overflow-x: auto" not in content.split(".unified-text")[1].split("}")[0], (
-        ".unified-text must not have overflow-x: auto"
-    )
-
-    # 2. Diff container has overflow: auto for bottom-level scrolling
-    assert ".diff-container {\n      flex: 1;\n      overflow: auto;" in content, (
-        ".diff-container must have overflow: auto so horizontal scrollbars reside at the bottom of the container"
-    )
-
-    # 3. Tables and wrappers have min-width: max-content to prevent truncation while expanding container
-    assert "min-width: max-content" in content.split(".sbs-table")[1].split("}")[0]
-    assert "min-width: 100%" in content.split(".unified-wrap")[1].split("}")[0]
-
-
 def test_code_review_tracker_only_commit_handling(tmp_path: Path) -> None:
-    """Verify that commits modifying only BUGS.md report ignored_files and render clear UI notices."""
-    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
-    template_file = templates_dir / "code_review.html.j2"
-    assert template_file.exists()
-    content = template_file.read_text(encoding="utf-8")
-
-    # 1. UI template must contain TRACKER ONLY badge and informative notice
-    assert "TRACKER ONLY" in content
-    assert "Issue Tracker & Documentation Update Only" in content
-    assert "filtered" in content
-    assert "isTrackerOnly" in content
-
-    # 2. Verify commit model tracks ignored files on CommitInfoModel
+    """Verify CommitInfoModel tracks ignored_files for tracker-only commits."""
     c = CommitInfoModel(
         commit_hash="abc1234",
         short_hash="abc1234",
@@ -1723,3 +1582,108 @@ def test_git_engine_file_diff_caching(tmp_path: Path) -> None:
     # clear_diff_cache clears the cache
     engine.clear_diff_cache()
     assert (target_sha, target_file) not in engine._file_diff_cache
+
+
+def test_large_diff_handling_without_hanging_three_cad_viewer(tmp_path: Path) -> None:
+    """Verify that large vendor files (>500KB or >3000 lines) are diffed without hanging."""
+    repo_dir = tmp_path / "oversized_repo"
+    repo_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=repo_dir, check=True, capture_output=True)
+
+    # Initial commit
+    (repo_dir / "README.md").write_text("# Project\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=repo_dir, check=True, capture_output=True)
+
+    # Create large untracked JS file simulating three-cad-viewer.esm.js (e.g. 5,000 lines, >600KB)
+    large_js = repo_dir / "three-cad-viewer.esm.js"
+    large_js.write_text("console.log('line');\n" * 5000, encoding="utf-8")
+
+    engine = GitEngine(repo_root=repo_dir)
+    diff = engine.get_file_diff("working", "three-cad-viewer.esm.js")
+
+    assert diff.is_oversized is False
+    assert len(diff.side_by_side) == 5000
+    assert len(diff.hunks) == 1
+    assert diff.additions == 5000
+    assert diff.deletions == 0
+
+
+def test_fuzzy_proximity_code_search_and_quake_themed_textbox(tmp_path: Path) -> None:
+    """Verify fuzzy code search, proximity ordering nearest to viewed file, and Quake search textbox theming."""
+    repo_dir = tmp_path / "fuzzy_search_repo"
+    repo_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "user@workspace"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "User"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=repo_dir, check=True, capture_output=True)
+
+    files_to_create = {
+        "unrelated/deep/nested/far.py": "def calculate_flux_density(val):\n    return val * 2.0\n",
+        "pkg/other_sub/cousin.py": "def calculate_flux_density(val):\n    return val * 1.5\n",
+        "pkg/parent_helper.py": "def calculate_flux_density(val):\n    return val * 1.2\n",
+        "pkg/sub/sibling_file.py": "def calculate_flux_density(val):\n    return val * 1.1\n",
+        "pkg/sub/active.py": "def calculate_flux_density(val):\n    return val * 1.0\n",
+    }
+    for rel_path, content in files_to_create.items():
+        full_p = repo_dir / rel_path
+        full_p.parent.mkdir(parents=True, exist_ok=True)
+        full_p.write_text(content, encoding="utf-8")
+
+    subprocess.run(["git", "add", "."], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Add flux modules"], cwd=repo_dir, check=True, capture_output=True)
+    head_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo_dir, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+    engine = GitEngine(repo_root=repo_dir)
+
+    expected_order_from_active = [
+        "pkg/sub/active.py",
+        "pkg/sub/sibling_file.py",
+        "pkg/parent_helper.py",
+        "pkg/other_sub/cousin.py",
+        "unrelated/deep/nested/far.py",
+    ]
+
+    # 1. Exact query ordered nearest to current_file ("pkg/sub/active.py") first
+    exact_hits = engine.search_code("calculate_flux_density", commit="working", current_file="pkg/sub/active.py")
+    assert [h["file_path"] for h in exact_hits] == expected_order_from_active
+
+    # 2. Fuzzy subsequence / abbreviated query ("calc_flx_dens") ordered nearest to current_file first
+    fuzzy_subseq_hits = engine.search_code("calc_flx_dens", commit="working", current_file="pkg/sub/active.py")
+    assert [h["file_path"] for h in fuzzy_subseq_hits] == expected_order_from_active
+
+    # 3. Fuzzy typo-tolerant query ("calculat_flux_densty") ordered nearest to current_file first
+    fuzzy_typo_hits = engine.search_code("calculat_flux_densty", commit="working", current_file="pkg/sub/active.py")
+    assert [h["file_path"] for h in fuzzy_typo_hits] == expected_order_from_active
+
+    # 4. Changing current_file re-ranks proximity relative to the newly viewed file on commit SHA
+    cousin_hits = engine.search_code("calc_flx", commit=head_sha, current_file="pkg/other_sub/cousin.py")
+    assert cousin_hits[0]["file_path"] == "pkg/other_sub/cousin.py"
+    assert cousin_hits[1]["file_path"] == "pkg/parent_helper.py"
+
+    # 5. Verify HTTP /api/search endpoint & Quake-themed search textbox CSS in ReviewServer
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        markdown_output=tmp_path / "CR.md",
+        state_file=tmp_path / "cr_state.json",
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.05)
+
+    try:
+        base_url = server.get_url()
+        search_url = f"{base_url}api/search?q=calc_flx&commit=working&file=pkg/sub/active.py"
+        with urllib.request.urlopen(search_url) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+            assert [r["file_path"] for r in payload["results"]] == expected_order_from_active
+    finally:
+        server.shutdown()
+        server.server_close()

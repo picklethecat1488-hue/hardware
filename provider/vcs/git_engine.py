@@ -9,7 +9,7 @@ resolve merge conflicts, and build topological ancestor DAG trees.
 from datetime import datetime, timezone
 import difflib
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import shutil
 import sqlite3
@@ -1751,56 +1751,259 @@ class GitEngine:
             )
         return None
 
-    def search_code(self, query: str, commit: str = "working", max_results: int = 50) -> List[Dict[str, Any]]:
-        """Search for symbol, identifier, or text occurrences across files in revision or repository."""
-        if not query.strip():
+    @staticmethod
+    def compute_file_proximity_distance(candidate_file: str, current_file: str) -> int:
+        """Compute directory tree hop distance from current_file (0 = active file, 1 = same dir, 2+ = hops)."""
+        curr = current_file.strip().lstrip("./").replace("\\", "/")
+        if not curr:
+            return 0
+        cand = candidate_file.strip().lstrip("./").replace("\\", "/")
+        if cand == curr:
+            return 0
+
+        curr_parent = PurePosixPath(curr).parent
+        cand_parent = PurePosixPath(cand).parent
+        curr_dirs = () if str(curr_parent) == "." else curr_parent.parts
+        cand_dirs = () if str(cand_parent) == "." else cand_parent.parts
+
+        common = 0
+        for part_a, part_b in zip(curr_dirs, cand_dirs):
+            if part_a == part_b:
+                common += 1
+            else:
+                break
+
+        dir_hops = (len(curr_dirs) - common) + (len(cand_dirs) - common)
+        return 1 + dir_hops
+
+    @staticmethod
+    def _is_subsequence(needle: str, haystack: str) -> bool:
+        """Return True if all characters of needle appear in order within haystack."""
+        it = iter(haystack)
+        return all(ch in it for ch in needle)
+
+    @classmethod
+    def _score_fuzzy_match(
+        cls,
+        query_lower: str,
+        query_tokens: List[str],
+        line_text: str,
+        file_path: str,
+    ) -> Optional[Tuple[int, float]]:
+        """Score a candidate line and file path against fuzzy query tokens.
+
+        Returns (match_tier, fuzzy_score) where match_tier=0 indicates a primary match
+        (exact, prefix, identifier subsequence, or close typo match) and match_tier=1
+        indicates a looser fallback match, or None if not matched.
+        """
+        line_lower = line_text.lower()
+        path_lower = file_path.lower()
+        combined_lower = f"{path_lower} {line_lower}"
+
+        if query_lower in line_lower:
+            bonus = 0.0
+            if re.search(rf"(?<![a-z0-9_]){re.escape(query_lower)}(?![a-z0-9_])", line_lower):
+                bonus += 20.0
+            stripped = line_lower.lstrip()
+            if stripped.startswith(("def ", "class ", "async def ", "function ", "fn ", "pub fn ", "struct ", "enum ")):
+                bonus += 15.0
+            return (0, 100.0 + bonus)
+
+        ident_tokens = re.findall(r"[a-z0-9_]+", combined_lower)
+        total_score = 0.0
+        worst_tier = 0
+
+        for qt in query_tokens:
+            qt_clean = re.sub(r"[^a-z0-9_]", "", qt)
+            if qt in combined_lower:
+                total_score += 92.0
+                continue
+
+            best_tok_score = 0.0
+            best_tok_tier = 2
+
+            if qt_clean:
+                for it in ident_tokens:
+                    if len(it) < max(2, len(qt_clean) // 2):
+                        continue
+                    if qt_clean in it:
+                        best_tok_score = max(best_tok_score, 90.0)
+                        best_tok_tier = 0
+                        break
+                    if len(qt_clean) >= 2 and cls._is_subsequence(qt_clean, it) and (len(qt_clean) / len(it)) >= 0.25:
+                        ratio = len(qt_clean) / len(it)
+                        best_tok_score = max(best_tok_score, 80.0 + 10.0 * ratio)
+                        best_tok_tier = min(best_tok_tier, 0)
+                        continue
+                    if len(qt_clean) >= 4 and abs(len(qt_clean) - len(it)) <= max(3, len(qt_clean) // 3):
+                        sim = difflib.SequenceMatcher(None, qt_clean, it).ratio()
+                        if sim >= 0.72:
+                            best_tok_score = max(best_tok_score, 75.0 * sim)
+                            best_tok_tier = min(best_tok_tier, 0)
+                        elif sim >= 0.60 and best_tok_tier > 0:
+                            best_tok_score = max(best_tok_score, 55.0 * sim)
+                            best_tok_tier = min(best_tok_tier, 1)
+
+            if best_tok_tier > 1 and len(qt) >= 3 and cls._is_subsequence(qt, combined_lower):
+                best_tok_score = 45.0
+                best_tok_tier = 1
+
+            if best_tok_tier > 1:
+                return None
+
+            total_score += best_tok_score
+            worst_tier = max(worst_tier, best_tok_tier)
+
+        return (worst_tier, total_score / max(1, len(query_tokens)))
+
+    @staticmethod
+    def _build_fuzzy_grep_pattern(seed_token: str) -> str:
+        """Build an extended regex for git grep covering exact, subsequence, and 1-edit typo chunks."""
+        escaped_exact = re.escape(seed_token)
+        branches = [escaped_exact]
+
+        if 2 <= len(seed_token) <= 24:
+            subseq = r".{0,16}".join(re.escape(ch) for ch in seed_token)
+            branches.append(subseq)
+
+        alnum = re.sub(r"[^a-zA-Z0-9_]", "", seed_token)
+        if len(alnum) >= 6:
+            third = len(alnum) // 3
+            c1 = re.escape(alnum[:third])
+            c2 = re.escape(alnum[third : 2 * third])
+            c3 = re.escape(alnum[2 * third :])
+            branches.append(rf"{c1}.{{0,20}}{c2}")
+            branches.append(rf"{c1}.{{0,24}}{c3}")
+            branches.append(rf"{c2}.{{0,20}}{c3}")
+
+        return "(" + "|".join(dict.fromkeys(branches)) + ")"
+
+    def search_code(
+        self,
+        query: str,
+        commit: str = "working",
+        current_file: str = "",
+        max_results: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """Fuzzy-search symbol, identifier, or text occurrences ranked nearest to current_file first."""
+        q = query.strip()
+        if not q:
             return []
 
-        results: List[Dict[str, Any]] = []
-        q = query.strip()
+        q_lower = q.lower()
+        q_tokens = [tok for tok in q_lower.split() if tok]
+        if not q_tokens:
+            return []
+
+        seed_token = max(q_tokens, key=len)
+        grep_pattern = self._build_fuzzy_grep_pattern(seed_token)
+
+        raw_candidates: List[Tuple[str, int, str]] = []
+        seen_locs: Set[Tuple[str, int]] = set()
 
         if commit == "working":
+            grep_cmd = [
+                "grep",
+                "-n",
+                "-I",
+                "-i",
+                "-E",
+                grep_pattern,
+                "--",
+                ".",
+            ]
             try:
-                out = run_git_command(["grep", "-n", "-I", "-i", q], cwd=self.repo_root)
+                out = run_git_command(grep_cmd, cwd=self.repo_root)
                 for line in out.splitlines():
-                    if len(results) >= max_results:
-                        break
                     parts = line.split(":", 2)
                     if len(parts) >= 3 and parts[1].isdigit():
-                        file_path = parts[0].strip()
-                        if self.is_file_ignored(file_path):
+                        f_path = parts[0].strip()
+                        if self.is_file_ignored(f_path):
                             continue
-                        results.append(
-                            {
-                                "file_path": file_path,
-                                "line_number": int(parts[1]),
-                                "line_content": parts[2].strip(),
-                            }
-                        )
+                        line_no = int(parts[1])
+                        content = parts[2].strip()
+                        if len(content) > 600:
+                            continue
+                        loc = (f_path, line_no)
+                        if loc not in seen_locs:
+                            seen_locs.add(loc)
+                            raw_candidates.append((f_path, line_no, content))
             except RuntimeError:
                 pass
         else:
+            grep_cmd = [
+                "grep",
+                "-n",
+                "-I",
+                "-i",
+                "-E",
+                grep_pattern,
+                commit,
+                "--",
+                ".",
+            ]
             try:
-                out = run_git_command(["grep", "-n", "-I", "-i", q, commit], cwd=self.repo_root)
+                out = run_git_command(grep_cmd, cwd=self.repo_root)
                 for line in out.splitlines():
-                    if len(results) >= max_results:
-                        break
                     parts = line.split(":", 3)
                     if len(parts) >= 4 and parts[2].isdigit():
-                        file_path = parts[1].strip()
-                        if self.is_file_ignored(file_path):
+                        f_path = parts[1].strip()
+                        if self.is_file_ignored(f_path):
                             continue
-                        results.append(
-                            {
-                                "file_path": file_path,
-                                "line_number": int(parts[2]),
-                                "line_content": parts[3].strip(),
-                            }
-                        )
+                        line_no = int(parts[2])
+                        content = parts[3].strip()
+                        if len(content) > 600:
+                            continue
+                        loc = (f_path, line_no)
+                        if loc not in seen_locs:
+                            seen_locs.add(loc)
+                            raw_candidates.append((f_path, line_no, content))
             except RuntimeError:
                 pass
 
-        return results
+        # Also check fuzzy file-path matches so searching a filename surfaces files near current_file
+        try:
+            ls_cmd = (
+                ["ls-files", "--cached", "--others", "--exclude-standard"]
+                if commit == "working"
+                else ["ls-tree", "-r", "--name-only", commit]
+            )
+            ls_out = run_git_command(ls_cmd, cwd=self.repo_root)
+            files_with_hits = {c[0] for c in raw_candidates}
+            for f_line in ls_out.splitlines():
+                f_path = f_line.strip()
+                if not f_path or f_path in files_with_hits or self.is_file_ignored(f_path):
+                    continue
+                scored_path = self._score_fuzzy_match(q_lower, q_tokens, "", f_path)
+                if scored_path is not None and (f_path, 1) not in seen_locs:
+                    seen_locs.add((f_path, 1))
+                    raw_candidates.append((f_path, 1, f"[File match] {f_path}"))
+        except RuntimeError:
+            pass
+
+        scored_results: List[Tuple[Tuple[int, int, float, str, int], Dict[str, Any]]] = []
+        for f_path, line_no, content in raw_candidates:
+            scored = self._score_fuzzy_match(q_lower, q_tokens, content, f_path)
+            if scored is None:
+                continue
+            tier, fuzzy_score = scored
+            prox = self.compute_file_proximity_distance(f_path, current_file)
+            sort_key = (tier, prox, -fuzzy_score, f_path, line_no)
+            scored_results.append(
+                (
+                    sort_key,
+                    {
+                        "file_path": f_path,
+                        "line_number": line_no,
+                        "line_content": content,
+                        "proximity_distance": prox,
+                        "fuzzy_score": round(fuzzy_score, 1),
+                    },
+                )
+            )
+
+        scored_results.sort(key=lambda item: item[0])
+        return [item[1] for item in scored_results[:max_results]]
 
     def _get_commit_stat_summary(self, commit_hash: str) -> Tuple[int, int, int, List[str]]:
         """Calculate additions, deletions, file count, and ignored files list for a commit."""
@@ -2077,6 +2280,11 @@ class GitEngine:
         if commit == "working":
             old_content = self.get_file_content("working", file_path, parent=True)
             new_content = self.get_file_content("working", file_path, parent=False)
+        else:
+            old_content = self.get_file_content(commit, file_path, parent=True)
+            new_content = self.get_file_content(commit, file_path, parent=False)
+
+        if commit == "working":
             if staged_only:
                 try:
                     raw_diff = run_git_command(["diff", "--cached", "--", file_path], cwd=self.repo_root)
@@ -2093,8 +2301,6 @@ class GitEngine:
                     f"+{l}" for l in lines
                 )
         else:
-            old_content = self.get_file_content(commit, file_path, parent=True)
-            new_content = self.get_file_content(commit, file_path, parent=False)
             try:
                 raw_diff = run_git_command(
                     ["diff-tree", "-p", "--no-commit-id", commit, "--", file_path], cwd=self.repo_root
@@ -2103,7 +2309,7 @@ class GitEngine:
                 raw_diff = ""
 
         hunks = self._parse_diff_hunks(raw_diff)
-        side_by_side = self._generate_side_by_side(old_content, new_content)
+        side_by_side = self._generate_side_by_side(old_content, new_content, hunks=hunks)
 
         additions = sum(1 for line in raw_diff.splitlines() if line.startswith("+") and not line.startswith("+++"))
         deletions = sum(1 for line in raw_diff.splitlines() if line.startswith("-") and not line.startswith("---"))
@@ -2220,68 +2426,230 @@ class GitEngine:
 
         return hunks
 
-    def _generate_side_by_side(self, old_text: str, new_text: str) -> List[DiffSideBySideRow]:
-        """Align old and new text into paired side-by-side rows using difflib SequenceMatcher."""
+    def _generate_side_by_side(
+        self, old_text: str, new_text: str, hunks: Optional[List[DiffHunk]] = None
+    ) -> List[DiffSideBySideRow]:
+        """Align old and new text into paired side-by-side rows in O(N) linear time using hunk-driven mapping."""
         old_lines = old_text.splitlines()
         new_lines = new_text.splitlines()
-
-        matcher = difflib.SequenceMatcher(None, old_lines, new_lines)
-        rows: List[DiffSideBySideRow] = []
 
         def _trim(s: str) -> str:
             if len(s) > MAX_DIFF_LINE_LENGTH:
                 return s[:MAX_DIFF_LINE_LENGTH] + "…"
             return s
 
-        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-            match tag:
-                case "equal":
-                    for offset in range(i2 - i1):
-                        rows.append(
-                            DiffSideBySideRow(
-                                old_no=i1 + offset + 1,
-                                old_text=_trim(old_lines[i1 + offset]),
-                                new_no=j1 + offset + 1,
-                                new_text=_trim(new_lines[j1 + offset]),
-                                row_type="equal",
-                            )
+        rows: List[DiffSideBySideRow] = []
+
+        # If one side is empty, generate pure insertions or deletions directly in linear time
+        if not old_lines:
+            for j, line in enumerate(new_lines):
+                rows.append(
+                    DiffSideBySideRow(
+                        old_no=None,
+                        old_text="",
+                        new_no=j + 1,
+                        new_text=_trim(line),
+                        row_type="insert",
+                    )
+                )
+            return rows
+
+        if not new_lines:
+            for i, line in enumerate(old_lines):
+                rows.append(
+                    DiffSideBySideRow(
+                        old_no=i + 1,
+                        old_text=_trim(line),
+                        new_no=None,
+                        new_text="",
+                        row_type="delete",
+                    )
+                )
+            return rows
+
+        # If no hunks provided or hunks empty
+        if not hunks:
+            if old_lines == new_lines:
+                for i, line in enumerate(old_lines):
+                    rows.append(
+                        DiffSideBySideRow(
+                            old_no=i + 1,
+                            old_text=_trim(line),
+                            new_no=i + 1,
+                            new_text=_trim(line),
+                            row_type="equal",
                         )
-                case "replace":
-                    count = max(i2 - i1, j2 - j1)
-                    for offset in range(count):
-                        has_old = offset < (i2 - i1)
-                        has_new = offset < (j2 - j1)
-                        rows.append(
-                            DiffSideBySideRow(
-                                old_no=i1 + offset + 1 if has_old else None,
-                                old_text=_trim(old_lines[i1 + offset]) if has_old else "",
-                                new_no=j1 + offset + 1 if has_new else None,
-                                new_text=_trim(new_lines[j1 + offset]) if has_new else "",
-                                row_type="replace",
+                    )
+                return rows
+            matcher = difflib.SequenceMatcher(None, old_lines, new_lines, autojunk=True)
+            for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+                match tag:
+                    case "equal":
+                        for offset in range(i2 - i1):
+                            rows.append(
+                                DiffSideBySideRow(
+                                    old_no=i1 + offset + 1,
+                                    old_text=_trim(old_lines[i1 + offset]),
+                                    new_no=j1 + offset + 1,
+                                    new_text=_trim(new_lines[j1 + offset]),
+                                    row_type="equal",
+                                )
                             )
-                        )
-                case "delete":
-                    for offset in range(i2 - i1):
-                        rows.append(
-                            DiffSideBySideRow(
-                                old_no=i1 + offset + 1,
-                                old_text=_trim(old_lines[i1 + offset]),
-                                new_no=None,
-                                new_text="",
-                                row_type="delete",
+                    case "replace":
+                        count = max(i2 - i1, j2 - j1)
+                        for offset in range(count):
+                            has_old = offset < (i2 - i1)
+                            has_new = offset < (j2 - j1)
+                            rows.append(
+                                DiffSideBySideRow(
+                                    old_no=i1 + offset + 1 if has_old else None,
+                                    old_text=_trim(old_lines[i1 + offset]) if has_old else "",
+                                    new_no=j1 + offset + 1 if has_new else None,
+                                    new_text=_trim(new_lines[j1 + offset]) if has_new else "",
+                                    row_type="replace",
+                                )
                             )
-                        )
-                case "insert":
-                    for offset in range(j2 - j1):
-                        rows.append(
-                            DiffSideBySideRow(
-                                old_no=None,
-                                old_text="",
-                                new_no=j1 + offset + 1,
-                                new_text=_trim(new_lines[j1 + offset]),
-                                row_type="insert",
+                    case "delete":
+                        for offset in range(i2 - i1):
+                            rows.append(
+                                DiffSideBySideRow(
+                                    old_no=i1 + offset + 1,
+                                    old_text=_trim(old_lines[i1 + offset]),
+                                    new_no=None,
+                                    new_text="",
+                                    row_type="delete",
+                                )
                             )
+                    case "insert":
+                        for offset in range(j2 - j1):
+                            rows.append(
+                                DiffSideBySideRow(
+                                    old_no=None,
+                                    old_text="",
+                                    new_no=j1 + offset + 1,
+                                    new_text=_trim(new_lines[j1 + offset]),
+                                    row_type="insert",
+                                )
+                            )
+            return rows
+
+        # Fast Hunk-Driven Side-by-Side Construction
+        old_idx = 0
+        new_idx = 0
+
+        for hunk in hunks:
+            hunk_old_start_0 = hunk.old_start - 1
+            hunk_new_start_0 = hunk.new_start - 1
+
+            while old_idx < hunk_old_start_0 and new_idx < hunk_new_start_0:
+                old_t = old_lines[old_idx] if old_idx < len(old_lines) else ""
+                new_t = new_lines[new_idx] if new_idx < len(new_lines) else ""
+                rows.append(
+                    DiffSideBySideRow(
+                        old_no=old_idx + 1,
+                        old_text=_trim(old_t),
+                        new_no=new_idx + 1,
+                        new_text=_trim(new_t),
+                        row_type="equal",
+                    )
+                )
+                old_idx += 1
+                new_idx += 1
+
+            hunk_lines = hunk.lines
+            k = 0
+            while k < len(hunk_lines):
+                line = hunk_lines[k]
+                if line.type == DiffLineType.CONTEXT:
+                    rows.append(
+                        DiffSideBySideRow(
+                            old_no=line.old_line_no,
+                            old_text=_trim(line.content),
+                            new_no=line.new_line_no,
+                            new_text=_trim(line.content),
+                            row_type="equal",
                         )
+                    )
+                    if line.old_line_no is not None:
+                        old_idx = line.old_line_no
+                    if line.new_line_no is not None:
+                        new_idx = line.new_line_no
+                    k += 1
+                else:
+                    del_block: List[DiffLine] = []
+                    add_block: List[DiffLine] = []
+                    while k < len(hunk_lines) and hunk_lines[k].type != DiffLineType.CONTEXT:
+                        if hunk_lines[k].type == DiffLineType.DELETE:
+                            del_block.append(hunk_lines[k])
+                        elif hunk_lines[k].type == DiffLineType.ADD:
+                            add_block.append(hunk_lines[k])
+                        k += 1
+
+                    if del_block and add_block:
+                        count = max(len(del_block), len(add_block))
+                        for offset in range(count):
+                            d_line = del_block[offset] if offset < len(del_block) else None
+                            a_line = add_block[offset] if offset < len(add_block) else None
+                            rows.append(
+                                DiffSideBySideRow(
+                                    old_no=d_line.old_line_no if d_line else None,
+                                    old_text=_trim(d_line.content) if d_line else "",
+                                    new_no=a_line.new_line_no if a_line else None,
+                                    new_text=_trim(a_line.content) if a_line else "",
+                                    row_type="replace",
+                                )
+                            )
+                            if d_line and d_line.old_line_no is not None:
+                                old_idx = d_line.old_line_no
+                            if a_line and a_line.new_line_no is not None:
+                                new_idx = a_line.new_line_no
+                    elif del_block:
+                        for d_line in del_block:
+                            rows.append(
+                                DiffSideBySideRow(
+                                    old_no=d_line.old_line_no,
+                                    old_text=_trim(d_line.content),
+                                    new_no=None,
+                                    new_text="",
+                                    row_type="delete",
+                                )
+                            )
+                            if d_line.old_line_no is not None:
+                                old_idx = d_line.old_line_no
+                    elif add_block:
+                        for a_line in add_block:
+                            rows.append(
+                                DiffSideBySideRow(
+                                    old_no=None,
+                                    old_text="",
+                                    new_no=a_line.new_line_no,
+                                    new_text=_trim(a_line.content),
+                                    row_type="insert",
+                                )
+                            )
+                            if a_line.new_line_no is not None:
+                                new_idx = a_line.new_line_no
+
+        while old_idx < len(old_lines) or new_idx < len(new_lines):
+            has_old = old_idx < len(old_lines)
+            has_new = new_idx < len(new_lines)
+            old_t = old_lines[old_idx] if has_old else ""
+            new_t = new_lines[new_idx] if has_new else ""
+            rows.append(
+                DiffSideBySideRow(
+                    old_no=old_idx + 1 if has_old else None,
+                    old_text=_trim(old_t) if has_old else "",
+                    new_no=new_idx + 1 if has_new else None,
+                    new_text=_trim(new_t) if has_new else "",
+                    row_type="equal"
+                    if (has_old and has_new and old_t == new_t)
+                    else ("replace" if (has_old and has_new) else ("delete" if has_old else "insert")),
+                )
+            )
+            if has_old:
+                old_idx += 1
+            if has_new:
+                new_idx += 1
 
         return rows
 

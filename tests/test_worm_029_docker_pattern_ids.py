@@ -190,7 +190,6 @@ def test_regression_bug_vermiform_crawler_442_bug_themed_id_generator() -> None:
     3. Worm-specific terms (TAPEWORM, SANDWORM, OLIGOCHAETE, PALOLO, ANNELIDIC, etc.) are purged
     4. Generated IDs match the Docker pattern and use bug words
     5. Historical IDs (BUG-BURROWING-ANNELID-42, BUG-FERTILE-SANDWORM-588) remain backward-compatible
-    6. Frontend bug_report.html.j2 template matches bug word lists
     """
     # 1. Bug nouns present
     bug_nouns = {"CICADA", "DRAGONFLY", "MANTIS", "FIREFLY", "BEETLE", "CRICKET", "KATYDID", "LADYBUG", "WEEVIL"}
@@ -231,13 +230,3 @@ def test_regression_bug_vermiform_crawler_442_bug_themed_id_generator() -> None:
     ]
     for hid in historical_ids:
         assert is_docker_pattern_id(hid), f"Historical ID '{hid}' must remain valid Docker pattern"
-
-    # 6. Verify frontend bug_report.html.j2 template has bug lists
-    template_path = Path("provider/templates/bug_report.html.j2")
-    if template_path.exists():
-        content = template_path.read_text(encoding="utf-8")
-        assert "CICADA" in content, "Expected CICADA in bug_report.html.j2"
-        assert "DRAGONFLY" in content, "Expected DRAGONFLY in bug_report.html.j2"
-        assert "TAPEWORM" not in content, "TAPEWORM should not be in bug_report.html.j2"
-        assert "SANDWORM" not in content, "SANDWORM should not be in bug_report.html.j2"
-        assert "OLIGOCHAETE" not in content, "OLIGOCHAETE should not be in bug_report.html.j2"

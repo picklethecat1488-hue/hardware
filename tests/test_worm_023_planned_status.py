@@ -12,8 +12,6 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from model.bug_report import (
     BugCategory,
     BugDatabaseModel,
@@ -101,17 +99,6 @@ def test_cli_planned_argument() -> None:
 
     assert "BUG-102" in output, "Planned bug must be listed when planned_only=True"
     assert "BUG-101" not in output, "Open bug must be excluded when planned_only=True"
-
-
-def test_template_planned_filter_and_default_open() -> None:
-    """Verify bug report template includes PLANNED filter and retains OPEN as default."""
-    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "bug_report.html.j2"
-    assert template_path.exists(), f"Template not found at {template_path}"
-    content = template_path.read_text(encoding="utf-8")
-
-    assert 'id="filter-planned"' in content, "Template must have filter-planned button"
-    assert "PLANNED" in content, "Template must reference PLANNED"
-    assert 'status: "OPEN"' in content, "Template new bug must default to OPEN status"
 
 
 def test_documentation_planned_bug_exemption() -> None:

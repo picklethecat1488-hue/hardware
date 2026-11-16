@@ -649,33 +649,8 @@ def stop_dashboard_instance(pid: int, lock_file: Path, host: str, port: int) -> 
     return stopped
 
 
-def launch_browser(
-    url: str,
-    browser: str = "webview",
-    on_close: Optional[Callable[[], None]] = None,
-) -> bool:
-    """Open the review or diff workstation dashboard in a standalone desktop window.
-
-    Args:
-        url: The web URL of the workstation dashboard.
-        browser: Display environment ('webview' or 'eel').
-        on_close: Optional callback invoked when the standalone window process terminates.
-
-    Returns:
-        True if successfully launched, False otherwise.
-    """
-    if browser == "eel":
-        from provider.eel.launcher import launch_eel
-
-        if on_close is not None:
-            return launch_eel(url, on_close=on_close)
-        return launch_eel(url)
-
-    from provider.webview.launcher import launch_webview
-
-    if on_close is not None:
-        return launch_webview(url, on_close=on_close)
-    return launch_webview(url)
+from provider.browser import launch_browser
+from provider.shell import Logger
 
 
 def print_cli_smartlog(engine: GitEngine) -> None:
@@ -1536,8 +1511,9 @@ def main(cli_args: Optional[List[str]] = None) -> None:
                     pass
             time.sleep(0.05)
 
-        print(f"➜ Dashboard workstation running at {url} (PID {proc.pid}).")
-        print("➜ Detached from terminal.")
+        logger = Logger(enabled=True)
+        logger.print(f"Dashboard workstation running at {url} (PID {proc.pid}).", symbol="➜")
+        logger.print("Detached from terminal.", symbol="➜")
         sys.exit(0)
 
     # Foreground / non-detached server process

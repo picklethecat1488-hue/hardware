@@ -265,15 +265,12 @@ class DetachedBranchBugStore:
 
         is_wt = (fb_dir / ".git").is_file()
         if is_wt:
-            prefix = "BUG" if self.branch_name == "bugs" else "WORM"
             fb_dir.mkdir(parents=True, exist_ok=True)
             dirty_set = set(dirty_bug_ids) if (dirty_bug_ids is not None) else None
             for bug in database.bugs:
                 if dirty_set is not None and bug.id not in dirty_set:
                     continue
-                clean_id = bug.id.removeprefix("WORM-").removeprefix("WORM_").removeprefix("BUG-").removeprefix("BUG_")
-                md_content = self.exporter.render_bug_markdown(bug)
-                (fb_dir / f"{prefix}_{clean_id}.md").write_text(md_content, encoding="utf-8")
+                self.exporter.export_individual_bug(bug, fb_dir)
 
             try:
                 subprocess.run(["git", "-C", str(fb_dir), "add", "-A"], cwd=str(self.repo_root), check=True)

@@ -137,3 +137,42 @@ class TestTargetParser:
         """Verify split_target static helper."""
         assert TargetParser.split_target("tube/driver:part/print") == ("tube", "driver")
         assert TargetParser.split_target("driver") == ("default", "driver")
+
+
+def test_parse_target_string():
+    """Verify target string parsing logic in provider.target_list."""
+    from provider.target_list import parse_target_string
+
+    # Empty target defaults to nothing
+    assert parse_target_string("") == ("", "", None, "CAD")
+    assert parse_target_string(None) == ("", "", None, "CAD")
+
+    # PCB target
+    proj, target, sub, mode = parse_target_string("carrier_board/carrier_board:pcb")
+    assert proj == "carrier_board"
+    assert target == "carrier_board"
+    assert sub is None
+    assert mode == "PCB"
+
+    # Simulation target
+    proj, target, sub, mode = parse_target_string("cat_fountain/product:simulate")
+    assert proj == "cat_fountain"
+    assert target == "product"
+    assert sub is None
+    assert mode == "SIMULATE"
+
+    # Part target
+    proj, target, sub, mode = parse_target_string("cat_fountain/bowl:part")
+    assert proj == "cat_fountain"
+    assert target == "bowl"
+    assert sub is None
+    assert mode == "CAD"
+
+    # Explicit :cad and /cad suffixes (BUG-TARSIAL-TERMITE-773)
+    assert parse_target_string("cat_fountain/product:cad") == ("cat_fountain", "product", None, "CAD")
+    assert parse_target_string("carrier_board/carrier_board:cad") == ("carrier_board", "carrier_board", None, "CAD")
+    assert parse_target_string("cat_fountain/product/cad") == ("cat_fountain", "product", None, "CAD")
+    assert parse_target_string("cat_fountain/product:print:cad") == ("cat_fountain", "product", "print", "CAD")
+
+    # Project-only target string
+    assert parse_target_string("carrier_board") == ("carrier_board", "", None, "CAD")

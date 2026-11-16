@@ -178,10 +178,13 @@ class ColorType(StrEnum):
     BLUE = "blue"
     ORANGE = "orange"
     CYAN = "cyan"
+    TEAL = "teal"
     YELLOW = "yellow"
     MAGENTA = "magenta"
+    BROWN = "brown"
     GREY = "grey"
     BLACK = "black"
+    WHITE = "white"
     PURPLE = "purple"
 
 

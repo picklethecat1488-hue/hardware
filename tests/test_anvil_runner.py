@@ -118,7 +118,7 @@ exit 0
     calls = log_file.read_text(encoding="utf-8")
     assert "-p 34567" in calls
     assert "root@ssh5.vast.ai" in calls
-    assert "tools/view.py --speed 10" in calls
+    assert "tools/scope.py --speed 10" in calls
     assert "tools/smoke.py" in calls
     assert "pkill" in calls
 

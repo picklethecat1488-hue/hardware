@@ -51,7 +51,7 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
 
-        if path.startswith("/static/"):
+        if path.startswith("/js/") or path.startswith("/static/"):
             self._handle_serve_static(path)
             return
 
@@ -87,8 +87,9 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
             case "/api/search":
                 q = query.get("q", [""])[0]
                 commit = query.get("commit", ["working"])[0]
-                results = self.server.git_engine.search_code(q, commit=commit)
-                self._send_json({"query": q, "commit": commit, "results": results})
+                current_file = query.get("file", [""])[0]
+                results = self.server.git_engine.search_code(q, commit=commit, current_file=current_file)
+                self._send_json({"query": q, "commit": commit, "current_file": current_file, "results": results})
             case "/api/raw":
                 commit = query.get("commit", ["working"])[0]
                 file_path = query.get("file", [""])[0]
@@ -196,28 +197,10 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(encoded)
 
     def _handle_serve_static(self, path: str) -> None:
-        """Serve static files such as JavaScript vendor bundles and CSS."""
-        static_dir = Path(__file__).resolve().parent / "static"
-        filename = path.removeprefix("/static/").strip("/")
-        file_target = (static_dir / filename).resolve()
+        """Serve ES modules from js/ and static assets from js/static/."""
+        from provider.http_static import get_hardware_js_root, serve_static_asset
 
-        if not str(file_target).startswith(str(static_dir)) or not file_target.is_file():
-            self.send_error(404, "Static asset not found")
-            return
-
-        if file_target.suffix == ".js":
-            content_type = "application/javascript"
-        elif file_target.suffix == ".svg":
-            content_type = "image/svg+xml"
-        else:
-            content_type = "text/css"
-        data = file_target.read_bytes()
-        self.send_response(200)
-        self.send_header("Content-Type", f"{content_type}; charset=utf-8")
-        self.send_header("Content-Length", str(len(data)))
-        self.send_header("Cache-Control", "public, max-age=86400")
-        self.end_headers()
-        self.wfile.write(data)
+        serve_static_asset(self, path, js_root=get_hardware_js_root(), cache_control="no-cache")
 
     def _handle_add_comment(self, data: dict) -> None:
         """Create and append a new line comment to the review session."""

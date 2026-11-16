@@ -4,8 +4,12 @@
 
  - **tools/build.py** - Orchestrates the generation and export of 3D-printable geometry.
  - **tools/config.py** - Automated utility for part placement and geometry optimization.
- - **tools/view.py** - Interactive CAD visualization tool for inspection and debugging.
+ - **tools/scope.py** - Interactive CAD/PCB Scope workstation for 3D inspection and debugging.
  - **tools/forge.py** - Unified Quake-themed workstation integrating VCS Diff Viewer, Smartlog DAG tree, Code Review, and Bug Tracker.
+ - **tools/verify.sh** - Automated pre-commit verification script running Python compilation, Ruff formatting/linting, JS zero-globals validation, parallel `node --test` suites, and parallel `pytest`.
+ - **tools/validate_js.py** - Oxlint-backed JavaScript zero-globals linter, Jinja2 HTML template verifier, and parallel JS test validator.
+ - **js/** - Canonical zero-globals ES modules (`core/`, `scope/`, `diff/`, `vcs/`, `review/`, `tracker/`) and unminified vendor Three.js engine (`js/static/vendor/three/`). See [docs/javascript_style_architecture.md](docs/javascript_style_architecture.md).
+ - **tests/js/** - Isolated Node (`node --test`) behavioral unit test suites (`*.test.mjs`).
  - **model/** - Core application data models and configuration schemas.
  - **provider/** - Framework for geometry generation and build orchestration.
  - **projects/** - Specific geometry provider implementations.
@@ -263,13 +267,10 @@ pcb_materials.yaml imports -> manifest.yaml -> .kicad_pcb / .kicad_sch targets -
 
 ### 3. Viewing & Inspecting Board Files
 - **In VS Code (KiCode)**: Install the recommended [KiCode](https://marketplace.visualstudio.com/items?itemName=SajadGhorbani.KiCode) (`sajadghorbani.kicode`) extension (powered by KiCanvas). Opening any `.kicad_pcb` or `.kicad_sch` file opens an interactive webview tab with layer toggling, zoom/pan, net highlighting, and component inspection directly in VS Code.
-- **Interactive Viewer CLI (`view.py`)**:
+- **Interactive Scope Workstation (`tools/scope.py`)**:
   ```bash
-  # View PCB target (opens KiCode tab in VS Code and renders 3D substrate in ocp_vscode):
-  python tools/view.py carrier_board:pcb
-
-  # View a direct board or schematic file:
-  python tools/view.py build/board/carrier_board/carrier_board.kicad_pcb
+  # View PCB target in Scope workstation:
+  python tools/scope.py carrier_board/carrier_board:pcb
   ```
 - **In-Browser Gerber Viewers**: Drag the `build/board/<project>/` folder into open-source [tracespace.io/view](https://tracespace.io/view/) or online fab viewers (JLCPCB, PCBWay).
 - **Vector Schematics**: Open `build/schematics/<project>/<project>_schematic.svg` in any browser or SVG editor.
@@ -285,16 +286,15 @@ Run tests for your provider from the repo root using:
 pytest projects/tests/test_your_project.py
 ```
 
-After updating, these commands should be run to ensure proper formatting:
-```
-ruff format build.py
-ruff check build.py
+Before committing or opening a pull request, run the automated pre-commit verification script (which checks Python syntax compilation, Ruff formatting & linting, JavaScript zero-globals & template rules, parallel `node --test` suites, and parallel `pytest`):
+```bash
+./tools/verify.sh
+./tools/verify.sh --fix       # Auto-format & auto-fix Ruff lint issues first
 ```
 
-This will run unit tests, then build all project files, simulating a release:
-```
-pytest
-python build.py
+To build all project files, simulating a release:
+```bash
+python tools/build.py
 ```
 
 ### Remote Cloud Execution (`tools/anvil` / Vast.ai)
@@ -304,6 +304,7 @@ tools/anvil provision                # Rent Vast.ai Ubuntu instance and configur
 tools/anvil bootstrap                # Install build tools, Rust, Miniforge, and cq conda env on remote VM
 tools/anvil status                   # Check instance health, IP/port, GPU, and lock state
 tools/anvil sync                     # Sync repository to cloud container (/workspace/hardware)
+tools/anvil verify [args...]         # Run full ./tools/verify.sh pre-commit verification remotely
 tools/anvil pytest [args...]         # Run pytest remotely in the cq conda environment
 tools/anvil simulate [args...]       # Run simulation on remote GPU and auto-download results
 tools/anvil stages                   # Sync staged .rrd checkpoint recordings
