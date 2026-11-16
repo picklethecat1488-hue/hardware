@@ -69,6 +69,7 @@ class ScopeGeometryPipeline:
         logger: Optional[Logger] = None,
         repo_root: Optional[Path] = None,
         cache_dir: Optional[Path] = None,
+        recordings_dir: Optional[Path] = None,
     ):
         """Initialize the scope geometry pipeline with persistent disk caching."""
         self.config = AppConfig()
@@ -78,6 +79,7 @@ class ScopeGeometryPipeline:
         self.target_parser = TargetParser(self.manager.router)
         self.repo_root = (repo_root or Path(__file__).resolve().parent.parent.parent).resolve()
         self.cache_dir = (cache_dir or (self.repo_root / "build" / "cache" / "scope")).resolve()
+        self.recordings_dir = (recordings_dir or (self.repo_root / "recordings")).resolve()
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self._cache: Dict[Tuple[str, str, Optional[str], str, Optional[int]], Dict[str, Any]] = {}
         self._gz_cache: Dict[Tuple[str, str, Optional[str], str, Optional[int]], bytes] = {}
@@ -1161,6 +1163,44 @@ class ScopeGeometryPipeline:
 
         return False, round(2.0 * float(radius_mm), 4)
 
+    def resolve_recording_path(
+        self,
+        project: str,
+        target: str,
+        explicit_recording: Optional[str] = None,
+    ) -> Optional[Path]:
+        """Resolve an authentic Rerun `.rrd` recording path for `project`/`target`."""
+        if explicit_recording:
+            explicit_path = Path(explicit_recording)
+            if explicit_path.is_file():
+                return explicit_path.resolve()
+            repo_rel = self.repo_root / explicit_path
+            if repo_rel.is_file():
+                return repo_rel.resolve()
+
+        candidates = [
+            self.recordings_dir / f"{project}_{target}.rrd",
+            self.recordings_dir / f"{project}.rrd",
+            self.recordings_dir / f"{project}_3blade.rrd",
+        ]
+        for cand in candidates:
+            if cand.is_file():
+                return cand
+
+        if self.recordings_dir.is_dir():
+            for f in sorted(self.recordings_dir.glob("*.rrd")):
+                if project in f.name:
+                    return f
+        return None
+
+    def format_recording_display_path(self, rrd_file: Path) -> str:
+        """Format a resolved `.rrd` path cleanly relative to `repo_root` or `recordings/`."""
+        if rrd_file.is_relative_to(self.repo_root):
+            return str(rrd_file.relative_to(self.repo_root))
+        if rrd_file.is_relative_to(self.recordings_dir):
+            return str(Path("recordings") / rrd_file.relative_to(self.recordings_dir))
+        return str(rrd_file)
+
     def load_simulation_telemetry(self, project: str, target: str) -> Dict[str, Any]:
         """Extract undecimated binary fluid positions, voxel lattice metadata, kinematic transforms, and metrics."""
         cache_key = f"{project}_{target}_sim_telemetry_{self.SIM_TELEMETRY_CACHE_VERSION}"
@@ -1180,24 +1220,7 @@ class ScopeGeometryPipeline:
             except Exception as err:
                 self.log.warning("Failed to read telemetry cache for %s: %s", cache_key, err)
 
-        recordings_dir = self.repo_root / "recordings"
-        candidates = [
-            recordings_dir / f"{project}_{target}.rrd",
-            recordings_dir / f"{project}.rrd",
-            recordings_dir / f"{project}_3blade.rrd",
-        ]
-        rrd_file: Optional[Path] = None
-        for cand in candidates:
-            if cand.exists():
-                rrd_file = cand
-                break
-
-        if rrd_file is None and recordings_dir.exists():
-            for f in sorted(recordings_dir.glob("*.rrd")):
-                if project in f.name:
-                    rrd_file = f
-                    break
-
+        rrd_file = self.resolve_recording_path(project, target)
         if rrd_file is None:
             return {
                 "status": "not_found",
@@ -1355,9 +1378,7 @@ class ScopeGeometryPipeline:
 
             payload = {
                 "status": "ok",
-                "recording": str(
-                    rrd_file.relative_to(self.repo_root) if rrd_file.is_relative_to(self.repo_root) else rrd_file
-                ),
+                "recording": self.format_recording_display_path(rrd_file),
                 "encoding": "float32_b64",
                 "is_lagrangian": is_lagrangian,
                 "is_voxel_grid": is_voxel_grid,

@@ -5,36 +5,150 @@ import gzip
 from html.parser import HTMLParser
 import json
 import logging
+import math
 import os
 from pathlib import Path
 import subprocess
 import sys
 import threading
 import time
+import types
 import urllib.request
 
 import numpy as np
 import pytest
+import rerun as rr
 import yaml
 
 from projects.carrier_board.provider import CarrierBoardProvider
+from projects.cat_fountain.provider import CatFountainProvider
+from projects.cat_fountain.simulate_hooks import compute_flow_metrics
 from provider.bug_report.sqlite_store import SQLiteBugStore
 from provider.pcb.cad_assembler import PCB3DAssembler
 from provider.scope import ScopeGeometryPipeline, ScopeServer
 import tools.scope as scope_mod
 
+TEST_VOXEL_DX_M = 0.0035
+TEST_SIM_FRAMES = 6
+TEST_WATER_RGBA_U8 = [128, 204, 255, 191]
+
+
+def _write_deterministic_cat_fountain_rrd(rrd_path: Path) -> None:
+    """Write a self-contained 6-frame 3.5 mm Eulerian voxel Rerun recording for Scope telemetry tests."""
+    rrd_path.parent.mkdir(parents=True, exist_ok=True)
+    cat_provider = CatFountainProvider()
+    s = cat_provider.settings
+
+    dx = TEST_VOXEL_DX_M
+    radius_m = round(dx * ScopeGeometryPipeline.VOXEL_RADIUS_RATIO_FALLBACK, 5)
+    floor_z_m = s.floor_z * 0.001
+    bowl_inner_r_m = (s.bowl_radius - s.bowl_thickness) * 0.001
+    lid_mount_z_m = (s.bowl_height - s.lid_step_depth) * 0.001
+    lid_pocket_floor_z_m = lid_mount_z_m + s.lid_pocket_z_offset * 0.001
+    tube_y_m = 0.028
+    tube_r_inner_m = (s.tube_radius - s.tube_thickness) * 0.001
+    tube_r_outer_m = s.tube_radius * 0.001
+    tube_top_z_m = (s.floor_z + s.tube_height) * 0.001
+    cutout_y_m = s.lid_cutout_y * 0.001
+    cutout_r_m = s.lid_cutout_radius * 0.001
+
+    half_n = int((bowl_inner_r_m - 0.002) / dx)
+    xs_1d = np.arange(-half_n, half_n + 1, dtype=np.float64) * dx
+    ys_1d = np.arange(-half_n, half_n + 1, dtype=np.float64) * dx
+    zs_1d = floor_z_m + 0.0015 + np.arange(0, 20, dtype=np.float64) * dx
+    gx, gy, gz = np.meshgrid(xs_1d, ys_1d, zs_1d, indexing="ij")
+    grid_pts = np.column_stack([gx.ravel(), gy.ravel(), gz.ravel()])
+
+    x_col, y_col, z_col = grid_pts[:, 0], grid_pts[:, 1], grid_pts[:, 2]
+    r_xy = np.sqrt(x_col**2 + y_col**2)
+    dist_tube = np.sqrt(x_col**2 + (y_col - tube_y_m) ** 2)
+    dist_cutout = np.sqrt(x_col**2 + (y_col - cutout_y_m) ** 2)
+
+    pool_top_z_m = floor_z_m + 0.0015 + 8 * dx
+    pool_mask = (z_col <= pool_top_z_m + 1e-6) & (r_xy <= bowl_inner_r_m - 0.002) & (dist_tube > tube_r_outer_m)
+    tube_mask = (dist_tube <= tube_r_inner_m) & (z_col <= tube_top_z_m - 0.0025)
+    spout_mask = (
+        (dist_tube <= tube_r_outer_m + 0.012) & (z_col >= tube_top_z_m - 0.004) & (z_col <= tube_top_z_m + 0.006)
+    )
+    on_cutout = (dist_cutout <= cutout_r_m) & (dist_tube > 0.030)
+    sheet_mask = (
+        (np.abs(z_col - lid_pocket_floor_z_m) <= dx * 0.6)
+        & (dist_tube > tube_r_outer_m)
+        & (r_xy <= 0.080)
+        & (~on_cutout)
+    )
+    cutout_drain_mask = (
+        (dist_cutout <= cutout_r_m - 0.004)
+        & (dist_tube > 0.032)
+        & (y_col < -0.005)
+        & (z_col >= pool_top_z_m + 2 * dx)
+        & (z_col < lid_pocket_floor_z_m - 0.001)
+    )
+    waterfall_drain_mask = (
+        (r_xy >= 0.0755)
+        & (r_xy <= 0.0815)
+        & (np.abs(x_col) <= 0.018)
+        & (y_col >= 0.050)
+        & (z_col >= pool_top_z_m + 2 * dx)
+        & (z_col <= lid_pocket_floor_z_m)
+    )
+
+    steady_pts = grid_pts[pool_mask | tube_mask | sheet_mask | cutout_drain_mask | waterfall_drain_mask].astype(
+        np.float32
+    )
+    spout_pts = grid_pts[spout_mask].astype(np.float32)
+
+    rec = rr.RecordingStream("scope_test_cat_fountain")
+    rec.save(str(rrd_path))
+    for step_idx in range(TEST_SIM_FRAMES):
+        active_spout = spout_pts[: max(8, min(len(spout_pts), 8 + step_idx * 4))]
+        frame_pts = np.vstack([steady_pts, active_spout])
+
+        cat_provider.water_sim = types.SimpleNamespace(last_positions=frame_pts, last_velocities=None)
+        metrics = compute_flow_metrics(cat_provider, step_idx=None)
+
+        angle = step_idx * 0.35
+        rec.set_time("step", sequence=step_idx)
+        rec.log(
+            "world/impeller",
+            rr.Transform3D(
+                translation=[0.0, tube_y_m, floor_z_m + 0.008],
+                rotation=rr.Quaternion(xyzw=[0.0, 0.0, math.sin(angle * 0.5), math.cos(angle * 0.5)]),
+            ),
+        )
+        rec.log(
+            "world/particles",
+            rr.Points3D(
+                positions=frame_pts,
+                radii=radius_m,
+                colors=TEST_WATER_RGBA_U8,
+            ),
+        )
+        for metric_name, metric_val in metrics.items():
+            rec.log(f"metrics/{metric_name}", rr.Scalars(float(metric_val)))
+        rec.flush()
+    rec.disconnect()
+
 
 @pytest.fixture(scope="module")
 def scope_server(tmp_path_factory):
-    """Spin up an ephemeral ScopeServer instance for testing."""
+    """Spin up an ephemeral ScopeServer instance with isolated cache and deterministic Rerun fixtures."""
     repo_root = Path(__file__).resolve().parent.parent
     tmp_dir = tmp_path_factory.mktemp("scope_test")
     test_sqlite = tmp_dir / "bugs.sqlite"
     test_att = tmp_dir / "attachments"
     test_fb = tmp_dir / "feedback"
+    test_cache = tmp_dir / "scope_cache"
+    test_recordings = tmp_dir / "recordings"
+    test_build = tmp_dir / "build"
     test_att.mkdir(exist_ok=True)
     test_fb.mkdir(exist_ok=True)
-    pipeline = ScopeGeometryPipeline()
+    _write_deterministic_cat_fountain_rrd(test_recordings / "cat_fountain_3blade.rrd")
+    pipeline = ScopeGeometryPipeline(
+        repo_root=repo_root,
+        cache_dir=test_cache,
+        recordings_dir=test_recordings,
+    )
     server = ScopeServer(
         host="127.0.0.1",
         port=0,
@@ -43,6 +157,7 @@ def scope_server(tmp_path_factory):
         sqlite_file=test_sqlite,
         attachments_dir=test_att,
         feedback_dir=test_fb,
+        build_dir=test_build,
         bind_and_activate=True,
     )
     thread = threading.Thread(target=server.serve_forever, daemon=True)

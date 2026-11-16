@@ -153,17 +153,22 @@ class ScopeTool:
 
         fq_target = f"{proj}/{target}"
 
-        # Ensure URDF is compiled if not already present
+        # Ensure URDF and its referenced link OBJ meshes are compiled if not already present
         from tools.list import Lister
 
+        build_dir = _repo_dir / "build"
         lister = Lister(pipeline.manager, self.logger)
         urdf_rel_path = lister.get_urdf_output(fq_target)
-        real_urdf_path = Path("build") / urdf_rel_path
+        real_urdf_path = build_dir / urdf_rel_path
         if not real_urdf_path.exists():
             from tools.build import Builder
 
+            build_dir.mkdir(parents=True, exist_ok=True)
             builder = Builder(pipeline.manager, self.logger)
-            builder.export_urdf([fq_target])
+            builder._load_manifest(str(build_dir))
+            builder.generate_parts(out_dir=str(build_dir), names=[f"{proj}/*"])
+            builder.generate_urdfs(out_dir=str(build_dir), names=[fq_target])
+            builder._save_manifest(str(build_dir))
 
         for room_name, room in results:
             if not isinstance(room, Room):
@@ -202,6 +207,7 @@ class ScopeTool:
                 steps=steps,
                 manager=pipeline.manager,
                 logger=self.logger,
+                build_dir=str(build_dir),
                 save_rrd=save_rrd,
                 save_mp4=save_mp4,
                 fps=args.fps,

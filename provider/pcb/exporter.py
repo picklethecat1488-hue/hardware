@@ -56,7 +56,7 @@ class PCBExporter:
             lstrip_blocks=True,
         )
 
-    def export_kicad_pcb(self, output_file: str | Path) -> Path:
+    def export_kicad_pcb(self, output_file: str | Path, refill_zones: bool = True) -> Path:
         """Render and save KiCad 7/8 compatible .kicad_pcb file using Jinja2 template."""
         out_path = Path(output_file).resolve()
         out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -702,7 +702,7 @@ class PCBExporter:
             json.dump(pro_data, f, indent=2)
 
         # Automatically compute zone fill geometries and thermal reliefs so inner planes are never empty
-        if getattr(self.config, "copper_regions", None):
+        if refill_zones and getattr(self.config, "copper_regions", None):
             from provider.pcb.kicad_cli import KiCadCLI
 
             cli = KiCadCLI(design_rules=self.design_rules)
