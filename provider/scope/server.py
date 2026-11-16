@@ -440,28 +440,8 @@ class ScopeRequestHandler(BaseHTTPRequestHandler):
         target = data.get("target") or query.get("target", ["product"])[0]
         rec = data.get("recording") or query.get("recording", [""])[0]
 
-        rrd_path: Optional[Path] = None
-        if rec and Path(rec).exists():
-            rrd_path = Path(rec)
-        else:
-            candidates = [
-                Path(f"recordings/{project}_3blade.rrd"),
-                Path(f"recordings/{project}.rrd"),
-                Path(f"recordings/{project}_{target}.rrd"),
-            ]
-            for cand in candidates:
-                if cand.exists():
-                    rrd_path = cand
-                    break
-
-        if rrd_path is None or not rrd_path.exists():
-            recordings_dir = Path("recordings")
-            if recordings_dir.exists():
-                for f in recordings_dir.glob("*.rrd"):
-                    if project in f.name:
-                        rrd_path = f
-                        break
-
+        pipeline = self.server.pipeline
+        rrd_path = pipeline.resolve_recording_path(project, target, explicit_recording=rec or None)
         if rrd_path is None or not rrd_path.exists():
             self._send_json({"error": f"No simulation recording found for {project}/{target}"}, status=404)
             return
@@ -476,7 +456,7 @@ class ScopeRequestHandler(BaseHTTPRequestHandler):
                 {
                     "status": "ok",
                     "message": f"Launched Rerun Viewer with {rrd_path.name}",
-                    "recording": str(rrd_path),
+                    "recording": pipeline.format_recording_display_path(rrd_path),
                 }
             )
         except Exception as err:
@@ -484,25 +464,7 @@ class ScopeRequestHandler(BaseHTTPRequestHandler):
 
     def _handle_download_rrd(self, project: str, target: str) -> None:
         """Stream the authentic Rerun .rrd recording file as an attachment download."""
-        candidates = [
-            Path(f"recordings/{project}_3blade.rrd"),
-            Path(f"recordings/{project}.rrd"),
-            Path(f"recordings/{project}_{target}.rrd"),
-        ]
-        rrd_path = None
-        for cand in candidates:
-            if cand.exists():
-                rrd_path = cand
-                break
-
-        if rrd_path is None or not rrd_path.exists():
-            recordings_dir = Path("recordings")
-            if recordings_dir.exists():
-                for f in recordings_dir.glob("*.rrd"):
-                    if project in f.name:
-                        rrd_path = f
-                        break
-
+        rrd_path = self.server.pipeline.resolve_recording_path(project, target)
         if rrd_path is None or not rrd_path.exists():
             self._send_json({"error": f"No simulation recording found for {project}/{target}"}, status=404)
             return
@@ -519,14 +481,15 @@ class ScopeRequestHandler(BaseHTTPRequestHandler):
         """Launch the local KiCad EDA application to view the active PCB project."""
         sub = subassembly or (target if target != project else None)
         sub_name = sub or project
+        build_root = self.server.build_dir
 
         candidates = [
-            Path(f"build/board/{project}/{sub_name}.kicad_pro"),
-            Path(f"build/board/{project}/{sub_name}.kicad_pcb"),
-            Path(f"build/board/{project}/{project}.kicad_pro"),
-            Path(f"build/board/{project}/{project}.kicad_pcb"),
-            Path(f"build/{project}_export.kicad_pcb"),
-            Path(f"build/pcb/{project}/{sub_name}.kicad_pcb"),
+            build_root / "board" / project / f"{sub_name}.kicad_pro",
+            build_root / "board" / project / f"{sub_name}.kicad_pcb",
+            build_root / "board" / project / f"{project}.kicad_pro",
+            build_root / "board" / project / f"{project}.kicad_pcb",
+            build_root / f"{project}_export.kicad_pcb",
+            build_root / "pcb" / project / f"{sub_name}.kicad_pcb",
         ]
         kicad_file: Optional[Path] = None
         for cand in candidates:
@@ -535,7 +498,7 @@ class ScopeRequestHandler(BaseHTTPRequestHandler):
                 break
 
         if kicad_file is None:
-            board_dir = Path("build/board") / project
+            board_dir = build_root / "board" / project
             if board_dir.exists():
                 for ext in (".kicad_pro", ".kicad_pcb"):
                     for f in board_dir.glob(f"*{ext}"):
@@ -545,6 +508,37 @@ class ScopeRequestHandler(BaseHTTPRequestHandler):
                         break
 
         if kicad_file is None:
+            provider = next(
+                (p for p in self.server.pipeline.manager.router.providers if p.name == project),
+                None,
+            )
+            wiring = getattr(provider, "wiring", None) if provider is not None else None
+            pcb_config = getattr(provider, "pcb_config", None) if provider is not None else None
+            if provider is not None and wiring is not None and pcb_config is not None:
+                from model.pcb import resolve_subassembly_pcb_config
+                from provider.pcb import PCBExporter
+                from provider.types import Mode
+
+                sub_pcb_config = None
+                if sub_name in provider.part:
+                    part_res = provider.part[sub_name](sub_name, None, Mode.DEFAULT)
+                    if hasattr(part_res, "to_pcb_config"):
+                        sub_pcb_config = part_res.to_pcb_config()
+                    elif hasattr(part_res, "pcb_metadata"):
+                        sub_pcb_config = part_res.pcb_metadata
+                sub_param = sub_name if sub_name != project else None
+                target_cfg = resolve_subassembly_pcb_config(sub_pcb_config, pcb_config, subassembly=sub_param)
+                out_pcb = build_root / "board" / project / f"{sub_name}.kicad_pcb"
+                out_pcb.parent.mkdir(parents=True, exist_ok=True)
+                exporter = PCBExporter(
+                    target_cfg,
+                    wiring,
+                    subassembly=sub_param,
+                    design_rules=target_cfg.design_rules,
+                )
+                kicad_file = exporter.export_kicad_pcb(out_pcb, refill_zones=False)
+
+        if kicad_file is None or not kicad_file.exists():
             self._send_json({"error": f"No KiCad project found for {project}/{target}"}, status=404)
             return
 
@@ -590,6 +584,7 @@ class ScopeServer(ThreadingHTTPServer):
         sqlite_file: Optional[Path] = None,
         attachments_dir: Optional[Path] = None,
         feedback_dir: Optional[Path] = None,
+        build_dir: Optional[Path] = None,
         logger: Optional[logging.Logger] = None,
         bind_and_activate: bool = True,
     ) -> None:
@@ -600,6 +595,7 @@ class ScopeServer(ThreadingHTTPServer):
         from provider.http_static import get_hardware_js_root
 
         self.repo_root = (repo_root or Path(__file__).resolve().parent.parent.parent).resolve()
+        self.build_dir = (build_dir or (self.repo_root / "build")).resolve()
         self.js_dir = get_hardware_js_root(self.repo_root)
         self.static_dir = self.js_dir / "static"
         self.template_dir = self.repo_root / "provider" / "templates"
@@ -607,7 +603,7 @@ class ScopeServer(ThreadingHTTPServer):
             self.template_dir = Path(__file__).resolve().parent.parent / "templates"
         self.feedback_dir = feedback_dir or (self.repo_root / "feedback")
         self.attachments_dir = attachments_dir or (self.repo_root / "attachments")
-        self.sqlite_file = sqlite_file or (self.repo_root / "build" / "bugs.sqlite")
+        self.sqlite_file = sqlite_file or (self.build_dir / "bugs.sqlite")
         self.pipeline = pipeline or ScopeGeometryPipeline()
 
         if bind_and_activate:
