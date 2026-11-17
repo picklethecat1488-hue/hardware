@@ -354,3 +354,33 @@ def test_provider_simulate_validation(provider):
     assert provider.get_simulate_hooks("default") == {
         Simulate.SETUP: provider.get_simulate_hooks_impl.return_value[Simulate.SETUP]
     }
+
+    # 7. STEP hook with typed SimulationStepResult return annotation passes, invalid annotation fails
+    from pydantic import ValidationError
+    from model.simulation import SimulationStepResult
+
+    def valid_step(body_id: int, client: int, step_idx: int, name: str) -> SimulationStepResult:
+        return SimulationStepResult(metrics={"flow_spout": 3})
+
+    provider.get_simulate_hooks_impl = MagicMock(return_value={Simulate.STEP: valid_step})
+    assert provider.get_simulate_hooks("default") == {Simulate.STEP: valid_step}
+
+    def invalid_step_return(body_id: int, client: int, step_idx: int, name: str) -> str:
+        return "bad"
+
+    provider.get_simulate_hooks_impl = MagicMock(return_value={Simulate.STEP: invalid_step_return})
+    with pytest.raises(ValueError, match="Simulation hook STEP return annotation must be SimulationStepResult"):
+        _ = provider.get_simulate_hooks("default")
+
+    # 8. SimulationStepResult model invariants (happy & sad cases)
+    idle_res = SimulationStepResult()
+    assert idle_res.metrics is None and idle_res.termination_condition is None and not idle_res.is_complete
+
+    metrics_res = SimulationStepResult(metrics={"flow_spout": 7, "water_depth": 0.03})
+    assert metrics_res.metrics == {"flow_spout": 7, "water_depth": 0.03} and not metrics_res.is_complete
+
+    term_res = SimulationStepResult(termination_condition="Completed all steps")
+    assert term_res.is_complete and term_res.termination_condition == "Completed all steps"
+
+    with pytest.raises(ValidationError, match="either metrics or termination_condition, not both"):
+        SimulationStepResult(metrics={"flow_spout": 1}, termination_condition="Completed")

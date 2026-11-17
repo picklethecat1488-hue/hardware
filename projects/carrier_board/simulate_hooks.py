@@ -5,15 +5,15 @@ Loads declarative assembly test steps from provider models, populates obstacles 
 and delegates simulation execution to provider.simulation.flying_probe.
 """
 
-from typing import Any, Callable, Dict
+from typing import Any
 
-from provider import Simulate
+from provider import SimulateHooks
 from provider.simulation.flying_probe import (
     create_flying_probe_hooks,
 )
 
 
-def get_simulate_hooks_impl(self: Any, sim_name: str) -> Dict[Simulate, Callable[..., Any]]:
+def get_simulate_hooks_impl(self: Any, sim_name: str) -> SimulateHooks:
     """Return flying probe simulation and electrical verification hooks for carrier_board.
 
     Args:

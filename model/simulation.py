@@ -1,7 +1,71 @@
 """Simulation models for flying probe automated acceptance testing and telemetry."""
 
-from typing import List
-from pydantic import BaseModel, Field
+from typing import Any, Dict, List, Optional, Protocol
+from pydantic import BaseModel, Field, model_validator
+
+
+MetricsDict = Dict[str, float | int]
+
+
+class SimulationStepResult(BaseModel):
+    """Structured return model for `Simulate.STEP` callbacks.
+
+    Carries either an optional scalar telemetry metrics dictionary for active
+    simulation steps or a termination condition message when the simulation is complete.
+    """
+
+    metrics: Optional[MetricsDict] = Field(
+        default=None,
+        description="Optional scalar telemetry metrics computed during this step (logged under metrics/<name>).",
+    )
+    termination_condition: Optional[str] = Field(
+        default=None,
+        description="Termination condition message signaling that the simulation is complete.",
+    )
+
+    @model_validator(mode="after")
+    def _validate_metrics_or_termination(self) -> "SimulationStepResult":
+        """Enforce that a step returns either optional metrics or a termination condition, not both."""
+        if self.metrics is not None and self.termination_condition is not None:
+            raise ValueError("SimulationStepResult must specify either metrics or termination_condition, not both.")
+        return self
+
+    @property
+    def is_complete(self) -> bool:
+        """Return True when a simulation termination condition has been signaled."""
+        return self.termination_condition is not None
+
+
+class SetupSimulationFn(Protocol):
+    """Callable specification for `Simulate.SETUP` initialization callbacks."""
+
+    def __call__(
+        self,
+        body_id: int,
+        client: int,
+        name: str,
+        boundaries: Dict[str, Any],
+        state_tracker: Optional[Any] = None,
+    ) -> None:
+        """Configure simulation physics, boundaries, and solver state before stepping."""
+        ...
+
+
+class StepSimulationFn(Protocol):
+    """Callable specification for `Simulate.STEP` per-step callbacks."""
+
+    def __call__(
+        self,
+        body_id: int,
+        client: int,
+        step_idx: int,
+        name: str,
+    ) -> SimulationStepResult:
+        """Advance one simulation step and return either optional metrics or a termination condition."""
+        ...
+
+
+SimulateHookFn = SetupSimulationFn | StepSimulationFn
 
 
 class FlyingProbeStepReportModel(BaseModel):

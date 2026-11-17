@@ -117,26 +117,38 @@ If your project supports physical simulation (`Mode.SIMULATE`), you should regis
 
 ```python
 # projects/bracket/provider.py
-def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
+def get_simulate_hooks_impl(self, sim_name: str) -> SimulateHooks:
     """Return simulation callbacks mapped to execution hooks."""
     from .simulate_hooks import get_simulate_hooks_impl as impl
 
     return impl(self, sim_name)
 ```
 
-Create a `simulate_hooks.py` file within your project package to specify hooks for `Simulate.INIT`, `Simulate.PRE_STEP`, etc.:
+Create a `simulate_hooks.py` file within your project package to specify hooks for `Simulate.SETUP` and `Simulate.STEP`:
 
 ```python
 # projects/bracket/simulate_hooks.py
-from provider import Simulate, Room, Bullet, Fluid
+from typing import Any, Optional
+from model import SimulationStepResult
+from provider import Simulate, SimulateHooks
 
 
-def get_simulate_hooks_impl(provider, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
-    def on_init(bullet: Bullet, fluid: Fluid) -> None:
-        bullet.set_motor_velocity("motor_joint", velocity=10.0)
+def get_simulate_hooks_impl(provider: Any, sim_name: str) -> SimulateHooks:
+    def setup_simulation(
+        body_id: int,
+        client: int,
+        name: str,
+        boundaries: dict[str, Any],
+        state_tracker: Optional[Any] = None,
+    ) -> None:
+        pass
+
+    def step_simulation(body_id: int, client: int, step_idx: int, name: str) -> SimulationStepResult:
+        return SimulationStepResult(metrics={"active_step": step_idx})
 
     return {
-        Simulate.INIT: on_init,
+        Simulate.SETUP: setup_simulation,
+        Simulate.STEP: step_simulation,
     }
 ```
 
