@@ -7,7 +7,7 @@ import shutil
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Union, Optional, TYPE_CHECKING, cast, Callable
+from typing import Any, Union, Optional, TYPE_CHECKING, cast
 from build123d import (
     BoundBox,
     BuildPart,
@@ -54,6 +54,8 @@ import socket
 from model import DiagramOptions, TextArgs
 from .types import (
     ColorType,
+    MetricsDict,
+    SimulateHooks,
     URDFShape,
     Simulate,
     CollisionGroup,
@@ -965,11 +967,16 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         particle_colors: Optional[list[list[float]]] = None,
         particle_radii: Optional[list[float]] = None,
         boundary_voxels: Optional[dict[str, Any]] = None,
+        metrics: Optional[MetricsDict] = None,
         step_idx: Optional[int] = None,
     ) -> None:
-        """Log the given state data to Rerun."""
+        """Log the given state data and optional step metrics to Rerun."""
         if step_idx is not None:
             rr.set_time("step", sequence=step_idx)
+
+        if metrics is not None:
+            for metric_name, metric_val in metrics.items():
+                rr.log(f"metrics/{metric_name}", rr.Scalars(float(metric_val)))
 
         # Log link transforms
         for label, (pos, orn) in transforms.items():
@@ -1047,7 +1054,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
 
     def simulate(
         self,
-        provider_hooks: dict[Simulate, Callable[..., Any]],
+        provider_hooks: SimulateHooks,
         proj_name: str,
         sim_target: str,
         steps: Optional[int] = None,

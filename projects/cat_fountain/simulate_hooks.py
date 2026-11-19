@@ -3,14 +3,14 @@
 import numpy as np
 import pybullet as p
 from provider.bullet import _is_real_physics_client, get_bullet_link_names
-from typing import Any, Callable, cast, Optional
-from provider import Bullet, LinkType, Fluid, Simulate, URDFShape, rerun_is_enabled
-from model import FluidConfig, BoundaryConfig, ResolvedBoundaries
+from typing import Any, cast, Optional
+from provider import Bullet, Fluid, Simulate, SimulateHooks, URDFShape
+from model import FluidConfig, MetricsDict, ResolvedBoundaries, SimulationStepResult
 
 
-def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[str, int]:
+def compute_flow_metrics(provider: Any) -> MetricsDict:
     """Compute flow, sheet, drainage, and reservoir volume metrics from current fluid state."""
-    metrics = {
+    metrics: MetricsDict = {
         "flow_spout": 0,
         "flow_tube": 0,
         "flow_lid_sheet": 0,
@@ -147,35 +147,23 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
         provider.metrics_history = []
     provider.metrics_history.append(metrics)
 
-    if step_idx is not None and rerun_is_enabled():
-        import rerun as rr
-
-        rr.set_time("step", sequence=step_idx)
-        rr.log("metrics/flow_spout", rr.Scalars(float(at_spout_cnt)))
-        rr.log("metrics/flow_tube", rr.Scalars(float(in_tube_cnt)))
-        rr.log("metrics/flow_lid_sheet", rr.Scalars(float(lid_sheet_cnt)))
-        rr.log("metrics/drainage_waterfall", rr.Scalars(float(waterfall_cnt)))
-        rr.log("metrics/drainage_cutout", rr.Scalars(float(drain_cnt)))
-        rr.log("metrics/pool_volume", rr.Scalars(float(pool_cnt)))
-        rr.log("metrics/water_depth", rr.Scalars(float(water_depth)))
-        rr.log("metrics/ejected_particles", rr.Scalars(float(ejected_cnt)))
-        rr.log("metrics/max_vertical_vel", rr.Scalars(float(max_vz)))
-        rr.log("metrics/max_particle_speed", rr.Scalars(float(max_speed)))
-        rr.log("metrics/mean_sheet_speed", rr.Scalars(float(sheet_speed)))
-        rr.log("metrics/drain_downward_vel", rr.Scalars(float(drain_down_vz)))
-        rr.log("metrics/drain_stagnant_particles", rr.Scalars(float(drain_stagnant_cnt)))
-
     return metrics
 
 
-def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
+def get_simulate_hooks_impl(self: Any, sim_name: str) -> SimulateHooks:
     """Return simulation hooks for the cat fountain."""
     self.water_sim = None
     self.last_metrics = {}
     self.metrics_history = []
-    self.compute_flow_metrics = lambda step_idx=None: compute_flow_metrics(self, step_idx)
+    self.compute_flow_metrics = lambda: compute_flow_metrics(self)
 
-    def setup_simulation(body_id, client, name, boundaries, state_tracker=None):
+    def setup_simulation(
+        body_id: int,
+        client: int,
+        name: str,
+        boundaries: dict[str, Any],
+        state_tracker: Optional[Any] = None,
+    ) -> None:
         self.last_metrics = {}
         if _is_real_physics_client(client):
             p.setGravity(0.0, 0.0, -9.81, physicsClientId=client)
@@ -217,7 +205,7 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
         bullet_sim = Bullet(self.room, {}, "", "", 0, None, None)
         bullet_sim.reset_camera(client, view_from="top rear")
 
-    def step_simulation(body_id, client, step_idx, name):
+    def step_simulation(body_id: int, client: int, step_idx: int, name: str) -> SimulationStepResult:
         assert self.water_sim is not None
         target_omega = 15.0
         max_force = 10.0
@@ -235,7 +223,7 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
             step_idx=step_idx,
         )
 
-        metrics = compute_flow_metrics(self, step_idx=step_idx)
+        metrics = compute_flow_metrics(self)
         if step_idx is not None and step_idx % 100 == 0:
             logger = getattr(self, "logger", None)
             if logger is not None:
@@ -250,8 +238,10 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
             and len(self.water_sim.fallen_out_water_ids) * self.water_sim.vol_s * 1000.0
             >= self.water_sim.fallen_threshold_liters
         ):
-            return f"{self.water_sim.fallen_threshold_liters}L of water fell out of bowl at step {step_idx}"
-        return None
+            return SimulationStepResult(
+                termination_condition=f"{self.water_sim.fallen_threshold_liters}L of water fell out of bowl at step {step_idx}"
+            )
+        return SimulationStepResult(metrics=metrics)
 
     return {
         Simulate.SETUP: setup_simulation,

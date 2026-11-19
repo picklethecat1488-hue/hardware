@@ -61,7 +61,15 @@ from .pcb import (
     PinSideDef,
     resolve_subassembly_pcb_config,
 )
-from .simulation import FlyingProbeReportModel, FlyingProbeStepReportModel
+from .simulation import (
+    FlyingProbeReportModel,
+    FlyingProbeStepReportModel,
+    MetricsDict,
+    SetupSimulationFn,
+    SimulateHookFn,
+    SimulationStepResult,
+    StepSimulationFn,
+)
 from .scope import (
     ScopeAnnotationModel,
     ScopeMarkupModel,

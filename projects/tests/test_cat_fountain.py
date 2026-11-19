@@ -667,8 +667,8 @@ class TestCatFountainProvider:
                             pos_arr[0] = [0.0, 0.0, -10.0]
                             provider.water_sim.pos_jax = jnp.array(pos_arr)
                     res = step_fn(body_id, physics_client, step_idx, "product:view/simulate")
-                    if res is not None:
-                        terminated_message = res
+                    if res.is_complete:
+                        terminated_message = res.termination_condition
                         break
                     p.stepSimulation(physicsClientId=physics_client)
 
@@ -854,8 +854,11 @@ class TestCatFountainProvider:
                 assert provider.water_sim is not None
                 provider.water_sim.recycle_fluid = False
 
-                # Verify that when all water is within boundaries, simulation does not terminate
-                assert step_fn(body_id, client, 0, "simulate") is None
+                # Verify that when all water is within boundaries, simulation returns metrics and does not terminate
+                step0_res = step_fn(body_id, client, 0, "simulate")
+                assert not step0_res.is_complete
+                assert step0_res.termination_condition is None
+                assert step0_res.metrics is not None
 
                 # Move a sufficient volume of water particles (at least 0.0012L) outside the boundary to trigger escaping
                 vol_s = (4.0 / 3.0) * np.pi * (provider.water_sim.r_s**3)
@@ -870,8 +873,10 @@ class TestCatFountainProvider:
 
                 # Execute step simulation and verify the termination condition is met
                 res = step_fn(body_id, client, 1, "simulate")
-                assert res is not None
-                assert "L of water fell out of bowl" in res
+                assert res.is_complete
+                assert res.metrics is None
+                assert res.termination_condition is not None
+                assert "L of water fell out of bowl" in res.termination_condition
 
         finally:
             p.disconnect(client)
@@ -1171,8 +1176,10 @@ class TestCatFountainProvider:
         def mock_setup(body_id, physics_client, view_path, boundaries, state):
             provider.water_sim = mock_water
 
+        from model.simulation import SimulationStepResult
+
         mock_setup_fn = MagicMock(side_effect=mock_setup)
-        mock_step_fn = MagicMock()
+        mock_step_fn = MagicMock(return_value=SimulationStepResult())
 
         provider.get_simulate_hooks_impl = MagicMock(
             return_value={
@@ -1730,8 +1737,13 @@ class TestCatFountainProvider:
         Regression test: Prevents metric collapse where an artificial 15mm cutoff dropped pool_volume
         when the bowl reservoir was filled near the lid.
         """
+        import inspect
         import numpy as np
+        from unittest.mock import patch
         from projects.cat_fountain.simulate_hooks import compute_flow_metrics
+
+        sig = inspect.signature(compute_flow_metrics)
+        assert list(sig.parameters.keys()) == ["provider"]
 
         bowl_h = provider.settings.bowl_height * 0.001
         step_d = provider.settings.lid_step_depth * 0.001
@@ -1744,7 +1756,9 @@ class TestCatFountainProvider:
         pts[:, 2] = lid_mount_z - 0.005
 
         provider.water_sim = type("MockSim", (), {"last_positions": pts, "last_velocities": None})()
-        metrics = compute_flow_metrics(provider)
+        with patch("rerun.log") as mock_rr_log:
+            metrics = compute_flow_metrics(provider)
+            mock_rr_log.assert_not_called()
 
         assert metrics["pool_volume"] == 500, (
             f"Upper reservoir particles were artificially excluded from pool_volume: got {metrics['pool_volume']}"
