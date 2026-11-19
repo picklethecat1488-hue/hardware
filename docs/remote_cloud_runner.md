@@ -74,7 +74,7 @@ Prepares clean Ubuntu containers for firmware, hardware, and machine learning wo
 * Before initiating new test suites or builds (`pytest`, `verify`, `simulate`), `tools/anvil` issues remote `pkill -9` commands targeting preceding runs to eliminate duplicate GPU allocations and cloud resource contention.
 
 ### 4. Remote Pre-Commit Verification (`tools/anvil verify`)
-* Synchronizes the local working tree to `/workspace/<repo>` and executes `./tools/verify.sh` (forwarding any flags such as `--fix`, `--quick`, `--slow`, or `--smoke`) inside the persistent `cq` / `firmware-env` conda environment on `anvil`:
+* Synchronizes the local working tree to `/workspace/<repo>` and executes `./tools/verify.py` (forwarding any flags such as `--fix`, `--quick`, `--slow`, or `--smoke`) inside the persistent `cq` / `firmware-env` conda environment on `anvil`:
   ```bash
   tools/anvil verify            # Full pre-commit verification on anvil
   tools/anvil verify --slow     # Include @pytest.mark.slow CAD & physics suites
