@@ -105,7 +105,7 @@ def _write_deterministic_cat_fountain_rrd(rrd_path: Path) -> None:
         frame_pts = np.vstack([steady_pts, active_spout])
 
         cat_provider.water_sim = types.SimpleNamespace(last_positions=frame_pts, last_velocities=None)
-        metrics = compute_flow_metrics(cat_provider, step_idx=None)
+        metrics = compute_flow_metrics(cat_provider)
 
         angle = step_idx * 0.35
         rec.set_time("step", sequence=step_idx)
