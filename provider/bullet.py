@@ -7,12 +7,24 @@ import tempfile
 import pybullet as p
 import socket
 import xml.etree.ElementTree as ET
-from typing import Any, Optional, Callable, cast
+from typing import Any, Optional, cast
 import rerun as rr
 import queue
 import threading
 import numpy as np
-from provider.types import CollisionGroup, CollisionMask, URDFShape, URDFCollisionType, Simulate, LinkType
+from provider.types import (
+    CollisionGroup,
+    CollisionMask,
+    LinkType,
+    MetricsDict,
+    SetupSimulationFn,
+    Simulate,
+    SimulateHooks,
+    SimulationStepResult,
+    StepSimulationFn,
+    URDFCollisionType,
+    URDFShape,
+)
 
 
 def _is_real_physics_client(physics_client: Any) -> bool:
@@ -141,7 +153,7 @@ class Bullet:
     def __init__(
         self,
         room: Any,
-        provider_hooks: dict[Simulate, Callable[..., Any]],
+        provider_hooks: SimulateHooks,
         proj_name: str,
         sim_target: str,
         steps: Optional[int] = None,
@@ -760,7 +772,7 @@ class Bullet:
                             boundaries_metadata[label] = geom_boundaries
 
                 # Setup Hooks
-                setup_hook = self.provider_hooks.get(Simulate.SETUP, None)
+                setup_hook = cast(Optional[SetupSimulationFn], self.provider_hooks.get(Simulate.SETUP, None))
                 if setup_hook:
                     import inspect
 
@@ -799,6 +811,7 @@ class Bullet:
                                 particle_colors,
                                 particle_radii,
                                 boundary_voxels,
+                                step_metrics,
                                 step_idx,
                             ) = item
                             self.room._log_rerun(
@@ -807,6 +820,7 @@ class Bullet:
                                 particle_colors,
                                 particle_radii=particle_radii,
                                 boundary_voxels=boundary_voxels,
+                                metrics=step_metrics,
                                 step_idx=step_idx,
                             )
                             q.task_done()
@@ -814,14 +828,25 @@ class Bullet:
                     log_thread = threading.Thread(target=logging_worker, daemon=True)
                     log_thread.start()
 
-                step_hook = self.provider_hooks.get(Simulate.STEP, None)
+                step_hook = cast(Optional[StepSimulationFn], self.provider_hooks.get(Simulate.STEP, None))
                 for step_idx in range(self.steps):
                     terminated = False
+                    step_metrics: Optional[MetricsDict] = None
                     if step_hook is not None:
                         res = step_hook(body_id, physics_client, step_idx, self.sim_target)
-                        if isinstance(res, str):
-                            self.logger.print(f"Simulation terminated: {res}", symbol="🛑")
-                            terminated = True
+                        if isinstance(res, SimulationStepResult):
+                            step_metrics = res.metrics
+                            if res.termination_condition is not None:
+                                self.logger.print(f"Simulation terminated: {res.termination_condition}", symbol="🛑")
+                                terminated = True
+                        elif res is not None and res.__class__.__name__ not in (
+                            "MagicMock",
+                            "Mock",
+                            "NonCallableMock",
+                        ):
+                            raise TypeError(
+                                f"Simulate.STEP hook must return SimulationStepResult, got {type(res).__name__}"
+                            )
 
                     is_frame_step = step_idx % self.step_stride == 0
 
@@ -856,6 +881,7 @@ class Bullet:
                                     state_tracker.particle_colors,
                                     state_tracker.particle_radii,
                                     state_tracker.boundary_voxels,
+                                    step_metrics,
                                     step_idx,
                                 )
                             )

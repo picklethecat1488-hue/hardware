@@ -1756,7 +1756,15 @@
       <div class="pane-header">
         <div class="pane-title-row">
           <span id="filesCountHeader">Changed Files (0)</span>
-          <button class="quake-btn quake-btn-default" style="padding: 2px 6px;" data-action="toggle-pane" data-pane="files" title="Collapse Pane (Shortcut: ])">◀</button>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <label style="font-size: 10px; color: var(--quake-text-dim); display: flex; align-items: center; gap: 3px; cursor: pointer; user-select: none;" title="Show closed review comments">
+              <input type="checkbox" id="showClosedCommentsCb"> Show Closed
+            </label>
+            <label style="font-size: 10px; color: var(--quake-text-dim); display: flex; align-items: center; gap: 3px; cursor: pointer; user-select: none;" title="Hide attachments in code review">
+              <input type="checkbox" id="hideAttachmentsCb" checked> Hide Attachments
+            </label>
+            <button class="quake-btn quake-btn-default" style="padding: 2px 6px;" data-action="toggle-pane" data-pane="files" title="Collapse Pane (Shortcut: ])">◀</button>
+          </div>
         </div>
         <input type="text" id="fileSearchInput" class="quake-input" placeholder="Fuzzy filter files...">
       </div>

@@ -44,6 +44,7 @@ from provider import (
     Room,
     Mode,
     Simulate,
+    SimulateHooks,
     WiringDiagram,
     BuildSilkscreen,
     SilkscreenText,
@@ -136,7 +137,7 @@ class CarrierBoardProvider(CarrierBoardCAD, CarrierBoardPCBListing, FlexTailPCBL
             "wiring": self.diagram_wiring,
         }
 
-    def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
+    def get_simulate_hooks_impl(self, sim_name: str) -> SimulateHooks:
         """Return flying probe simulation and electrical verification hooks."""
         from .simulate_hooks import get_simulate_hooks_impl as impl
 

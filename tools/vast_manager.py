@@ -966,7 +966,7 @@ fi
 export PATH="$HOME/.cargo/bin:$PATH"
 if command -v cargo &>/dev/null; then
     rustup component add rustfmt clippy 2>/dev/null || true
-    rustup target add thumbv6m-none-eabi 2>/dev/null || true
+    rustup target add thumbv6m-none-eabi thumbv8m.main-none-eabihf 2>/dev/null || true
     if ! command -v cargo-nextest &>/dev/null; then
         echo "Installing cargo-nextest..."
         cargo install cargo-nextest --locked 2>/dev/null || true
@@ -1027,13 +1027,13 @@ if [ "$TARGET" = "all" ] || [ "$TARGET" = "firmware" ]; then
         echo "Creating firmware-env..."
         conda create -y -n firmware-env python=3.11
         conda run -n firmware-env pip install --no-cache-dir \
-            pytest pytest-mock pytest-xdist pydantic jinja2 requests \
+            pytest pytest-mock pytest-xdist "pytest-asyncio>=1.0.0" "pluggy<1.7.0" pydantic jinja2 requests \
             ruff oxlint tree-sitter tree-sitter-rust halo colorama pyyaml \
             eel pillow beautifulsoup4 pyserial numpy psutil pywebview
     else
         echo "firmware-env already exists, ensuring required packages..."
         conda run -n firmware-env pip install --no-cache-dir \
-            pytest pytest-mock pytest-xdist pydantic jinja2 requests \
+            pytest pytest-mock pytest-xdist "pytest-asyncio>=1.0.0" "pluggy<1.7.0" pydantic jinja2 requests \
             ruff oxlint tree-sitter tree-sitter-rust halo colorama pyyaml \
             eel pillow beautifulsoup4 pyserial numpy psutil pywebview || true
     fi

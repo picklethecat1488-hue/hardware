@@ -14,6 +14,7 @@ import uuid as uuid_pkg
 
 from model.code_review import (
     CommentModel,
+    CommentStatus,
     CommitUpdateModel,
     FileReviewStatus,
     FileStateModel,
@@ -60,7 +61,7 @@ class SQLiteReviewStore:
             return
         cursor = conn.execute("PRAGMA table_info(comments)")
         cols = [row["name"] for row in cursor.fetchall()]
-        if "uuid" not in cols or "commit_hash" not in cols:
+        if "uuid" not in cols or "commit_hash" not in cols or "status" not in cols or "resolution_notes" not in cols:
             self._init_schema_with_conn(conn)
 
     def _init_schema(self) -> None:
@@ -91,11 +92,13 @@ class SQLiteReviewStore:
                 start_line INTEGER NOT NULL,
                 end_line INTEGER NOT NULL,
                 severity TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'OPEN',
                 body TEXT NOT NULL,
                 author TEXT NOT NULL DEFAULT 'Reviewer',
                 code_snippet TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL DEFAULT '',
-                resolved INTEGER NOT NULL DEFAULT 0
+                resolved INTEGER NOT NULL DEFAULT 0,
+                resolution_notes TEXT NOT NULL DEFAULT ''
             );
 
             CREATE TABLE IF NOT EXISTS commit_updates (
@@ -114,13 +117,23 @@ class SQLiteReviewStore:
             CREATE INDEX IF NOT EXISTS idx_commit_updates_session ON commit_updates(session_uuid);
             """
         )
-        # Ensure uuid and commit_hash columns exist on preexisting comments table
+        # Ensure uuid, commit_hash, status, and resolution_notes columns exist on preexisting comments table
         cursor = conn.execute("PRAGMA table_info(comments)")
         cols = [row["name"] for row in cursor.fetchall()]
         if "uuid" not in cols:
             conn.execute("ALTER TABLE comments ADD COLUMN uuid TEXT")
         if "commit_hash" not in cols:
             conn.execute("ALTER TABLE comments ADD COLUMN commit_hash TEXT NOT NULL DEFAULT ''")
+        if "status" not in cols:
+            conn.execute("ALTER TABLE comments ADD COLUMN status TEXT NOT NULL DEFAULT 'OPEN'")
+            conn.execute("UPDATE comments SET status = 'RESOLVED' WHERE resolved = 1 AND status = 'OPEN'")
+        if "resolution_notes" not in cols:
+            conn.execute("ALTER TABLE comments ADD COLUMN resolution_notes TEXT NOT NULL DEFAULT ''")
+
+        conn.execute(
+            "UPDATE comments SET status = CASE WHEN resolved = 1 THEN 'RESOLVED' ELSE 'OPEN' END "
+            "WHERE status IS NULL OR status = ''"
+        )
 
         # Backfill missing UUIDs on comments
         null_uuid_rows = conn.execute("SELECT id FROM comments WHERE uuid IS NULL OR uuid = ''").fetchall()
@@ -129,6 +142,50 @@ class SQLiteReviewStore:
 
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_comments_uuid ON comments(uuid)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_comments_commit ON comments(commit_hash)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_comments_status ON comments(status)")
+
+    @staticmethod
+    def _row_to_comment(row: sqlite3.Row) -> CommentModel:
+        """Hydrate a CommentModel from a SQLite row."""
+        row_keys = row.keys()
+        sev_str = row["severity"]
+        try:
+            sev = ReviewSeverity(sev_str)
+        except ValueError:
+            sev = ReviewSeverity.MUST_FIX
+
+        is_resolved = bool(row["resolved"])
+        raw_status = row["status"] if ("status" in row_keys and row["status"]) else ""
+        try:
+            status = (
+                CommentStatus(raw_status)
+                if raw_status
+                else (CommentStatus.RESOLVED if is_resolved else CommentStatus.OPEN)
+            )
+        except ValueError:
+            status = CommentStatus.RESOLVED if is_resolved else CommentStatus.OPEN
+        if is_resolved and status == CommentStatus.OPEN:
+            status = CommentStatus.RESOLVED
+
+        c_uuid = row["uuid"] if ("uuid" in row_keys and row["uuid"]) else str(uuid_pkg.uuid4())
+        c_commit = row["commit_hash"] if ("commit_hash" in row_keys and row["commit_hash"]) else ""
+        notes = row["resolution_notes"] if ("resolution_notes" in row_keys and row["resolution_notes"]) else ""
+        return CommentModel(
+            id=row["id"],
+            uuid=c_uuid,
+            file_path=row["file_path"],
+            start_line=row["start_line"],
+            end_line=row["end_line"],
+            severity=sev,
+            status=status,
+            body=row["body"],
+            author=row["author"] or "Reviewer",
+            code_snippet=row["code_snippet"] or "",
+            created_at=row["created_at"] or "",
+            resolved=status in (CommentStatus.RESOLVED, CommentStatus.CLOSED),
+            resolution_notes=notes,
+            commit=c_commit,
+        )
 
     def load_session(self) -> Optional[ReviewSessionModel]:
         """Load full review session model from SQLite.
@@ -200,34 +257,10 @@ class SQLiteReviewStore:
 
             # Load comments
             comment_rows = conn.execute(
-                "SELECT id, uuid, commit_hash, file_path, start_line, end_line, severity, body, author, "
-                "code_snippet, created_at, resolved FROM comments ORDER BY created_at ASC"
+                "SELECT id, uuid, commit_hash, file_path, start_line, end_line, severity, status, body, author, "
+                "code_snippet, created_at, resolved, resolution_notes FROM comments ORDER BY created_at ASC"
             ).fetchall()
-            comments: List[CommentModel] = []
-            for row in comment_rows:
-                sev_str = row["severity"]
-                try:
-                    sev = ReviewSeverity(sev_str)
-                except ValueError:
-                    sev = ReviewSeverity.MUST_FIX
-
-                c_uuid = row["uuid"] if ("uuid" in row.keys() and row["uuid"]) else str(uuid_pkg.uuid4())
-                c_commit = row["commit_hash"] if ("commit_hash" in row.keys() and row["commit_hash"]) else ""
-                comment = CommentModel(
-                    id=row["id"],
-                    uuid=c_uuid,
-                    file_path=row["file_path"],
-                    start_line=row["start_line"],
-                    end_line=row["end_line"],
-                    severity=sev,
-                    body=row["body"],
-                    author=row["author"] or "Reviewer",
-                    code_snippet=row["code_snippet"] or "",
-                    created_at=row["created_at"] or "",
-                    resolved=bool(row["resolved"]),
-                    commit=c_commit,
-                )
-                comments.append(comment)
+            comments: List[CommentModel] = [self._row_to_comment(row) for row in comment_rows]
 
             return ReviewSessionModel(
                 title=title,
@@ -356,6 +389,14 @@ class SQLiteReviewStore:
         c_uuid = comment.uuid or str(uuid_pkg.uuid4())
         body_clean = elide_personal_info(comment.body)
         snippet_clean = elide_personal_info(comment.code_snippet)
+        notes_clean = elide_personal_info(comment.resolution_notes or "")
+        if comment.resolved and comment.status == CommentStatus.OPEN:
+            comment.status = CommentStatus.RESOLVED
+        elif not comment.resolved and comment.status in (CommentStatus.RESOLVED, CommentStatus.CLOSED):
+            comment.status = CommentStatus.OPEN
+        is_resolved = 1 if comment.status in (CommentStatus.RESOLVED, CommentStatus.CLOSED) else 0
+        comment.resolved = bool(is_resolved)
+
         existing = conn.execute(
             "SELECT id, uuid FROM comments WHERE uuid = ? OR id = ?",
             (c_uuid, comment.id),
@@ -381,11 +422,13 @@ class SQLiteReviewStore:
                     start_line = ?,
                     end_line = ?,
                     severity = ?,
+                    status = ?,
                     body = ?,
                     author = ?,
                     code_snippet = ?,
                     created_at = ?,
-                    resolved = ?
+                    resolved = ?,
+                    resolution_notes = ?
                 WHERE id = ?
                 """,
                 (
@@ -396,11 +439,13 @@ class SQLiteReviewStore:
                     comment.start_line,
                     comment.end_line,
                     comment.severity.value,
+                    comment.status.value,
                     body_clean,
                     comment.author,
                     snippet_clean,
                     comment.created_at,
-                    1 if comment.resolved else 0,
+                    is_resolved,
+                    notes_clean,
                     existing["id"],
                 ),
             )
@@ -408,9 +453,9 @@ class SQLiteReviewStore:
             conn.execute(
                 """
                 INSERT INTO comments (
-                    id, uuid, commit_hash, file_path, start_line, end_line, severity, body,
-                    author, code_snippet, created_at, resolved
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    id, uuid, commit_hash, file_path, start_line, end_line, severity, status, body,
+                    author, code_snippet, created_at, resolved, resolution_notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     comment.id,
@@ -420,11 +465,13 @@ class SQLiteReviewStore:
                     comment.start_line,
                     comment.end_line,
                     comment.severity.value,
+                    comment.status.value,
                     body_clean,
                     comment.author,
                     snippet_clean,
                     comment.created_at,
-                    1 if comment.resolved else 0,
+                    is_resolved,
+                    notes_clean,
                 ),
             )
 
@@ -612,31 +659,32 @@ class SQLiteReviewStore:
         """
         with self._get_connection() as conn:
             row = conn.execute(
-                "SELECT id, uuid, commit_hash, file_path, start_line, end_line, severity, body, author, "
-                "code_snippet, created_at, resolved FROM comments WHERE uuid = ?",
+                "SELECT id, uuid, commit_hash, file_path, start_line, end_line, severity, status, body, author, "
+                "code_snippet, created_at, resolved, resolution_notes FROM comments WHERE uuid = ?",
                 (comment_uuid,),
             ).fetchone()
             if not row:
                 return None
-            try:
-                sev = ReviewSeverity(row["severity"])
-            except ValueError:
-                sev = ReviewSeverity.MUST_FIX
-            c_commit = row["commit_hash"] if ("commit_hash" in row.keys() and row["commit_hash"]) else ""
-            return CommentModel(
-                id=row["id"],
-                uuid=row["uuid"] or comment_uuid,
-                file_path=row["file_path"],
-                start_line=row["start_line"],
-                end_line=row["end_line"],
-                severity=sev,
-                body=row["body"],
-                author=row["author"] or "Reviewer",
-                code_snippet=row["code_snippet"] or "",
-                created_at=row["created_at"] or "",
-                resolved=bool(row["resolved"]),
-                commit=c_commit,
-            )
+            return self._row_to_comment(row)
+
+    def get_comment_by_id(self, comment_id: str) -> Optional[CommentModel]:
+        """Find a comment by its short ID or UUID in SQLite.
+
+        Args:
+            comment_id: Comment short ID or UUID.
+
+        Returns:
+            CommentModel if found, else None.
+        """
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT id, uuid, commit_hash, file_path, start_line, end_line, severity, status, body, author, "
+                "code_snippet, created_at, resolved, resolution_notes FROM comments WHERE id = ? OR uuid = ?",
+                (comment_id, comment_id),
+            ).fetchone()
+            if not row:
+                return None
+            return self._row_to_comment(row)
 
     def update_comment_commit_hash(self, orig_commit: str, new_commit: str) -> int:
         """Update commit_hash for comments matching orig_commit to new_commit.

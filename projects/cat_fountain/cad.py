@@ -6,6 +6,7 @@ from pathlib import Path
 from build123d import *  # type: ignore
 from model import (
     DiagramOptions,
+    MetricsDict,
     TextArgs,
     ShapeType,
     BoundaryType,
@@ -1728,7 +1729,7 @@ class CatFountainCAD:
 
         self.room = room
 
-    def compute_flow_metrics(self) -> dict[str, Any]:
+    def compute_flow_metrics(self) -> MetricsDict:
         """Compute continuous flow and drainage metrics delegating to simulation hooks."""
         from .simulate_hooks import compute_flow_metrics
 

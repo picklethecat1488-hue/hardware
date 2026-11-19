@@ -14,6 +14,7 @@ import uuid as uuid_pkg
 
 from model.code_review import (
     CommentModel,
+    CommentStatus,
     FileReviewStatus,
     ReviewSessionModel,
     ReviewSeverity,
@@ -217,6 +218,11 @@ class MarkdownReviewExporter:
                     end = comment.end_line
                     line_range_str = f"L{start}" if start == end else f"L{start}-L{end}"
                     line_url = f"{abs_file_url}#{line_range_str}"
+                    eff_status = comment.status
+                    if comment.resolved and eff_status == CommentStatus.OPEN:
+                        eff_status = CommentStatus.RESOLVED
+                    elif not comment.resolved and eff_status in (CommentStatus.RESOLVED, CommentStatus.CLOSED):
+                        eff_status = CommentStatus.OPEN
 
                     lines.extend(
                         [
@@ -226,6 +232,8 @@ class MarkdownReviewExporter:
                     )
                     if comment.commit:
                         lines.append(f"<!-- comment-commit: {comment.commit} -->")
+                    if eff_status != CommentStatus.OPEN:
+                        lines.append(f"<!-- comment-status: {eff_status.value} -->")
                     lines.append("")
 
                     if comment.code_snippet.strip():
@@ -245,6 +253,13 @@ class MarkdownReviewExporter:
                             "",
                         ]
                     )
+                    if comment.resolution_notes.strip():
+                        lines.extend(
+                            [
+                                f"> **Resolution**: {self._format_file_references(comment.resolution_notes.strip())}",
+                                "",
+                            ]
+                        )
 
         # Action checklist
         lines.extend(
@@ -265,7 +280,12 @@ class MarkdownReviewExporter:
                 end = comment.end_line
                 line_range_str = f"L{start}" if start == end else f"L{start}-L{end}"
                 abs_file_url = f"file://{(self.repo_root / comment.file_path).resolve()}#{line_range_str}"
-                checked = "x" if comment.resolved else " "
+                eff_status = comment.status
+                if comment.resolved and eff_status == CommentStatus.OPEN:
+                    eff_status = CommentStatus.RESOLVED
+                elif not comment.resolved and eff_status in (CommentStatus.RESOLVED, CommentStatus.CLOSED):
+                    eff_status = CommentStatus.OPEN
+                checked = "x" if eff_status in (CommentStatus.RESOLVED, CommentStatus.CLOSED) else " "
                 summary_snippet = comment.body.splitlines()[0] if comment.body else "Review item"
                 summary_formatted = self._format_file_references(summary_snippet)
                 sev_tag = comment.severity.value.replace("_", " ")
@@ -399,8 +419,9 @@ class MarkdownReviewExporter:
                     checklist_data[uuid_str] = is_resolved
                 checklist_data[f"{fpath}:{s_line}-{e_line}"] = is_resolved
 
-        # Parse inline comment sections
-        comment_blocks = re.split(r"\n(?=####\s+\*\*\[)", content)
+        # Parse inline comment sections (strip trailing Action Items Checklist first so it never leaks into the final comment)
+        findings_content = content.split("\n## Action Items Checklist", 1)[0]
+        comment_blocks = re.split(r"\n(?=####\s+\*\*\[)", findings_content)
         for block in comment_blocks:
             block_clean = block.strip()
             if not block_clean.startswith("####"):
@@ -426,21 +447,54 @@ class MarkdownReviewExporter:
             commit_m = re.search(r"<!--\s*comment-commit:\s*([^\s>]+)\s*-->", block_clean)
             c_commit = commit_m.group(1).strip() if commit_m else ""
 
+            status_m = re.search(
+                r"<!--\s*comment-status:\s*(OPEN|RESOLVED|CLOSED)\s*-->",
+                block_clean,
+                re.IGNORECASE,
+            )
+            tag_status: Optional[CommentStatus] = None
+            if status_m:
+                try:
+                    tag_status = CommentStatus(status_m.group(1).strip().upper())
+                except ValueError:
+                    tag_status = None
+
             snippet_m = re.search(r"```[a-zA-Z0-9_-]*\n(.*?)\n```", block_clean, re.DOTALL)
             code_snippet = snippet_m.group(1).strip() if snippet_m else ""
 
-            body_m = re.search(r">\s+\*\*Reviewer\s*\((.*?)\)\*\*:\s*(.*?)$", block_clean, re.MULTILINE | re.DOTALL)
+            resolution_notes = ""
+            res_m = re.search(r"(?:\n|^)>\s+\*\*Resolution\*\*:\s*(.*?)$", block_clean, re.DOTALL)
+            if res_m:
+                resolution_notes = re.sub(r"\[`(@[^`]+)`\]\([^)]+\)", r"\1", res_m.group(1).strip())
+                block_for_body = block_clean[: res_m.start()].strip()
+            else:
+                block_for_body = block_clean
+
+            body_m = re.search(
+                r">\s+\*\*Reviewer\s*\((.*?)\)\*\*:\s*(.*?)$",
+                block_for_body,
+                re.MULTILINE | re.DOTALL,
+            )
             author = "Reviewer"
             body = ""
             if body_m:
                 author = body_m.group(1).strip()
                 body = body_m.group(2).strip()
             else:
-                body_lines = [l.lstrip("> ").strip() for l in block_clean.splitlines() if l.startswith(">")]
+                body_lines = [l.lstrip("> ").strip() for l in block_for_body.splitlines() if l.startswith(">")]
                 body = "\n".join(body_lines).strip()
 
             body = re.sub(r"\[`(@[^`]+)`\]\([^)]+\)", r"\1", body)
-            resolved = checklist_data.get(c_uuid, checklist_data.get(f"{fpath}:{start_line}-{end_line}", False))
+            chk_resolved: Optional[bool] = checklist_data.get(
+                c_uuid,
+                checklist_data.get(f"{fpath}:{start_line}-{end_line}", None),
+            )
+            if chk_resolved is False:
+                status = CommentStatus.OPEN
+            elif chk_resolved is True:
+                status = CommentStatus.CLOSED if tag_status == CommentStatus.CLOSED else CommentStatus.RESOLVED
+            else:
+                status = tag_status or CommentStatus.OPEN
 
             comment = CommentModel(
                 id=c_uuid[:8],
@@ -449,11 +503,13 @@ class MarkdownReviewExporter:
                 start_line=start_line,
                 end_line=end_line,
                 severity=sev,
+                status=status,
                 body=body,
                 author=author,
                 code_snippet=code_snippet,
                 created_at=datetime.now(timezone.utc).isoformat(),
-                resolved=resolved,
+                resolved=status in (CommentStatus.RESOLVED, CommentStatus.CLOSED),
+                resolution_notes=resolution_notes,
                 commit=c_commit,
             )
             session.comments.append(comment)
@@ -488,21 +544,25 @@ class MarkdownReviewExporter:
             if parsed_session.created_at:
                 session.created_at = parsed_session.created_at
             existing_by_uuid = {c.uuid: c for c in session.comments if c.uuid}
-            existing_by_loc = {(c.file_path, c.start_line, c.end_line): c for c in session.comments}
+            existing_by_loc = {(c.commit or "", c.file_path, c.start_line, c.end_line): c for c in session.comments}
+            status_rank = {CommentStatus.OPEN: 0, CommentStatus.RESOLVED: 1, CommentStatus.CLOSED: 2}
 
             for pc in parsed_session.comments:
                 if not pc.commit and commit_from_filename:
                     pc.commit = commit_from_filename
 
+                loc_key = (pc.commit or "", pc.file_path, pc.start_line, pc.end_line)
                 match_c = None
                 if pc.uuid and pc.uuid in existing_by_uuid:
                     match_c = existing_by_uuid[pc.uuid]
-                elif (pc.file_path, pc.start_line, pc.end_line) in existing_by_loc:
-                    match_c = existing_by_loc[(pc.file_path, pc.start_line, pc.end_line)]
+                elif loc_key in existing_by_loc:
+                    match_c = existing_by_loc[loc_key]
 
                 if match_c:
-                    if pc.resolved:
-                        match_c.resolved = True
+                    if status_rank[pc.status] > status_rank[match_c.status]:
+                        match_c.set_status(pc.status, pc.resolution_notes or None)
+                    elif pc.resolution_notes and not match_c.resolution_notes:
+                        match_c.resolution_notes = pc.resolution_notes
                     if pc.body and pc.body != match_c.body:
                         match_c.body = pc.body
                     if pc.commit and match_c.commit != pc.commit:
@@ -511,7 +571,7 @@ class MarkdownReviewExporter:
                     session.comments.append(pc)
                     if pc.uuid:
                         existing_by_uuid[pc.uuid] = pc
-                    existing_by_loc[(pc.file_path, pc.start_line, pc.end_line)] = pc
+                    existing_by_loc[loc_key] = pc
         except Exception:
             pass
         return session
@@ -588,3 +648,24 @@ class MarkdownReviewExporter:
         md_text = elide_personal_info(self.render_markdown(commit_session, total_repo_files=total_repo_files))
         target_path.write_text(md_text, encoding="utf-8")
         return target_path
+
+
+def comment_matches_revisions(comment: CommentModel, revisions: List[str]) -> bool:
+    """Return True when `comment` belongs to any revision in `revisions`."""
+    if not revisions:
+        return True
+    c_commit = (comment.commit or "").strip()
+    for rev in revisions:
+        clean_rev = (rev or "").strip()
+        if not clean_rev:
+            continue
+        if not c_commit:
+            if clean_rev == "working":
+                return True
+            continue
+        if c_commit == clean_rev:
+            return True
+        if c_commit != "working" and clean_rev != "working":
+            if c_commit.startswith(clean_rev) or clean_rev.startswith(c_commit):
+                return True
+    return False

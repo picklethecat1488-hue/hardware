@@ -21,6 +21,7 @@ import jinja2
 
 from model.code_review import (
     CommentModel,
+    CommentStatus,
     FileReviewStatus,
     ReviewSessionModel,
     ReviewSeverity,
@@ -31,9 +32,9 @@ from provider.vcs.git_engine import (
     extract_line_snippet,
     get_git_root,
 )
-from provider.code_review.markdown_exporter import MarkdownReviewExporter
+from provider.code_review.markdown_exporter import MarkdownReviewExporter, comment_matches_revisions
 from provider.code_review.sqlite_store import SQLiteReviewStore
-from provider.sanitizer import get_author_blacklist
+from provider.sanitizer import elide_personal_info, get_author_blacklist
 
 
 class ReviewRequestHandler(BaseHTTPRequestHandler):
@@ -133,6 +134,8 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
                     self._handle_add_comment(data)
             case "/api/comment/edit":
                 self._handle_edit_comment(data)
+            case "/api/comment/status" | "/api/review/comment/status":
+                self._handle_update_comment_status(data)
             case "/api/file_status":
                 self._handle_update_file_status(data)
             case "/api/verdict":
@@ -260,9 +263,9 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
         )
 
     def _handle_edit_comment(self, data: dict) -> None:
-        """Edit body and optional severity of an existing comment."""
+        """Edit body and optional severity or status of an existing comment."""
         cid = data.get("id", "").strip()
-        new_body = data.get("body", "").strip()
+        new_body = elide_personal_info(data.get("body", "").strip())
         if not cid or not new_body:
             self._send_json({"error": "Missing id or body"}, status=400)
             return
@@ -279,11 +282,44 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
                             comment.severity = ReviewSeverity.PROPOSAL
                         case "NIT":
                             comment.severity = ReviewSeverity.NIT
+                if "status" in data:
+                    try:
+                        comment.set_status(CommentStatus(str(data["status"]).strip().upper()))
+                    except ValueError:
+                        pass
+                elif "resolved" in data:
+                    comment.set_status(CommentStatus.RESOLVED if data["resolved"] else CommentStatus.OPEN)
                 self.server.save_and_sync()
                 self._send_json({"status": "ok", "comment": comment.model_dump(mode="json")})
                 return
 
         self._send_json({"error": f"Comment {cid} not found"}, status=404)
+
+    def _handle_update_comment_status(self, data: dict) -> None:
+        """Transition a review comment between OPEN, RESOLVED, and CLOSED states."""
+        cid = str(data.get("id", "")).strip()
+        status_raw = str(data.get("status", "")).strip().upper()
+        notes = data.get("notes")
+        if not cid or not status_raw:
+            self._send_json({"error": "Missing id or status parameter"}, status=400)
+            return
+        try:
+            target_status = CommentStatus(status_raw)
+        except ValueError:
+            self._send_json({"error": f"Invalid comment status: {status_raw}"}, status=400)
+            return
+
+        updated = self.server.update_comment_status(cid, target_status, notes=notes)
+        if updated is None:
+            self._send_json({"error": f"Comment {cid} not found"}, status=404)
+            return
+        self._send_json(
+            {
+                "status": "ok",
+                "comment": updated.model_dump(mode="json"),
+                "verdict": self.server.session.verdict.value,
+            }
+        )
 
     def _handle_update_file_status(self, data: dict) -> None:
         """Update reviewed status and optional notes for a file."""
@@ -464,12 +500,21 @@ class ReviewServer(ThreadingHTTPServer):
 
         # Requirement 7: Auto merge CR feedback if CR files exist in feedback_dir
         if self.feedback_dir.exists():
+            all_session = self.session.model_copy(deep=True)
             for cr_file in sorted(self.feedback_dir.glob("CR_*.md")):
-                self.session = self.exporter.merge_commit_feedback(self.session, cr_file)
+                all_session = self.exporter.merge_commit_feedback(all_session, cr_file)
             if (self.feedback_dir / "CR.md").exists():
-                self.session = self.exporter.merge_commit_feedback(self.session, self.feedback_dir / "CR.md")
-            if self.session.comments:
-                self.sqlite_store.save_session(self.session)
+                all_session = self.exporter.merge_commit_feedback(all_session, self.feedback_dir / "CR.md")
+            for c in all_session.comments:
+                self.sqlite_store.save_comment(c)
+            if resolved_revisions:
+                self.session.comments = [
+                    c for c in all_session.comments if comment_matches_revisions(c, resolved_revisions)
+                ]
+            else:
+                self.session.title = all_session.title
+                self.session.created_at = all_session.created_at
+                self.session.comments = list(all_session.comments)
 
         # Attempt port binding if bind_and_activate is enabled
         self.host = host
@@ -546,16 +591,94 @@ class ReviewServer(ThreadingHTTPServer):
             return False
 
     def sync_feedback(self) -> dict:
-        """Scan feedback/ directory for CR_*.md files and merge feedback into SQLite."""
+        """Scan feedback/ directory for CR_*.md files and merge feedback into SQLite without cross-commit leakage."""
         merged_count = 0
+        loaded_all = self.sqlite_store.load_session() if self.sqlite_store else None
+        all_session = loaded_all if loaded_all is not None else self.session.model_copy(deep=True)
+
+        existing_by_id = {c.id: c for c in all_session.comments}
+        for c in self.session.comments:
+            existing_by_id[c.id] = c
+        all_session.comments = list(existing_by_id.values())
+
         if self.feedback_dir.exists():
             for cr_file in sorted(self.feedback_dir.glob("CR_*.md")):
-                self.session = self.exporter.merge_commit_feedback(self.session, cr_file)
+                all_session = self.exporter.merge_commit_feedback(all_session, cr_file)
                 merged_count += 1
             if (self.feedback_dir / "CR.md").exists():
-                self.session = self.exporter.merge_commit_feedback(self.session, self.feedback_dir / "CR.md")
+                all_session = self.exporter.merge_commit_feedback(all_session, self.feedback_dir / "CR.md")
+
+        if self.sqlite_store:
+            for c in all_session.comments:
+                self.sqlite_store.save_comment(c)
+
+        if self.session.revisions:
+            self.session.comments = [
+                c for c in all_session.comments if comment_matches_revisions(c, self.session.revisions)
+            ]
+        else:
+            self.session.title = all_session.title
+            self.session.created_at = all_session.created_at
+            self.session.comments = list(all_session.comments)
+
         self.save_and_sync()
-        return {"status": "ok", "merged_files": merged_count, "total_comments": len(self.session.comments)}
+        return {"status": "ok", "merged_files": merged_count, "total_comments": len(all_session.comments)}
+
+    def update_comment_status(
+        self,
+        comment_id: str,
+        new_status: CommentStatus,
+        notes: Optional[str] = None,
+    ) -> Optional[CommentModel]:
+        """Transition a review comment's status in session and SQLite, then sync Markdown reports.
+
+        Args:
+            comment_id: Short ID or UUID of the target comment.
+            new_status: Target CommentStatus (OPEN, RESOLVED, or CLOSED).
+            notes: Optional resolution or acceptance/reopen note.
+
+        Returns:
+            Updated CommentModel if found, otherwise None.
+        """
+        with self._lock:
+            clean_notes = elide_personal_info(notes.strip()) if isinstance(notes, str) else None
+            target_comment: Optional[CommentModel] = None
+            for comment in self.session.comments:
+                if comment.id == comment_id or comment.uuid == comment_id:
+                    target_comment = comment
+                    break
+
+            in_active_session = target_comment is not None
+            if target_comment is None and self.sqlite_store:
+                target_comment = self.sqlite_store.get_comment_by_id(comment_id)
+
+            if target_comment is None:
+                return None
+
+            target_comment.set_status(new_status, notes=clean_notes)
+            if new_status == CommentStatus.OPEN:
+                self.session.auto_update_status_on_comment()
+
+            if self.sqlite_store:
+                self.sqlite_store.save_comment(target_comment)
+
+            self.save_and_sync()
+
+            if not in_active_session and target_comment.commit and self.sqlite_store:
+                all_session = self.sqlite_store.load_session()
+                if all_session is not None:
+                    try:
+                        commit_files = len(self.git_engine.get_changed_files(target_comment.commit))
+                        self.exporter.export_commit_markdown(
+                            all_session,
+                            target_comment.commit,
+                            self.feedback_dir,
+                            total_repo_files=commit_files,
+                        )
+                    except OSError:
+                        pass
+
+            return target_comment
 
     def update_commit_hash(self, orig_commit: str, new_commit: str) -> None:
         """Update review session and comments from orig_commit to new_commit.

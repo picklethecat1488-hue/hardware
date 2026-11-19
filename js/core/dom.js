@@ -147,8 +147,16 @@ export function bindDelegatedEvent(container, eventType, selector, handler) {
     return () => {};
   }
   const listener = (event) => {
-    const target = event.target;
-    if (!target || typeof target.closest !== "function") {
+    const rawTarget = event.target;
+    const target =
+      rawTarget && typeof rawTarget.closest === "function"
+        ? rawTarget
+        : rawTarget &&
+            rawTarget.parentElement &&
+            typeof rawTarget.parentElement.closest === "function"
+          ? rawTarget.parentElement
+          : null;
+    if (!target) {
       return;
     }
     const matched = target.closest(selector);

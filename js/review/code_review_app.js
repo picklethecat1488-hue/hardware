@@ -27,9 +27,12 @@ import {
   createInlineCommentCard,
   deleteReviewComment,
   editReviewComment,
+  isCommentVisible,
   postReviewComment,
+  updateReviewCommentStatus,
 } from "./comment_threads.js";
 import {
+  commentMatchesCommit,
   getFileChanges,
   isLfsFile,
   renderCommitsList,
@@ -442,6 +445,27 @@ export function initCodeReviewApp(ctx = getRuntimeContext()) {
     }
   };
 
+  const handleCommentStatusChange = async (commentId, targetStatus, notes = "") => {
+    try {
+      const data = await updateReviewCommentStatus(ctx, commentId, targetStatus, notes);
+      if (data && data.status === "ok") {
+        logCli(ctx, `> Comment [${commentId}] status -> [${targetStatus}]`, "green");
+        await loadSession();
+        renderCurrentDiff();
+        refreshFilesUI();
+        showToast(ctx, `Comment ${commentId} -> ${targetStatus}`, "success");
+      } else {
+        logCli(
+          ctx,
+          `Error updating comment status: ${(data && data.error) || "Unknown error"}`,
+          "red",
+        );
+      }
+    } catch (err) {
+      logCli(ctx, `Network error updating comment status: ${err.message}`, "red");
+    }
+  };
+
   const renderCurrentDiff = () => {
     if (!state.currentDiff) {
       return;
@@ -451,8 +475,13 @@ export function initCodeReviewApp(ctx = getRuntimeContext()) {
       file_path: state.selectedFile || state.currentDiff.file_path || "",
       commit: state.selectedCommit || "working",
     };
+    const showClosedCb = resolveElement(ctx, "showClosedCommentsCb");
+    const showClosed = showClosedCb ? Boolean(showClosedCb.checked) : false;
     const fileComments = ((state.session && state.session.comments) || []).filter(
-      (c) => c.file_path === state.selectedFile,
+      (c) =>
+        c.file_path === state.selectedFile &&
+        commentMatchesCommit(c, state.selectedCommit) &&
+        isCommentVisible(c, showClosed),
     );
     const activeRange =
       state.selectedRange && state.selectedRange.start
@@ -471,6 +500,7 @@ export function initCodeReviewApp(ctx = getRuntimeContext()) {
         createInlineCommentCard(ctx, comment, {
           language: state.activeLanguage,
           authorBlacklist: config.authorBlacklist || [],
+          onStatusChange: (cid, nextStatus) => handleCommentStatusChange(cid, nextStatus),
           onEdit: editCommentViaCli,
           onDelete: handleDeleteComment,
           onGotoRef: (fileRef, lineRef) => goto(fileRef, lineRef),
@@ -1145,7 +1175,9 @@ export function initCodeReviewApp(ctx = getRuntimeContext()) {
           Object.entries(session.files || {}).map(([p, f]) => [p, f.status, f.notes]),
           (session.comments || []).map((c) => [
             c.id,
+            c.status,
             c.resolved,
+            c.resolution_notes,
             c.body,
             c.severity,
             c.commit_hash,
@@ -1213,6 +1245,7 @@ export function initCodeReviewApp(ctx = getRuntimeContext()) {
     goto,
     postComment: handlePostComment,
     editComment: handleEditComment,
+    updateCommentStatus: handleCommentStatusChange,
     setFileStatus: handleSetFileStatus,
     navigateChange,
     navigateCommit,
@@ -1235,6 +1268,14 @@ export function initCodeReviewApp(ctx = getRuntimeContext()) {
   const hideAttachmentsCb = resolveElement(ctx, "hideAttachmentsCb");
   if (hideAttachmentsCb) {
     hideAttachmentsCb.addEventListener("change", refreshFilesUI);
+  }
+  const showClosedCommentsCb = resolveElement(ctx, "showClosedCommentsCb");
+  if (showClosedCommentsCb) {
+    showClosedCommentsCb.addEventListener("change", () => {
+      updateSessionMetricsUI(ctx, state, config);
+      refreshFilesUI();
+      renderCurrentDiff();
+    });
   }
 
   const codeSearchInput = resolveElement(ctx, "codeSearchInput");

@@ -35,7 +35,7 @@ from model.bug_report import (
     ReviewTaskModel,
     ReviewTaskStatus,
 )
-from model.code_review import CommentModel, ReviewSessionModel, ReviewSeverity, ReviewStatus
+from model.code_review import CommentModel, CommentStatus, ReviewSessionModel, ReviewSeverity, ReviewStatus
 from model.vcs import (
     BranchInfoModel,
     CommitBugTagModel,
@@ -515,6 +515,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     self._handle_add_comment(data)
             case "/api/comment/edit":
                 self._handle_edit_comment(data)
+            case "/api/comment/status" | "/api/review/comment/status":
+                self._handle_update_comment_status(data)
             case "/api/file_status":
                 self._handle_update_file_status(data)
             case "/api/verdict":
@@ -791,8 +793,13 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                             comment.severity = ReviewSeverity.PROPOSAL
                         case "NIT":
                             comment.severity = ReviewSeverity.NIT
-                if "resolved" in data:
-                    comment.resolved = bool(data["resolved"])
+                if "status" in data:
+                    try:
+                        comment.set_status(CommentStatus(str(data["status"]).strip().upper()))
+                    except ValueError:
+                        pass
+                elif "resolved" in data:
+                    comment.set_status(CommentStatus.RESOLVED if data["resolved"] else CommentStatus.OPEN)
                 self.server.review_server.session.auto_update_status_on_comment()
                 self.server.review_server.save_and_sync()
                 resp = comment.model_dump(mode="json")
@@ -801,6 +808,48 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(resp)
                 return
         self._send_json({"status": "error", "error": "Comment not found", "message": "Comment not found"}, status=404)
+
+    def _handle_update_comment_status(self, data: Dict[str, Any]) -> None:
+        """Transition a review comment between OPEN, RESOLVED, and CLOSED states."""
+        cid = str(data.get("id", "")).strip()
+        status_raw = str(data.get("status", "")).strip().upper()
+        notes = data.get("notes")
+        if not cid or not status_raw:
+            self._send_json(
+                {
+                    "status": "error",
+                    "error": "Missing id or status parameter",
+                    "message": "Missing id or status parameter",
+                },
+                status=400,
+            )
+            return
+        try:
+            target_status = CommentStatus(status_raw)
+        except ValueError:
+            self._send_json(
+                {
+                    "status": "error",
+                    "error": f"Invalid comment status: {status_raw}",
+                    "message": f"Invalid comment status: {status_raw}",
+                },
+                status=400,
+            )
+            return
+
+        updated = self.server.review_server.update_comment_status(cid, target_status, notes=notes)
+        if updated is None:
+            self._send_json(
+                {"status": "error", "error": "Comment not found", "message": "Comment not found"}, status=404
+            )
+            return
+        self._send_json(
+            {
+                "status": "ok",
+                "comment": updated.model_dump(mode="json"),
+                "verdict": self.server.review_server.session.verdict.value,
+            }
+        )
 
     def _handle_update_file_status(self, data: Dict[str, Any]) -> None:
         """Update review status of a file."""
@@ -1595,6 +1644,8 @@ class DashboardServer(ThreadingHTTPServer):
             return self.review_server.session
 
         commit_hash = resolved[0]
+        from provider.code_review.markdown_exporter import comment_matches_revisions
+
         if (
             self.review_server.session
             and self.review_server.session.commit_hash == commit_hash
@@ -1602,6 +1653,9 @@ class DashboardServer(ThreadingHTTPServer):
         ):
             self.review_server.session.repo_root = str(self.repo_root)
             self.review_server.session.author_blacklist = blacklist
+            self.review_server.session.comments = [
+                c for c in self.review_server.session.comments if comment_matches_revisions(c, resolved)
+            ]
             return self.review_server.session
 
         session = ReviewSessionModel(
@@ -1616,44 +1670,29 @@ class DashboardServer(ThreadingHTTPServer):
         )
 
         if self.review_server.feedback_dir.exists():
-            cr_commit_path = self.review_server.feedback_dir / f"CR_{commit_hash}.md"
-            if cr_commit_path.exists():
-                session = self.review_server.exporter.merge_commit_feedback(session, cr_commit_path)
-            elif (self.review_server.feedback_dir / "CR.md").exists():
-                session = self.review_server.exporter.merge_commit_feedback(
-                    session, self.review_server.feedback_dir / "CR.md"
-                )
+            for rev in resolved:
+                cr_commit_path = self.review_server.feedback_dir / f"CR_{rev}.md"
+                if cr_commit_path.exists():
+                    session = self.review_server.exporter.merge_commit_feedback(session, cr_commit_path)
 
         if self.review_server.sqlite_store:
             try:
+                placeholders = ",".join("?" for _ in resolved)
+                empty_clause = " OR commit_hash = ''" if "working" in resolved else ""
                 with self.review_server.sqlite_store._get_connection() as conn:
                     comment_rows = conn.execute(
-                        "SELECT id, uuid, commit_hash, file_path, start_line, end_line, severity, body, author, code_snippet, created_at, resolved "
-                        "FROM comments WHERE commit_hash = ? OR commit_hash = '' ORDER BY file_path, start_line",
-                        (commit_hash,),
+                        "SELECT id, uuid, commit_hash, file_path, start_line, end_line, severity, status, body, author, code_snippet, created_at, resolved, resolution_notes "
+                        f"FROM comments WHERE commit_hash IN ({placeholders}){empty_clause} ORDER BY file_path, start_line",
+                        tuple(resolved),
                     ).fetchall()
                     existing_ids = {c.id for c in session.comments}
                     for row in comment_rows:
                         if row["id"] not in existing_ids:
-                            session.comments.append(
-                                CommentModel(
-                                    id=row["id"],
-                                    uuid=row["uuid"] or row["id"],
-                                    commit=row["commit_hash"] or "",
-                                    file_path=row["file_path"],
-                                    start_line=row["start_line"],
-                                    end_line=row["end_line"],
-                                    severity=ReviewSeverity(row["severity"]),
-                                    body=row["body"],
-                                    author=row["author"],
-                                    code_snippet=row["code_snippet"],
-                                    created_at=row["created_at"],
-                                    resolved=bool(row["resolved"]),
-                                )
-                            )
+                            session.comments.append(self.review_server.sqlite_store._row_to_comment(row))
             except Exception:
                 pass
 
+        session.comments = [c for c in session.comments if comment_matches_revisions(c, resolved)]
         self.review_server.session = session
         return session
 

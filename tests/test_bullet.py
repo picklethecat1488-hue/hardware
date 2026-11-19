@@ -352,3 +352,85 @@ def test_bullet_state_tracker_raw_continuous_particles():
         assert tracker.raw_particle_positions is None
     finally:
         p.disconnect(physicsClientId=client_id)
+
+
+def test_bullet_step_result_metrics_and_termination(tmp_path):
+    """Verify Bullet.run forwards SimulationStepResult metrics to Room._log_rerun and halts on termination_condition."""
+    from model.simulation import SimulationStepResult
+    from provider.room import Room
+    from provider.types import Simulate
+
+    room = Room()
+    dummy_urdf = tmp_path / "test.urdf"
+    dummy_urdf.write_text('<robot name="test"></robot>')
+
+    def step_fn(body_id: int, client: int, step_idx: int, name: str) -> SimulationStepResult:
+        if step_idx < 2:
+            return SimulationStepResult(metrics={"flow_spout": step_idx + 1})
+        return SimulationStepResult(termination_condition="Target volume reached")
+
+    mock_logger = MagicMock()
+    bullet = Bullet(
+        room=room,
+        provider_hooks={Simulate.STEP: step_fn},
+        proj_name="test_proj",
+        sim_target="default",
+        steps=10,
+        manager=MagicMock(),
+        logger=mock_logger,
+        build_dir=str(tmp_path),
+        save_rrd=str(tmp_path / "test.rrd"),
+        spawn_viewer=False,
+    )
+
+    real_client = p.connect(p.DIRECT)
+    try:
+        col = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.1, 0.1, 0.01], physicsClientId=real_client)
+        real_body_id = p.createMultiBody(baseCollisionShapeIndex=col, physicsClientId=real_client)
+        with (
+            patch("list.Lister.get_urdf_output", return_value="test.urdf"),
+            patch.object(Bullet, "_copy_project_assets"),
+            patch("pybullet.connect", return_value=real_client),
+            patch("pybullet.disconnect"),
+            patch("pybullet.loadURDF", return_value=real_body_id),
+            patch("pybullet.stepSimulation") as mock_step_sim,
+            patch.object(Bullet, "_init_simulation_objects", return_value={"base": -1}),
+            patch.object(Bullet, "_init_rerun"),
+            patch("rerun.save"),
+            patch.object(Room, "_log_rerun") as mock_log_rerun,
+        ):
+            bullet.run()
+
+            # Steps 0 and 1 emit metrics and step physics; step 2 terminates early without stepping physics
+            assert mock_log_rerun.call_count == 3
+            assert mock_step_sim.call_count == 2
+            logged_metrics = [call.kwargs.get("metrics") for call in mock_log_rerun.call_args_list]
+            assert logged_metrics == [{"flow_spout": 1}, {"flow_spout": 2}, None]
+            mock_logger.print.assert_any_call("Simulation terminated: Target volume reached", symbol="🛑")
+
+        # Sad case: returning a raw legacy string instead of SimulationStepResult raises TypeError
+        bad_bullet = Bullet(
+            room=room,
+            provider_hooks={Simulate.STEP: lambda b, c, s, n: "legacy_string"},  # type: ignore[dict-item]
+            proj_name="test_proj",
+            sim_target="default",
+            steps=3,
+            manager=MagicMock(),
+            logger=MagicMock(),
+            build_dir=str(tmp_path),
+            spawn_viewer=False,
+        )
+        with (
+            patch("list.Lister.get_urdf_output", return_value="test.urdf"),
+            patch.object(Bullet, "_copy_project_assets"),
+            patch("pybullet.connect", return_value=real_client),
+            patch("pybullet.disconnect"),
+            patch("pybullet.loadURDF", return_value=real_body_id),
+            patch.object(Bullet, "_init_simulation_objects", return_value={"base": -1}),
+        ):
+            import pytest
+
+            with pytest.raises(TypeError, match="Simulate.STEP hook must return SimulationStepResult"):
+                bad_bullet.run()
+    finally:
+        p.disconnect(physicsClientId=real_client)
