@@ -122,6 +122,14 @@ describe("Shared Core Modules (Sanitize, ANSI, Fuzzy, UI Scale, Progress, DOM)",
     list.children[0].children[0].click();
     assert.deepEqual(clickedIds, ["pad-42"]);
 
+    // WebKit / WKWebView Text-node click target (nodeType === 3, no .closest() method)
+    list.dispatchEvent({
+      type: "click",
+      bubbles: true,
+      target: { nodeType: 3, parentElement: list.children[0] },
+    });
+    assert.deepEqual(clickedIds, ["pad-42", "pad-42"]);
+
     const pane = createEl(ctx, "div", { id: "left-pane" });
     pane.setBoundingClientRect({ left: 0, top: 0, width: 240, height: 600 });
     const handle = createEl(ctx, "div", { id: "left-resizer" });
