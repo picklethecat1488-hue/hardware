@@ -140,6 +140,9 @@ export async function executeParsedCliCommand(ctx, rawCmd, state, handlers) {
       logCli(ctx, "  reviewed / done / todo       : Toggle reviewed status on current file", "cyan");
       logCli(ctx, "  sel / line <start> [end]     : Select line range in active file", "cyan");
       logCli(ctx, "  edit <id> <text>             : Edit existing comment body", "cyan");
+      logCli(ctx, "  resolve <id> [notes]         : Mark comment as RESOLVED", "cyan");
+      logCli(ctx, "  close / accept <id> [notes]  : Verify and CLOSE resolved comment", "cyan");
+      logCli(ctx, "  reopen <id> [notes]          : Reopen comment to OPEN", "cyan");
       logCli(ctx, "  approve / lgtm               : Conclude review with APPROVAL and export CR.md", "cyan");
       logCli(ctx, "  reject / changes             : Conclude review with CHANGES REQUESTED and export CR.md", "cyan");
       logCli(ctx, "  clear                        : Clear CLI screen log or selection", "cyan");
@@ -214,6 +217,46 @@ export async function executeParsedCliCommand(ctx, rawCmd, state, handlers) {
         return;
       }
       await handlers.editComment(commentId, newBody);
+      break;
+    }
+
+    case "resolve": {
+      const commentId = parts[1];
+      const notes = parts.slice(2).join(" ").trim();
+      if (!commentId) {
+        logCli(ctx, "Usage: resolve <comment_id> [notes]", "red");
+        return;
+      }
+      if (typeof handlers.updateCommentStatus === "function") {
+        await handlers.updateCommentStatus(commentId, "RESOLVED", notes);
+      }
+      break;
+    }
+
+    case "close":
+    case "accept": {
+      const commentId = parts[1];
+      const notes = parts.slice(2).join(" ").trim();
+      if (!commentId) {
+        logCli(ctx, "Usage: close <comment_id> [notes]", "red");
+        return;
+      }
+      if (typeof handlers.updateCommentStatus === "function") {
+        await handlers.updateCommentStatus(commentId, "CLOSED", notes);
+      }
+      break;
+    }
+
+    case "reopen": {
+      const commentId = parts[1];
+      const notes = parts.slice(2).join(" ").trim();
+      if (!commentId) {
+        logCli(ctx, "Usage: reopen <comment_id> [notes]", "red");
+        return;
+      }
+      if (typeof handlers.updateCommentStatus === "function") {
+        await handlers.updateCommentStatus(commentId, "OPEN", notes);
+      }
       break;
     }
 

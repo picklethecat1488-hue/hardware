@@ -449,12 +449,22 @@ def test_scan_and_sync_incremental_mtime_caching(tmp_path: Path) -> None:
     subprocess.run(["git", "add", "README.md"], cwd=repo_dir, check=True)
     subprocess.run(["git", "commit", "-m", "init"], cwd=repo_dir, check=True, capture_output=True)
     wt_dir = repo_dir / "feedback"
-    subprocess.run(
-        ["git", "worktree", "add", "--orphan", "-b", "bugs", str(wt_dir)],
+    empty_tree = subprocess.run(
+        ["git", "hash-object", "-t", "tree", "/dev/null"],
         cwd=repo_dir,
         check=True,
         capture_output=True,
-    )
+        text=True,
+    ).stdout.strip()
+    orphan_sha = subprocess.run(
+        ["git", "commit-tree", empty_tree, "-m", "init bugs"],
+        cwd=repo_dir,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    subprocess.run(["git", "branch", "bugs", orphan_sha], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "worktree", "add", str(wt_dir), "bugs"], cwd=repo_dir, check=True, capture_output=True)
 
     wt_store = SQLiteBugStore(repo_dir / "build" / "bugs.sqlite")
     cross_worm = BugReportModel(
@@ -573,12 +583,22 @@ def test_detached_branch_refuses_to_commit_to_production_worktree_in_tests(
     subprocess.run(["git", "add", "README.md"], cwd=sim_ws, check=True)
     subprocess.run(["git", "commit", "-m", "init"], cwd=sim_ws, check=True, capture_output=True)
     sim_fb = sim_ws / "feedback"
-    subprocess.run(
-        ["git", "worktree", "add", "--orphan", "-b", "bugs", str(sim_fb)],
+    sim_empty_tree = subprocess.run(
+        ["git", "hash-object", "-t", "tree", "/dev/null"],
         cwd=sim_ws,
         check=True,
         capture_output=True,
-    )
+        text=True,
+    ).stdout.strip()
+    sim_orphan_sha = subprocess.run(
+        ["git", "commit-tree", sim_empty_tree, "-m", "init bugs"],
+        cwd=sim_ws,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    subprocess.run(["git", "branch", "bugs", sim_orphan_sha], cwd=sim_ws, check=True, capture_output=True)
+    subprocess.run(["git", "worktree", "add", str(sim_fb), "bugs"], cwd=sim_ws, check=True, capture_output=True)
     assert (sim_fb / ".git").is_file()
 
     monkeypatch.setattr(git_engine, "get_git_root", lambda: sim_ws)

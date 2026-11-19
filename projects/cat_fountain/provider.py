@@ -18,6 +18,7 @@ from provider import (
     discover_provider,
     Room,
     Simulate,
+    SimulateHooks,
     URDFBoundary,
     URDFMetadata,
     URDFShape,
@@ -201,7 +202,7 @@ class CatFountainProvider(CatFountainCAD, Provider):
         """Build the revised wet-side pump cover that slides down the tube and mounts directly over the tube and casing."""
         return self._build_pump_cover_impl(target.split("/")[-1])
 
-    def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
+    def get_simulate_hooks_impl(self, sim_name: str) -> SimulateHooks:
         """Return the simulation hooks for the cat fountain."""
         from .simulate_hooks import get_simulate_hooks_impl as impl
 

@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, List, Optional
 import uuid as uuid_pkg
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ReviewSeverity(str, Enum):
@@ -17,6 +17,14 @@ class ReviewSeverity(str, Enum):
     MUST_FIX = "MUST_FIX"  # Blocker / Critical defect that must be fixed
     PROPOSAL = "PROPOSAL"  # Architecture suggestion or conceptual enhancement
     NIT = "NIT"  # Trivial formatting, naming, or cosmetic cleanup
+
+
+class CommentStatus(str, Enum):
+    """Lifecycle resolution state for individual code review comments."""
+
+    OPEN = "OPEN"  # Active finding requiring author remediation
+    RESOLVED = "RESOLVED"  # Addressed by author, awaiting reviewer verification
+    CLOSED = "CLOSED"  # Verified and closed by reviewer
 
 
 class ReviewStatus(str, Enum):
@@ -54,12 +62,30 @@ class CommentModel(BaseModel):
     start_line: int
     end_line: int
     severity: ReviewSeverity = ReviewSeverity.MUST_FIX
+    status: CommentStatus = CommentStatus.OPEN
     body: str
     author: str = "Reviewer"
     code_snippet: str = ""
     created_at: str
     resolved: bool = False
+    resolution_notes: str = ""
     commit: str = ""
+
+    @model_validator(mode="after")
+    def _sync_status_and_resolved(self) -> "CommentModel":
+        """Synchronize `status` and `resolved` flags across initialization paths."""
+        if "status" not in self.model_fields_set and self.resolved:
+            self.status = CommentStatus.RESOLVED
+        else:
+            self.resolved = self.status in (CommentStatus.RESOLVED, CommentStatus.CLOSED)
+        return self
+
+    def set_status(self, new_status: CommentStatus, notes: Optional[str] = None) -> None:
+        """Transition comment lifecycle state and synchronize boolean `resolved` flag."""
+        self.status = new_status
+        self.resolved = new_status in (CommentStatus.RESOLVED, CommentStatus.CLOSED)
+        if notes is not None:
+            self.resolution_notes = notes
 
 
 class FileStateModel(BaseModel):
