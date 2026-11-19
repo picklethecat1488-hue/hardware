@@ -27,6 +27,7 @@
 #### **[MUST FIX]** [js/scope/pcb_renderer.js:L53](file:///Users/<username>/gh/hardware/js/scope/pcb_renderer.js#L53)
 <!-- comment-uuid: 9a706a32-6231-4105-902b-6ac39d76f02d -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```javascript
 const TRACE_CAPSULE_VERTEX_SHADER = /* glsl */ `
@@ -39,6 +40,7 @@ const TRACE_CAPSULE_VERTEX_SHADER = /* glsl */ `
 #### **[MUST FIX]** [js/scope/sim_renderer.js:L35](file:///Users/<username>/gh/hardware/js/scope/sim_renderer.js#L35)
 <!-- comment-uuid: 8a9fe25e-cff2-42fe-bc9a-7f65afbec553 -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```javascript
 const FLUID_VERTEX_SHADER = /* glsl */ `
@@ -51,6 +53,7 @@ const FLUID_VERTEX_SHADER = /* glsl */ `
 #### **[MUST FIX]** [model/wiring.py:L417-L427](file:///Users/<username>/gh/hardware/model/wiring.py#L417-L427)
 <!-- comment-uuid: 29f34525-045c-4672-861d-cb18bb3ef1d3 -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```python
 def load_shared_footprints(search_dir: Optional[Path] = None) -> Dict[str, Dict[str, Any]]:
@@ -72,6 +75,7 @@ def load_shared_footprints(search_dir: Optional[Path] = None) -> Dict[str, Dict[
 #### **[MUST FIX]** [projects/carrier_board/cad.py:L659-L685](file:///Users/<username>/gh/hardware/projects/carrier_board/cad.py#L659-L685)
 <!-- comment-uuid: 37285658-901e-48e5-a647-98c029ff4af3 -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```python
 @property
@@ -110,6 +114,7 @@ def load_shared_footprints(search_dir: Optional[Path] = None) -> Dict[str, Dict[
 #### **[MUST FIX]** [projects/carrier_board/carrier_board.py:L1326-L1328](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L1326-L1328)
 <!-- comment-uuid: 98484bb2-40b2-40af-827e-c79ea6f36f68 -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```python
 with BuildPcb(name="carrier_board", board_type=BoardType.RIGID) as pcb_ctx:
@@ -121,6 +126,7 @@ with BuildPcb(name="carrier_board", board_type=BoardType.RIGID) as pcb_ctx:
 #### **[MUST FIX]** [projects/carrier_board/carrier_board.py:L2327-L2349](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L2327-L2349)
 <!-- comment-uuid: 8b65070e-3c35-4017-9cbd-9b4523445f27 -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```python
 all_components = carrier_comps.components + status_comps.components + rf_comps.components
@@ -153,6 +159,7 @@ all_components = carrier_comps.components + status_comps.components + rf_comps.c
 #### **[MUST FIX]** [projects/carrier_board/carrier_board.py:L2463](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L2463)
 <!-- comment-uuid: a2a98f2b-1d56-435f-8e23-1219d2e00381 -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```python
 symbol_table=sys_comps.symbol_table_entries,
@@ -163,6 +170,7 @@ symbol_table=sys_comps.symbol_table_entries,
 #### **[MUST FIX]** [projects/carrier_board/carrier_board.py:L562-L628](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L562-L628)
 <!-- comment-uuid: c1616d76-62e9-428e-8f94-640cfef21a69 -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```python
 def schematic_config(self) -> SchematicConfig:
@@ -238,6 +246,7 @@ def schematic_config(self) -> SchematicConfig:
 #### **[MUST FIX]** [projects/carrier_board/carrier_board.py:L687-L704](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L687-L704)
 <!-- comment-uuid: c6403df6-0b63-40c6-a55d-f3a382f9753e -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```python
 bdr.add(self.design_rules())
@@ -264,6 +273,7 @@ bdr.add(self.design_rules())
 #### **[MUST FIX]** [projects/carrier_board/carrier_board.py:L731-L745](file:///Users/<username>/gh/hardware/projects/carrier_board/carrier_board.py#L731-L745)
 <!-- comment-uuid: 1974ef72-82bc-45bd-a765-0f3748897ea2 -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```python
 for r in cr.regions:
@@ -290,6 +300,7 @@ for r in cr.regions:
 #### **[MUST FIX]** [projects/carrier_board/pcb.py:L245-L249](file:///Users/<username>/gh/hardware/projects/carrier_board/pcb.py#L245-L249)
 <!-- comment-uuid: daa0c72a-746b-4bbd-8326-160a0d4ba8a2 -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```python
 if hasattr(pcb, "part") and pcb.part is not None:
@@ -304,6 +315,7 @@ if hasattr(pcb, "part") and pcb.part is not None:
 #### **[MUST FIX]** [projects/carrier_board/pcb.py:L335-L340](file:///Users/<username>/gh/hardware/projects/carrier_board/pcb.py#L335-L340)
 <!-- comment-uuid: ff7731b0-cbec-470d-ab1e-8de54b8be10b -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```python
 if hasattr(tail, "part") and tail.part is not None:
@@ -318,6 +330,7 @@ if hasattr(tail, "part") and tail.part is not None:
 #### **[MUST FIX]** [projects/carrier_board/pcb.py:L436-L447](file:///Users/<username>/gh/hardware/projects/carrier_board/pcb.py#L436-L447)
 <!-- comment-uuid: 8230e2f9-dfd6-4932-a026-51847d6b45da -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```python
 default_routing = self.wiring_path.parent / "routing.yaml"
@@ -337,6 +350,7 @@ default_routing = self.wiring_path.parent / "routing.yaml"
 #### **[MUST FIX]** [projects/carrier_board/pcb.py:L685-L1369](file:///Users/<username>/gh/hardware/projects/carrier_board/pcb.py#L685-L1369)
 <!-- comment-uuid: 2391aee4-93f3-4d2a-9a0f-e2f11580a291 -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```python
 Component(
@@ -1031,6 +1045,7 @@ Component(
 #### **[MUST FIX]** [projects/carrier_board/pcb.py:L1052-L1534](file:///Users/<username>/gh/hardware/projects/carrier_board/pcb.py#L1052-L1534)
 <!-- comment-uuid: e83d0b2a-22a7-4507-bb9b-cf80f64db3b4 -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```python
 Component(
@@ -1523,6 +1538,7 @@ Component(
 #### **[MUST FIX]** [projects/carrier_board/pcb.py:L1880-L1982](file:///Users/<username>/gh/hardware/projects/carrier_board/pcb.py#L1880-L1982)
 <!-- comment-uuid: 9b5c8e33-32ff-4995-86ea-be0a0ba9a515 -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```python
 {
@@ -1635,6 +1651,7 @@ Component(
 #### **[MUST FIX]** [projects/carrier_board/pcb.py:L1991-L3032](file:///Users/<username>/gh/hardware/projects/carrier_board/pcb.py#L1991-L3032)
 <!-- comment-uuid: 12ad5f49-3cc0-4879-9ae1-75943108e8b5 -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```python
 def build_carrier_board_pcb_config(provider: Optional[Any] = None) -> PCBConfig:
@@ -2686,6 +2703,7 @@ def build_carrier_board_pcb_config(provider: Optional[Any] = None) -> PCBConfig:
 #### **[MUST FIX]** [projects/carrier_board/pcb.py:L2841](file:///Users/<username>/gh/hardware/projects/carrier_board/pcb.py#L2841)
 <!-- comment-uuid: 2c1c4800-e218-4313-b35b-27470743ea02 -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```python
 cb_steps = [
@@ -2696,6 +2714,7 @@ cb_steps = [
 #### **[MUST FIX]** [projects/carrier_board/pcb.py:L2937-L3032](file:///Users/<username>/gh/hardware/projects/carrier_board/pcb.py#L2937-L3032)
 <!-- comment-uuid: dab9a6a0-a33a-47f9-acb3-6a7c02f63970 -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```python
 flex_steps = [
@@ -2801,6 +2820,7 @@ flex_steps = [
 #### **[MUST FIX]** [projects/carrier_board/pcb.py:L3033-L3070](file:///Users/<username>/gh/hardware/projects/carrier_board/pcb.py#L3033-L3070)
 <!-- comment-uuid: c89703be-d087-40c5-833d-db435143c6c2 -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```python
 cfg.test_steps = cb_steps + flex_steps
@@ -2850,12 +2870,14 @@ cfg.test_steps = cb_steps + flex_steps
 #### **[MUST FIX]** [projects/cat_fountain/pcb.py:L2](file:///Users/<username>/gh/hardware/projects/cat_fountain/pcb.py#L2)
 <!-- comment-uuid: 9d002d93-8530-4fe7-9aa5-7e90241b6cc6 -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 > **Reviewer (Reviewer)**: please apply the improvements discussed in [`@projects/carrier_board/pcb.py`](file:///Users/<username>/gh/hardware/projects/carrier_board/pcb.py) to this listing
 
 #### **[MUST FIX]** [projects/cat_fountain/pcb.py:L336](file:///Users/<username>/gh/hardware/projects/cat_fountain/pcb.py#L336)
 <!-- comment-uuid: ee5ceaa2-2d92-4aff-82dd-800735a5069e -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```python
 symbol_table=layout.symbol_table_entries,
@@ -2868,6 +2890,7 @@ symbol_table=layout.symbol_table_entries,
 #### **[MUST FIX]** [provider/pcb/test_steps.py:L12](file:///Users/<username>/gh/hardware/provider/pcb/test_steps.py#L12)
 <!-- comment-uuid: b6026d89-c299-4de7-bf1e-30f7e0a3db93 -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```python
 class BuildTestSteps:
@@ -2880,6 +2903,7 @@ class BuildTestSteps:
 #### **[MUST FIX]** [provider/provider.py:L314-L348](file:///Users/<username>/gh/hardware/provider/provider.py#L314-L348)
 <!-- comment-uuid: 4f134659-55da-4f50-af53-913c1fd58b5f -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```python
 @property
@@ -2924,6 +2948,7 @@ class BuildTestSteps:
 #### **[MUST FIX]** [provider/provider.py:L351-L369](file:///Users/<username>/gh/hardware/provider/provider.py#L351-L369)
 <!-- comment-uuid: 1e3f05ed-393d-485e-8562-2d7a2694302a -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```python
 def pcb_manifest_path(self) -> Path:
@@ -2954,6 +2979,7 @@ def pcb_manifest_path(self) -> Path:
 #### **[MUST FIX]** [provider/templates/scope.html.j2:L1524](file:///Users/<username>/gh/hardware/provider/templates/scope.html.j2#L1524)
 <!-- comment-uuid: 967809a5-da28-44f8-97d9-85b3d1e1b6a0 -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```
 if (state.currentMode === "SIMULATE" || (data.name && data.name.toLowerCase().includes("simulation"))) {
@@ -2966,6 +2992,7 @@ if (state.currentMode === "SIMULATE" || (data.name && data.name.toLowerCase().in
 #### **[MUST FIX]** [provider/vcs/git_engine.py:L35-L37](file:///Users/<username>/gh/hardware/provider/vcs/git_engine.py#L35-L37)
 <!-- comment-uuid: 3f57a99f-6e20-42b5-abad-682ad8805a70 -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```python
 MAX_DIFF_LINE_LENGTH: int = 1000
@@ -2980,6 +3007,7 @@ MAX_DIFF_LINES: int = 4500  # 4,500 lines limit for full side-by-side matching
 #### **[MUST FIX]** [tools/build.py:L563-L566](file:///Users/<username>/gh/hardware/tools/build.py#L563-L566)
 <!-- comment-uuid: 9c4d7eb9-dbe4-4f4e-97f4-6dc2b3f8216f -->
 <!-- comment-commit: working -->
+<!-- comment-status: RESOLVED -->
 
 ```python
 if wiring is None:
