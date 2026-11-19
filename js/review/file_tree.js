@@ -7,6 +7,7 @@
 import { bindDelegatedEvent, clearChildren, createEl, resolveElement } from "../core/dom.js";
 import { fuzzyScore } from "../core/fuzzy_search.js";
 import { sanitizeAuthor } from "../core/sanitize.js";
+import { COMMENT_STATUS, isCommentVisible, resolveCommentStatus } from "./comment_threads.js";
 
 const ATTACHMENT_PREFIXES = Object.freeze([
   "attachments/",
@@ -14,6 +15,38 @@ const ATTACHMENT_PREFIXES = Object.freeze([
   "build/attachments/",
   "feedback/attachments/",
 ]);
+
+/**
+ * Determine whether `comment` belongs to the active `selectedCommit` revision.
+ *
+ * Prevents historical comments from past commits (e.g. resolved review comments
+ * on `app/carrier_board.md` across prior commits) from leaking into `working`
+ * or unrelated commit views.
+ *
+ * @param {object|null|undefined} comment - Review comment model (`{ commit }`).
+ * @param {string|null|undefined} selectedCommit - Currently selected commit hash or `"working"`.
+ * @returns {boolean} True when `comment` belongs to `selectedCommit`.
+ */
+export function commentMatchesCommit(comment, selectedCommit) {
+  if (!comment || typeof comment !== "object") {
+    return false;
+  }
+  const active = String(selectedCommit || "").trim();
+  if (!active) {
+    return true;
+  }
+  const cCommit = String(comment.commit || "").trim();
+  if (!cCommit) {
+    return active === "working";
+  }
+  if (cCommit === active) {
+    return true;
+  }
+  if (active !== "working" && cCommit !== "working") {
+    return active.startsWith(cCommit) || cCommit.startsWith(active);
+  }
+  return false;
+}
 
 /**
  * Return true when `filePath` resides inside an issue-tracker attachment directory.
@@ -356,6 +389,8 @@ export function renderFilesList(ctx, state, callbacks = {}) {
 
   const hideCb = resolveElement(ctx, "hideAttachmentsCb");
   const hideAttachments = hideCb ? Boolean(hideCb.checked) : false;
+  const showClosedCb = resolveElement(ctx, "showClosedCommentsCb");
+  const showClosed = showClosedCb ? Boolean(showClosedCb.checked) : false;
   const searchInput = resolveElement(ctx, "fileSearchInput");
   const query = String((searchInput && searchInput.value) || "").trim();
 
@@ -381,7 +416,15 @@ export function renderFilesList(ctx, state, callbacks = {}) {
 
   for (const fileObj of displayFiles) {
     const filePath = String(fileObj.path || "");
-    const commentsForFile = sessionComments.filter((c) => c.file_path === filePath);
+    const commentsForFile = sessionComments.filter(
+      (c) =>
+        c.file_path === filePath &&
+        commentMatchesCommit(c, state.selectedCommit) &&
+        isCommentVisible(c, showClosed),
+    );
+    const openCommentsCount = commentsForFile.filter(
+      (c) => resolveCommentStatus(c) === COMMENT_STATUS.OPEN,
+    ).length;
     const fileState = sessionFiles[filePath];
     const isExplicitlyReviewed = Boolean(fileState && fileState.status === "REVIEWED");
     const isViewed = Boolean(
@@ -431,9 +474,14 @@ export function renderFilesList(ctx, state, callbacks = {}) {
 
     const rightChildren = [];
     if (commentsForFile.length > 0) {
+      const commentBadgeClass =
+        openCommentsCount > 0 ? "quake-badge-amber" : "quake-badge-green";
       rightChildren.push(
         createEl(ctx, "span", {
-          className: "quake-badge quake-badge-amber",
+          className: `quake-badge ${commentBadgeClass}`,
+          attrs: {
+            title: `${openCommentsCount} open / ${commentsForFile.length - openCommentsCount} resolved`,
+          },
           text: `💬 ${commentsForFile.length}`,
         }),
       );
