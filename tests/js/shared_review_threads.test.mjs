@@ -11,16 +11,21 @@ import {
 } from "../../js/review/cli_drawer.js";
 import { initCodeReviewApp } from "../../js/review/code_review_app.js";
 import {
+  COMMENT_STATUS,
   createInlineCommentCard,
+  isCommentVisible,
   parseFileReferences,
   renderCommentBody,
+  resolveCommentStatus,
   resolveSeverityBadge,
 } from "../../js/review/comment_threads.js";
 import {
+  commentMatchesCommit,
   filterAndSortReviewFiles,
   getFileChanges,
   isAttachmentPath,
   isLfsFile,
+  renderFilesList,
 } from "../../js/review/file_tree.js";
 import {
   handleSessionTermination,
@@ -261,5 +266,211 @@ describe("Shared Code Review Modules (Comment Threads, File Tree, Verdicts, CLI 
     await app.ready;
     assert.ok(doc.getElementById("filesList").textContent.includes("lib.rs"));
     app.dispose();
+  });
+
+  it("isolates inline comments and file badges by selectedCommit so historical comments never leak into working", async () => {
+    assert.equal(commentMatchesCommit({ commit: "7c6e41fdf0f8" }, "working"), false);
+    assert.equal(commentMatchesCommit({ commit: "7c6e41fdf0f8" }, "7c6e41fd"), true);
+    assert.equal(commentMatchesCommit({ commit: "working" }, "working"), true);
+    assert.equal(commentMatchesCommit({ commit: "" }, "working"), true);
+    assert.equal(commentMatchesCommit({ commit: "" }, "7c6e41fdf0f8"), false);
+
+    const historicalComments = Array.from({ length: 83 }, (_, idx) => ({
+      id: `hist-${idx}`,
+      commit: "7c6e41fdf0f88a209379baa8a1a9996778b3a938",
+      file_path: "app/carrier_board.md",
+      start_line: 1,
+      end_line: 1,
+      severity: "MUST_FIX",
+      resolved: true,
+      body: `Historical comment #${idx}`,
+    }));
+
+    const ctx = createMockRuntimeContext({
+      bootConfig: {
+        repoName: "firmware",
+        issueKind: "worm",
+        trackerRoute: "/worms",
+        issueLabel: "WORM",
+        singleCommit: false,
+      },
+      fetchRoutes: {
+        "GET /api/session": {
+          repo_name: "firmware",
+          verdict: "IN_REVIEW",
+          files: {},
+          comments: historicalComments,
+        },
+        "GET /api/commits": [
+          {
+            commit_hash: "working",
+            short_hash: "working",
+            author: "User",
+            subject: "Working Tree Changes",
+          },
+          {
+            commit_hash: "7c6e41fdf0f88a209379baa8a1a9996778b3a938",
+            short_hash: "7c6e41fd",
+            author: "User",
+            subject: "Historical Carrier Board Doc Commit",
+          },
+        ],
+        "GET /api/files?commit=working": [
+          { path: "app/carrier_board.md", status: "M", additions: 2, deletions: 2 },
+        ],
+        "GET /api/files?commit=7c6e41fdf0f88a209379baa8a1a9996778b3a938": [
+          { path: "app/carrier_board.md", status: "M", additions: 50, deletions: 10 },
+        ],
+        "GET /api/diff?commit=working&file=app%2Fcarrier_board.md": {
+          file_path: "app/carrier_board.md",
+          old_content: "# Carrier Board",
+          new_content: "# Carrier Board 2.0",
+          side_by_side: [
+            {
+              row_type: "replace",
+              old_no: 1,
+              new_no: 1,
+              old_text: "# Carrier Board",
+              new_text: "# Carrier Board 2.0",
+            },
+          ],
+        },
+      },
+    });
+
+    const doc = ctx.getDocument();
+    for (const id of ["commitsList", "filesList", "diffContent", "cliLog", "commentsCountText"]) {
+      doc.body.appendChild(createEl(ctx, "div", { id }));
+    }
+    doc.body.appendChild(createEl(ctx, "input", { id: "cliInput" }));
+
+    const app = initCodeReviewApp(ctx);
+    await app.ready;
+
+    // On `working`, all 83 historical comments from 7c6e41fd must be excluded!
+    assert.equal(doc.getElementById("filesList").textContent.includes("83"), false);
+    assert.equal(doc.getElementById("diffContent").textContent.includes("Historical comment"), false);
+    assert.equal(doc.getElementById("commentsCountText").textContent, "0 findings");
+
+    // When inspecting commit 7c6e41fd directly, its 83 comments appear on `app/carrier_board.md`
+    renderFilesList(ctx, {
+      selectedCommit: "7c6e41fdf0f88a209379baa8a1a9996778b3a938",
+      selectedFile: "app/carrier_board.md",
+      commits: [],
+      files: [{ path: "app/carrier_board.md", status: "M", additions: 50, deletions: 10 }],
+      session: { files: {}, comments: historicalComments },
+    });
+    assert.equal(doc.getElementById("filesList").textContent.includes("83"), true);
+    app.dispose();
+  });
+
+  it("supports OPEN -> RESOLVED -> CLOSED lifecycle actions, CLI status commands, and Show Closed filtering", async () => {
+    assert.equal(resolveCommentStatus({ resolved: false }), COMMENT_STATUS.OPEN);
+    assert.equal(resolveCommentStatus({ resolved: true }), COMMENT_STATUS.RESOLVED);
+    assert.equal(
+      resolveCommentStatus({ status: "CLOSED", resolved: true }),
+      COMMENT_STATUS.CLOSED,
+    );
+    assert.equal(isCommentVisible({ status: "OPEN" }, false), true);
+    assert.equal(isCommentVisible({ status: "RESOLVED", resolved: true }, false), true);
+    assert.equal(isCommentVisible({ status: "CLOSED", resolved: true }, false), false);
+    assert.equal(isCommentVisible({ status: "CLOSED", resolved: true }, true), true);
+
+    const ctx = createMockRuntimeContext();
+    const doc = ctx.getDocument();
+    doc.body.appendChild(createEl(ctx, "div", { id: "cliLog" }));
+    doc.body.appendChild(createEl(ctx, "ul", { id: "filesList" }));
+    doc.body.appendChild(createEl(ctx, "span", { id: "filesCountHeader" }));
+    doc.body.appendChild(createEl(ctx, "span", { id: "commentsCountText" }));
+    const showClosedCb = createEl(ctx, "input", {
+      id: "showClosedCommentsCb",
+      attrs: { type: "checkbox" },
+    });
+    showClosedCb.checked = false;
+    doc.body.appendChild(showClosedCb);
+
+    const statusTransitions = [];
+    const openCard = createInlineCommentCard(
+      ctx,
+      { id: "c-open", severity: "MUST_FIX", status: "OPEN", start_line: 5, body: "Fix bounds" },
+      { onStatusChange: (id, status) => statusTransitions.push({ id, status }) },
+    );
+    assert.ok(openCard.textContent.includes("[OPEN]"));
+    const resolveBtn = openCard.querySelector('[data-status="RESOLVED"]');
+    assert.ok(resolveBtn);
+    resolveBtn.click();
+
+    const resolvedCard = createInlineCommentCard(
+      ctx,
+      {
+        id: "c-res",
+        severity: "PROPOSAL",
+        status: "RESOLVED",
+        resolved: true,
+        resolution_notes: "Added bounds check",
+        start_line: 8,
+        body: "Validate index",
+      },
+      { onStatusChange: (id, status) => statusTransitions.push({ id, status }) },
+    );
+    assert.ok(resolvedCard.textContent.includes("[RESOLVED]"));
+    const notesBlock = resolvedCard.querySelector(".inline-comment-resolution");
+    assert.ok(notesBlock);
+    assert.ok(notesBlock.innerHTML.includes("Added bounds check"));
+    const closeBtn = resolvedCard.querySelector('[data-status="CLOSED"]');
+    const reopenBtn = resolvedCard.querySelector('[data-status="OPEN"]');
+    assert.ok(closeBtn);
+    assert.ok(reopenBtn);
+    closeBtn.click();
+    reopenBtn.click();
+
+    assert.deepEqual(statusTransitions, [
+      { id: "c-open", status: "RESOLVED" },
+      { id: "c-res", status: "CLOSED" },
+      { id: "c-res", status: "OPEN" },
+    ]);
+
+    // Verify CLOSED comments are hidden from file badges and metrics until Show Closed is checked
+    const reviewState = {
+      selectedCommit: "working",
+      selectedFile: "src/main.rs",
+      commits: [],
+      files: [{ path: "src/main.rs", status: "M", additions: 4, deletions: 1 }],
+      session: {
+        repo_name: "firmware",
+        verdict: "IN_REVIEW",
+        files: {},
+        comments: [
+          { id: "c1", commit: "working", file_path: "src/main.rs", status: "RESOLVED", resolved: true, severity: "MUST_FIX", start_line: 1, body: "Fixed" },
+          { id: "c2", commit: "working", file_path: "src/main.rs", status: "CLOSED", resolved: true, severity: "NIT", start_line: 2, body: "Closed" },
+        ],
+      },
+    };
+
+    renderFilesList(ctx, reviewState);
+    updateSessionMetricsUI(ctx, reviewState);
+    assert.ok(doc.getElementById("filesList").textContent.includes("💬 1"));
+    assert.ok(doc.getElementById("filesList").querySelector(".quake-badge-green"));
+    assert.equal(doc.getElementById("commentsCountText").textContent, "1 findings (0 open)");
+
+    showClosedCb.checked = true;
+    renderFilesList(ctx, reviewState);
+    updateSessionMetricsUI(ctx, reviewState);
+    assert.ok(doc.getElementById("filesList").textContent.includes("💬 2"));
+    assert.equal(doc.getElementById("commentsCountText").textContent, "2 findings (0 open)");
+
+    // Verify CLI commands: resolve, close, reopen
+    const cliStatusCalls = [];
+    const handlers = {
+      updateCommentStatus: async (id, status, notes) => cliStatusCalls.push({ id, status, notes }),
+    };
+    await executeParsedCliCommand(ctx, "resolve c1 Fixed IRQ", reviewState, handlers);
+    await executeParsedCliCommand(ctx, "close c1 Verified LGTM", reviewState, handlers);
+    await executeParsedCliCommand(ctx, "reopen c1 Still reproduces", reviewState, handlers);
+    assert.deepEqual(cliStatusCalls, [
+      { id: "c1", status: "RESOLVED", notes: "Fixed IRQ" },
+      { id: "c1", status: "CLOSED", notes: "Verified LGTM" },
+      { id: "c1", status: "OPEN", notes: "Still reproduces" },
+    ]);
   });
 });

@@ -27,15 +27,22 @@ from tools.vast_manager import (
 
 
 def test_anvil_runner_executable_and_syntax() -> None:
-    """Verify tools/anvil exists, has executable permissions, and passes bash syntax validation."""
-    script_path = REPO_ROOT / "tools" / "anvil"
-    assert script_path.exists(), "tools/anvil runner script must exist"
+    """Verify tools/anvil and tools/verify.py exist, are executable Python scripts, and pass syntax validation."""
+    import py_compile
 
-    file_stat = script_path.stat()
-    assert bool(file_stat.st_mode & stat.S_IXUSR), "tools/anvil must be executable"
+    for rel_name in ("anvil", "verify.py"):
+        script_path = REPO_ROOT / "tools" / rel_name
+        assert script_path.exists(), f"tools/{rel_name} runner script must exist"
+        file_stat = script_path.stat()
+        assert bool(file_stat.st_mode & stat.S_IXUSR), f"tools/{rel_name} must be executable"
+        first_line = script_path.read_text(encoding="utf-8").splitlines()[0]
+        assert "python" in first_line, f"tools/{rel_name} must use a Python shebang, got: {first_line}"
+        py_compile.compile(str(script_path), doraise=True)
 
-    result = subprocess.run(["bash", "-n", str(script_path)], capture_output=True, text=True)
-    assert result.returncode == 0, f"tools/anvil syntax error: {result.stderr}"
+    assert not (REPO_ROOT / "tools" / "verify.sh").exists(), "Legacy tools/verify.sh must be removed"
+    help_res = subprocess.run([str(REPO_ROOT / "tools" / "anvil"), "--help"], capture_output=True, text=True)
+    assert help_res.returncode == 0
+    assert "Usage: tools/anvil" in help_res.stdout
 
 
 def test_anvil_runner_usage_without_args() -> None:

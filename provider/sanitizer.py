@@ -385,6 +385,11 @@ def elide_personal_info(text: str) -> str:
         _replace_posix_user,
         result,
     )
+    result = re.sub(
+        r"(pytest-of-)([^/\\\"'\s`]+)",
+        _replace_posix_user,
+        result,
+    )
 
     # 3. Redact personal email addresses (dynamically discovered handles and consumer domains)
     names, emails, handles = get_personal_identifiers()

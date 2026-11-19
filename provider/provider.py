@@ -22,6 +22,8 @@ from .types import (
     MATERIAL,
     EXPORT,
     Simulate,
+    SimulateHooks,
+    SimulationStepResult,
     URDFCollisionType,
     URDFJointType,
     URDFMotorType,
@@ -630,25 +632,23 @@ class Provider:
         """Map room names to view functions."""
         return {}
 
-    def get_simulate_hooks(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
+    def get_simulate_hooks(self, sim_name: str) -> SimulateHooks:
         """Return the simulation hooks for the given target. Subclasses override this."""
         hooks = self.get_simulate_hooks_impl(sim_name)
         Provider.validate_simulate_hooks(hooks)
         return hooks
 
-    def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
+    def get_simulate_hooks_impl(self, sim_name: str) -> SimulateHooks:
         """Implement get_simulate_hooks. Subclasses override this."""
         return {}
 
     @staticmethod
-    def validate_simulate_hooks(hooks: dict[Simulate, Callable[..., Any]]) -> None:
-        """Validate simulation hooks structure and signatures."""
+    def validate_simulate_hooks(hooks: SimulateHooks) -> None:
+        """Validate simulation hooks structure, arity, and return annotations."""
         if hasattr(hooks, "_mock_return_value") or hooks.__class__.__name__ in ("MagicMock", "Mock", "NonCallableMock"):
             return
         if not isinstance(hooks, dict):
             raise TypeError(f"Simulation hooks must be a dictionary, got {type(hooks).__name__}")
-
-        import inspect
 
         for key, hook in hooks.items():
             if not isinstance(key, Simulate):
@@ -683,6 +683,14 @@ class Provider:
                         f"Simulation hook {key.name} must accept at least {min_params} parameters, "
                         f"got {len(pos_params)}."
                     )
+
+                if key == Simulate.STEP and sig.return_annotation is not inspect.Signature.empty:
+                    ret_ann = sig.return_annotation
+                    valid_step_returns = (SimulationStepResult, "SimulationStepResult", Any, "Any")
+                    if ret_ann not in valid_step_returns:
+                        raise ValueError(
+                            f"Simulation hook STEP return annotation must be SimulationStepResult, got {ret_ann!r}."
+                        )
             except (ValueError, TypeError) as e:
                 raise ValueError(f"Invalid signature for simulation hook {key.name}: {e}")
 

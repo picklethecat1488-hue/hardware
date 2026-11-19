@@ -1687,3 +1687,231 @@ def test_fuzzy_proximity_code_search_and_quake_themed_textbox(tmp_path: Path) ->
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_regression_cross_commit_cr_comments_do_not_leak_into_working(tmp_path: Path) -> None:
+    """Verify historical `CR_<sha>.md` comments never leak into `working` review sessions after `sync_feedback()`."""
+    import uuid as uuid_pkg
+
+    from provider.dashboard.server import DashboardServer
+
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    hist_sha = shas[-1]
+    fb_dir = repo_dir / "feedback"
+    fb_dir.mkdir(parents=True, exist_ok=True)
+    exporter = MarkdownReviewExporter(repo_root=repo_dir)
+
+    hist_comments = [
+        CommentModel(
+            id=f"hist{i:02d}",
+            uuid=str(uuid_pkg.uuid4()),
+            commit=hist_sha,
+            file_path="projects/carrier_board/carrier_board.md",
+            start_line=10 + i,
+            end_line=10 + i,
+            severity=ReviewSeverity.MUST_FIX,
+            body=f"Historical carrier board note {i}",
+            created_at="2026-10-01T00:00:00Z",
+            resolved=True,
+        )
+        for i in range(5)
+    ]
+    exporter.export_commit_markdown(
+        ReviewSessionModel(
+            title="Historical Review",
+            repo_name="hardware",
+            commit_hash=hist_sha,
+            revisions=[hist_sha],
+            comments=hist_comments,
+        ),
+        hist_sha,
+        fb_dir,
+    )
+
+    dash = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        feedback_dir=fb_dir,
+        sqlite_review_file=tmp_path / "code_review.sqlite",
+        sqlite_bug_file=tmp_path / "bugs.sqlite",
+        markdown_review_path=fb_dir / "CR.md",
+        markdown_bugs_path=fb_dir / "BUGS.md",
+        bind_and_activate=False,
+    )
+
+    working_before = dash.get_review_session(["working"])
+    assert working_before.comments == []
+
+    sync_res = dash.sync_feedback()
+    assert sync_res["review"]["total_comments"] == 5
+
+    working_after = dash.get_review_session(["working"])
+    assert working_after.comments == []
+
+    hist_session = dash.get_review_session([hist_sha])
+    assert len(hist_session.comments) == 5
+
+
+def test_comment_status_lifecycle_open_resolved_closed_api_cli_and_markdown(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Verify OPEN -> RESOLVED -> CLOSED -> OPEN comment lifecycle across SQLite, Markdown, REST API, and CLI."""
+    from model.code_review import CommentStatus
+    from provider.dashboard.server import DashboardServer
+    from tools.forge import main
+
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    monkeypatch.chdir(repo_dir)
+    db_file = tmp_path / "lifecycle_review.sqlite"
+    fb_dir = repo_dir / "feedback"
+    fb_dir.mkdir(parents=True, exist_ok=True)
+
+    legacy_resolved = CommentModel(
+        id="leg1",
+        file_path="test_0.txt",
+        start_line=1,
+        end_line=1,
+        body="Legacy resolved item",
+        created_at="2026-10-01T00:00:00Z",
+        resolved=True,
+    )
+    assert legacy_resolved.status == CommentStatus.RESOLVED
+    assert legacy_resolved.resolved is True
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "forge.py",
+            "--db-file",
+            str(db_file),
+            "--feedback-dir",
+            str(fb_dir),
+            "add-comment",
+            "Check crystal routing clearance",
+            "--file",
+            "test_0.txt",
+            "--line",
+            "2",
+            "--severity",
+            "MUST_FIX",
+        ],
+    )
+    main()
+    capsys.readouterr()
+
+    store = SQLiteReviewStore(db_file)
+    loaded = store.load_session()
+    assert loaded is not None and len(loaded.comments) == 1
+    cid = loaded.comments[0].id
+    assert loaded.comments[0].status == CommentStatus.OPEN
+    assert loaded.comments[0].resolved is False
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "forge.py",
+            "--db-file",
+            str(db_file),
+            "--feedback-dir",
+            str(fb_dir),
+            "resolve-comment",
+            cid,
+            "--notes",
+            "Increased clearance to 0.25mm",
+        ],
+    )
+    main()
+    res_out = capsys.readouterr().out
+    assert f"Resolved comment [{cid}]" in res_out
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "forge.py",
+            "--db-file",
+            str(db_file),
+            "--feedback-dir",
+            str(fb_dir),
+            "close-comment",
+            cid,
+            "--notes",
+            "DRC verified",
+        ],
+    )
+    main()
+    close_out = capsys.readouterr().out
+    assert f"Closed comment [{cid}]" in close_out
+
+    loaded_closed = store.get_comment_by_id(cid)
+    assert loaded_closed is not None
+    assert loaded_closed.status == CommentStatus.CLOSED
+    assert loaded_closed.resolved is True
+
+    monkeypatch.setattr(
+        "sys.argv",
+        ["forge.py", "--db-file", str(db_file), "--feedback-dir", str(fb_dir), "list-reviews", "--all-users"],
+    )
+    main()
+    default_list = capsys.readouterr().out
+    assert cid not in default_list
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "forge.py",
+            "--db-file",
+            str(db_file),
+            "--feedback-dir",
+            str(fb_dir),
+            "list-reviews",
+            "--closed",
+            "--all-users",
+        ],
+    )
+    main()
+    closed_list = capsys.readouterr().out
+    assert cid in closed_list
+    assert "[CLOSED]" in closed_list
+
+    exporter = MarkdownReviewExporter(repo_root=repo_dir)
+    md_text = exporter.render_markdown(
+        ReviewSessionModel(
+            title="Status Roundtrip",
+            repo_name="hardware",
+            commit_hash=shas[-1],
+            revisions=[shas[-1]],
+            comments=[loaded_closed],
+        )
+    )
+    assert "<!-- comment-status: CLOSED -->" in md_text
+    parsed_md = exporter.parse_markdown_text(md_text)
+    assert len(parsed_md.comments) == 1
+    assert parsed_md.comments[0].status == CommentStatus.CLOSED
+
+    dash = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        feedback_dir=fb_dir,
+        sqlite_review_file=db_file,
+        sqlite_bug_file=tmp_path / "bugs.sqlite",
+        bind_and_activate=True,
+    )
+    srv_thread = threading.Thread(target=dash.serve_forever, daemon=True)
+    srv_thread.start()
+    try:
+        req = urllib.request.Request(
+            f"{dash.get_url()}/api/comment/status",
+            data=json.dumps({"id": cid, "status": "OPEN", "notes": "Re-verify layer 2"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+        assert payload["status"] == "ok"
+        assert payload["comment"]["status"] == "OPEN"
+        assert payload["comment"]["resolved"] is False
+    finally:
+        dash.shutdown()
+        dash.server_close()

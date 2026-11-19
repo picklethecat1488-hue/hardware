@@ -3,6 +3,13 @@
 from enum import StrEnum, IntEnum
 from typing import Protocol, Optional, Any
 from build123d import Shape  # type: ignore
+from model.simulation import (
+    MetricsDict,
+    SetupSimulationFn,
+    SimulateHookFn,
+    SimulationStepResult,
+    StepSimulationFn,
+)
 
 
 class CollisionGroup(IntEnum):
@@ -168,6 +175,9 @@ class Simulate(StrEnum):
 
     SETUP = "setup"
     STEP = "step"
+
+
+SimulateHooks = dict[Simulate, SimulateHookFn]
 
 
 class ColorType(StrEnum):

@@ -6,7 +6,7 @@
  - **tools/config.py** - Automated utility for part placement and geometry optimization.
  - **tools/scope.py** - Interactive CAD/PCB Scope workstation for 3D inspection and debugging.
  - **tools/forge.py** - Unified Quake-themed workstation integrating VCS Diff Viewer, Smartlog DAG tree, Code Review, and Bug Tracker.
- - **tools/verify.sh** - Automated pre-commit verification script running Python compilation, Ruff formatting/linting, JS zero-globals validation, parallel `node --test` suites, and parallel `pytest`.
+ - **tools/verify.py** - Automated pre-commit verification script running Python compilation, Ruff formatting/linting, JS zero-globals validation, parallel `node --test` suites, and parallel `pytest`.
  - **tools/validate_js.py** - Oxlint-backed JavaScript zero-globals linter, Jinja2 HTML template verifier, and parallel JS test validator.
  - **js/** - Canonical zero-globals ES modules (`core/`, `scope/`, `diff/`, `vcs/`, `review/`, `tracker/`) and unminified vendor Three.js engine (`js/static/vendor/three/`). See [docs/javascript_style_architecture.md](docs/javascript_style_architecture.md).
  - **tests/js/** - Isolated Node (`node --test`) behavioral unit test suites (`*.test.mjs`).
@@ -117,26 +117,38 @@ If your project supports physical simulation (`Mode.SIMULATE`), you should regis
 
 ```python
 # projects/bracket/provider.py
-def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
+def get_simulate_hooks_impl(self, sim_name: str) -> SimulateHooks:
     """Return simulation callbacks mapped to execution hooks."""
     from .simulate_hooks import get_simulate_hooks_impl as impl
 
     return impl(self, sim_name)
 ```
 
-Create a `simulate_hooks.py` file within your project package to specify hooks for `Simulate.INIT`, `Simulate.PRE_STEP`, etc.:
+Create a `simulate_hooks.py` file within your project package to specify hooks for `Simulate.SETUP` and `Simulate.STEP`:
 
 ```python
 # projects/bracket/simulate_hooks.py
-from provider import Simulate, Room, Bullet, Fluid
+from typing import Any, Optional
+from model import SimulationStepResult
+from provider import Simulate, SimulateHooks
 
 
-def get_simulate_hooks_impl(provider, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
-    def on_init(bullet: Bullet, fluid: Fluid) -> None:
-        bullet.set_motor_velocity("motor_joint", velocity=10.0)
+def get_simulate_hooks_impl(provider: Any, sim_name: str) -> SimulateHooks:
+    def setup_simulation(
+        body_id: int,
+        client: int,
+        name: str,
+        boundaries: dict[str, Any],
+        state_tracker: Optional[Any] = None,
+    ) -> None:
+        pass
+
+    def step_simulation(body_id: int, client: int, step_idx: int, name: str) -> SimulationStepResult:
+        return SimulationStepResult(metrics={"active_step": step_idx})
 
     return {
-        Simulate.INIT: on_init,
+        Simulate.SETUP: setup_simulation,
+        Simulate.STEP: step_simulation,
     }
 ```
 
@@ -288,8 +300,8 @@ pytest projects/tests/test_your_project.py
 
 Before committing or opening a pull request, run the automated pre-commit verification script (which checks Python syntax compilation, Ruff formatting & linting, JavaScript zero-globals & template rules, parallel `node --test` suites, and parallel `pytest`):
 ```bash
-./tools/verify.sh
-./tools/verify.sh --fix       # Auto-format & auto-fix Ruff lint issues first
+./tools/verify.py
+./tools/verify.py --fix       # Auto-format & auto-fix Ruff lint issues first
 ```
 
 To build all project files, simulating a release:
@@ -304,7 +316,7 @@ tools/anvil provision                # Rent Vast.ai Ubuntu instance and configur
 tools/anvil bootstrap                # Install build tools, Rust, Miniforge, and cq conda env on remote VM
 tools/anvil status                   # Check instance health, IP/port, GPU, and lock state
 tools/anvil sync                     # Sync repository to cloud container (/workspace/hardware)
-tools/anvil verify [args...]         # Run full ./tools/verify.sh pre-commit verification remotely
+tools/anvil verify [args...]         # Run full ./tools/verify.py pre-commit verification remotely
 tools/anvil pytest [args...]         # Run pytest remotely in the cq conda environment
 tools/anvil simulate [args...]       # Run simulation on remote GPU and auto-download results
 tools/anvil stages                   # Sync staged .rrd checkpoint recordings
