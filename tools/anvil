@@ -1,431 +1,74 @@
-#!/usr/bin/env bash
-# ==============================================================================
-# Unified Cloud Server (Anvil / Vast.ai) Execution and Synchronization Runner
-# Supports:
-#   - Automated Vast.ai VM provisioning and release
-#   - Remote dependency bootstrapping (compiler toolchains, Rust, Miniforge, CUDA)
-#   - Activity lock tracking (~/.anvil.lock) and Close of Business (COB) auto-release
-#   - Shared ~/.anvil.env instance configuration across all workspaces
-#   - Dynamic /workspace/<repo> fallback to $HOME/<repo>
-#   - Reverse proxy host CLI commands (port 8899)
-#   - Multi-repo support: firmware, hardware, and SSD
-# ==============================================================================
+#!/usr/bin/env python3
+"""Unified Cloud Server (Anvil / Vast.ai) execution, reverse-proxy, and synchronization runner.
 
-set -e
+Supports:
+  - Automated Vast.ai VM provisioning, bootstrapping, status inspection, and COB auto-release
+  - Shared `~/.anvil.env` configuration across `firmware`, `hardware`, and `SSD`
+  - Activity lock tracking (`~/.anvil.lock`) with automatic signal/exit cleanup
+  - Reverse-proxying port 8899 (`-R 8899:127.0.0.1:8899`) to the local `tools/host.py` daemon
+  - Remote `verify` (`./tools/verify.py`), `pytest`, `cargo`, `simulate`, and `smoke` execution
+"""
 
-# 1. Resolve Local Repository Root and Project Name
-if git rev-parse --is-inside-work-tree &>/dev/null; then
-    REPO_DIR="$(git rev-parse --show-toplevel)"
-else
-    REPO_DIR="$(pwd)"
-fi
-REPO_NAME="$(basename "${REPO_DIR}")"
+import atexit
+import glob
+import os
+from pathlib import Path
+import shlex
+import signal
+import socket
+import subprocess
+import sys
+import time
+from typing import Callable, Dict, List, Optional, Sequence
 
-# 2. Source Configuration Files (Global ~/.anvil.env with Local .anvil.env override)
-GLOBAL_ENV_FILE="${HOME}/.anvil.env"
-LOCAL_ENV_FILE="${REPO_DIR}/.anvil.env"
+DEFAULT_REMOTE_HOST: str = "anvil"
+DEFAULT_REMOTE_USER: str = "root"
+LOCAL_HOST_DAEMON_ADDR: str = "127.0.0.1"
+LOCAL_HOST_DAEMON_PORT: int = 8899
+BOOTSTRAP_MAX_ATTEMPTS: int = 5
+BOOTSTRAP_RETRY_SEC: float = 3.0
 
-# Preserve environment variables explicitly passed by caller
-CALLER_REMOTE_HOST="${REMOTE_HOST:-}"
-CALLER_REMOTE_PORT="${REMOTE_PORT:-}"
-CALLER_REMOTE_USER="${REMOTE_USER:-}"
-CALLER_REMOTE_DIR="${REMOTE_DIR:-}"
+SSH_BASE_OPTS: tuple[str, ...] = (
+    "-o",
+    "ServerAliveInterval=30",
+    "-o",
+    "ServerAliveCountMax=120",
+    "-o",
+    "TCPKeepAlive=yes",
+    "-o",
+    "StrictHostKeyChecking=accept-new",
+)
 
-if [ -f "${GLOBAL_ENV_FILE}" ]; then
-    # shellcheck disable=SC1090
-    source "${GLOBAL_ENV_FILE}"
-fi
-if [ -f "${LOCAL_ENV_FILE}" ]; then
-    # shellcheck disable=SC1090
-    source "${LOCAL_ENV_FILE}"
-fi
+RSYNC_EXCLUDES: tuple[str, ...] = (
+    ".git",
+    "/target",
+    "/build",
+    "/build_temp",
+    "/build_test_tmp",
+    "/tmp",
+    "__pycache__",
+    "*.pyc",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".mypy_cache",
+    ".venv",
+    "venv",
+    "*.rrd",
+    "*.mp4",
+    "*.MOV",
+    "*.mov",
+    ".anvil.env*",
+    ".anvil.lock*",
+)
 
-# Restore caller overrides if explicitly supplied
-[ -n "${CALLER_REMOTE_HOST}" ] && REMOTE_HOST="${CALLER_REMOTE_HOST}"
-[ -n "${CALLER_REMOTE_PORT}" ] && REMOTE_PORT="${CALLER_REMOTE_PORT}"
-[ -n "${CALLER_REMOTE_USER}" ] && REMOTE_USER="${CALLER_REMOTE_USER}"
-[ -n "${CALLER_REMOTE_DIR}" ] && REMOTE_DIR="${CALLER_REMOTE_DIR}"
+REMOTE_CARGO_PATH: str = (
+    'export PATH="/workspace/miniforge3/bin:$HOME/.cargo/bin:/root/.cargo/bin:/home/ubuntu/.cargo/bin:$PATH" '
+    "&& export OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 OMP_NUM_THREADS=1 "
+    "NUMEXPR_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 PYTEST_XDIST_AUTO_NUM_WORKERS=8 "
+    'XLA_FLAGS="--xla_cpu_multi_thread_eigen=false"'
+)
 
-# 3. Connection Parameters
-REMOTE_HOST="${REMOTE_HOST:-anvil}"
-REMOTE_PORT="${REMOTE_PORT:-}"
-REMOTE_USER="${REMOTE_USER:-root}"
-REMOTE_KEY="${REMOTE_KEY:-}"
-REMOTE_DIR="${REMOTE_DIR:-}"
-MIN_TOPS="${MIN_TOPS:-${ANVIL_MIN_TOPS:-50.0}}"
-MAX_COST="${MAX_COST:-${ANVIL_MAX_COST:-${MAX_DPH:-${ANVIL_MAX_DPH:-1.50}}}}"
-
-# SSH & Rsync Options
-SSH_BASE_OPTS="-o ServerAliveInterval=30 -o ServerAliveCountMax=120 -o TCPKeepAlive=yes -o StrictHostKeyChecking=accept-new"
-
-SSH_PORT_OPT=""
-if [ -n "${REMOTE_PORT}" ]; then
-    SSH_PORT_OPT="-p ${REMOTE_PORT}"
-fi
-
-SSH_KEY_OPT=""
-if [ -n "${REMOTE_KEY}" ] && [ -f "${REMOTE_KEY}" ]; then
-    SSH_KEY_OPT="-i ${REMOTE_KEY}"
-fi
-
-SSH_TARGET="${REMOTE_HOST}"
-if [ -n "${REMOTE_USER}" ] && [[ "${REMOTE_HOST}" != *"@"* ]]; then
-    SSH_TARGET="${REMOTE_USER}@${REMOTE_HOST}"
-fi
-
-SSH_OPTS="${SSH_BASE_OPTS} ${SSH_PORT_OPT} ${SSH_KEY_OPT}"
-RSYNC_SSH="ssh ${SSH_OPTS}"
-
-# 4. Remote Execution Paths
-DEFAULT_REMOTE_ENV="base"
-if [ "${REPO_NAME}" = "firmware" ]; then
-    DEFAULT_REMOTE_ENV="firmware-env"
-elif [ "${REPO_NAME}" = "hardware" ]; then
-    DEFAULT_REMOTE_ENV="cq"
-elif [ "${REPO_NAME}" = "ssd" ] || [ "${REPO_NAME}" = "SSD" ] || [ "${REPO_NAME}" = "predict" ] || [ "${REPO_NAME}" = "stalking" ]; then
-    DEFAULT_REMOTE_ENV="predict-env"
-fi
-
-REMOTE_CONDA="source \$(if [ -f /workspace/miniforge3/etc/profile.d/conda.sh ]; then echo /workspace/miniforge3/etc/profile.d/conda.sh; elif [ -f /home/ubuntu/miniforge3/etc/profile.d/conda.sh ]; then echo /home/ubuntu/miniforge3/etc/profile.d/conda.sh; else echo \$HOME/miniforge3/etc/profile.d/conda.sh; fi 2>/dev/null) 2>/dev/null && ENV_NAME=\$(conda env list 2>/dev/null | grep -E '^${DEFAULT_REMOTE_ENV} ' | awk '{print \$1}' | head -n 1 || (conda env list 2>/dev/null | grep -E '^firmware-env |^cq |^predict-env |^stalking-env ' | awk '{print \$1}' | head -n 1) || echo 'base') && conda run -n \$ENV_NAME --no-capture-output"
-REMOTE_CARGO_PATH="export PATH=\"/workspace/miniforge3/bin:\$HOME/.cargo/bin:/root/.cargo/bin:/home/ubuntu/.cargo/bin:\$PATH\" && export OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 OMP_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 PYTEST_XDIST_AUTO_NUM_WORKERS=8 XLA_FLAGS=\"--xla_cpu_multi_thread_eigen=false\""
-
-# 5. Helper Functions
-run_vast_manager() {
-    local mgr_path=""
-    if [ -f "${REPO_DIR}/tools/vast_manager.py" ]; then
-        mgr_path="${REPO_DIR}/tools/vast_manager.py"
-    elif [ -f "${REPO_DIR}/bin/vast_manager.py" ]; then
-        mgr_path="${REPO_DIR}/bin/vast_manager.py"
-    elif [ -f "${HOME}/.local/share/anvil/vast_manager.py" ]; then
-        mgr_path="${HOME}/.local/share/anvil/vast_manager.py"
-    fi
-
-    if [ -z "${mgr_path}" ]; then
-        echo "❌ vast_manager.py not found in repo or ~/.local/share/anvil/" >&2
-        return 1
-    fi
-
-    if command -v python3 &>/dev/null; then
-        python3 "${mgr_path}" "$@"
-    else
-        python "${mgr_path}" "$@"
-    fi
-}
-
-acquire_lock() {
-    run_vast_manager lock --pid $$ --repo "${REPO_NAME}" "$@" 2>/dev/null || true
-}
-
-release_lock() {
-    run_vast_manager unlock --pid $$ 2>/dev/null || true
-}
-
-resolve_remote_dir() {
-    if [ -z "${REMOTE_DIR}" ]; then
-        REMOTE_DIR=$(ssh ${SSH_OPTS} "${SSH_TARGET}" "if [ -d /workspace ]; then echo /workspace/${REPO_NAME}; else echo \$HOME/${REPO_NAME}; fi" 2>/dev/null || echo "/workspace/${REPO_NAME}")
-    fi
-}
-
-sync_code() {
-    resolve_remote_dir
-    echo "📦 Syncing repository to ${SSH_TARGET}:${REMOTE_DIR}..."
-    ssh ${SSH_OPTS} "${SSH_TARGET}" "mkdir -p ${REMOTE_DIR}"
-    rsync -az --delete -e "${RSYNC_SSH}" \
-        --exclude '.git' \
-        --exclude '/target' \
-        --exclude '/build' \
-        --exclude '/build_temp' \
-        --exclude '/build_test_tmp' \
-        --exclude '/tmp' \
-        --exclude '__pycache__' \
-        --exclude '*.pyc' \
-        --exclude '.pytest_cache' \
-        --exclude '.ruff_cache' \
-        --exclude '.mypy_cache' \
-        --exclude '.venv' \
-        --exclude 'venv' \
-        --exclude '*.rrd' \
-        --exclude '*.mp4' \
-        --exclude '*.MOV' \
-        --exclude '*.mov' \
-        --exclude '.anvil.env*' \
-        --exclude '.anvil.lock*' \
-        "${REPO_DIR}/" "${SSH_TARGET}:${REMOTE_DIR}/"
-    if [ -f "${REPO_DIR}/target/host_session.json" ]; then
-        ssh ${SSH_OPTS} "${SSH_TARGET}" "mkdir -p ${REMOTE_DIR}/target" 2>/dev/null || true
-        rsync -az -e "${RSYNC_SSH}" "${REPO_DIR}/target/host_session.json" "${SSH_TARGET}:${REMOTE_DIR}/target/host_session.json" 2>/dev/null || true
-    fi
-}
-
-pull_file() {
-    resolve_remote_dir
-    local remote_path="$1"
-    local local_dest="${2:-$1}"
-    local local_dir
-    local_dir="$(dirname "${REPO_DIR}/${local_dest}")"
-    mkdir -p "${local_dir}"
-    if ssh ${SSH_OPTS} "${SSH_TARGET}" "[ -e '${REMOTE_DIR}/${remote_path}' ]" 2>/dev/null; then
-        echo "📥 Downloading ${SSH_TARGET}:${REMOTE_DIR}/${remote_path} -> ${REPO_DIR}/${local_dest}..."
-        rsync -avz -e "${RSYNC_SSH}" "${SSH_TARGET}:${REMOTE_DIR}/${remote_path}" "${REPO_DIR}/${local_dest}"
-        echo "✅ Download complete."
-    else
-        echo "⚠️ Remote path ${remote_path} was not found on ${SSH_TARGET}."
-    fi
-}
-
-pull_recordings() {
-    resolve_remote_dir
-    local target_dir="${1:-recordings}"
-    mkdir -p "${REPO_DIR}/${target_dir}"
-    echo "📥 Syncing all preview artifacts and recordings from ${SSH_TARGET}:${REMOTE_DIR}/${target_dir}/..."
-    rsync -avz -e "${RSYNC_SSH}" "${SSH_TARGET}:${REMOTE_DIR}/${target_dir}/" "${REPO_DIR}/${target_dir}/"
-    echo "✅ Recordings synced."
-}
-
-pull_stages() {
-    resolve_remote_dir
-    local target_dir="${1:-recordings}"
-    mkdir -p "${REPO_DIR}/${target_dir}"
-    echo "📥 Syncing all staged .rrd recordings from ${SSH_TARGET}:${REMOTE_DIR}/${target_dir}/..."
-    rsync -avz -e "${RSYNC_SSH}" --include='*.rrd' --include='*/' --exclude='*' "${SSH_TARGET}:${REMOTE_DIR}/${target_dir}/" "${REPO_DIR}/${target_dir}/"
-    echo "✅ Staged recordings synced."
-}
-
-auto_download_simulate() {
-    for arg in "$@"; do
-        local file_path="${arg#*=}"
-        if [[ "$file_path" == *.rrd ]] || [[ "$file_path" == *.mp4 ]]; then
-            echo "📥 Auto-downloading generated artifact: ${file_path}..."
-            pull_file "${file_path}"
-        fi
-    done
-}
-
-kill_remote_pytest() {
-    echo "🛑 Terminating preceding pytest runs on ${SSH_TARGET}..."
-    ssh ${SSH_OPTS} "${SSH_TARGET}" "pkill -9 -f 'pytest|execnet|readline' 2>/dev/null || true" 2>/dev/null || true
-}
-
-kill_remote_verify() {
-    echo "🛑 Terminating preceding verification runs on ${SSH_TARGET}..."
-    ssh ${SSH_OPTS} "${SSH_TARGET}" "pkill -9 -f 'verify.sh|validate_all.py|cargo-nextest|cargo test|pytest' 2>/dev/null || true" 2>/dev/null || true
-}
-
-kill_remote_daemon() {
-    echo "🛑 Terminating daemon and simulation processes on ${SSH_TARGET}..."
-    ssh ${SSH_OPTS} "${SSH_TARGET}" "pkill -9 -f 'host.py|forge.py|motor_stress.py|daemon.py|scope.py|smoke.py' 2>/dev/null || true" 2>/dev/null || true
-}
-
-bootstrap_remote() {
-    local target="${1:-${REPO_NAME}}"
-    echo "🚀 Bootstrapping remote environment on ${SSH_TARGET} (Target: ${target})..."
-    local max_attempts=5
-    local attempt=1
-    while [ "${attempt}" -le "${max_attempts}" ]; do
-        if run_vast_manager bootstrap-script --target "${target}" | ssh ${SSH_OPTS} "${SSH_TARGET}" "bash -s"; then
-            echo "✅ Bootstrap complete on ${SSH_TARGET}."
-            return 0
-        fi
-        if [ "${attempt}" -lt "${max_attempts}" ]; then
-            echo "⚠️ SSH connection to ${SSH_TARGET} not ready yet (attempt ${attempt}/${max_attempts}); retrying in 3s..."
-            sleep 3
-        fi
-        attempt=$((attempt + 1))
-    done
-    echo "❌ Failed to bootstrap remote environment on ${SSH_TARGET} after ${max_attempts} attempts." >&2
-    return 1
-}
-
-# 6. CLI Subcommand Dispatch
-case "$1" in
-    provision)
-        shift
-        run_vast_manager provision "$@"
-        if [[ "$*" != *"--no-bootstrap"* ]]; then
-            # Reload freshly written ~/.anvil.env
-            if [ -f "${GLOBAL_ENV_FILE}" ]; then
-                # shellcheck disable=SC1090
-                source "${GLOBAL_ENV_FILE}"
-            fi
-            SSH_PORT_OPT=""
-            [ -n "${REMOTE_PORT}" ] && SSH_PORT_OPT="-p ${REMOTE_PORT}"
-            SSH_TARGET="${REMOTE_HOST}"
-            [ -n "${REMOTE_USER}" ] && [[ "${REMOTE_HOST}" != *"@"* ]] && SSH_TARGET="${REMOTE_USER}@${REMOTE_HOST}"
-            SSH_OPTS="${SSH_BASE_OPTS} ${SSH_PORT_OPT} ${SSH_KEY_OPT}"
-            RSYNC_SSH="ssh ${SSH_OPTS}"
-            bootstrap_remote "${REPO_NAME}"
-        fi
-        ;;
-    bootstrap|setup)
-        shift
-        bootstrap_remote "${1:-${REPO_NAME}}"
-        ;;
-    release|destroy)
-        shift
-        run_vast_manager release "$@"
-        ;;
-    reboot|restart)
-        shift
-        run_vast_manager reboot "$@"
-        ;;
-    auto-release|cob)
-        shift
-        run_vast_manager auto-release "$@"
-        ;;
-    status|info)
-        shift
-        run_vast_manager status "$@"
-        ;;
-    sync|push)
-        acquire_lock "$@"
-        trap release_lock EXIT INT TERM
-        sync_code
-        echo "✅ Sync complete."
-        ;;
-    pull|fetch|get|download)
-        shift
-        if [ $# -eq 0 ]; then
-            echo "Usage: tools/anvil pull <remote_path> [local_dest]"
-            exit 1
-        fi
-        pull_file "$1" "$2"
-        ;;
-    recordings|previews)
-        shift
-        pull_recordings "$1"
-        ;;
-    stages|checkpoints)
-        shift
-        pull_stages "$1"
-        ;;
-    combine|merge)
-        shift
-        echo "✨ Combining staged RRD recordings..."
-        python -c "
-import sys, os, glob
-sys.path.insert(0, os.path.abspath('.'))
-from provider.utils import merge_rrd_recordings
-
-args = sys.argv[1:]
-out = 'recordings/sim_combined.rrd'
-inputs = []
-if '-o' in args:
-    idx = args.index('-o')
-    out = args[idx + 1]
-    inputs = args[:idx] + args[idx + 2:]
-else:
-    inputs = args
-
-if not inputs:
-    inputs = sorted(glob.glob('recordings/sim_*.rrd'))
-
-inputs = [f for f in inputs if os.path.abspath(f) != os.path.abspath(out)]
-if not inputs:
-    print('No input RRD files found to combine.')
-    sys.exit(1)
-
-merge_rrd_recordings(inputs, out)
-print(f'✅ Successfully merged {len(inputs)} recording(s) into {out}')
-" "$@"
-        ;;
-    kill|stop)
-        kill_remote_pytest
-        kill_remote_verify
-        kill_remote_daemon
-        echo "✅ Remote processes cleaned up on ${SSH_TARGET}."
-        ;;
-    pytest)
-        shift
-        acquire_lock "pytest $*"
-        trap 'kill_remote_pytest; release_lock' EXIT INT TERM
-        kill_remote_pytest
-        sync_code
-        echo "🧪 Running pytest on ${SSH_TARGET}..."
-        if [ $# -gt 0 ]; then
-            cmd_args=$(printf ' %q' "$@")
-        else
-            cmd_args=""
-        fi
-        worker_opt=""
-        if [[ "$*" != *"-n "* ]] && [[ "$*" != *"--numprocesses"* ]]; then
-            worker_opt=" -n 8"
-        fi
-        ssh ${SSH_OPTS} "${SSH_TARGET}" "cd ${REMOTE_DIR} && ${REMOTE_CARGO_PATH} && ${REMOTE_CONDA} taskset -c 0-7 pytest${worker_opt}${cmd_args}"
-        ;;
-    verify)
-        shift
-        acquire_lock "verify $*"
-        trap 'kill_remote_verify; release_lock' EXIT INT TERM
-        kill_remote_verify
-        sync_code
-        echo "🔍 Running pre-commit verification on ${SSH_TARGET}..."
-        ssh ${SSH_OPTS} "${SSH_TARGET}" "cd ${REMOTE_DIR} && ${REMOTE_CARGO_PATH} && taskset -c 0-7 ./tools/verify.sh $*"
-        ;;
-    cargo)
-        shift
-        acquire_lock "cargo $*"
-        trap release_lock EXIT INT TERM
-        sync_code
-        echo "🦀 Running cargo on ${SSH_TARGET}: cargo $*"
-        ssh ${SSH_OPTS} "${SSH_TARGET}" "cd ${REMOTE_DIR} && ${REMOTE_CARGO_PATH} && cargo $*"
-        ;;
-    cli)
-        shift
-        if [ $# -eq 0 ]; then
-            echo "Usage: tools/anvil cli <command...>"
-            exit 1
-        fi
-        acquire_lock "cli $*"
-        trap release_lock EXIT INT TERM
-        sync_code
-        echo "🔌 Reverse proxying host CLI to local daemon (127.0.0.1:8899) and executing on ${SSH_TARGET}..."
-        cmd_args=$(printf ' %q' "$@")
-        ssh ${SSH_OPTS} -R 8899:127.0.0.1:8899 "${SSH_TARGET}" "cd ${REMOTE_DIR} && ${REMOTE_CARGO_PATH} && ${REMOTE_CONDA} python tools/host.py cli${cmd_args}"
-        ;;
-    host)
-        shift
-        if [ $# -eq 0 ]; then
-            echo "Usage: tools/anvil host <subcommand...> [args...]"
-            exit 1
-        fi
-        acquire_lock "host $*"
-        trap release_lock EXIT INT TERM
-        sync_code
-        echo "🔌 Reverse proxying host command to local daemon (127.0.0.1:8899) and executing on ${SSH_TARGET}..."
-        cmd_args=$(printf ' %q' "$@")
-        ssh ${SSH_OPTS} -R 8899:127.0.0.1:8899 "${SSH_TARGET}" "cd ${REMOTE_DIR} && ${REMOTE_CARGO_PATH} && ${REMOTE_CONDA} python tools/host.py${cmd_args}"
-        ;;
-    simulate)
-        shift
-        acquire_lock "simulate $*"
-        trap 'kill_remote_daemon; release_lock' EXIT INT TERM
-        kill_remote_daemon
-        sync_code
-        echo "🌊 Running simulation on ${SSH_TARGET}..."
-        ssh ${SSH_OPTS} "${SSH_TARGET}" "cd ${REMOTE_DIR} && ${REMOTE_CONDA} python tools/scope.py $*"
-        auto_download_simulate "$@"
-        ;;
-    smoke)
-        shift
-        acquire_lock "smoke $*"
-        trap 'kill_remote_daemon; release_lock' EXIT INT TERM
-        kill_remote_daemon
-        sync_code
-        echo "🚀 Running smoke test suite on ${SSH_TARGET}..."
-        ssh ${SSH_OPTS} "${SSH_TARGET}" "cd ${REMOTE_DIR} && ${REMOTE_CONDA} pytest -n 0 tools/smoke.py"
-        ;;
-    run|exec)
-        shift
-        acquire_lock "run $*"
-        trap release_lock EXIT INT TERM
-        sync_code
-        echo "⚡ Executing command on ${SSH_TARGET}: $*"
-        ssh ${SSH_OPTS} "${SSH_TARGET}" "cd ${REMOTE_DIR} && ${REMOTE_CARGO_PATH} && ${REMOTE_CONDA} $*"
-        ;;
-    *)
-        if [ $# -eq 0 ]; then
-            cat <<EOF
-Usage: tools/anvil <command> [args...]
+USAGE_TEXT: str = """Usage: tools/anvil <command> [args...]
 
 Instance Lifecycle Subcommands:
   provision [--image ubuntu:22.04] [--disk 40] [--min-tops 50] [--max-cost 1.50]  Provision new Vast.ai instance and write ~/.anvil.env
@@ -446,14 +89,713 @@ Workspace Execution Subcommands:
   simulate [args...]                             Run simulation on remote GPU and auto-download results
   smoke                                          Run integration smoke test suite
   run <command...>                               Sync and run arbitrary shell command on cloud container
-  stop / kill                                    Terminate remote running test and simulation processes
-EOF
-            exit 1
-        fi
-        acquire_lock "$*"
-        trap release_lock EXIT INT TERM
-        sync_code
-        echo "⚡ Executing command on ${SSH_TARGET}: $*"
-        ssh ${SSH_OPTS} "${SSH_TARGET}" "cd ${REMOTE_DIR} && ${REMOTE_CARGO_PATH} && ${REMOTE_CONDA} $*"
-        ;;
-esac
+  stop / kill                                    Terminate remote running test and simulation processes"""
+
+
+def parse_shell_env_file(path: Path) -> Dict[str, str]:
+    """Parse `KEY=VALUE` or `export KEY="VALUE"` lines from `.anvil.env`."""
+    values: Dict[str, str] = {}
+    if not path.is_file():
+        return values
+    try:
+        raw_lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return values
+
+    for raw_line in raw_lines:
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export ") :].strip()
+        if "=" not in line:
+            continue
+        key, val = line.split("=", 1)
+        key = key.strip()
+        val = val.strip()
+        if len(val) >= 2 and val[0] == val[-1] and val[0] in ('"', "'"):
+            val = val[1:-1]
+        values[key] = val
+    return values
+
+
+def resolve_repo_dir() -> Path:
+    """Resolve current git repository root (falling back to current working directory)."""
+    try:
+        proc = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if proc.returncode == 0 and proc.stdout.strip():
+            return Path(proc.stdout.strip()).resolve()
+    except OSError:
+        pass
+    return Path.cwd().resolve()
+
+
+def default_remote_conda_env(repo_name: str) -> str:
+    """Return canonical conda environment name for `repo_name`."""
+    lower = repo_name.lower()
+    if lower == "firmware":
+        return "firmware-env"
+    if lower == "hardware":
+        return "cq"
+    if lower in ("ssd", "predict", "stalking"):
+        return "predict-env"
+    return "base"
+
+
+def build_remote_conda_prefix(default_env: str) -> str:
+    """Build shell snippet activating `conda run` on the remote Vast.ai instance."""
+    return (
+        "source $(if [ -f /workspace/miniforge3/etc/profile.d/conda.sh ]; then "
+        "echo /workspace/miniforge3/etc/profile.d/conda.sh; "
+        "elif [ -f /home/ubuntu/miniforge3/etc/profile.d/conda.sh ]; then "
+        "echo /home/ubuntu/miniforge3/etc/profile.d/conda.sh; "
+        "else echo $HOME/miniforge3/etc/profile.d/conda.sh; fi 2>/dev/null) 2>/dev/null "
+        f"&& ENV_NAME=$(conda env list 2>/dev/null | grep -E '^{default_env} ' | awk '{{print $1}}' | head -n 1 "
+        "|| (conda env list 2>/dev/null | grep -E '^firmware-env |^cq |^predict-env |^stalking-env ' "
+        "| awk '{print $1}' | head -n 1) || echo 'base') "
+        "&& conda run -n $ENV_NAME --no-capture-output"
+    )
+
+
+def format_shell_args(args: Sequence[str]) -> str:
+    """Format command arguments safely for remote shell execution while keeping clean tokens unquoted."""
+    safe_chars = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_./:=+-@")
+    formatted: List[str] = []
+    for arg in args:
+        if arg and all(ch in safe_chars for ch in arg):
+            formatted.append(arg)
+        else:
+            formatted.append(shlex.quote(arg))
+    return " ".join(formatted)
+
+
+def is_local_port_listening(host: str, port: int) -> bool:
+    """Return True if a local TCP listener (such as `host.py` on 8899) is accepting connections."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(0.25)
+            return sock.connect_ex((host, port)) == 0
+    except OSError:
+        return False
+
+
+class AnvilRunner:
+    """Orchestrates SSH/rsync workspace sync, Vast.ai lifecycle, and remote command execution."""
+
+    def __init__(self) -> None:
+        """Load configuration from caller environment, `~/.anvil.env`, and `<repo>/.anvil.env`."""
+        self.repo_dir: Path = resolve_repo_dir()
+        self.repo_name: str = self.repo_dir.name
+        self.global_env_file: Path = Path.home() / ".anvil.env"
+        self.local_env_file: Path = self.repo_dir / ".anvil.env"
+
+        self._caller_overrides: Dict[str, str] = {}
+        for key in ("REMOTE_HOST", "REMOTE_PORT", "REMOTE_USER", "REMOTE_DIR", "REMOTE_KEY"):
+            val = os.environ.get(key, "").strip()
+            if val:
+                self._caller_overrides[key] = val
+
+        self.remote_host: str = DEFAULT_REMOTE_HOST
+        self.remote_port: str = ""
+        self.remote_user: str = DEFAULT_REMOTE_USER
+        self.remote_key: str = ""
+        self.remote_dir: str = ""
+        self.reload_config()
+
+        default_env = default_remote_conda_env(self.repo_name)
+        self.remote_conda: str = build_remote_conda_prefix(default_env)
+        self._cleanup_callbacks: List[Callable[[], None]] = []
+
+    def reload_config(self) -> None:
+        """Reload `.anvil.env` files and apply explicit caller environment overrides."""
+        merged: Dict[str, str] = {}
+        merged.update(parse_shell_env_file(self.global_env_file))
+        merged.update(parse_shell_env_file(self.local_env_file))
+        merged.update(self._caller_overrides)
+
+        self.remote_host = merged.get("REMOTE_HOST") or DEFAULT_REMOTE_HOST
+        self.remote_port = merged.get("REMOTE_PORT") or ""
+        self.remote_user = merged.get("REMOTE_USER") or DEFAULT_REMOTE_USER
+        self.remote_key = merged.get("REMOTE_KEY") or ""
+        self.remote_dir = merged.get("REMOTE_DIR") or ""
+
+    @property
+    def ssh_target(self) -> str:
+        """Return `[user@]host` SSH destination string."""
+        if self.remote_user and "@" not in self.remote_host:
+            return f"{self.remote_user}@{self.remote_host}"
+        return self.remote_host
+
+    @property
+    def ssh_opts(self) -> List[str]:
+        """Return list of SSH CLI option tokens including dynamic port and identity key."""
+        opts = list(SSH_BASE_OPTS)
+        if self.remote_port:
+            opts.extend(["-p", self.remote_port])
+        if self.remote_key and Path(self.remote_key).is_file():
+            opts.extend(["-i", self.remote_key])
+        return opts
+
+    @property
+    def rsync_ssh(self) -> str:
+        """Return `-e` transport string passed to `rsync`."""
+        return "ssh " + " ".join(self.ssh_opts)
+
+    def find_vast_manager(self) -> Optional[Path]:
+        """Locate `vast_manager.py` in the workspace or `~/.local/share/anvil/`."""
+        candidates = [
+            self.repo_dir / "tools" / "vast_manager.py",
+            self.repo_dir / "bin" / "vast_manager.py",
+            Path.home() / ".local" / "share" / "anvil" / "vast_manager.py",
+        ]
+        return next((p for p in candidates if p.is_file()), None)
+
+    def run_vast_manager(
+        self,
+        args: Sequence[str],
+        *,
+        quiet_errors: bool = False,
+        capture_stdout: bool = False,
+    ) -> subprocess.CompletedProcess[str]:
+        """Execute `vast_manager.py` with `args`."""
+        mgr = self.find_vast_manager()
+        if mgr is None:
+            if not quiet_errors:
+                print("❌ vast_manager.py not found in repo or ~/.local/share/anvil/", file=sys.stderr)
+            return subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr="missing vast_manager.py")
+
+        cmd = [sys.executable, str(mgr), *args]
+        try:
+            return subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE if capture_stdout else None,
+                stderr=subprocess.DEVNULL if quiet_errors else None,
+                text=True,
+                check=False,
+            )
+        except OSError as exc:
+            if not quiet_errors:
+                print(f"❌ Failed to run vast_manager.py: {exc}", file=sys.stderr)
+            return subprocess.CompletedProcess(args=cmd, returncode=1, stdout="", stderr=str(exc))
+
+    def acquire_lock(self, description: str) -> None:
+        """Record active PID lock in `~/.anvil.lock`."""
+        self.run_vast_manager(
+            ["lock", "--pid", str(os.getpid()), "--repo", self.repo_name, description],
+            quiet_errors=True,
+        )
+
+    def release_lock(self) -> None:
+        """Remove active PID lock from `~/.anvil.lock`."""
+        self.run_vast_manager(["unlock", "--pid", str(os.getpid())], quiet_errors=True)
+
+    def register_cleanup(self, fn: Callable[[], None]) -> None:
+        """Register cleanup callback executed on process exit, SIGINT, or SIGTERM."""
+        self._cleanup_callbacks.append(fn)
+
+    def run_cleanups(self) -> None:
+        """Run and clear registered cleanup callbacks in LIFO order."""
+        while self._cleanup_callbacks:
+            cb = self._cleanup_callbacks.pop()
+            cb()
+
+    def run_ssh(
+        self,
+        remote_cmd: str,
+        *,
+        extra_ssh_opts: Sequence[str] = (),
+        capture_output: bool = False,
+        quiet_errors: bool = False,
+    ) -> subprocess.CompletedProcess[str]:
+        """Execute `remote_cmd` over SSH on `self.ssh_target`."""
+        cmd = ["ssh", *self.ssh_opts, *extra_ssh_opts, self.ssh_target, remote_cmd]
+        try:
+            return subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE if capture_output else None,
+                stderr=subprocess.DEVNULL if quiet_errors else (subprocess.PIPE if capture_output else None),
+                text=True,
+                check=False,
+            )
+        except OSError as exc:
+            return subprocess.CompletedProcess(args=cmd, returncode=1, stdout="", stderr=str(exc))
+
+    def resolve_remote_dir(self) -> str:
+        """Resolve `/workspace/<repo>` (falling back to `$HOME/<repo>`) on the remote host."""
+        if self.remote_dir:
+            return self.remote_dir
+        probe = self.run_ssh(
+            f"if [ -d /workspace ]; then echo /workspace/{self.repo_name}; else echo $HOME/{self.repo_name}; fi",
+            capture_output=True,
+            quiet_errors=True,
+        )
+        resolved = (
+            probe.stdout.strip().splitlines()[-1].strip() if (probe.returncode == 0 and probe.stdout.strip()) else ""
+        )
+        self.remote_dir = resolved or f"/workspace/{self.repo_name}"
+        return self.remote_dir
+
+    def sync_code(self) -> int:
+        """Synchronize local repository working tree to `remote_dir` via `rsync`."""
+        target_dir = self.resolve_remote_dir()
+        print(f"📦 Syncing repository to {self.ssh_target}:{target_dir}...")
+        mkdir_res = self.run_ssh(f"mkdir -p {target_dir}")
+        if mkdir_res.returncode != 0:
+            return mkdir_res.returncode
+
+        rsync_cmd: List[str] = ["rsync", "-az", "--delete", "-e", self.rsync_ssh]
+        for pattern in RSYNC_EXCLUDES:
+            rsync_cmd.extend(["--exclude", pattern])
+        rsync_cmd.extend([f"{self.repo_dir}/", f"{self.ssh_target}:{target_dir}/"])
+
+        try:
+            res = subprocess.run(rsync_cmd, check=False)
+        except OSError as exc:
+            print(f"❌ rsync failed: {exc}", file=sys.stderr)
+            return 1
+        if res.returncode != 0:
+            return res.returncode
+
+        self.run_ssh(
+            f"if [ ! -d '{target_dir}/.git' ]; then "
+            f"cd '{target_dir}' && git init -q && git config user.name 'User' "
+            f"&& git config user.email 'user@workspace' && git add -A "
+            f"&& git commit -q -m 'Initial anvil workspace sync' --allow-empty; fi",
+            quiet_errors=True,
+        )
+
+        host_session = self.repo_dir / "target" / "host_session.json"
+        if host_session.is_file():
+            self.run_ssh(f"mkdir -p {target_dir}/target", quiet_errors=True)
+            try:
+                subprocess.run(
+                    [
+                        "rsync",
+                        "-az",
+                        "-e",
+                        self.rsync_ssh,
+                        str(host_session),
+                        f"{self.ssh_target}:{target_dir}/target/host_session.json",
+                    ],
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                )
+            except OSError:
+                pass
+        return 0
+
+    def pull_file(self, remote_path: str, local_dest: Optional[str] = None) -> int:
+        """Download `remote_path` from the cloud container into the local workspace."""
+        target_dir = self.resolve_remote_dir()
+        dest_rel = local_dest or remote_path
+        dest_abs = self.repo_dir / dest_rel
+        dest_abs.parent.mkdir(parents=True, exist_ok=True)
+
+        exists_res = self.run_ssh(f"[ -e '{target_dir}/{remote_path}' ]", quiet_errors=True)
+        if exists_res.returncode == 0:
+            print(f"📥 Downloading {self.ssh_target}:{target_dir}/{remote_path} -> {dest_abs}...")
+            try:
+                res = subprocess.run(
+                    [
+                        "rsync",
+                        "-avz",
+                        "-e",
+                        self.rsync_ssh,
+                        f"{self.ssh_target}:{target_dir}/{remote_path}",
+                        str(dest_abs),
+                    ],
+                    check=False,
+                )
+            except OSError as exc:
+                print(f"❌ rsync failed: {exc}", file=sys.stderr)
+                return 1
+            if res.returncode == 0:
+                print("✅ Download complete.")
+            return res.returncode
+
+        print(f"⚠️ Remote path {remote_path} was not found on {self.ssh_target}.")
+        return 0
+
+    def pull_recordings(self, target_subdir: str = "recordings") -> int:
+        """Sync preview artifacts and recordings directory from the remote container."""
+        remote_root = self.resolve_remote_dir()
+        local_dir = self.repo_dir / target_subdir
+        local_dir.mkdir(parents=True, exist_ok=True)
+        print(
+            f"📥 Syncing all preview artifacts and recordings from {self.ssh_target}:{remote_root}/{target_subdir}/..."
+        )
+        try:
+            res = subprocess.run(
+                [
+                    "rsync",
+                    "-avz",
+                    "-e",
+                    self.rsync_ssh,
+                    f"{self.ssh_target}:{remote_root}/{target_subdir}/",
+                    f"{local_dir}/",
+                ],
+                check=False,
+            )
+        except OSError as exc:
+            print(f"❌ rsync failed: {exc}", file=sys.stderr)
+            return 1
+        if res.returncode == 0:
+            print("✅ Recordings synced.")
+        return res.returncode
+
+    def pull_stages(self, target_subdir: str = "recordings") -> int:
+        """Sync staged `.rrd` checkpoints from the remote container."""
+        remote_root = self.resolve_remote_dir()
+        local_dir = self.repo_dir / target_subdir
+        local_dir.mkdir(parents=True, exist_ok=True)
+        print(f"📥 Syncing all staged .rrd recordings from {self.ssh_target}:{remote_root}/{target_subdir}/...")
+        try:
+            res = subprocess.run(
+                [
+                    "rsync",
+                    "-avz",
+                    "-e",
+                    self.rsync_ssh,
+                    "--include=*.rrd",
+                    "--include=*/",
+                    "--exclude=*",
+                    f"{self.ssh_target}:{remote_root}/{target_subdir}/",
+                    f"{local_dir}/",
+                ],
+                check=False,
+            )
+        except OSError as exc:
+            print(f"❌ rsync failed: {exc}", file=sys.stderr)
+            return 1
+        if res.returncode == 0:
+            print("✅ Staged recordings synced.")
+        return res.returncode
+
+    def auto_download_simulate(self, args: Sequence[str]) -> None:
+        """Automatically pull `.rrd` or `.mp4` output paths passed to `simulate`."""
+        for arg in args:
+            file_path = arg.split("=", 1)[-1]
+            if file_path.endswith((".rrd", ".mp4")):
+                print(f"📥 Auto-downloading generated artifact: {file_path}...")
+                self.pull_file(file_path)
+
+    def kill_remote_pytest(self) -> None:
+        """Terminate preceding `pytest` workers on the remote container."""
+        print(f"🛑 Terminating preceding pytest runs on {self.ssh_target}...")
+        self.run_ssh("pkill -9 -f 'pytest|execnet|readline' 2>/dev/null || true", quiet_errors=True)
+
+    def kill_remote_verify(self) -> None:
+        """Terminate preceding verification runs on the remote container."""
+        print(f"🛑 Terminating preceding verification runs on {self.ssh_target}...")
+        self.run_ssh(
+            "pkill -9 -f 'verify.py|validate_all.py|cargo-nextest|cargo test|pytest' 2>/dev/null || true",
+            quiet_errors=True,
+        )
+
+    def kill_remote_daemon(self) -> None:
+        """Terminate remote daemon, scope, and smoke processes."""
+        print(f"🛑 Terminating daemon and simulation processes on {self.ssh_target}...")
+        self.run_ssh(
+            "pkill -9 -f 'host.py|forge.py|motor_stress.py|daemon.py|scope.py|smoke.py' 2>/dev/null || true",
+            quiet_errors=True,
+        )
+
+    def bootstrap_remote(self, target: Optional[str] = None) -> int:
+        """Stream `vast_manager.py bootstrap-script` into `bash -s` on the remote VM with retries."""
+        resolved_target = target or self.repo_name
+        print(f"🚀 Bootstrapping remote environment on {self.ssh_target} (Target: {resolved_target})...")
+        script_res = self.run_vast_manager(["bootstrap-script", "--target", resolved_target], capture_stdout=True)
+        if script_res.returncode != 0 or not script_res.stdout:
+            print("❌ Failed to generate bootstrap script via vast_manager.py.", file=sys.stderr)
+            return 1
+
+        for attempt in range(1, BOOTSTRAP_MAX_ATTEMPTS + 1):
+            ssh_cmd = ["ssh", *self.ssh_opts, self.ssh_target, "bash -s"]
+            try:
+                proc = subprocess.run(ssh_cmd, input=script_res.stdout, text=True, check=False)
+            except OSError:
+                proc = subprocess.CompletedProcess(args=ssh_cmd, returncode=1)
+            if proc.returncode == 0:
+                print(f"✅ Bootstrap complete on {self.ssh_target}.")
+                return 0
+            if attempt < BOOTSTRAP_MAX_ATTEMPTS:
+                print(
+                    f"⚠️ SSH connection to {self.ssh_target} not ready yet "
+                    f"(attempt {attempt}/{BOOTSTRAP_MAX_ATTEMPTS}); retrying in {int(BOOTSTRAP_RETRY_SEC)}s..."
+                )
+                time.sleep(BOOTSTRAP_RETRY_SEC)
+
+        print(
+            f"❌ Failed to bootstrap remote environment on {self.ssh_target} after {BOOTSTRAP_MAX_ATTEMPTS} attempts.",
+            file=sys.stderr,
+        )
+        return 1
+
+    def combine_recordings(self, args: Sequence[str]) -> int:
+        """Combine staged `.rrd` recordings into a unified `.rrd` file locally."""
+        print("✨ Combining staged RRD recordings...")
+        sys.path.insert(0, str(self.repo_dir))
+        from provider.utils import merge_rrd_recordings  # type: ignore[import-not-found]
+
+        arg_list = list(args)
+        out = "recordings/sim_combined.rrd"
+        if "-o" in arg_list:
+            idx = arg_list.index("-o")
+            out = arg_list[idx + 1]
+            inputs = arg_list[:idx] + arg_list[idx + 2 :]
+        else:
+            inputs = arg_list
+
+        if not inputs:
+            inputs = sorted(glob.glob(str(self.repo_dir / "recordings" / "sim_*.rrd")))
+
+        out_abs = (self.repo_dir / out).resolve()
+        filtered = [f for f in inputs if Path(f).resolve() != out_abs]
+        if not filtered:
+            print("No input RRD files found to combine.")
+            return 1
+
+        merge_rrd_recordings(filtered, str(out_abs))
+        print(f"✅ Successfully merged {len(filtered)} recording(s) into {out}")
+        return 0
+
+    def dispatch(self, argv: Sequence[str]) -> int:
+        """Parse CLI subcommand and execute corresponding Vast.ai or remote action."""
+        if not argv:
+            print(USAGE_TEXT)
+            return 1
+
+        subcmd = argv[0]
+        rest = list(argv[1:])
+
+        if subcmd in ("-h", "--help", "help"):
+            print(USAGE_TEXT)
+            return 0
+
+        if subcmd == "provision":
+            res = self.run_vast_manager(["provision", *rest])
+            if res.returncode != 0:
+                return res.returncode
+            if "--no-bootstrap" not in rest:
+                self.reload_config()
+                return self.bootstrap_remote(self.repo_name)
+            return 0
+
+        if subcmd in ("bootstrap", "setup"):
+            return self.bootstrap_remote(rest[0] if rest else self.repo_name)
+
+        if subcmd in ("release", "destroy"):
+            return self.run_vast_manager(["release", *rest]).returncode
+
+        if subcmd in ("reboot", "restart"):
+            return self.run_vast_manager(["reboot", *rest]).returncode
+
+        if subcmd in ("auto-release", "cob"):
+            return self.run_vast_manager(["auto-release", *rest]).returncode
+
+        if subcmd in ("status", "info"):
+            return self.run_vast_manager(["status", *rest]).returncode
+
+        if subcmd in ("sync", "push"):
+            self.acquire_lock(f"sync {' '.join(rest)}".strip())
+            self.register_cleanup(self.release_lock)
+            rc = self.sync_code()
+            if rc == 0:
+                print("✅ Sync complete.")
+            return rc
+
+        if subcmd in ("pull", "fetch", "get", "download"):
+            if not rest:
+                print("Usage: tools/anvil pull <remote_path> [local_dest]")
+                return 1
+            return self.pull_file(rest[0], rest[1] if len(rest) > 1 else None)
+
+        if subcmd in ("recordings", "previews"):
+            return self.pull_recordings(rest[0] if rest else "recordings")
+
+        if subcmd in ("stages", "checkpoints"):
+            return self.pull_stages(rest[0] if rest else "recordings")
+
+        if subcmd in ("combine", "merge"):
+            return self.combine_recordings(rest)
+
+        if subcmd in ("kill", "stop"):
+            self.kill_remote_pytest()
+            self.kill_remote_verify()
+            self.kill_remote_daemon()
+            print(f"✅ Remote processes cleaned up on {self.ssh_target}.")
+            return 0
+
+        if subcmd == "pytest":
+            self.acquire_lock(f"pytest {' '.join(rest)}".strip())
+            self.register_cleanup(self.release_lock)
+            self.register_cleanup(self.kill_remote_pytest)
+            self.kill_remote_pytest()
+            rc = self.sync_code()
+            if rc != 0:
+                return rc
+            print(f"🧪 Running pytest on {self.ssh_target}...")
+            joined = f" {' '.join(rest)} "
+            worker_opt = "" if (" -n " in joined or "--numprocesses" in joined) else " -n 8"
+            cmd_suffix = f" {format_shell_args(rest)}" if rest else ""
+            remote_cmd = (
+                f"cd {self.remote_dir} && {REMOTE_CARGO_PATH} "
+                f"&& {self.remote_conda} taskset -c 0-7 pytest{worker_opt}{cmd_suffix}"
+            )
+            return self.run_ssh(remote_cmd).returncode
+
+        if subcmd == "verify":
+            self.acquire_lock(f"verify {' '.join(rest)}".strip())
+            self.register_cleanup(self.release_lock)
+            self.register_cleanup(self.kill_remote_verify)
+            self.kill_remote_verify()
+            rc = self.sync_code()
+            if rc != 0:
+                return rc
+            print(f"🔍 Running pre-commit verification on {self.ssh_target}...")
+            tunnel_opts: List[str] = []
+            if is_local_port_listening(LOCAL_HOST_DAEMON_ADDR, LOCAL_HOST_DAEMON_PORT):
+                tunnel_opts = [
+                    "-o",
+                    "ExitOnForwardFailure=no",
+                    "-R",
+                    f"{LOCAL_HOST_DAEMON_PORT}:{LOCAL_HOST_DAEMON_ADDR}:{LOCAL_HOST_DAEMON_PORT}",
+                ]
+                print(
+                    f"🔌 Local host.py detected on {LOCAL_HOST_DAEMON_ADDR}:{LOCAL_HOST_DAEMON_PORT} — "
+                    "reverse proxying port 8899 for remote device tests..."
+                )
+            cmd_suffix = f" {format_shell_args(rest)}" if rest else ""
+            remote_cmd = (
+                f"cd {self.remote_dir} && {REMOTE_CARGO_PATH} "
+                f"&& {self.remote_conda} taskset -c 0-7 ./tools/verify.py{cmd_suffix}"
+            )
+            return self.run_ssh(remote_cmd, extra_ssh_opts=tunnel_opts).returncode
+
+        if subcmd == "cargo":
+            self.acquire_lock(f"cargo {' '.join(rest)}".strip())
+            self.register_cleanup(self.release_lock)
+            rc = self.sync_code()
+            if rc != 0:
+                return rc
+            cmd_suffix = f" {format_shell_args(rest)}" if rest else ""
+            print(f"🦀 Running cargo on {self.ssh_target}: cargo {' '.join(rest)}")
+            return self.run_ssh(f"cd {self.remote_dir} && {REMOTE_CARGO_PATH} && cargo{cmd_suffix}").returncode
+
+        if subcmd == "cli":
+            if not rest:
+                print("Usage: tools/anvil cli <command...>")
+                return 1
+            self.acquire_lock(f"cli {' '.join(rest)}")
+            self.register_cleanup(self.release_lock)
+            rc = self.sync_code()
+            if rc != 0:
+                return rc
+            print(
+                f"🔌 Reverse proxying host CLI to local daemon "
+                f"({LOCAL_HOST_DAEMON_ADDR}:{LOCAL_HOST_DAEMON_PORT}) and executing on {self.ssh_target}..."
+            )
+            remote_cmd = (
+                f"cd {self.remote_dir} && {REMOTE_CARGO_PATH} "
+                f"&& {self.remote_conda} python tools/host.py cli {format_shell_args(rest)}"
+            )
+            return self.run_ssh(
+                remote_cmd,
+                extra_ssh_opts=[
+                    "-R",
+                    f"{LOCAL_HOST_DAEMON_PORT}:{LOCAL_HOST_DAEMON_ADDR}:{LOCAL_HOST_DAEMON_PORT}",
+                ],
+            ).returncode
+
+        if subcmd == "host":
+            if not rest:
+                print("Usage: tools/anvil host <subcommand...> [args...]")
+                return 1
+            self.acquire_lock(f"host {' '.join(rest)}")
+            self.register_cleanup(self.release_lock)
+            rc = self.sync_code()
+            if rc != 0:
+                return rc
+            print(
+                f"🔌 Reverse proxying host command to local daemon "
+                f"({LOCAL_HOST_DAEMON_ADDR}:{LOCAL_HOST_DAEMON_PORT}) and executing on {self.ssh_target}..."
+            )
+            remote_cmd = (
+                f"cd {self.remote_dir} && {REMOTE_CARGO_PATH} "
+                f"&& {self.remote_conda} python tools/host.py {format_shell_args(rest)}"
+            )
+            return self.run_ssh(
+                remote_cmd,
+                extra_ssh_opts=[
+                    "-R",
+                    f"{LOCAL_HOST_DAEMON_PORT}:{LOCAL_HOST_DAEMON_ADDR}:{LOCAL_HOST_DAEMON_PORT}",
+                ],
+            ).returncode
+
+        if subcmd == "simulate":
+            self.acquire_lock(f"simulate {' '.join(rest)}".strip())
+            self.register_cleanup(self.release_lock)
+            self.register_cleanup(self.kill_remote_daemon)
+            self.kill_remote_daemon()
+            rc = self.sync_code()
+            if rc != 0:
+                return rc
+            print(f"🌊 Running simulation on {self.ssh_target}...")
+            cmd_suffix = f" {format_shell_args(rest)}" if rest else ""
+            sim_rc = self.run_ssh(
+                f"cd {self.remote_dir} && {REMOTE_CARGO_PATH} && {self.remote_conda} python tools/scope.py{cmd_suffix}"
+            ).returncode
+            if sim_rc == 0:
+                self.auto_download_simulate(rest)
+            return sim_rc
+
+        if subcmd == "smoke":
+            self.acquire_lock(f"smoke {' '.join(rest)}".strip())
+            self.register_cleanup(self.release_lock)
+            self.register_cleanup(self.kill_remote_daemon)
+            self.kill_remote_daemon()
+            rc = self.sync_code()
+            if rc != 0:
+                return rc
+            print(f"🚀 Running smoke test suite on {self.ssh_target}...")
+            return self.run_ssh(
+                f"cd {self.remote_dir} && {REMOTE_CARGO_PATH} && {self.remote_conda} pytest -n 0 tools/smoke.py"
+            ).returncode
+
+        run_tokens = rest if subcmd in ("run", "exec") else list(argv)
+        self.acquire_lock(f"run {' '.join(run_tokens)}".strip())
+        self.register_cleanup(self.release_lock)
+        rc = self.sync_code()
+        if rc != 0:
+            return rc
+        joined_cmd = " ".join(run_tokens)
+        print(f"⚡ Executing command on {self.ssh_target}: {joined_cmd}")
+        return self.run_ssh(
+            f"cd {self.remote_dir} && {REMOTE_CARGO_PATH} && {self.remote_conda} {joined_cmd}"
+        ).returncode
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    """Entry point for `tools/anvil`."""
+    runner = AnvilRunner()
+    atexit.register(runner.run_cleanups)
+
+    def _handle_signal(signum: int, _frame: object) -> None:
+        runner.run_cleanups()
+        sys.exit(128 + signum)
+
+    signal.signal(signal.SIGINT, _handle_signal)
+    signal.signal(signal.SIGTERM, _handle_signal)
+    try:
+        return runner.dispatch(list(sys.argv[1:] if argv is None else argv))
+    finally:
+        runner.run_cleanups()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

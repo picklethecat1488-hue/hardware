@@ -588,10 +588,12 @@ def test_room_simulate_loop_optimization():
     room = Room()
     room.add("item", Box(1, 1, 1))
 
+    from model.simulation import SimulationStepResult
+
     # Mock setup, step, teardown hooks
     hooks = {
         Simulate.SETUP: MagicMock(),
-        Simulate.STEP: MagicMock(return_value=None),
+        Simulate.STEP: MagicMock(return_value=SimulationStepResult()),
     }
 
     from provider.bullet import Bullet
@@ -850,7 +852,7 @@ def test_room_log_rerun_show_boundary_voxels(monkeypatch):
         assert not any("world/boundaries" in p for p in logged_paths)
 
     with patch("rerun.log") as mock_rr_log:
-        # Enabled: True
+        # Enabled: True, plus verify centralized metrics/<name> logging
         monkeypatch.setenv("SHOW_BOUNDARY_VOXELS", "1")
         room._log_rerun(
             transforms={},
@@ -858,10 +860,13 @@ def test_room_log_rerun_show_boundary_voxels(monkeypatch):
             particle_colors=None,
             particle_radii=None,
             boundary_voxels=boundary_voxels,
+            metrics={"flow_spout": 12, "water_depth": 0.042},
             step_idx=0,
         )
         logged_paths = [call[0][0] for call in mock_rr_log.call_args_list]
         assert any("world/boundaries/lid" in p for p in logged_paths)
+        assert "metrics/flow_spout" in logged_paths
+        assert "metrics/water_depth" in logged_paths
 
 
 def test_room_step_support(tmp_path):

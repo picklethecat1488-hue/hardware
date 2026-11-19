@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import os
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pybullet as p
 import yaml
@@ -22,8 +22,9 @@ from model.simulation import (
     FlyingProbeMutualCapCheckModel,
     FlyingProbeReportModel,
     FlyingProbeStepReportModel,
+    SimulationStepResult,
 )
-from provider import Simulate, rerun_is_enabled
+from provider import Simulate, SimulateHooks, rerun_is_enabled
 from provider.bullet import _is_real_physics_client
 
 
@@ -608,7 +609,7 @@ def create_flying_probe_hooks(
     provider: Any,
     sim_name: str,
     test_steps_path: Optional[Path | str] = None,
-) -> Dict[Simulate, Callable[..., Any]]:
+) -> SimulateHooks:
     """Return flying probe simulation and electrical verification hooks.
 
     Args:
@@ -845,11 +846,11 @@ def create_flying_probe_hooks(
 
         sim_state["obstacle_ids"] = obstacle_ids
 
-    def step_simulation(body_id: int, client: int, step_idx: int, name: str) -> Optional[str]:
+    def step_simulation(body_id: int, client: int, step_idx: int, name: str) -> SimulationStepResult:
         sim_state["current_step_idx"] = step_idx
         num_tests = len(test_steps)
         if num_tests == 0:
-            return None
+            return SimulationStepResult()
 
         # Allocate simulation steps across the test steps
         steps_per_test = sim_state["steps_per_test"]
@@ -1012,9 +1013,11 @@ def create_flying_probe_hooks(
             out_rpt = Path(f"build/{proj_folder}/{target_label}_flying_probe_report.md")
             out_rpt.parent.mkdir(parents=True, exist_ok=True)
             out_rpt.write_text(report_md, encoding="utf-8")
-            return f"All {num_tests} flying probe test points completed successfully"
+            return SimulationStepResult(
+                termination_condition=f"All {num_tests} flying probe test points completed successfully"
+            )
 
-        return None
+        return SimulationStepResult()
 
     return {
         Simulate.SETUP: setup_simulation,

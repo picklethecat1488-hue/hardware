@@ -6,6 +6,8 @@
 
 import { clearChildren, createEl, resolveElement } from "../core/dom.js";
 import { showToast } from "../core/toast.js";
+import { COMMENT_STATUS, isCommentVisible, resolveCommentStatus } from "./comment_threads.js";
+import { commentMatchesCommit } from "./file_tree.js";
 
 const VERDICT_RETURN_DELAY_MS = 800;
 
@@ -66,10 +68,22 @@ export function updateSessionMetricsUI(ctx, state, config = {}) {
     progressEl.textContent = `${reviewedCount}/${totalCount} (${pct}%)`;
   }
 
-  const comments = Array.isArray(state.session.comments) ? state.session.comments : [];
+  const showClosedCb = resolveElement(ctx, "showClosedCommentsCb");
+  const showClosed = showClosedCb ? Boolean(showClosedCb.checked) : false;
+  const allComments = Array.isArray(state.session.comments) ? state.session.comments : [];
+  const scopedComments = state.selectedCommit
+    ? allComments.filter((c) => commentMatchesCommit(c, state.selectedCommit))
+    : allComments;
+  const comments = scopedComments.filter((c) => isCommentVisible(c, showClosed));
+  const openCount = comments.filter(
+    (c) => resolveCommentStatus(c) === COMMENT_STATUS.OPEN,
+  ).length;
   const commentsCountEl = resolveElement(ctx, "commentsCountText");
   if (commentsCountEl) {
-    commentsCountEl.textContent = `${comments.length} findings`;
+    commentsCountEl.textContent =
+      openCount < comments.length
+        ? `${comments.length} findings (${openCount} open)`
+        : `${comments.length} findings`;
   }
 
   const counts = { MUST_FIX: 0, PROPOSAL: 0, NIT: 0 };

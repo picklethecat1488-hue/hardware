@@ -15,6 +15,76 @@ const FILE_REF_REGEX =
 const TRAILING_PUNCT_REGEX = /[.,;:!?)]+$/;
 const FENCED_CODE_REGEX = /```(\w*)\r?\n([\s\S]*?)```/g;
 const INLINE_CODE_REGEX = /`([^`\r\n]+)`/g;
+const CLOSED_CARD_OPACITY = "0.72";
+
+/**
+ * Canonical lifecycle statuses for Code Review comments.
+ */
+export const COMMENT_STATUS = Object.freeze({
+  OPEN: "OPEN",
+  RESOLVED: "RESOLVED",
+  CLOSED: "CLOSED",
+});
+
+/**
+ * Normalize the lifecycle status of a review comment (`OPEN`, `RESOLVED`, or `CLOSED`).
+ *
+ * Falls back to `comment.resolved ? "RESOLVED" : "OPEN"` when `comment.status` is absent.
+ *
+ * @param {object|null|undefined} comment - Review comment model.
+ * @returns {string} `"OPEN"` | `"RESOLVED"` | `"CLOSED"`.
+ */
+export function resolveCommentStatus(comment) {
+  if (!comment) {
+    return COMMENT_STATUS.OPEN;
+  }
+  const raw = String(comment.status || "").trim().toUpperCase();
+  if (raw === COMMENT_STATUS.CLOSED) {
+    return COMMENT_STATUS.CLOSED;
+  }
+  if (raw === COMMENT_STATUS.RESOLVED) {
+    return COMMENT_STATUS.RESOLVED;
+  }
+  if (raw === COMMENT_STATUS.OPEN) {
+    return comment.resolved ? COMMENT_STATUS.RESOLVED : COMMENT_STATUS.OPEN;
+  }
+  return comment.resolved ? COMMENT_STATUS.RESOLVED : COMMENT_STATUS.OPEN;
+}
+
+/**
+ * Determine whether `comment` should be displayed in active diff/file views.
+ *
+ * `OPEN` and `RESOLVED` comments are always visible; `CLOSED` comments are hidden
+ * unless `showClosed` is enabled.
+ *
+ * @param {object|null|undefined} comment - Review comment model.
+ * @param {boolean} [showClosed] - Whether closed comments should be shown.
+ * @returns {boolean} True when comment should be displayed.
+ */
+export function isCommentVisible(comment, showClosed = false) {
+  if (showClosed) {
+    return true;
+  }
+  return resolveCommentStatus(comment) !== COMMENT_STATUS.CLOSED;
+}
+
+/**
+ * Resolve badge CSS class and display label for a comment lifecycle status.
+ *
+ * @param {string} status - `"OPEN"` | `"RESOLVED"` | `"CLOSED"`.
+ * @returns {{badgeClass: string, displayLabel: string}}
+ */
+export function resolveStatusBadge(status) {
+  const upper = String(status || "").toUpperCase();
+  switch (upper) {
+    case COMMENT_STATUS.RESOLVED:
+      return { badgeClass: "quake-badge-green", displayLabel: "RESOLVED" };
+    case COMMENT_STATUS.CLOSED:
+      return { badgeClass: "quake-badge-default", displayLabel: "CLOSED" };
+    default:
+      return { badgeClass: "quake-badge-amber", displayLabel: "OPEN" };
+  }
+}
 
 /**
  * Reverse basic HTML entity escaping inside fenced code blocks prior to syntax highlighting.
@@ -154,13 +224,14 @@ export function resolveSeverityBadge(severity) {
 
 /**
  * Build a `.inline-comment-card` DOM element for an inline diff comment with delegated
- * Edit, Delete, and `@file:line` reference click handlers.
+ * lifecycle status (`Resolve`, `Close`, `Reopen`), Edit, Delete, and `@file:line` handlers.
  *
  * @param {import("../core/runtime_context.js").RuntimeContext} ctx - Runtime context.
- * @param {object} comment - Review comment model (`id`, `severity`, `start_line`, `end_line`, `author`, `created_at`, `body`, `code_snippet`).
+ * @param {object} comment - Review comment model (`id`, `severity`, `status`, `resolved`, `start_line`, `end_line`, `author`, `created_at`, `body`, `code_snippet`, `resolution_notes`).
  * @param {object} [options] - Card rendering options.
  * @param {string} [options.language] - Active file language for snippet/code highlighting.
  * @param {Array<string>} [options.authorBlacklist] - Dynamic personal tokens to redact.
+ * @param {Function|null} [options.onStatusChange] - `(commentId, newStatus) => void` callback.
  * @param {Function|null} [options.onEdit] - `(commentId) => void` callback.
  * @param {Function|null} [options.onDelete] - `(commentId) => void` callback.
  * @param {Function|null} [options.onGotoRef] - `(filePath, lineNo) => void` callback.
@@ -170,6 +241,9 @@ export function createInlineCommentCard(ctx, comment, options = {}) {
   const language = options.language || "plaintext";
   const blacklist = options.authorBlacklist || [];
   const { badgeClass, displayLabel } = resolveSeverityBadge(comment.severity);
+  const commentStatus = resolveCommentStatus(comment);
+  const { badgeClass: statusBadgeClass, displayLabel: statusLabel } =
+    resolveStatusBadge(commentStatus);
 
   const startLine = Number(comment.start_line || 1);
   const endLine = Number(comment.end_line || startLine);
@@ -178,6 +252,80 @@ export function createInlineCommentCard(ctx, comment, options = {}) {
   const safeAuthor = sanitizeAuthor(comment.author, blacklist);
   const createdRaw = String(comment.created_at || "");
   const timePart = createdRaw.length >= 19 ? ` (${createdRaw.slice(11, 19)})` : "";
+  const cidStr = String(comment.id || "");
+
+  const actionButtons = [];
+  if (commentStatus === COMMENT_STATUS.OPEN) {
+    actionButtons.push(
+      createEl(ctx, "button", {
+        className: "quake-btn quake-btn-green",
+        style: { padding: "1px 6px", fontSize: "8px" },
+        attrs: { type: "button", title: "Mark comment as RESOLVED" },
+        dataset: {
+          action: "set-comment-status",
+          status: COMMENT_STATUS.RESOLVED,
+          commentId: cidStr,
+        },
+        text: "Resolve ✓",
+      }),
+    );
+  } else if (commentStatus === COMMENT_STATUS.RESOLVED) {
+    actionButtons.push(
+      createEl(ctx, "button", {
+        className: "quake-btn quake-btn-cyan",
+        style: { padding: "1px 6px", fontSize: "8px" },
+        attrs: { type: "button", title: "Verify and CLOSE resolved comment" },
+        dataset: {
+          action: "set-comment-status",
+          status: COMMENT_STATUS.CLOSED,
+          commentId: cidStr,
+        },
+        text: "Close ✓✓",
+      }),
+      createEl(ctx, "button", {
+        className: "quake-btn quake-btn-default",
+        style: { padding: "1px 6px", fontSize: "8px" },
+        attrs: { type: "button", title: "Reopen comment to OPEN" },
+        dataset: {
+          action: "set-comment-status",
+          status: COMMENT_STATUS.OPEN,
+          commentId: cidStr,
+        },
+        text: "Reopen ↺",
+      }),
+    );
+  } else {
+    actionButtons.push(
+      createEl(ctx, "button", {
+        className: "quake-btn quake-btn-default",
+        style: { padding: "1px 6px", fontSize: "8px" },
+        attrs: { type: "button", title: "Reopen closed comment to OPEN" },
+        dataset: {
+          action: "set-comment-status",
+          status: COMMENT_STATUS.OPEN,
+          commentId: cidStr,
+        },
+        text: "Reopen ↺",
+      }),
+    );
+  }
+
+  actionButtons.push(
+    createEl(ctx, "button", {
+      className: "quake-btn quake-btn-default",
+      style: { padding: "1px 6px", fontSize: "8px" },
+      attrs: { type: "button" },
+      dataset: { action: "edit-comment", commentId: cidStr },
+      text: "Edit ✎",
+    }),
+    createEl(ctx, "button", {
+      className: "quake-btn quake-btn-default",
+      style: { padding: "1px 6px", fontSize: "8px" },
+      attrs: { type: "button" },
+      dataset: { action: "delete-comment", commentId: cidStr },
+      text: "Delete ✕",
+    }),
+  );
 
   const children = [
     createEl(ctx, "div", {
@@ -189,6 +337,11 @@ export function createInlineCommentCard(ctx, comment, options = {}) {
             createEl(ctx, "span", {
               className: `quake-badge ${badgeClass}`,
               text: `[${displayLabel}]`,
+            }),
+            createEl(ctx, "span", {
+              className: `quake-badge ${statusBadgeClass}`,
+              dataset: { commentStatus },
+              text: `[${statusLabel}]`,
             }),
             createEl(ctx, "span", {
               style: { fontSize: "9px", color: "var(--quake-gold)", fontWeight: "700" },
@@ -203,22 +356,7 @@ export function createInlineCommentCard(ctx, comment, options = {}) {
         }),
         createEl(ctx, "div", {
           style: { display: "flex", alignItems: "center", gap: "4px" },
-          children: [
-            createEl(ctx, "button", {
-              className: "quake-btn quake-btn-default",
-              style: { padding: "1px 6px", fontSize: "8px" },
-              attrs: { type: "button" },
-              dataset: { action: "edit-comment", commentId: String(comment.id || "") },
-              text: "Edit ✎",
-            }),
-            createEl(ctx, "button", {
-              className: "quake-btn quake-btn-default",
-              style: { padding: "1px 6px", fontSize: "8px" },
-              attrs: { type: "button" },
-              dataset: { action: "delete-comment", commentId: String(comment.id || "") },
-              text: "Delete ✕",
-            }),
-          ],
+          children: actionButtons,
         }),
       ],
     }),
@@ -243,9 +381,31 @@ export function createInlineCommentCard(ctx, comment, options = {}) {
   bodyEl.innerHTML = renderCommentBody(ctx, String(comment.body || ""), language);
   children.push(bodyEl);
 
+  if (comment.resolution_notes && String(comment.resolution_notes).trim()) {
+    const notesEl = createEl(ctx, "div", {
+      className: "inline-comment-resolution",
+      style: {
+        marginTop: "6px",
+        paddingTop: "4px",
+        borderTop: "1px dashed var(--quake-border)",
+        fontSize: "9px",
+        color: "var(--quake-green)",
+      },
+    });
+    notesEl.innerHTML = `<strong>Resolution:</strong> ${renderCommentBody(
+      ctx,
+      String(comment.resolution_notes).trim(),
+      language,
+    )}`;
+    children.push(notesEl);
+  }
+
+  const cardStyle =
+    commentStatus === COMMENT_STATUS.CLOSED ? { opacity: CLOSED_CARD_OPACITY } : undefined;
   const card = createEl(ctx, "div", {
     className: "inline-comment-card",
-    dataset: { commentId: String(comment.id || "") },
+    style: cardStyle,
+    dataset: { commentId: cidStr, commentStatus },
     children,
   });
 
@@ -257,10 +417,15 @@ export function createInlineCommentCard(ctx, comment, options = {}) {
   bindDelegatedEvent(card, "click", "[data-action]", (event, actionEl) => {
     event.stopPropagation();
     const action = actionEl.dataset.action;
-    if (action === "edit-comment" && typeof options.onEdit === "function") {
-      options.onEdit(actionEl.dataset.commentId || String(comment.id || ""));
+    if (action === "set-comment-status" && typeof options.onStatusChange === "function") {
+      options.onStatusChange(
+        actionEl.dataset.commentId || cidStr,
+        actionEl.dataset.status || COMMENT_STATUS.RESOLVED,
+      );
+    } else if (action === "edit-comment" && typeof options.onEdit === "function") {
+      options.onEdit(actionEl.dataset.commentId || cidStr);
     } else if (action === "delete-comment" && typeof options.onDelete === "function") {
-      options.onDelete(actionEl.dataset.commentId || String(comment.id || ""));
+      options.onDelete(actionEl.dataset.commentId || cidStr);
     } else if (action === "goto-ref" && typeof options.onGotoRef === "function") {
       const targetFile = actionEl.dataset.file || "";
       const rawLine = actionEl.dataset.line;
@@ -270,6 +435,24 @@ export function createInlineCommentCard(ctx, comment, options = {}) {
   });
 
   return card;
+}
+
+/**
+ * Update the lifecycle status (`OPEN`, `RESOLVED`, `CLOSED`) of an existing review comment
+ * via `POST /api/comment/status`.
+ *
+ * @param {import("../core/runtime_context.js").RuntimeContext} ctx - Runtime context.
+ * @param {string} commentId - Target comment ID.
+ * @param {string} status - `"OPEN"` | `"RESOLVED"` | `"CLOSED"`.
+ * @param {string} [notes] - Optional resolution/acceptance/reopen notes.
+ * @returns {Promise<object>} Parsed JSON response.
+ */
+export async function updateReviewCommentStatus(ctx, commentId, status, notes = "") {
+  const payload = { id: commentId, status };
+  if (notes) {
+    payload.notes = notes;
+  }
+  return ctx.postJson("/api/comment/status", payload);
 }
 
 /**
