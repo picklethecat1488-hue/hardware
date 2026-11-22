@@ -28,7 +28,7 @@ mamba env create -f environment.yml && conda activate cq
 
 python tools/scope.py          # Launch interactive CAD / PCB / Simulation / Diagram workstation
 python tools/forge.py          # Launch VCS Diff / Smartlog / Code Review / Bug Tracker workstation
-./tools/verify.sh              # Run full pre-commit verification (Python, Ruff, JS lint, Node & Pytest)
+./tools/verify.py              # Run full pre-commit verification (Python, Ruff, JS lint, Node & Pytest)
 ```
 
 For full CLI flags, target syntax, build commands, and test runners, see **[CLI Tools, Build & Workstation Workflows](docs/cli_and_workflows.md)**.
@@ -48,7 +48,7 @@ For full CLI flags, target syntax, build commands, and test runners, see **[CLI 
 
 ## Documentation Index
 
-- **[CLI Tools, Build & Workstation Workflows](docs/cli_and_workflows.md)** — Environment setup, target specifiers, `build.py`, `config.py`, `list.py`, `scope.py`, `forge.py`, and `./tools/verify.sh`.
+- **[CLI Tools, Build & Workstation Workflows](docs/cli_and_workflows.md)** — Environment setup, target specifiers, `build.py`, `config.py`, `list.py`, `scope.py`, `forge.py`, and `./tools/verify.py`.
 - **[Declarative Wiring & PCB Engine](docs/declarative_wiring_pcb.md)** — `build123d` component footprints, declarative netlists & trace routing, schematic sheets, DRC, and headless `kicad-cli` CAM generation.
 - **[JavaScript Style, Zero-Globals & CAD Viewport Architecture](docs/javascript_style_architecture.md)** — Modular `js/` ES architecture, strict `runtime_context.js` global isolation, GPU SDF PCB shaders, and parallel `node --test` suites.
 - **[Physics & URDF Simulation Guidelines](docs/physics_urdf_simulation.md)** — Kinematic joints, `URDFMetadata` / `URDFBoundary` CAD-derived collision primitives, and PyBullet simulation hooks.

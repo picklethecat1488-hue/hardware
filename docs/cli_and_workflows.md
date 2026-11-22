@@ -1,6 +1,6 @@
 # CLI Tools, Build & Workstation Workflows
 
-This guide covers environment setup, target syntax, CAD/PCB compilation, interactive visualization in Scope (`tools/scope.py`), VCS/review/bug tracking in Forge (`tools/forge.py`), and pre-commit verification (`./tools/verify.sh`).
+This guide covers environment setup, target syntax, CAD/PCB compilation, interactive visualization in Scope (`tools/scope.py`), VCS/review/bug tracking in Forge (`tools/forge.py`), and pre-commit verification (`./tools/verify.py`).
 
 ---
 
@@ -143,23 +143,23 @@ See [VCS Workstation, Code Review & Quake HUD Templates](vcs_code_review.md) and
 
 ## 6. Pre-Commit Verification, Testing & Cloud Execution
 
-Run `./tools/verify.sh` before committing changes to execute Python syntax compilation, Ruff formatting & linting, JavaScript zero-globals & Jinja2 template validation (`tools/validate_js.py`), parallel `node --test` suites, and parallel `pytest`:
+Run `./tools/verify.py` before committing changes to execute Python syntax compilation, Ruff formatting & linting, JavaScript zero-globals & Jinja2 template validation (`tools/validate_js.py`), parallel `node --test` suites, and parallel `pytest`:
 
 ```bash
 # Full pre-commit verification (auto-resolves the cq conda environment)
-./tools/verify.sh
+./tools/verify.py
 
 # Auto-format & auto-fix Ruff lint issues before running checks
-./tools/verify.sh --fix
+./tools/verify.py --fix
 
 # Fast static + JS lint + parallel JS unit tests only (skips pytest)
-./tools/verify.sh --quick
+./tools/verify.py --quick
 
 # Include @pytest.mark.slow 3D CAD boolean & PyBullet/JAX SPH simulation suites
-./tools/verify.sh --slow
+./tools/verify.py --slow
 
 # Include end-to-end CLI & HTTP workstation smoke tests (python tools/smoke.py)
-./tools/verify.sh --smoke
+./tools/verify.py --smoke
 
 # Offload verification, pytest, or GPU fluid simulations to the remote anvil cloud server
 tools/anvil verify
